@@ -1,0 +1,69 @@
+{
+  "project": "Livistone",
+  "concept": "01-garden-town",
+  "date": "2026-09-16",
+  "generation_method": "built-in image_gen",
+  "source_repository": "../livia",
+  "lore_source": "content/art-design/2_Livia Lore.md",
+  "assumptions": {
+    "rendering": "Believable architectural concept art",
+    "scale": "Intimate walkable town",
+    "livia_personal_home": "Undecided"
+  },
+  "roles": {
+    "nut_of_power": "City Hall",
+    "mitoring": "Ministry of Energy",
+    "nanot": "Ministry of Science"
+  },
+  "images": [
+    {
+      "id": "01-town-overview",
+      "status": "generated",
+      "file": "images/01-town-overview.png",
+      "prompt": "prompts/01-town-overview.txt",
+      "width": 1536,
+      "height": 1024,
+      "source_references": [
+        "../livia/assets/RJW2025/IMG_3493.jpg",
+        "../livia/assets/RJW2025/IMG_3475.jpg",
+        "../livia/assets/RJW2025/IMG_3433.jpg"
+      ],
+      "original_output": "/home/antonkulaga/.codex/generated_images/01a0aa43-c540-74a2-8451-830315b90b83/exec-af2f77d3-5809-4b0c-85c1-336d0cd11612.png"
+    },
+    {
+      "id": "02-city-hall",
+      "status": "blocked_usage_limit",
+      "prompt": "prompts/02-city-hall.txt",
+      "references": [
+        "concepts/01-garden-town/images/01-town-overview.png",
+        "../livia/assets/RJW2025/IMG_3496.jpg"
+      ]
+    },
+    {
+      "id": "03-ministry-of-energy",
+      "status": "prompt_ready_not_submitted",
+      "prompt": "prompts/03-ministry-of-energy.txt",
+      "references": [
+        "concepts/01-garden-town/images/01-town-overview.png",
+        "../livia/assets/RJW2025/IMG_3475.jpg",
+        "../livia/assets/RJW2025/IMG_3480.jpg"
+      ]
+    },
+    {
+      "id": "04-ministry-of-science",
+      "status": "prompt_ready_not_submitted",
+      "prompt": "prompts/04-ministry-of-science.txt",
+      "references": [
+        "concepts/01-garden-town/images/01-town-overview.png",
+        "../livia/assets/RJW2025/IMG_3433.jpg",
+        "../livia/assets/RJW2025/IMG_3434.jpg"
+      ]
+    }
+  ],
+  "path_notes": "image file and prompt paths are relative to this record. All reference paths are relative to the Livistone repository root. Original output is the preserved built-in tool output.",
+  "blocker": {
+    "type": "usage_limit_reached",
+    "reset_unix_seconds": 1789580413,
+    "api_fallback": "Not invoked; key not configured in checked environment/workspace .env files."
+  }
+}
