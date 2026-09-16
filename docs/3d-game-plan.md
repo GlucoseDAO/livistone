@@ -1,6 +1,6 @@
 # Livistone: browser game implementation plan
 
-Status: implementation plan following the design interview, 16 September 2026. The user approved the visual direction and confirmed exploration/lore, first-person walking plus a 3D aerial map, and desktop/mobile support from the start. Original STL models and possibly Grasshopper files will be supplied later. The engine choice below is made under the user's delegation. No game implementation has started.
+Status: implementation plan following the design interview, 16 September 2026. The user approved the visual direction and confirmed exploration/lore, first-person walking plus a 3D aerial map, and desktop/mobile support from the start. Original STL models and possibly Grasshopper files will be supplied later. The engine choice below is made under the user's delegation. A first procedural prototype now implements town walking, the bridge, ground-floor interiors for all three landmarks, six discoveries, two artifact interactions, local journal persistence, an aerial map, and desktop/touch input. See the README for Bun setup and running instructions. The multi-room interiors, authored GLB assets, and physical-device performance targets below remain roadmap work.
 
 ## 1. Product direction
 

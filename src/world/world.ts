@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import type { ColliderSpec } from '../game/physics';
+import { jewelryCage } from './jewelry';
+import { Forest } from './forest';
 import { LANDMARKS } from '../game/content';
 
 export interface Interactive { id: string; object: THREE.Object3D; position: THREE.Vector3; }
@@ -25,7 +27,7 @@ function ribbon(curve: THREE.Curve<THREE.Vector3>, width: number, steps = 80): T
     const t = i / steps, p = curve.getPoint(t), tangent = curve.getTangent(t);
     const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize().multiplyScalar(width / 2);
     for (const side of [-1, 1]) { vertices.push(p.x + normal.x * side, p.y, p.z + normal.z * side); uv.push(t * 10, (side + 1) / 2); }
-    if (i < steps) { const n = i * 2; indices.push(n, n + 2, n + 1, n + 1, n + 2, n + 3); }
+    if (i < steps) { const n = i * 2; indices.push(n, n + 1, n + 2, n + 1, n + 3, n + 2); }
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(indices); g.computeVertexNormals(); return g;
 }
@@ -72,7 +74,7 @@ export class Town {
     this.water = new THREE.ShaderMaterial({
       uniforms: { time: { value: 0 }, tint: { value: new THREE.Color('#68a3a0') } },
       vertexShader: 'varying vec3 vPosition; void main(){vPosition=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-      fragmentShader: 'uniform float time; uniform vec3 tint; varying vec3 vPosition; void main(){float waves=sin(vPosition.x*2.4+vPosition.z*4.0-time*1.1)*sin(vPosition.x*.7-vPosition.z*2.8-time*.7); float sparkle=pow(max(0.0,waves),12.0); gl_FragColor=vec4(tint*(.88+.10*waves)+vec3(.40)*sparkle,1.0); #include <tonemapping_fragment>\n #include <colorspace_fragment>\n }',
+      fragmentShader: 'uniform float time; uniform vec3 tint; varying vec3 vPosition; void main(){float waves=sin(vPosition.x*2.4+vPosition.z*4.0-time*1.1)*sin(vPosition.x*.7-vPosition.z*2.8-time*.7); float sparkle=pow(max(0.0,waves),12.0); gl_FragColor=vec4(tint*(.88+.10*waves)+vec3(.40)*sparkle,1.0);\n#include <tonemapping_fragment>\n #include <colorspace_fragment>\n }',
       side: THREE.DoubleSide,
     });
     this.createTerrain(); this.createPaths(); this.createBridge();
@@ -84,7 +86,7 @@ export class Town {
     const pos = geo.getAttribute('position'); const colors: number[] = []; const color = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i); pos.setY(i, terrainHeight(x, z));
-      color.setHSL(0.235 + Math.sin(x * 0.3) * 0.015, 0.25 + Math.sin(z) * 0.03, 0.36 + Math.sin(x * 0.12 + z * 0.08) * 0.045);
+      color.setHSL(0.235 + Math.sin(x * 0.3) * 0.015, 0.42 + Math.sin(z) * 0.03, 0.13 + Math.sin(x * 0.12 + z * 0.08) * 0.028);
       colors.push(color.r, color.g, color.b);
     }
     geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geo.computeVertexNormals();
@@ -136,15 +138,15 @@ export class Town {
   private createLandmark(id: string, x: number, z: number): void {
     const exterior = new THREE.Group(); exterior.position.set(x, 0.16, z); this.root.add(exterior);
     const inside = new THREE.Group(); inside.position.copy(exterior.position); this.interiors.add(inside);
-    const radius = id === 'city-hall' ? 10 : 8.5; const centerY = id === 'city-hall' ? 5.7 : 4.3;
-    const sx = id === 'energy' ? 1.12 : 1; const sz = id === 'energy' ? 0.95 : 1;
+    const radius = id === 'science' ? 8.5 : 10; const centerY = id === 'energy' ? 6.8 : id === 'science' ? 6 : 5.7;
+    const sx = id === 'energy' ? 0.73 : 1; const sz = id === 'energy' ? 0.56 : 1;
     const floorR = Math.sqrt(radius * radius - centerY * centerY);
     const maxTheta = Math.acos(-centerY / radius); const doorwayTheta = Math.acos((3.1 - centerY) / radius);
-    const glass = new THREE.MeshPhysicalMaterial({ color: id === 'energy' ? '#dda53e' : id === 'city-hall' ? '#bbbabd' : '#b6d6ce', metalness: 0.05, roughness: 0.16, transmission: this.mobile ? 0 : 0.45, thickness: 0.25, transparent: true, opacity: this.mobile ? 0.32 : 0.65, side: THREE.DoubleSide, depthWrite: false });
+    const glass = new THREE.MeshPhysicalMaterial({ color: id === 'energy' ? '#c47816' : id === 'city-hall' ? '#bbbabd' : '#b4bdb8', metalness: 0.05, roughness: 0.16, transmission: this.mobile ? 0 : 0.45, thickness: 0.25, transparent: true, opacity: this.mobile ? 0.32 : 0.65, side: THREE.DoubleSide, depthWrite: false });
     const wood = this.wood.clone(); wood.side = THREE.DoubleSide;
     const halves = id === 'city-hall' ? [{ start: 0, length: Math.PI, mat: wood }, { start: Math.PI, length: Math.PI, mat: glass }] : [{ start: 0, length: TAU, mat: glass }];
     for (const half of halves) {
-      this.surface(half.start, half.length, 0.01, doorwayTheta - 0.01, radius, centerY, half.mat, exterior, sx, sz);
+      if (id !== 'science') this.surface(half.start, half.length, 0.01, doorwayTheta - 0.01, radius, centerY, half.mat, exterior, sx, sz);
       const start = Math.max(0.29, half.start); const end = Math.min(TAU - 0.29, half.start + half.length);
       if (end > start) this.surface(start, end - start, doorwayTheta, maxTheta - doorwayTheta, radius, centerY, half.mat, exterior, sx, sz);
     }
@@ -175,32 +177,8 @@ export class Town {
       const belt = Array.from({ length: 49 }, (_, j) => this.shellPoint(j / 48 * TAU, 1.36, radius + 0.06, centerY)); lineTube(belt, 0.12, this.gold, exterior);
       // Walnut pendant's loop becomes a small sculptural crown.
       const loop = mesh(new THREE.TorusGeometry(1.05, 0.17, 8, 32), this.gold, exterior, 0, 16.5, 0); loop.scale.set(0.65, 1, 1);
-    } else if (id === 'energy') {
-      for (let i = 0; i < 9; i++) {
-        const pts = Array.from({ length: 42 }, (_, j) => {
-          const t = j / 41; const phi = i / 9 * TAU + Math.sin(t * Math.PI * 5.5) * 0.25;
-          return this.shellPoint(phi, 0.1 + t * (maxTheta - 0.1), radius + 0.14, centerY, sx, sz);
-        });
-        lineTube(pts, 0.21, this.silver, exterior);
-      }
-      const ring = mesh(new THREE.TorusGeometry(11.2, 0.16, 8, 64, Math.PI * 1.3), this.silver, exterior, 0, 2.95, 0); ring.rotation.x = Math.PI / 2; ring.rotation.z = -0.5;
-      for (const angle of [-1.2, -0.4, 0.4, 1.2]) {
-        const px = Math.sin(angle) * 11.2, pz = Math.cos(angle) * 11.2;
-        lineTube([new THREE.Vector3(px, 0, pz), new THREE.Vector3(px * 0.96, 2, pz * 0.96), new THREE.Vector3(px, 3, pz)], 0.1, this.white, exterior);
-      }
-    } else {
-      for (let i = 0; i < 11; i++) {
-        const pts = Array.from({ length: 12 }, (_, j) => {
-          const phi = i / 11 * TAU + (j % 2 ? 0.12 : -0.12);
-          return this.shellPoint(phi, 0.12 + j / 11 * (maxTheta - 0.12), radius + 0.22, centerY);
-        });
-        lineTube(pts, 0.19, this.silver, exterior, false);
-      }
-      for (const [phi, theta] of [[0.8, 0.8], [3.1, 1.1], [4.5, 0.75]]) {
-        const p = this.shellPoint(phi, theta, radius, centerY); const orb = mesh(this.sphere, this.dark, exterior, p.x, p.y, p.z); orb.scale.setScalar(0.85);
-      }
-    }
-    this.createInterior(id, inside, x, z, floorR);
+    } else jewelryCage(id as 'energy' | 'science', exterior, radius, centerY, sx, sz);
+    this.createInterior(id, inside, x, z, floorR * Math.min(sx, sz));
   }
   private createInterior(id: string, group: THREE.Group, x: number, z: number, floorR: number): void {
     const floorInset = mesh(new THREE.CircleGeometry(floorR * 0.87, 56), new THREE.MeshStandardMaterial({ color: '#ddd7c4', roughness: 0.95 }), group, 0, 0.14); floorInset.rotation.x = -Math.PI / 2;
@@ -259,28 +237,17 @@ export class Town {
     if (Math.abs(z + 24) < 9 && Math.abs(x) > 40 && Math.abs(x) < 60) return false;
     return true;
   }
+  readonly forest = new Forest();
+  async loadVegetation(): Promise<void> { await this.forest.load(this.mobile); }
   private createTrees(): void {
     const rand = seeded(3974); const sites: THREE.Vector3[] = [];
-    for (let i = 0; i < 450; i++) {
+    for (let i = 0; i < 240; i++) {
       const x = (rand() - 0.5) * 185, z = (rand() - 0.5) * 155;
-      if (this.clearForTree(x, z)) sites.push(new THREE.Vector3(x, terrainHeight(x, z), z));
+      if (!this.clearForTree(x, z) || sites.some((p) => Math.hypot(p.x - x, p.z - z) < 7)) continue;
+      sites.push(new THREE.Vector3(x, terrainHeight(x, z), z));
+      if (Math.hypot(x, z) < 65) this.colliders.push({ type: 'box', position: [x, terrainHeight(x, z) + 2, z], size: [0.3, 2, 0.3] });
     }
-    const trunkMaterial = new THREE.MeshStandardMaterial({ color: '#695d42', roughness: 1 });
-    const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.35, 1, 7), trunkMaterial, sites.length);
-    const leaves = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 2), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 }), sites.length * 4);
-    const matrix = new THREE.Matrix4(), q = new THREE.Quaternion(); const color = new THREE.Color();
-    sites.forEach((p, i) => {
-      const height = 5 + rand() * 7, scale = 2.3 + rand() * 2.3;
-      matrix.compose(new THREE.Vector3(p.x, p.y + height * 0.4, p.z), q, new THREE.Vector3(1, height * 0.8, 1)); trunks.setMatrixAt(i, matrix);
-      for (let j = 0; j < 4; j++) {
-        const phi = j * 2.4;
-        const pos = new THREE.Vector3(p.x + Math.sin(phi) * scale * 0.5, p.y + height + (j === 0 ? scale * 0.4 : -0.5), p.z + Math.cos(phi) * scale * 0.5);
-        matrix.compose(pos, q, new THREE.Vector3(scale, scale * (0.85 + rand() * 0.3), scale)); leaves.setMatrixAt(i * 4 + j, matrix);
-        color.setHSL(0.22 + rand() * 0.06, 0.27 + rand() * 0.15, 0.25 + rand() * 0.1); leaves.setColorAt(i * 4 + j, color);
-      }
-      if (Math.hypot(p.x, p.z) < 65) this.colliders.push({ type: 'box', position: [p.x, p.y + 2, p.z], size: [0.25, 2, 0.25] });
-    });
-    trunks.castShadow = true; leaves.castShadow = true; leaves.receiveShadow = true; this.root.add(trunks, leaves);
+    this.forest.sites = sites; this.root.add(this.forest);
   }
   private createGardens(): void {
     const rand = seeded(58); const shrubs = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 }), 500);
@@ -291,7 +258,7 @@ export class Town {
       let x = l.x + Math.sin(a) * r, z = l.z + Math.cos(a) * r;
       if (Math.abs(x - l.x) < 4 && z > l.z) x += 5;
       const s = 0.35 + rand() * 0.75;
-      matrix.compose(new THREE.Vector3(x, s * 0.4, z), q, new THREE.Vector3(s, s * 0.7, s)); shrubs.setMatrixAt(i, matrix); color.setHSL(0.24 + rand() * 0.07, 0.3, 0.25 + rand() * 0.12); shrubs.setColorAt(i, color);
+      matrix.compose(new THREE.Vector3(x, s * 0.4, z), q, new THREE.Vector3(s, s * 0.7, s)); shrubs.setMatrixAt(i, matrix); color.setHSL(0.24 + rand() * 0.07, 0.4, 0.08 + rand() * 0.06); shrubs.setColorAt(i, color);
     }
     for (let i = 0; i < 600; i++) {
       const l = LANDMARKS[i % 3]; const a = rand() * TAU, r = 12.5 + rand() * 2;

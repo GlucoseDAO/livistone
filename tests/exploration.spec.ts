@@ -1,0 +1,76 @@
+import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
+interface Snapshot { ready: boolean; mode: string; position: { x: number; y: number; z: number }; yaw: number; interaction: string | null; progress: { discovered: string[] }; }
+const snapshot = (page: Page): Promise<Snapshot> => page.evaluate(() => (window as unknown as { __livistone: { snapshot(): Snapshot } }).__livistone.snapshot());
+const teleport = (page: Page, x: number, z: number, yaw = 0): Promise<void> => page.evaluate(({ x, z, yaw }) => (window as unknown as { __livistone: { teleport(x: number, z: number, yaw: number): void } }).__livistone.teleport(x, z, yaw), { x, z, yaw });
+
+test('explore City Hall, preserve position through map mode, and retain discoveries', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Enter Livistone' })).toBeEnabled({ timeout: 60000 });
+  await page.getByRole('button', { name: 'Enter Livistone' }).click();
+  await page.waitForFunction(() => (window as unknown as { __livistone: { snapshot(): Snapshot } }).__livistone.snapshot().mode === 'walking');
+  // The cursor must remain free; only a held left-button drag changes the view.
+  expect(await page.evaluate(() => document.pointerLockElement)).toBeNull();
+  const initial = await snapshot(page);
+  await page.mouse.move(650, 350); await page.mouse.move(750, 350);
+  expect((await snapshot(page)).yaw).toBe(initial.yaw);
+  await page.mouse.down(); await page.mouse.move(850, 350, { steps: 6 }); await page.mouse.up();
+  expect((await snapshot(page)).yaw).not.toBe(initial.yaw);
+  const dragged = await snapshot(page);
+  await page.mouse.move(650, 350); expect((await snapshot(page)).yaw).toBe(dragged.yaw);
+  await page.getByRole('button', { name: 'City map', exact: true }).click();
+  await expect(page.locator('#map-panel')).toBeVisible();
+  await page.getByRole('button', { name: 'Return to walking' }).click();
+  await teleport(page, 0, -9);
+  await page.keyboard.down('KeyW');
+  await expect.poll(async () => (await snapshot(page)).position.z, { timeout: 15000 }).toBeLessThan(-18.2);
+  await page.keyboard.up('KeyW');
+  await expect(page.locator('#location')).toHaveText('City Hall');
+  await expect(page.locator('#interact')).toBeVisible();
+  await page.keyboard.press('KeyE');
+  await expect(page.getByRole('heading', { name: 'One Nut to connect them all' })).toBeVisible();
+  await page.screenshot({ path: 'output/testing/city-hall-discovery.png' });
+  await page.getByRole('button', { name: 'Continue exploring' }).click();
+  const before = await snapshot(page);
+  await page.keyboard.press('KeyM');
+  await expect(page.locator('#map-panel')).toBeVisible();
+  await page.getByRole('button', { name: 'View Ministry of Science' }).click();
+  await expect(page.locator('#map-description')).toContainText('intricate silver lattice');
+  await page.screenshot({ path: 'output/testing/aerial-map-desktop.png' });
+  await page.getByRole('button', { name: 'Return to walking' }).click();
+  const after = await snapshot(page);
+  expect(after.position.x).toBeCloseTo(before.position.x, 1); expect(after.position.z).toBeCloseTo(before.position.z, 1); expect(after.yaw).toBeCloseTo(before.yaw, 4);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Enter Livistone' })).toBeEnabled({ timeout: 60000 });
+  expect((await snapshot(page)).progress.discovered).toContain('nut');
+  expect(errors).toEqual([]);
+});
+
+test('mobile layout, simultaneous touch look/movement, cancellation, and aerial map', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
+  const page = await context.newPage(); const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Enter Livistone' })).toBeEnabled({ timeout: 60000 });
+  await page.screenshot({ path: 'output/testing/welcome-mobile.png' });
+  await page.getByRole('button', { name: 'Enter Livistone' }).tap();
+  await expect(page.locator('#joystick')).toBeVisible();
+  const before = await snapshot(page); const box = (await page.locator('#joystick').boundingBox())!;
+  const cdp = await context.newCDPSession(page);
+  const left = { x: box.x + box.width / 2, y: box.y + 15, id: 0 };
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [left] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [left, { x: 300, y: 350, id: 1 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [left, { x: 330, y: 350, id: 1 }] });
+  await expect.poll(async () => (await snapshot(page)).position.z, { timeout: 6000 }).toBeLessThan(before.position.z - 0.3);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+  const stopped = await snapshot(page);
+  expect(stopped.yaw).not.toBe(before.yaw);
+  await page.getByRole('button', { name: 'City map' }).tap();
+  await expect(page.getByRole('heading', { name: 'Find your wonder.' })).toBeVisible();
+  await page.screenshot({ path: 'output/testing/aerial-map-mobile.png' });
+  await page.getByRole('button', { name: 'Return to walking' }).tap();
+  expect((await snapshot(page)).position.z).toBeCloseTo(stopped.position.z, 1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
+  await context.close();
+});

@@ -23,17 +23,15 @@ export class Input {
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.clear());
     document.addEventListener('visibilitychange', () => this.clear());
-    document.addEventListener('mousemove', (e) => {
-      if (this.active && document.pointerLockElement === this.canvas) this.look(e.movementX, e.movementY);
-    });
     canvas.addEventListener('pointerdown', (e) => {
-      if (!this.active || this.lookPointer !== null) return;
+      if (!this.active || this.lookPointer !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      e.preventDefault();
       this.lookPointer = e.pointerId;
       this.last = { x: e.clientX, y: e.clientY };
       canvas.setPointerCapture(e.pointerId);
     });
     canvas.addEventListener('pointermove', (e) => {
-      if (!this.active || this.lookPointer !== e.pointerId || document.pointerLockElement === canvas) return;
+      if (!this.active || this.lookPointer !== e.pointerId) return;
       this.look(e.clientX - this.last.x, e.clientY - this.last.y);
       this.last = { x: e.clientX, y: e.clientY };
     });
@@ -79,9 +77,5 @@ export class Input {
   }
   clear(): void {
     this.keys.clear(); this.moveX = 0; this.moveZ = 0; this.lookPointer = null; this.joystickPointer = null; this.knob.style.transform = '';
-  }
-  async capture(): Promise<void> {
-    if (matchMedia('(pointer: coarse)').matches || !this.canvas.requestPointerLock) return;
-    try { await this.canvas.requestPointerLock(); } catch { /* Drag-to-look remains available. */ }
   }
 }

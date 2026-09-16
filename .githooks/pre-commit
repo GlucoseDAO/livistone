@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Livistone pre-commit hook. Installed by `bun run hooks:install`, which points
+# core.hooksPath at this directory so the hook is version-controlled with the repo.
+set -euo pipefail
+exec "$(git rev-parse --show-toplevel)/scripts/sync-agent-docs.sh" --staged
