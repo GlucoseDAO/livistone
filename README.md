@@ -35,4 +35,4 @@ The City Hall image request was blocked by the tool's usage limit. The Energy an
 
 Review the balance of literal jewelry forms and white architecture, the relative scale of the three civic landmarks, the amount of greenery, and the atmosphere at walking height. Livia's own home and workshop remain open for discussion.
 
-After the visual direction is agreed, develop a spatial plan and consider browser-based 3D implementation. No engine has been selected and no web application has been implemented in this phase.
+The user approved the visual direction. The [browser game implementation plan](docs/3d-game-plan.md) selects TypeScript, Three.js, and Rapier WebAssembly physics. The first release will support exploration and lore, first-person walking plus a 3D aerial map, and desktop/mobile browsers from the start. Original STL and possibly Grasshopper files can be supplied later. The first implementation milestone is a walk from the river into City Hall, with touch controls and map switching. No web game has been implemented yet.
