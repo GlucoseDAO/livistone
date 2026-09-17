@@ -28,7 +28,7 @@ function band(points: THREE.Vector3[], center: THREE.Vector3, width: number): TH
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geo.setIndex(indices); geo.computeVertexNormals(); return geo;
 }
 
-function cage(parent: THREE.Group, strands: number[][], transform: (x: number, y: number, z: number) => THREE.Vector3, allowed: (p: THREE.Vector3) => boolean, center: THREE.Vector3, width: number, mobile: boolean, smooth: boolean): void {
+function cage(parent: THREE.Group, strands: number[][], transform: (x: number, y: number, z: number) => THREE.Vector3, allowed: (p: THREE.Vector3) => boolean, center: THREE.Vector3, width: number, mobile: boolean, smooth: boolean, project?: (p: THREE.Vector3) => THREE.Vector3): void {
   const geometries: THREE.BufferGeometry[] = [];
   for (const strand of strands) {
     const points: THREE.Vector3[] = [];
@@ -45,8 +45,9 @@ function cage(parent: THREE.Group, strands: number[][], transform: (x: number, y
       run = [];
     };
     // Clip sampled curves, not just control points: long struts otherwise bridge across the door.
-    for (const p of path.getSpacedPoints(Math.max(points.length * 2, Math.ceil(path.getLength() / (mobile ? .32 : .18))))) {
-      if (allowed(p)) run.push(p); else flush();
+    for (const sample of path.getSpacedPoints(Math.max(points.length * 2, Math.ceil(path.getLength() / (mobile ? .32 : .18))))) {
+      const p = project ? project(sample) : sample;
+      if (allowed(p)) { if (!run.length || p.distanceToSquared(run[run.length - 1]) > .000001) run.push(p); } else flush();
     }
     flush();
   }
@@ -70,12 +71,50 @@ export function mitoringCage(parent: THREE.Group, mobile: boolean): void {
   }, (p) => p.y > .25 && !(p.y < 4.8 && Math.abs(p.x) < 2.8 && p.z > b * .5) && !(p.y < 3.6 && Math.hypot(p.x / a, p.z / b) < 1.02), new THREE.Vector3(0, wall, 0), .48, mobile, true);
 }
 
-export function nanotCage(parent: THREE.Group, radius: number, centerY: number, mobile: boolean): void {
-  const scale = (radius + .5) / 20, angle = .45;
-  cage(parent, nanot.strands, (x, y, z) => new THREE.Vector3((x * Math.cos(angle) - y * Math.sin(angle)) * scale, (z - 20.7) * scale + centerY, (x * Math.sin(angle) + y * Math.cos(angle)) * scale),
-    (p) => p.y > .3 && !(p.y < 4.6 && Math.abs(p.x) < 2.8 && p.z > 2.5) && !(p.y < 3.6 && Math.hypot(p.x, p.z) < 7), new THREE.Vector3(0, centerY, 0), .36, mobile, false);
-  const dark = new THREE.MeshStandardMaterial({ color: '#292628', metalness: .4, roughness: .2 });
-  for (const [x, y, z, size] of [[4.9, 10.7, 4.9, 1.65], [-3.2, 13.2, 1.7, 1.15], [-5.5, 8.7, -5.1, 1.3]]) {
-    const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(size, mobile ? 1 : 2), dark); orb.position.set(x, y, z); orb.scale.set(1, 1.12, .85); orb.castShadow = true; parent.add(orb);
+export function nanotCage(parent: THREE.Group, radius: number, centerY: number, mobile: boolean): THREE.BufferGeometry {
+  const scale = (radius + .5) / 20, angle = .45, center = new THREE.Vector3(0, centerY, 0), frameRadius = radius + .85;
+  const baseY = .22, baseRadius = Math.sqrt(frameRadius ** 2 - (centerY - baseY) ** 2), frame: THREE.BufferGeometry[] = [];
+  const silver = new THREE.MeshStandardMaterial({ color: '#d9dfda', metalness: .72, roughness: .3 });
+  const point = (phi: number, theta: number): THREE.Vector3 => new THREE.Vector3(Math.sin(phi) * Math.sin(theta) * frameRadius, centerY + Math.cos(theta) * frameRadius, Math.cos(phi) * Math.sin(theta) * frameRadius);
+  const baseTheta = Math.acos((baseY - centerY) / frameRadius);
+  // Continuous ribs carry the folded facade to the foundation; the south bay is the entrance.
+  for (let i = 0; i < 10; i++) {
+    const phi = .43 + i / 9 * (Math.PI * 2 - .86), points: THREE.Vector3[] = [];
+    for (let j = 0; j <= 28; j++) {
+      const t = j / 28, theta = baseTheta * (1 - t);
+      points.push(point(phi + Math.sin(t * Math.PI) * .055 * (i % 2 ? 1 : -1), theta));
+    }
+    frame.push(band(points, center, .58));
   }
+  for (const y of [baseY, 5.1, 10.5]) {
+    const theta = Math.acos((y - centerY) / frameRadius), gap = y < 1 ? .39 : 0;
+    frame.push(band(Array.from({ length: 97 }, (_, i) => point(gap + i / 96 * (Math.PI * 2 - gap * 2), theta)), center, y < 1 ? .45 : .28));
+  }
+  const frameGeometry = mergeGeometries(frame)!; frame.forEach((g) => g.dispose());
+  const structure = new THREE.Mesh(frameGeometry, silver); structure.name = 'Nanot supporting frame'; structure.castShadow = structure.receiveShadow = true; parent.add(structure);
+  // Keep the original folded silhouettes, but move every sampled span outside the glazing.
+  // The pendant's radial hub belongs to jewelry: it cannot occupy an inhabited hall.
+  const surfaceStrands: number[][] = [];
+  for (const strand of nanot.strands) {
+    let run: number[] = [];
+    const flush = (): void => { if (run.length >= 6) surfaceStrands.push(run); run = []; };
+    for (let i = 0; i < strand.length; i += 3) {
+      if (Math.hypot(strand[i], strand[i + 1], strand[i + 2] - 20.7) >= 12) run.push(strand[i], strand[i + 1], strand[i + 2]); else flush();
+    }
+    flush();
+  }
+  cage(parent, surfaceStrands, (x, y, z) => new THREE.Vector3((x * Math.cos(angle) - y * Math.sin(angle)) * scale, (z - 20.7) * scale + centerY, (x * Math.sin(angle) + y * Math.cos(angle)) * scale),
+    (p) => !(p.y < 4.6 && Math.abs(p.x) < 2.85 && p.z > 2.5), center, .42, mobile, false, (p) => {
+      if (p.y > centerY + radius + .6 && Math.hypot(p.x, p.z) < 1.8) return p;
+      p.sub(center).setLength(frameRadius).add(center);
+      if (p.y < baseY) { const k = baseRadius / Math.max(.001, Math.hypot(p.x, p.z)); p.set(p.x * k, baseY, p.z * k); }
+      return p;
+    });
+  const dark = new THREE.MeshStandardMaterial({ color: '#292628', metalness: .4, roughness: .2 });
+  for (const [phi, theta, size] of [[.78, .91, 1.1], [-.85, .55, .85], [-2.3, 1.23, 1.0]]) {
+    const p = point(phi, theta), direction = p.clone().sub(center).normalize(); p.addScaledVector(direction, size * .45);
+    const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(size, mobile ? 1 : 2), dark); orb.position.copy(p); orb.castShadow = true; parent.add(orb);
+    const setting = new THREE.Mesh(new THREE.TorusGeometry(size * .91, .1, 6, 32), silver); setting.position.copy(p); setting.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction); parent.add(setting);
+  }
+  return frameGeometry;
 }

@@ -55,7 +55,9 @@ For a phone on the same Wi-Fi, use the **Network** URL that Vite prints, such as
 
 | Action | Desktop | Touch |
 | --- | --- | --- |
-| Walk | WASD or arrow keys; Shift to walk faster | Left thumbstick |
+| Forward / backward | W/S or ↑/↓; Shift to walk faster | Left thumbstick |
+| Strafe left / right | A/D | Left thumbstick |
+| Turn left / right | ←/→ | Drag the scene |
 | Look | Hold the left mouse button and drag; release it to stop turning | Drag the scene with your other finger |
 | Discover | Face a nearby artifact or plaque, then E | Tap the discovery prompt |
 | Aerial map | M or City map | Map icon in the top bar |
@@ -63,7 +65,7 @@ For a phone on the same Wi-Fi, use the **Network** URL that Vite prints, such as
 | Journal | Journal button | Book icon |
 | Pause | Escape or menu | Menu icon |
 
-Rotation happens only while the left mouse button is held on a drag begun in the scene. WASD and arrow keys move the player without changing the mouse-button state or camera rotation. Entering, resuming, and moving an unpressed mouse do not turn the camera; the game never requests pointer lock. The map returns you to the same walking position. The menu offers visual detail, optional ambient sound, and a return-to-entrance action. Discoveries are saved locally in this browser; clearing site data resets them.
+Mouse rotation happens only while the left button is held on a drag begun in the scene. Left/Right arrows turn at a fixed rate; A/D strafe and W/S or Up/Down move forward/backward. Keyboard turning and mouse dragging work together without resetting one another. Entering, resuming, and moving an unpressed mouse do not turn the camera; the game never requests pointer lock. The map returns you to the same walking position. The menu offers visual detail, optional ambient sound, and a return-to-entrance action. Discoveries are saved locally in this browser; clearing site data resets them.
 
 ## Build and verify
 
@@ -95,6 +97,12 @@ src/
     walnut.ts        Procedural walnut relief, furrows, and material
     strands/         mitoring.json, nanot.json — wire centerlines derived from the STL models
     forest.ts        Batched tree instancing from GLB models
+    landscape.ts     Shared path curves and planting-clearance rules
+    planting.ts      Instanced leafy shrubs, flowers, and grass blades
+    bridge.ts        Masonry arch, paved deck, railings, and matching colliders
+    sky.ts           Baked daylight/cloud cubemap and reflection environment
+    mountains.ts     Ridged terrain with triplanar rock textures and green foothills
+    exhibition.ts    Framed real jewelry photographs and information lecterns
   ui/ui.ts           HUD, aerial map panel, lore panel, journal, pause menu
 tests/               Vitest unit tests (*.test.ts) and Playwright browser tests (*.spec.ts)
 scripts/             Tree asset generation, landmark screenshots, agent-doc sync
@@ -107,9 +115,13 @@ docs/                Implementation plan
 
 ## How the game is built
 
-**Rendering.** Three.js with `WebGLRenderer` on WebGL 2, a room-environment probe for soft indirect light, and a directional sun with shadows. WebGPU is a later evaluation, not a current dependency.
+**Rendering.** Three.js with `WebGLRenderer` on WebGL 2, a daylight skybox with layered clouds, matching sky reflections, and a directional sun with shadows. The sky is baked into a cubemap once at startup, with a smaller cubemap on mobile; it needs no remote sky assets. WebGPU is a later evaluation, not a current dependency.
 
-**The town is generated in code.** `Town` in [src/world/world.ts](src/world/world.ts) builds the vertex-coloured terrain, a shader-animated river, garden paths, the white river bridge, the three landmarks with their ground-floor interiors, homes, planting, and surrounding hills. Building shells are parametric surfaces: furrowed walnut and smoky crystal joined by broad brass clasps for City Hall, an elongated amber hall with folded membranes for Mitoring, and a glazed hall within Nanot's angular lattice. The supplied models survive as about 40 KB of extracted centerlines under `src/world/strands/`. [src/world/jewelry.ts](src/world/jewelry.ts) adapts those curves into bevelled silver ribbons, clears the doors and walking space, and merges each building's silver into one draw call. The Mitoring hall is 28 × 13.2 m and 8.4 m high; its folds remain visible in the aerial map. Mobile uses fewer curve samples.
+**The town is generated in code.** `Town` in [src/world/world.ts](src/world/world.ts) builds the vertex-coloured terrain, a shader-animated river, garden paths, the white river bridge, the three landmarks with their ground-floor interiors, homes, planting, and surrounding hills. Building shells are parametric surfaces: furrowed walnut and smoky crystal joined by broad brass clasps for City Hall, an elongated amber hall with folded membranes for Mitoring, and a glazed hall inside Nanot's exterior supporting frame and angular lattice. Nanot's silver stays outside the glass; continuous ribs and connecting rings carry the facade down to its foundation. The supplied models survive as about 40 KB of extracted centerlines under `src/world/strands/`. [src/world/jewelry.ts](src/world/jewelry.ts) adapts those curves into bevelled silver ribbons, clears the doors and walking space, and merges each building's silver into one draw call. The Mitoring hall is 28 × 13.2 m and 8.4 m high; its folds remain visible in the aerial map. Mobile uses fewer curve samples.
+
+**Gardens and arrival.** A solid white masonry arch carries the river bridge, with a jointed stone deck and brass railings. Continuous curved paving reaches every civic doorway. The same path curves reserve space for the full footprint of shrubs, flowers, grass, and nearby trees, keeping the approaches open. Shrubs use individual folded leaves, branching stems, and small blossoms; grass uses curved blade geometry over a textured meadow surface. Plants are instanced in spatial batches, with fewer shrubs and blades on mobile and fine grass hidden in map mode. The plant meshes remain procedural assets. Surrounding mountain ridges use slope-dependent vegetation colouring and scanned CC0 rock textures, with lower mesh detail on mobile.
+
+**Jewelry exhibitions.** Every civic hall has two framed, authentic studio photographs of its original jewelry and a freestanding information lectern. Face a display or lectern and press E (or tap the discovery prompt) to open photographs and a readable table of artist, object, materials, dimensions, and year, with a link to Livia’s catalogue. The six optimized photos are bundled locally, with attribution in `public/images/jewelry/`; the factual catalogue and fictional lore have separate headings.
 
 **Physics is separate from what you see.** `Town` emits a list of `ColliderSpec` values — boxes and trimeshes — that [src/game/physics.ts](src/game/physics.ts) loads into a Rapier world. The player is a kinematic capsule driven by Rapier's character controller, with autostep for stairs, snap-to-ground, and slope limits. New walkable or blocking geometry needs a matching collider; nothing is derived from the render meshes automatically.
 
@@ -129,7 +141,7 @@ Progress is stored in `localStorage` under `livistone-progress-v1`. Every read a
 
 ## Asset pipeline
 
-The only binary assets today are two tree models in `public/models/trees/`, generated from [EZ-Tree](https://github.com/dgreenheck/ez-tree) presets with deterministic seeds and exported as GLB with embedded textures. To regenerate them, start the dev server and run:
+Runtime assets include two tree models, six jewelry photographs, and two mountain texture maps. The tree models in `public/models/trees/` are generated from [EZ-Tree](https://github.com/dgreenheck/ez-tree) presets with deterministic seeds and exported as GLB with embedded textures. To regenerate them, start the dev server and run:
 
 ```bash
 bun scripts/generate-trees.mjs
@@ -146,9 +158,9 @@ bun run test          # Vitest unit tests
 bun run test:browser  # Playwright browser tests in Google Chrome
 ```
 
-Use `bun run test`, not `bun test` — these are Vitest tests. Unit tests cover save parsing and headless Rapier walking behaviour. Browser tests drive the real game, including a mobile viewport with touch emulation: entering the town, held-mouse looking while walking with WASD and arrows, stable entry orientation, pointer-capture loss, opening the menu, crossing into City Hall, opening the map and returning to the same position, and persisting discoveries.
+Use `bun run test`, not `bun test` — these are Vitest tests. Unit tests cover save parsing, planting clearance, Nanot’s glass clearance, and headless Rapier walking behaviour, including the bridge deck and railings. Browser tests drive the real game, including a mobile viewport with touch emulation: entering the town, held-mouse looking while moving, arrow-key turning versus A/D strafing, stable entry orientation, pointer-capture loss, opening the menu, crossing into City Hall, opening the map and returning to the same position, persisting discoveries, and loading photographs and catalogue tables in all three halls.
 
-For a visual review of the buildings, `node scripts/screenshot-landmarks.mjs` saves ten views of the three landmarks to `output/testing/landmarks/` (the dev server must be running). It launches headless Chrome with hardware WebGL flags; the reported frame rate is a local diagnostic, not a physical-device benchmark.
+For a visual review of the buildings, `node scripts/screenshot-landmarks.mjs` saves nineteen views of the landmarks, jewelry galleries, information lectern, bridge, gardens, and aerial map to `output/testing/landmarks/` (the dev server must be running). It launches headless Chrome with hardware WebGL flags; the reported frame rate is a local diagnostic, not a physical-device benchmark.
 
 If Chrome is missing, install it or run `bunx playwright install chrome`. The tests start a development server automatically if one is not already running. Headless Chrome renders on the GPU when the machine has one; set `LIVISTONE_SOFTWARE_GL=1` to force SwiftShader instead, which is reproducible anywhere but slow enough on a busy machine that the 120 s test budget can run out. Neither mode measures real-device performance. Screenshots go to `output/testing/`; failure reports and traces to `test-results/`.
 
@@ -167,8 +179,9 @@ The hook lives in the version-controlled [.githooks/](.githooks/) directory, ena
 
 ## What is playable today
 
-- Walk across the river bridge and around a green town with jewelry-inspired civic buildings.
+- Walk across an arched stone river bridge into leafy gardens, under a cloudy daylight sky, with clear paved approaches to the jewelry-inspired civic buildings.
 - Enter the ground-floor interiors of **Nut of Power City Hall**, **Mitoring Ministry of Energy**, and **Nanot Ministry of Science**.
+- View original jewelry photographs and catalogue information in each civic hall.
 - Discover six lore entries, revisit them in the journal, and activate two artifact effects.
 - Switch between first-person exploration and an orbitable 3D aerial map with landmark selection.
 - Play with desktop controls or simultaneous touch movement and look.
@@ -201,3 +214,5 @@ The town overview above is the approved generated image. The three close-up prom
 Livistone is built on the Livia Lore artifacts and Livia Zaharia's jewelry; the concept and civic roles were agreed with the project owner and are recorded in [concepts/01-garden-town/brief.md](concepts/01-garden-town/brief.md) and [docs/3d-game-plan.md](docs/3d-game-plan.md).
 
 The oak and ash tree models are generated from Daniel Greenheck's EZ-Tree 1.1.0 (MIT), with the licence reproduced in [public/models/trees/LICENSE.txt](public/models/trees/LICENSE.txt). Runtime libraries are Three.js and Rapier; this repository is private and has no licence of its own yet.
+
+Jewelry photographs and catalogue facts come from [Livia Zaharia’s Pieces catalogue](https://livia.glucosedao.org/pieces/), bundled from the website’s original studio archive. See [photo attribution](public/images/jewelry/ATTRIBUTION.md). Mountain rock maps are [Rock Face 03](https://polyhaven.com/a/rock_face_03) by Dario Barresi and Rico Cilliers, provided by Poly Haven under CC0; see [texture attribution](public/textures/mountains/ATTRIBUTION.md).

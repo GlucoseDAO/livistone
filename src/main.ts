@@ -1,7 +1,7 @@
 import './style.css';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { createSky } from './world/sky';
 import { Town } from './world/world';
 import { UI } from './ui/ui';
 import type { Mode } from './ui/ui';
@@ -13,8 +13,8 @@ import type { Physics } from './game/physics';
 class Game {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
-  private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, 260);
-  private readonly mapCamera = new THREE.PerspectiveCamera(44, 1, 0.2, 450);
+  private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, 700);
+  private readonly mapCamera = new THREE.PerspectiveCamera(44, 1, 0.2, 800);
   private readonly orbit: OrbitControls;
   private readonly town: Town;
   private readonly input: Input;
@@ -45,15 +45,14 @@ class Game {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.coarse ? 1 : 1.5));
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 0.96;
-    this.scene.background = new THREE.Color('#dbe6df'); this.scene.fog = new THREE.Fog('#dbe6df', 95, 245);
+    this.scene.fog = new THREE.Fog('#c3d8df', 150, 640);
     this.scene.add(new THREE.HemisphereLight('#e9f4f0', '#73805c', 1.2));
     this.sun = new THREE.DirectionalLight('#fff0ce', 2.4); this.sun.position.set(-35, 70, 35); this.sun.castShadow = true;
     this.sun.shadow.mapSize.setScalar(this.coarse ? 1024 : 2048);
     this.sun.shadow.camera.left = -75; this.sun.shadow.camera.right = 75; this.sun.shadow.camera.top = 65; this.sun.shadow.camera.bottom = -65;
     this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = 170; this.sun.shadow.normalBias = 0.035; this.sun.shadow.bias = -0.00015;
     this.scene.add(this.sun);
-    const environment = new RoomEnvironment(); const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(environment, 0.04).texture; environment.dispose(); pmrem.dispose();
+    const sky = createSky(this.renderer, this.coarse); this.scene.background = sky.background; this.scene.environment = sky.environment;
     this.scene.environmentIntensity = 0.5;
     this.town = new Town(this.coarse); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
     // The town and sun are static; refresh shadows only when scene visibility changes.
@@ -85,10 +84,10 @@ class Game {
     }
   }
   async load(): Promise<void> {
-    const vegetation = this.town.loadVegetation();
+    const assets = this.town.loadAssets();
     const { Physics } = await import('./game/physics');
     this.physics = await Physics.create(this.town.colliders);
-    await vegetation;
+    await assets;
     this.renderer.shadowMap.needsUpdate = true;
     this.ui.ready();
   }
@@ -172,8 +171,10 @@ class Game {
   private updateWalking(dt: number): void {
     if (!this.physics) return;
     this.accumulator = Math.min(this.accumulator + dt, 0.1);
-    const movement = this.input.direction();
-    while (this.accumulator >= 1 / 60) { this.physics.step(movement.x * movement.speed, movement.z * movement.speed); this.accumulator -= 1 / 60; }
+    while (this.accumulator >= 1 / 60) {
+      this.input.turn(1 / 60); const movement = this.input.direction();
+      this.physics.step(movement.x * movement.speed, movement.z * movement.speed); this.accumulator -= 1 / 60;
+    }
     const pos = this.physics.position();
     if (pos.y < -0.5 || Math.abs(pos.x) > 103 || Math.abs(pos.z) > 88) { this.physics.teleport(); this.ui.toast('Let’s stay on the garden paths.'); }
     const current = this.physics.position(); this.walkCamera.position.set(current.x, current.y + 0.78, current.z); this.walkCamera.rotation.set(this.input.pitch, this.input.yaw, 0, 'YXZ');

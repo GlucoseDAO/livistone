@@ -17,7 +17,7 @@ A TypeScript + Vite single-page app. Three.js renders the town on WebGL 2; Rapie
 (WebAssembly) provides a kinematic capsule character controller. There is no backend, no
 API key, no database, and no account system — the entire game is static files plus
 `localStorage`. Every building, tree placement, path, and piece of jewelry geometry in the
-current build is generated in code at load time; the only binary assets are two tree GLBs.
+current build is generated in code at load time; binary assets are two tree GLBs, six real jewelry photographs, and two CC0 rock maps.
 
 ## Commands
 
@@ -49,6 +49,7 @@ src/
   style.css          All UI styling (no CSS framework)
   game/
     content.ts       LANDMARKS, DISCOVERIES, SPAWN, progress parse/read/write
+    exhibits.ts      Source-linked factual jewelry catalogue and photograph metadata
     physics.ts       Rapier world, collider specs, kinematic character controller
     input.ts         Keyboard, held-button drag-to-look mouse, and touch thumbstick input
     audio.ts         Procedural filtered-noise ambience via WebAudio
@@ -59,6 +60,12 @@ src/
     walnut.ts        Procedural walnut shell relief and material
     strands/         mitoring.json, nanot.json: preserved wire centerlines from the STLs
     forest.ts        Batched GLB tree instancing with a mobile foliage reduction
+    landscape.ts     Shared path curves, home sites, and planting clearance
+    planting.ts      Spatially batched leafy shrubs, blossoms, blade grass, meadow texture
+    bridge.ts        Solid arch bridge, deck, rails, and matching colliders
+    sky.ts           Startup-baked cloud/daylight cubemap and reflection environment
+    mountains.ts     Ridged backdrop with triplanar rock maps and reduced mobile detail
+    exhibition.ts    Local-photo frames, catalogue lecterns, and matching colliders
   ui/ui.ts           DOM overlay: HUD, map panel, lore panel, journal, pause menu
 tests/               *.test.ts → Vitest, *.spec.ts → Playwright
 scripts/             Tree asset generation, agent-doc sync
@@ -78,6 +85,11 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   interiors until you are inside), and `animated` (objects the artifact interactions spin
   or pulse). If you add geometry that the player can walk into, you must push a matching
   `ColliderSpec` — the renderer and the physics world share no geometry automatically.
+- **Paths and planting share one layout.** `landscape.ts` owns the path curves and
+  `plantingAllowed(x, z, radius)`. Every plant placement must reserve its full canopy or
+  tuft radius, including flowers; keep civic doorway approaches and the bridge clear.
+  Shrubs and grass are spatially instanced, with reduced mobile density. Bridge rail
+  colliders follow the deck height; update their physics tests when changing the span.
 - **Physics is a kinematic capsule, not a rigid body.** `Physics.step(x, z, dt)` applies
   horizontal intent plus its own gravity accumulation, then Rapier's character controller
   resolves the movement. Autostep, snap-to-ground, and slope limits are configured once in
@@ -87,16 +99,25 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **Modes drive the UI.** `Mode` is `'welcome' | 'walking' | 'map' | 'lore' | 'journal' |
   'paused'`. Mode changes are the single place where input capture, the active camera, and
   DOM visibility all change together. Do not bypass them with ad-hoc DOM toggling.
-- **Desktop rotation requires a held left mouse button.** Never request pointer lock or turn on
+- **Mouse rotation requires a held left mouse button; Left/Right arrows also turn.** Never request pointer lock or turn on
   entering/resuming. A drag starts on the canvas, uses client-coordinate deltas on document
-  pointer events, and checks `buttons & 1`. Keyboard events only affect movement; they must not
-  reset a held drag. Mouse capture loss is handled through document events, while release,
+  pointer events, and checks `buttons & 1`. A/D strafe, W/S or Up/Down move forward/backward, and Left/Right turn
+  through `Input.turn(dt)` in the fixed physics loop; none reset a held drag. Mouse capture loss is handled through document events, while release,
   cancellation, blur, and mode changes clear the appropriate inputs. Keep touch pointer IDs
   independent so looking and the thumbstick can work together.
 - **The ministries' silver is data, not hand-drawn geometry.** `jewelry.ts` maps the strands in
-  `src/world/strands/*.json` into hall space, rejects points in the doorway, below ground, or at
-  head height inside the hall (splitting strands there), and drops fragments under 1.2 m. Change
+  `src/world/strands/*.json` into hall space, clips doorway crossings and short fragments,
+  and keeps silver out of inhabited walking space. Mitoring clips its basket; Nanot projects
+  its facade outside the glazing and seats low strands at its base. Change
   the look through the architectural transforms and clipping rules, not by editing the JSON.
+- **Nanot silver belongs outside its glazing.** Its source folds are projected after curve
+  sampling, keeping every ribbon outside the glass. Continuous supporting ribs and rings
+  reach the base; their returned geometry is also a world-space collider. Do not restore
+  radial spokes through the inhabited glass hall. Preserve the extracted source JSON.
+- **Jewelry displays use real local photos.** `exhibits.ts` holds catalogue facts and source
+  links; `exhibition.ts` loads bundled images with labelled fallbacks. Keep photos framed
+  on freestanding panels, paths clear, and factual catalogue information separate from
+  lore in the accessible discovery dialog. Attribute new photos and texture assets.
 - **The Mitoring hall is not a sphere.** `createEnergyHall` builds an amber cup with a domed lid
   from `ENERGY_HALL` (`a`, `b` semi-axes, wall and dome heights, door angle); the basket strands
   below the rim are projected onto its outside, and the crown loops curl onto the lower roof.
@@ -163,8 +184,9 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   the browser. Their extracted JSON strands survived the recovery, but the historical
   `scripts/derive-strands.mjs` did not; do not document a working regeneration command until
   that tool is restored and verified. Preserve the source JSON. Tooling here is Bun/Node.
-- Browser tests forbid pointer-lock requests and compare identical drags across WASD and
-  arrow-key states. Include key presses during a held drag and unpressed movement after release.
+- Browser tests forbid pointer-lock requests and compare identical drags across movement
+  keys. Separately check Left/Right turning, A/D strafing, keyboard turning during a held
+  drag, and unpressed mouse movement after release.
 
 ## Documentation duties
 

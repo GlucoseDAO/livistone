@@ -1,4 +1,5 @@
 import { DISCOVERIES, LANDMARKS } from '../game/content';
+import { EXHIBITS, CATALOGUE_URL, photoURL } from '../game/exhibits';
 import type { Progress, Discovery, Landmark } from '../game/content';
 export type Mode = 'welcome' | 'walking' | 'map' | 'lore' | 'journal' | 'paused';
 const icons: Record<string, string> = {
@@ -32,16 +33,16 @@ export class UI {
       '<section id="welcome" class="welcome" aria-labelledby="welcome-title"><div class="eyebrow"><span class="tiny-line"></span>A TOWN LIKE NO OTHER</div><h1 id="welcome-title">Welcome to<br><em>Livistone.</em></h1><p>A place where jewelry becomes architecture,<br class="desktop-break"> science sparks wonder, and nature feels like home.</p><div class="welcome-actions"><button id="enter" class="primary" data-action="enter" disabled><span>Preparing your visit</span>' + icon('arrow') + '</button><button id="preview-map" class="text-button" data-action="preview-map" disabled>' + icon('map') + 'Look around from above</button></div><div class="welcome-foot"><span class="status-dot"></span>TAKE YOUR TIME. THERE IS MUCH TO DISCOVER.</div></section>',
       '<div id="welcome-caption" class="welcome-caption"><span>01 / THE CIVIC GARDENS</span><p>Small artifacts.<br>Extraordinary places.</p><span class="caption-rule"></span></div>',
       '<div id="crosshair" class="crosshair" aria-hidden="true" hidden></div>',
-      '<footer id="walk-footer" class="walk-footer" hidden><div class="place-card"><span class="eyebrow">YOU ARE EXPLORING</span><strong id="location">Riverside Gardens</strong><span id="discoveries">0 of 6 discoveries</span></div><div class="controls-hint"><span><kbd>W A S D</kbd> Walk</span><span id="look-hint">Hold left mouse to look</span><span><kbd>E</kbd> Discover</span></div></footer>',
+      '<footer id="walk-footer" class="walk-footer" hidden><div class="place-card"><span class="eyebrow">YOU ARE EXPLORING</span><strong id="location">Riverside Gardens</strong><span id="discoveries">0 of 6 discoveries</span></div><div class="controls-hint"><span><kbd>W A S D</kbd> Walk</span><span><kbd>← →</kbd> Turn</span><span id="look-hint">Hold left mouse to look</span><span><kbd>E</kbd> Discover</span></div></footer>',
       '<button id="interact" class="interaction" data-action="interact" hidden><span class="interaction-key">E</span><span id="interact-label">Discover</span>' + icon('arrow') + '</button>',
       '<div id="touch-controls" class="touch-controls" hidden><div id="joystick" class="joystick" role="group" aria-label="Touch movement control"><div class="stick-knob"></div></div><span class="touch-look">Drag to look around</span></div>',
       '<section id="map-panel" class="map-panel" hidden aria-labelledby="map-title"><div class="eyebrow">THE CITY AT A GLANCE</div><h2 id="map-title">Find your wonder.</h2><p>Three extraordinary buildings.<br>A town of possibilities between them.</p><div class="landmark-list">' + LANDMARKS.map((l, i) => '<button class="landmark-item" data-action="landmark:' + l.id + '"><span class="landmark-number">0' + (i + 1) + '</span><span><strong>' + l.name + '</strong><small>' + l.artifact + '</small></span>' + icon('arrow') + '</button>').join('') + '</div><div id="map-description" class="map-description">Select a landmark to learn more.</div><button class="primary full" data-action="walk">' + icon('walk') + 'Return to walking</button></section>',
       '<div id="map-controls" class="map-controls" hidden><button class="tool square" data-action="zoom-in" aria-label="Zoom map in">+</button><button class="tool square" data-action="zoom-out" aria-label="Zoom map out">−</button><button class="tool square" data-action="reset-map" aria-label="Reset map view">' + icon('compass') + '</button><span>Drag to orbit · Pinch or scroll to zoom</span></div>',
       '<div id="map-markers" hidden>' + LANDMARKS.map((l, i) => '<button class="map-marker" id="marker-' + l.id + '" data-action="landmark:' + l.id + '" aria-label="View ' + l.name + '"><span>0' + (i + 1) + '</span><b>' + l.name + '</b></button>').join('') + '<div id="player-marker" class="player-marker"><span></span>You are here</div></div>',
       '<div id="scrim" class="scrim" hidden></div>',
-      '<section id="lore" class="dialog lore" role="dialog" aria-modal="true" aria-labelledby="lore-title" hidden><button class="close-button" data-action="close" aria-label="Close discovery">' + icon('close') + '</button><div class="eyebrow" id="lore-category"></div><div id="lore-emblem" class="lore-emblem">✧</div><h2 id="lore-title"></h2><p id="lore-body"></p><div class="lore-source">From Livia’s artifacts to a living town.</div><button id="artifact-action" class="primary full" hidden></button><button class="text-button full" data-action="close">Continue exploring ' + icon('arrow') + '</button></section>',
+      '<section id="lore" class="dialog lore" role="dialog" aria-modal="true" aria-labelledby="lore-title" hidden><button class="close-button" data-action="close" aria-label="Close discovery">' + icon('close') + '</button><div class="eyebrow" id="lore-category"></div><div id="lore-emblem" class="lore-emblem">✧</div><h2 id="lore-title"></h2><div id="exhibit-catalogue" hidden></div><p id="lore-body"></p><div class="lore-source">From Livia’s artifacts to a living town.</div><button id="artifact-action" class="primary full" hidden></button><button class="text-button full" data-action="close">Continue exploring ' + icon('arrow') + '</button></section>',
       '<section id="journal" class="dialog journal" role="dialog" aria-modal="true" aria-labelledby="journal-title" hidden><button class="close-button" data-action="close" aria-label="Close journal">' + icon('close') + '</button><div class="eyebrow">YOUR FIELD NOTES</div><h2 id="journal-title">A little more wonder.</h2><p>Discover the stories held within the city.</p><div id="journal-list"></div></section>',
-      '<section id="pause" class="dialog pause" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden><button class="close-button" data-action="close" aria-label="Close menu">' + icon('close') + '</button><div class="eyebrow">MAKE YOURSELF AT HOME</div><h2 id="pause-title">A moment of quiet.</h2><button class="primary full" data-action="close">Continue exploring ' + icon('arrow') + '</button><button class="menu-item" data-action="map">' + icon('map') + 'Open city map</button><button class="menu-item" data-action="reset-position">' + icon('compass') + 'Return to the river entrance</button><button class="menu-item" id="sound-toggle" data-action="sound" aria-pressed="false">' + icon('sound') + 'Ambient sound: off</button><label class="quality-label">Visual detail<select id="quality"><option value="low">Gentle — lower detail</option><option value="high">Rich — higher detail</option></select></label><p class="menu-note">Walk with WASD or the arrow keys. Hold the left mouse button and drag to look. On touch screens, use the left stick and drag to look. Your discoveries are saved on this device.</p></section>',
+      '<section id="pause" class="dialog pause" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden><button class="close-button" data-action="close" aria-label="Close menu">' + icon('close') + '</button><div class="eyebrow">MAKE YOURSELF AT HOME</div><h2 id="pause-title">A moment of quiet.</h2><button class="primary full" data-action="close">Continue exploring ' + icon('arrow') + '</button><button class="menu-item" data-action="map">' + icon('map') + 'Open city map</button><button class="menu-item" data-action="reset-position">' + icon('compass') + 'Return to the river entrance</button><button class="menu-item" id="sound-toggle" data-action="sound" aria-pressed="false">' + icon('sound') + 'Ambient sound: off</button><label class="quality-label">Visual detail<select id="quality"><option value="low">Gentle — lower detail</option><option value="high">Rich — higher detail</option></select></label><p class="menu-note">Move forward/back with W/S or ↑/↓. Strafe with A/D. Turn with ←/→, or hold the left mouse button and drag to look. On touch screens, use the left stick and drag to look. Your discoveries are saved on this device.</p></section>',
       '<div id="toast" class="toast" role="status" hidden></div><div id="live" class="sr-only" aria-live="polite"></div>',
       '<section id="error" class="error-screen" hidden><div class="eyebrow">LIVISTONE</div><h2>Let’s try that again.</h2><p id="error-message"></p><button class="primary" data-action="reload">Reload the town</button></section>',
     ].join('');
@@ -57,7 +58,7 @@ export class UI {
       if (e.key !== 'Tab') return;
       const dialog = this.app.querySelector<HTMLElement>('.dialog:not([hidden])');
       if (!dialog) return;
-      const focusable = [...dialog.querySelectorAll<HTMLElement>('button:not([hidden]), select, [tabindex="0"]')];
+      const focusable = [...dialog.querySelectorAll<HTMLElement>('button:not([hidden]), a[href], select, [tabindex="0"]')];
       const first = focusable[0], last = focusable.at(-1);
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
@@ -100,6 +101,26 @@ export class UI {
     this.app.querySelector('#lore-category')!.textContent = discovery.category;
     this.app.querySelector('#lore-title')!.textContent = discovery.title;
     this.app.querySelector('#lore-body')!.textContent = discovery.body;
+    const catalogue = this.app.querySelector<HTMLElement>('#exhibit-catalogue')!, exhibit = EXHIBITS.find((e) => e.discovery === discovery.id);
+    catalogue.replaceChildren(); catalogue.hidden = !exhibit;
+    if (exhibit) {
+      const gallery = document.createElement('div'); gallery.className = 'exhibit-photos';
+      for (const photo of exhibit.photos) {
+        const figure = document.createElement('figure'), image = document.createElement('img'), caption = document.createElement('figcaption');
+        image.src = photoURL(photo.file); image.alt = photo.alt; image.width = image.height = 1024;
+        caption.textContent = 'Livia Zaharia · Studio archive'; image.onerror = () => { image.hidden = true; caption.textContent = 'Photograph unavailable. The catalogue information remains below.'; };
+        figure.append(image, caption); gallery.append(figure);
+      }
+      const heading = document.createElement('h3'); heading.textContent = 'The original jewelry';
+      const description = document.createElement('p'); description.textContent = exhibit.description;
+      const table = document.createElement('table'); table.className = 'exhibit-facts'; table.setAttribute('aria-label', exhibit.title + ' catalogue information');
+      for (const [key, value] of [['Artist', 'Livia Zaharia'], ['Object', exhibit.type], ['Materials', exhibit.materials], ['Dimensions', exhibit.dimensions], ['Year', exhibit.year]]) {
+        const row = table.insertRow(), th = document.createElement('th'); th.scope = 'row'; th.textContent = key; row.append(th); row.insertCell().textContent = value;
+      }
+      const source = document.createElement('a'); source.href = CATALOGUE_URL; source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = 'View Livia’s jewelry catalogue ↗';
+      const loreHeading = document.createElement('h3'); loreHeading.textContent = 'Livia Lore & Livistone fiction';
+      catalogue.append(gallery, heading, description, table, source, loreHeading);
+    }
     const button = this.app.querySelector<HTMLButtonElement>('#artifact-action')!;
     button.hidden = !discovery.action; button.textContent = discovery.action ?? ''; button.dataset.action = 'activate:' + discovery.id;
     this.live.textContent = 'Discovered: ' + discovery.title;

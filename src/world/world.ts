@@ -3,6 +3,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
 import { mitoringCage, nanotCage, ENERGY_HALL } from './jewelry';
 import { Forest } from './forest';
+import { createBridge } from './bridge';
+import { createPlanting, meadowMaterial } from './planting';
+import { HOME_SITES, PATH_CURVES, PATH_WIDTH, plantingAllowed } from './landscape';
+import { Mountains } from './mountains';
+import { createExhibition } from './exhibition';
 import { walnutMaterial, walnutRadius } from './walnut';
 import { LANDMARKS } from '../game/content';
 import type { Landmark } from '../game/content';
@@ -60,6 +65,8 @@ export class Town {
   readonly occluders: THREE.Object3D[] = [];
   readonly animated: { object: THREE.Object3D; id: string; speed: number }[] = [];
   readonly water: THREE.ShaderMaterial;
+  private readonly exhibitLoads: Promise<void>[] = [];
+  private readonly mountains: Mountains;
   private readonly white = new THREE.MeshStandardMaterial({ color: '#f4f0df', roughness: 0.57, metalness: 0.07 });
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#e2e7dd', roughness: 0.26, metalness: 0.65 });
   private readonly gold = new THREE.MeshStandardMaterial({ color: '#b99a55', roughness: 0.3, metalness: 0.7 });
@@ -68,13 +75,6 @@ export class Town {
   private readonly paving = new THREE.MeshStandardMaterial({ color: '#efe5d0', roughness: 0.92, map: texture('stone'), side: THREE.DoubleSide });
   private readonly dark = new THREE.MeshStandardMaterial({ color: '#3e5550', roughness: 0.25, metalness: 0.35 });
   private readonly sphere = new THREE.SphereGeometry(1, 16, 12);
-  private readonly paths: [number, number][][] = [
-    [[0, 12], [0, 4], [0, -11]],
-    [[0, 7], [-13, 5], [-29, 3], [-29, -2]],
-    [[0, 7], [14, 6], [29, 1], [29, -4]],
-    [[-29, -1], [-16, -2], [0, -10], [17, -5], [29, -3]],
-    [[0, 42], [0, 49], [-12, 54]],
-  ];
   constructor(private mobile: boolean) {
     this.root.name = 'Livistone'; this.root.add(this.interiors, this.details);
     this.water = new THREE.ShaderMaterial({
@@ -83,9 +83,10 @@ export class Town {
       fragmentShader: 'uniform float time; uniform vec3 tint; varying vec3 vPosition; void main(){float waves=sin(vPosition.x*2.4+vPosition.z*4.0-time*1.1)*sin(vPosition.x*.7-vPosition.z*2.8-time*.7); float sparkle=pow(max(0.0,waves),12.0); gl_FragColor=vec4(tint*(.88+.10*waves)+vec3(.40)*sparkle,1.0);\n#include <tonemapping_fragment>\n #include <colorspace_fragment>\n }',
       side: THREE.DoubleSide,
     });
-    this.createTerrain(); this.createPaths(); this.createBridge();
+    this.createTerrain(); this.createPaths(); createBridge(this.root, this.colliders, this.white, this.paving, this.gold);
     for (const landmark of LANDMARKS) landmark.id === 'energy' ? this.createEnergyHall(landmark.x, landmark.z) : this.createLandmark(landmark.id, landmark.x, landmark.z);
-    this.createHomes(); this.createTrees(); this.createGardens(); this.createHills();
+    this.createHomes(); this.createTrees(); this.createGardens();
+    this.mountains = new Mountains(mobile); this.root.add(this.mountains);
   }
   private createTerrain(): void {
     const geo = new THREE.PlaneGeometry(230, 200, 115, 100); geo.rotateX(-Math.PI / 2);
@@ -96,36 +97,19 @@ export class Town {
       colors.push(color.r, color.g, color.b);
     }
     geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geo.computeVertexNormals();
-    mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), this.root).castShadow = false;
+    mesh(geo, meadowMaterial(), this.root).castShadow = false;
     this.colliders.push({ type: 'mesh', vertices: new Float32Array(pos.array), indices: new Uint32Array(geo.index!.array) });
     const riverPoints = Array.from({ length: 35 }, (_, i) => { const x = -115 + i / 34 * 230; return new THREE.Vector3(x, -0.42, riverCenter(x)); });
     const water = mesh(ribbon(new THREE.CatmullRomCurve3(riverPoints), 10.6, 130), this.water, this.root); water.castShadow = false;
   }
   private createPaths(): void {
-    for (const path of this.paths) {
-      const curve = new THREE.CatmullRomCurve3(path.map(([x, z]) => new THREE.Vector3(x, 0.055, z)));
-      mesh(ribbon(curve, 3.6, 45), this.paving, this.root).castShadow = false;
+    const edging = new THREE.MeshStandardMaterial({ color: '#bbb39e', roughness: .92, side: THREE.DoubleSide });
+    for (const curve of PATH_CURVES) {
+      mesh(ribbon(curve, PATH_WIDTH + .32, 100), edging, this.root, 0, -.012).castShadow = false;
+      mesh(ribbon(curve, PATH_WIDTH, 100), this.paving, this.root).castShadow = false;
     }
     for (const l of LANDMARKS) {
       const ring = mesh(new THREE.RingGeometry(8.4, 12.3, 64), this.paving, this.root, l.x, 0.06, l.z); ring.rotation.x = -Math.PI / 2; ring.castShadow = false; const sp = spread(l, .85); ring.scale.set(sp.x, sp.z, 1);
-    }
-  }
-  private createBridge(): void {
-    const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0.06, 40), new THREE.Vector3(0, 0.7, 34), new THREE.Vector3(0, 1.25, 26), new THREE.Vector3(0, 0.7, 18), new THREE.Vector3(0, 0.06, 12)]);
-    const geo = ribbon(curve, 4.8, 60); mesh(geo, this.white, this.root);
-    this.colliders.push({ type: 'mesh', vertices: new Float32Array(geo.getAttribute('position').array), indices: new Uint32Array(geo.index!.array) });
-    for (const side of [-1, 1]) {
-      const points = curve.getPoints(45).map((p) => p.add(new THREE.Vector3(side * 2.35, 1.05, 0)));
-      lineTube(points, 0.085, this.gold, this.root);
-      const lower = curve.getPoints(45).map((p) => p.add(new THREE.Vector3(side * 2.5, -0.22, 0)));
-      lineTube(lower, 0.24, this.white, this.root);
-      for (let i = 1; i < 15; i++) {
-        const p = curve.getPoint(i / 15);
-        lineTube([new THREE.Vector3(side * 2.4, p.y, p.z), new THREE.Vector3(side * 2.35, p.y + 1.05, p.z)], 0.035, this.white, this.root);
-      }
-      this.colliders.push({ type: 'box', position: [side * 2.6, 1.1, 26], size: [0.13, 1, 12] });
-      lineTube([new THREE.Vector3(side * 1.8, -1.8, 24), new THREE.Vector3(side * 2.2, -0.4, 29), new THREE.Vector3(side * 2.4, 0.7, 34)], 0.23, this.white, this.root);
-      lineTube([new THREE.Vector3(side * 1.8, -1.8, 28), new THREE.Vector3(side * 2.2, -0.4, 23), new THREE.Vector3(side * 2.4, 0.7, 18)], 0.23, this.white, this.root);
     }
   }
   private shellPoint(phi: number, theta: number, radius: number, height: number, sx = 1, sz = 1): THREE.Vector3 {
@@ -181,7 +165,13 @@ export class Town {
         }
       }
       const loop = mesh(new THREE.TorusGeometry(.85, .18, 8, 40), seam, exterior, 0, 16.6, 0); loop.scale.set(.5, 1.25, .6);
-    } else nanotCage(exterior, radius, centerY, this.mobile);
+    } else {
+      const frame = nanotCage(exterior, radius, centerY, this.mobile).clone().translate(x, .16, z);
+      this.colliders.push({ type: 'mesh', vertices: new Float32Array(frame.getAttribute('position').array), indices: new Uint32Array(frame.index!.array) }); frame.dispose();
+      const base = new THREE.RingGeometry(floorR - .1, 7.7, 80); base.rotateX(-Math.PI / 2); base.translate(x, .25, z);
+      mesh(base, this.paving, this.root);
+      this.colliders.push({ type: 'mesh', vertices: new Float32Array(base.getAttribute('position').array), indices: new Uint32Array(base.index!.array) });
+    }
     this.createInterior(id, inside, x, z, floorR);
   }
   private glass(color: string, emissive = '#000000'): THREE.MeshPhysicalMaterial {
@@ -284,7 +274,8 @@ export class Town {
     // Simple engraved lines are geometry, not tiny unreadable texture text.
     for (let i = 0; i < 3; i++) mesh(new THREE.BoxGeometry(0.85 - i * 0.15, 0.015, 0.025), this.gold, plaque, 0, 1.26 - i * 0.04, -0.2 + i * 0.13);
     this.interactives.push({ id: id === 'city-hall' ? 'artifactor' : id === 'energy' ? 'shelter' : 'connections', object: plaque, position: new THREE.Vector3(x - 3.7, 1.3, z + 2.3) });
-    for (const angle of [1.6, 2.25, 3.05, 3.85, 4.65]) {
+    this.exhibitLoads.push(createExhibition(id, group, x, z, floorR, this.colliders, this.interactives));
+    for (const angle of [1.6, 2.1, 4.2, 4.65]) {
       const px = Math.sin(angle) * (floorR - 1.35), pz = Math.cos(angle) * (floorR - 1.35);
       const seat = mesh(new THREE.BoxGeometry(1.7, 0.13, 0.65), this.wood, group, px, 0.65, pz); seat.rotation.y = angle;
       for (const offset of [-0.55, 0.55]) mesh(new THREE.BoxGeometry(0.13, 0.5, 0.5), this.white, group, px + offset * Math.cos(angle), 0.34, pz - offset * Math.sin(angle));
@@ -294,8 +285,7 @@ export class Town {
     plinth.userData.landmark = id;
   }
   private createHomes(): void {
-    const sites = [[-49, -23], [-38, -40], [-15, -48], [12, -52], [39, -41], [53, -22], [-53, 2], [52, 3], [-24, 52], [24, 52]];
-    for (const [i, site] of sites.entries()) {
+    for (const [i, site] of HOME_SITES.entries()) {
       const [x, z] = site; const group = new THREE.Group(); group.position.set(x, 0, z); group.rotation.y = (i % 3 - 1) * 0.5; this.root.add(group);
       const roof = mesh(new THREE.SphereGeometry(4.8, 24, 14, 0, TAU, 0, 1.5), this.white, group, 0, 0.3); roof.scale.set(1.25, 0.7, 1);
       const front = new THREE.MeshStandardMaterial({ color: '#7b9588', roughness: 0.4, metalness: 0.2 });
@@ -307,7 +297,7 @@ export class Town {
     }
   }
   private clearForTree(x: number, z: number): boolean {
-    if (Math.abs(z - riverCenter(x)) < 8) return false;
+    if (!plantingAllowed(x, z, 2.5) || Math.abs(z - riverCenter(x)) < 8) return false;
     if (Math.abs(x) < 6 && z > -13 && z < 49) return false;
     if (LANDMARKS.some((l) => Math.hypot((x - l.x) / l.stretch.x, (z - l.z) / Math.max(1, l.stretch.z)) < 14)) return false;
     if (Math.abs(x) < 40 && z > -10 && z < 10) return false;
@@ -315,7 +305,7 @@ export class Town {
     return true;
   }
   readonly forest = new Forest();
-  async loadVegetation(): Promise<void> { await this.forest.load(this.mobile); }
+  async loadAssets(): Promise<void> { await Promise.all([this.forest.load(this.mobile), this.mountains.ready, ...this.exhibitLoads]); }
   private createTrees(): void {
     const rand = seeded(3974); const sites: THREE.Vector3[] = [];
     for (let i = 0; i < 240; i++) {
@@ -327,23 +317,8 @@ export class Town {
     this.forest.sites = sites; this.root.add(this.forest);
   }
   private createGardens(): void {
-    const rand = seeded(58); const shrubs = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 }), 500);
-    const flowers = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.09, 0), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 }), 600);
-    const matrix = new THREE.Matrix4(), q = new THREE.Quaternion(), color = new THREE.Color();
-    for (let i = 0; i < 500; i++) {
-      const l = LANDMARKS[i % 3]; const a = rand() * TAU, r = 12.8 + rand() * 4, sp = spread(l, .6);
-      let x = l.x + Math.sin(a) * r * sp.x, z = l.z + Math.cos(a) * r * sp.z;
-      if (Math.abs(x - l.x) < 4 && z > l.z) x += 5;
-      const s = 0.35 + rand() * 0.75;
-      matrix.compose(new THREE.Vector3(x, s * 0.4, z), q, new THREE.Vector3(s, s * 0.7, s)); shrubs.setMatrixAt(i, matrix); color.setHSL(0.24 + rand() * 0.07, 0.4, 0.08 + rand() * 0.06); shrubs.setColorAt(i, color);
-    }
-    for (let i = 0; i < 600; i++) {
-      const l = LANDMARKS[i % 3]; const a = rand() * TAU, r = 12.5 + rand() * 2, s = spread(l, .6);
-      const x = l.x + Math.sin(a) * r * s.x, z = l.z + Math.cos(a) * r * s.z;
-      matrix.compose(new THREE.Vector3(x, 0.55 + rand() * 0.3, z), q, new THREE.Vector3(1, 1, 1)); flowers.setMatrixAt(i, matrix);
-      color.set(['#ede6bf', '#c1bbd4', '#e5c596'][i % 3]); flowers.setColorAt(i, color);
-    }
-    this.root.add(shrubs); this.details.add(flowers);
+    createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter);
+    const rand = seeded(58), matrix = new THREE.Matrix4(), q = new THREE.Quaternion();
     const stone = new THREE.MeshStandardMaterial({ color: '#aaa99a', roughness: 1 });
     const rocks = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), stone, 170);
     for (let i = 0; i < 170; i++) {
@@ -354,12 +329,6 @@ export class Town {
     for (const x of [-6.5, 6.5]) for (const z of [5, 13, 39]) {
       const pole = mesh(new THREE.CylinderGeometry(0.045, 0.065, 2.8, 8), this.gold, this.root, x, 1.4, z);
       const globe = mesh(this.sphere, new THREE.MeshStandardMaterial({ color: '#f3e8c9', emissive: '#e4c881', emissiveIntensity: 0.35, roughness: 0.6 }), this.root, x, 2.8, z); globe.scale.setScalar(0.23); pole.castShadow = false;
-    }
-  }
-  private createHills(): void {
-    const rand = seeded(20); const mat = new THREE.MeshStandardMaterial({ color: '#7e9980', roughness: 1 });
-    for (let i = 0; i < 18; i++) {
-      const phi = i / 18 * TAU; const m = mesh(new THREE.SphereGeometry(1, 20, 12), mat, this.root, Math.sin(phi) * 155, -2, Math.cos(phi) * 135); m.scale.set(28 + rand() * 25, 16 + rand() * 18, 32 + rand() * 25); m.castShadow = false;
     }
   }
   update(time: number, dt: number): void {

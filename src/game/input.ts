@@ -77,8 +77,11 @@ export class Input {
     this.yaw -= dx * 0.0028;
     this.pitch = Math.max(-1.3, Math.min(1.3, this.pitch - dy * 0.0028));
   }
+  turn(dt: number): void {
+    if (this.active) this.yaw += (Number(this.keys.has('ArrowLeft')) - Number(this.keys.has('ArrowRight'))) * 1.65 * dt;
+  }
   direction(): { x: number; z: number; speed: number } {
-    let x = this.moveX + Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));
+    let x = this.moveX + Number(this.keys.has('KeyD')) - Number(this.keys.has('KeyA'));
     let z = this.moveZ + Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'));
     const length = Math.max(1, Math.hypot(x, z)); x /= length; z /= length;
     return { x: x * Math.cos(this.yaw) - z * Math.sin(this.yaw), z: -x * Math.sin(this.yaw) - z * Math.cos(this.yaw), speed: this.keys.has('ShiftLeft') ? 6.5 : 4.2 };

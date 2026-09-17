@@ -14,7 +14,7 @@ test('explore City Hall, preserve position through map mode, and retain discover
   expect(await page.evaluate(() => document.pointerLockElement)).toBeNull();
   const initial = await snapshot(page);
   expect(initial.yaw).toBe(0); expect(initial.pitch).toBe(0);
-  for (const key of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']) {
+  for (const key of ['ArrowUp', 'ArrowDown', 'KeyA', 'KeyD']) {
     await page.keyboard.down(key); await page.keyboard.up(key);
     expect((await snapshot(page)).yaw).toBe(initial.yaw);
     expect((await snapshot(page)).pitch).toBe(initial.pitch);
@@ -84,11 +84,16 @@ test('mobile layout, simultaneous touch look/movement, cancellation, and aerial 
   await page.getByRole('button', { name: 'Return to walking' }).tap();
   expect((await snapshot(page)).position.z).toBeCloseTo(stopped.position.z, 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await teleport(page, 32.5, -6.7); await expect(page.locator('#interact')).toBeVisible(); await page.locator('#interact').tap();
+  await expect(page.getByRole('table')).toContainText('Sterling silver');
+  await expect.poll(() => page.locator('.exhibit-photos img').evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
+  expect(await page.locator('#lore').evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth)).toBe(true);
+  await page.waitForTimeout(600); await page.screenshot({ path: 'output/testing/catalogue-mobile.png' });
   expect(errors).toEqual([]);
   await context.close();
 });
 
-test('WASD and arrows never change held-mouse rotation or enable unpressed rotation', async ({ page }) => {
+test('movement keys preserve held-mouse rotation and never enable unpressed rotation', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => {
     HTMLCanvasElement.prototype.requestPointerLock = () => { throw new Error('Livistone must never request pointer lock'); };
@@ -97,7 +102,7 @@ test('WASD and arrows never change held-mouse rotation or enable unpressed rotat
   await expect(page.getByRole('button', { name: 'Enter Livistone' })).toBeEnabled({ timeout: 60000 });
   await page.getByRole('button', { name: 'Enter Livistone' }).click();
   const rotations: { yaw: number; pitch: number }[] = [];
-  for (const keys of [[], ['KeyW'], ['KeyA'], ['KeyS'], ['KeyD'], ['ArrowUp'], ['ArrowDown'], ['ArrowLeft'], ['ArrowRight'], ['ArrowUp', 'ArrowRight']]) {
+  for (const keys of [[], ['KeyW'], ['KeyA'], ['KeyS'], ['KeyD'], ['ArrowUp'], ['ArrowDown'], ['ArrowUp', 'KeyD']]) {
     await teleport(page, 0, 44);
     await page.mouse.move(620, 350);
     const before = await snapshot(page);
@@ -160,4 +165,45 @@ test('both jewelry ministries have walkable entrances and reachable artifacts', 
     await page.keyboard.up('ArrowDown');
   }
   expect(requests.filter((url) => /\.stl(?:$|\?)/i.test(url))).toEqual([]);
+});
+
+test('left/right arrows turn in place, A/D strafe, and keyboard turning preserves a held drag', async ({ page }) => {
+  await page.goto('/'); await expect(page.locator('#enter')).toBeEnabled({ timeout: 60000 }); await page.click('#enter');
+  for (const [key, sign] of [['ArrowLeft', 1], ['ArrowRight', -1]] as const) {
+    await teleport(page, 0, 44); const start = await snapshot(page);
+    await page.keyboard.down(key); await expect.poll(async () => (await snapshot(page)).yaw * sign).toBeGreaterThan(.25); await page.keyboard.up(key);
+    const turned = await snapshot(page);
+    expect(turned.position.x).toBeCloseTo(start.position.x, 2); expect(turned.position.z).toBeCloseTo(start.position.z, 2); expect(turned.pitch).toBe(start.pitch);
+    await page.mouse.move(800, 400, { steps: 4 }); expect((await snapshot(page)).yaw).toBe(turned.yaw);
+  }
+  for (const [key, sign] of [['KeyA', -1], ['KeyD', 1]] as const) {
+    await teleport(page, 0, 44); await page.keyboard.down(key);
+    await expect.poll(async () => (await snapshot(page)).position.x * sign).toBeGreaterThan(.4); await page.keyboard.up(key);
+    expect((await snapshot(page)).yaw).toBe(0); expect((await snapshot(page)).position.z).toBeCloseTo(44, 2);
+  }
+  await teleport(page, 0, 44); await page.mouse.move(620, 350); await page.mouse.down();
+  await page.keyboard.down('ArrowRight'); await expect.poll(async () => (await snapshot(page)).yaw).toBeLessThan(-.25); await page.keyboard.up('ArrowRight');
+  const beforeDrag = await snapshot(page); await page.mouse.move(720, 350, { steps: 6 }); await page.mouse.up();
+  expect((await snapshot(page)).yaw).toBeCloseTo(beforeDrag.yaw - 100 * .0028, 5);
+  await page.keyboard.down('ArrowLeft'); await page.keyboard.press('KeyM'); await page.keyboard.up('ArrowLeft');
+  const paused = await snapshot(page); await page.getByRole('button', { name: 'Return to walking' }).click();
+  await page.mouse.move(800, 400); expect((await snapshot(page)).yaw).toBe(paused.yaw);
+});
+
+test('every civic exhibition displays real local photos and readable catalogue facts', async ({ page }) => {
+  const failed: string[] = []; page.on('requestfailed', (request) => { if (/images\/jewelry|textures\/mountains/.test(request.url())) failed.push(request.url()); });
+  page.on('console', (message) => { if (message.type() === 'error' && /Shader|WebGLProgram/.test(message.text())) failed.push(message.text()); });
+  await page.goto('/'); await expect(page.locator('#enter')).toBeEnabled({ timeout: 60000 }); await page.click('#enter');
+  for (const [x, z, material, dimensions] of [[0, -21, 'Brass, walnut, amethyst', '3.4 × 3.4 cm'], [-29, -9, 'Amber, sterling silver', '3.2 × 2.2 cm'], [29, -11, 'Sterling silver', '3.2 × 3.2 cm']] as const) {
+    // Stand in front of the right-hand information table, looking north into the hall.
+    await teleport(page, x + 3.5, z + 4.3);
+    await expect(page.locator('#interact')).toBeVisible(); await page.keyboard.press('KeyE');
+    await expect(page.getByRole('table')).toContainText(material); await expect(page.getByRole('table')).toContainText(dimensions);
+    await expect(page.getByRole('heading', { name: 'The original jewelry', exact: true })).toBeVisible();
+    await expect(page.locator('.exhibit-photos img')).toHaveCount(2);
+    await expect.poll(() => page.locator('.exhibit-photos img').evaluateAll((images) => images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
+    await expect(page.getByRole('link', { name: /View Livia/ })).toHaveAttribute('href', 'https://livia.glucosedao.org/pieces/');
+    await page.getByRole('button', { name: 'Continue exploring' }).click();
+  }
+  expect(failed).toEqual([]);
 });

@@ -31,4 +31,17 @@ describe('architectural jewelry', () => {
     expect(energy.stretch.x * 7.1).toBeCloseTo(ENERGY_HALL.a);
     expect(energy.stretch.z * 7.1).toBeCloseTo(ENERGY_HALL.b);
   });
+
+  it('keeps Nanot silver outside its glazing and grounds the supporting ribs', () => {
+    const group = new THREE.Group(), frame = nanotCage(group, 8.5, 6, false), center = new THREE.Vector3(0, 6, 0), triangle = new THREE.Triangle(), nearest = new THREE.Vector3();
+    for (const name of ['Jewelry silver', 'Nanot supporting frame']) {
+      const g = (group.getObjectByName(name) as THREE.Mesh<THREE.BufferGeometry>).geometry, p = g.getAttribute('position'), indices = g.index!;
+      for (let i = 0; i < indices.count; i += 3) {
+        triangle.a.fromBufferAttribute(p, indices.getX(i)); triangle.b.fromBufferAttribute(p, indices.getX(i + 1)); triangle.c.fromBufferAttribute(p, indices.getX(i + 2));
+        triangle.closestPointToPoint(center, nearest); expect(nearest.distanceTo(center)).toBeGreaterThan(8.7);
+      }
+    }
+    frame.computeBoundingBox(); expect(frame.boundingBox!.min.y).toBeLessThan(.4); expect(frame.boundingBox!.max.y).toBeGreaterThan(15);
+    group.traverse((object) => { if (object instanceof THREE.Mesh) { object.geometry.dispose(); object.material.dispose(); } });
+  });
 });
