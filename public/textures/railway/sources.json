@@ -1,0 +1,65 @@
+[
+  {
+    "file": "ballast-color.jpg",
+    "asset": "gravel_stones",
+    "size": 802344,
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/gravel_stones/gravel_stones_diff_1k.jpg",
+    "md5": "0e04ba65c86cbc55554877bad6a40354"
+  },
+  {
+    "file": "ballast-normal.jpg",
+    "asset": "gravel_stones",
+    "size": 1485214,
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/gravel_stones/gravel_stones_nor_gl_1k.jpg",
+    "md5": "ae11c45b9bf93346c4b521ab02ec165d"
+  },
+  {
+    "file": "ballast-roughness.jpg",
+    "asset": "gravel_stones",
+    "size": 643561,
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/gravel_stones/gravel_stones_rough_1k.jpg",
+    "md5": "c1447058cea79417f1d19a4d8be8be28"
+  },
+  {
+    "file": "sleeper-color.jpg",
+    "asset": "wooden_planks",
+    "size": 489587,
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wooden_planks/wooden_planks_diff_1k.jpg",
+    "md5": "045a70f787fcb4b60ee5c9878a9bd674"
+  },
+  {
+    "file": "sleeper-normal.jpg",
+    "asset": "wooden_planks",
+    "size": 705118,
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wooden_planks/wooden_planks_nor_gl_1k.jpg",
+    "md5": "03206d820a026239db91a1ff3d8c589d"
+  },
+  {
+    "file": "sleeper-roughness.jpg",
+    "asset": "wooden_planks",
+    "size": 233217,
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wooden_planks/wooden_planks_rough_1k.jpg",
+    "md5": "006e1ad8b5a59e783c25b3b36c3a9e9b"
+  },
+  {
+    "file": "rail-color.jpg",
+    "asset": "rusty_metal",
+    "size": 577389,
+    "md5": "ba829f953270d3ad87d8e86d840f71d6",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rusty_metal/rusty_metal_diff_1k.jpg"
+  },
+  {
+    "file": "rail-normal.jpg",
+    "asset": "rusty_metal",
+    "size": 420984,
+    "md5": "6133cf0df6fd63d0c484ca1669f90935",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rusty_metal/rusty_metal_nor_gl_1k.jpg"
+  },
+  {
+    "file": "rail-roughness.jpg",
+    "asset": "rusty_metal",
+    "size": 214991,
+    "md5": "ec93adbfb6e4d8562a0272be937719dc",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rusty_metal/rusty_metal_rough_1k.jpg"
+  }
+]

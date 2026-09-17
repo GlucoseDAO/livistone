@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
 
-export function bridgeHeight(z: number): number { return .065 + 1.18 * Math.pow(Math.sin(Math.PI * (z - 12) / 28), 2); }
+export function bridgeHeight(z: number): number { return .065 + 2.35 * Math.pow(Math.sin(Math.PI * (z - 12) / 28), 2); }
 
 /** A continuous masonry vault, with its feet buried in the banks and an open waterway. */
 export function createBridge(parent: THREE.Group, colliders: ColliderSpec[], stone: THREE.Material, paving: THREE.Material, metal: THREE.Material): void {
@@ -10,7 +10,7 @@ export function createBridge(parent: THREE.Group, colliders: ColliderSpec[], sto
   const profile = new THREE.Shape(); profile.moveTo(12, bridgeHeight(12) - .008);
   for (let i = 1; i <= 64; i++) { const z = 12 + i / 64 * 28; profile.lineTo(z, bridgeHeight(z) - .008); }
   profile.lineTo(40, -2.2); profile.lineTo(33.5, -2.2);
-  profile.quadraticCurveTo(32.5, .8, 26, .82); profile.quadraticCurveTo(19.5, .8, 18.5, -2.2);
+  profile.quadraticCurveTo(32.5, 1.94, 26, 1.96); profile.quadraticCurveTo(19.5, 1.94, 18.5, -2.2);
   profile.lineTo(12, -2.2); profile.closePath();
   const vault = new THREE.ExtrudeGeometry(profile, { depth: 4.9, bevelEnabled: false, curveSegments: 32 });
   vault.rotateY(-Math.PI / 2); vault.translate(2.45, 0, 0); masonry.push(vault);
@@ -18,7 +18,7 @@ export function createBridge(parent: THREE.Group, colliders: ColliderSpec[], sto
   const vertices: number[] = [], indices: number[] = [], uv: number[] = [];
   for (let i = 0; i <= 84; i++) {
     const z = 12 + i / 84 * 28, y = bridgeHeight(z);
-    vertices.push(-2.45, y, z, 2.45, y, z); uv.push(0, z / 5, 1, z / 5);
+    vertices.push(-2.45, y, z, 2.45, y, z); uv.push(-2.45 / 4, z / 4, 2.45 / 4, z / 4);
     if (i < 84) { const n = i * 2; indices.push(n, n + 2, n + 1, n + 1, n + 2, n + 3); }
   }
   const deck = new THREE.BufferGeometry(); deck.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); deck.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); deck.setIndex(indices); deck.computeVertexNormals();
@@ -41,7 +41,26 @@ export function createBridge(parent: THREE.Group, colliders: ColliderSpec[], sto
       }
     }
     // Radial joints articulate the arch stones instead of leaving a featureless white slab.
-    const arch = [new THREE.QuadraticBezierCurve(new THREE.Vector2(18.5, -2.2), new THREE.Vector2(19.5, .8), new THREE.Vector2(26, .82)), new THREE.QuadraticBezierCurve(new THREE.Vector2(26, .82), new THREE.Vector2(32.5, .8), new THREE.Vector2(33.5, -2.2))];
+    const arch = [new THREE.QuadraticBezierCurve(new THREE.Vector2(18.5, -2.2), new THREE.Vector2(19.5, 1.94), new THREE.Vector2(26, 1.96)), new THREE.QuadraticBezierCurve(new THREE.Vector2(26, 1.96), new THREE.Vector2(32.5, 1.94), new THREE.Vector2(33.5, -2.2))];
+    // Proud arch mouldings and branching haunches catch side light like the concept's sculpted ribs.
+    const archPoints = Array.from({ length: 65 }, (_, i) => {
+      const t = i / 64, p = arch[t < .5 ? 0 : 1].getPoint(t < .5 ? t * 2 : (t - .5) * 2);
+      return new THREE.Vector3(side * 2.49, p.y + .06, p.x);
+    });
+    tube(archPoints, .19, masonry);
+    for (const end of [0, 1]) {
+      const z = end ? 33.5 : 18.5, direction = end ? 1 : -1;
+      for (const reach of [2.2, 4.4]) tube([
+        new THREE.Vector3(side * 2.5, -1.6, z),
+        new THREE.Vector3(side * 2.5, -.35, z + direction * reach * .35),
+        new THREE.Vector3(side * 2.5, bridgeHeight(z + direction * reach) - .14, z + direction * reach),
+      ], .12, masonry);
+      tube([
+        new THREE.Vector3(side * 2.52, -.7, z + direction * 1.1),
+        new THREE.Vector3(side * 2.52, -.1, z + direction * 1.4),
+        new THREE.Vector3(side * 2.52, bridgeHeight(z + direction * 2.8) - .2, z + direction * 2.8),
+      ], .028, rails);
+    }
     for (let i = 0; i <= 22; i++) {
       const t = i / 22, p = arch[t < .5 ? 0 : 1].getPoint(t < .5 ? t * 2 : (t - .5) * 2);
       tube([new THREE.Vector3(side * 2.455, p.y + .025, p.x), new THREE.Vector3(side * 2.455, bridgeHeight(p.x) - .035, p.x + (t - .5) * .22)], .01, joints);
@@ -53,5 +72,24 @@ export function createBridge(parent: THREE.Group, colliders: ColliderSpec[], sto
     const merged = mergeGeometries(geometries.map((g) => g.index ? g.toNonIndexed() : g))!;
     const mesh = new THREE.Mesh(merged, material); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh);
     geometries.forEach((g) => g.dispose());
+  }
+}
+
+/** Reuse the vault with exactly the same transform applied to every physics shape. */
+export function createGardenBridge(parent: THREE.Group, colliders: ColliderSpec[], stone: THREE.Material, paving: THREE.Material, metal: THREE.Material, site: { x: number; z: number; yaw: number; scale: number }): void {
+  const group = new THREE.Group(), local: ColliderSpec[] = [];
+  createBridge(group, local, stone, paving, metal);
+  const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), site.yaw);
+  const offset = new THREE.Vector3(0, 0, -26 * site.scale).applyQuaternion(rotation).add(new THREE.Vector3(site.x, 0, site.z));
+  group.position.copy(offset); group.quaternion.copy(rotation); group.scale.setScalar(site.scale); group.updateMatrix(); parent.add(group);
+  for (const spec of local) {
+    if (spec.type === 'mesh') {
+      const vertices = spec.vertices.slice(), p = new THREE.Vector3();
+      for (let i = 0; i < vertices.length; i += 3) { p.fromArray(vertices, i).applyMatrix4(group.matrix); p.toArray(vertices, i); }
+      colliders.push({ ...spec, vertices });
+    } else {
+      const p = new THREE.Vector3(...spec.position).applyMatrix4(group.matrix);
+      colliders.push({ type: 'box', position: [p.x, p.y, p.z], size: spec.size.map((v) => v * site.scale) as [number, number, number], yaw: (spec.yaw ?? 0) + site.yaw });
+    }
   }
 }

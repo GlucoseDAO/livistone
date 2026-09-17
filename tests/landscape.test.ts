@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { createBridge, bridgeHeight } from '../src/world/bridge';
 import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from '../src/world/landscape';
-import { LANDMARKS } from '../src/game/content';
+import { CIVIC_LANDMARKS } from '../src/game/content';
 import { Physics } from '../src/game/physics';
 import type { ColliderSpec } from '../src/game/physics';
 
@@ -15,7 +15,7 @@ describe('garden circulation', () => {
         expect(plantingAllowed(edge.x, edge.z, .8)).toBe(false);
       }
     }
-    for (const l of LANDMARKS) for (let z = l.z; z < l.z + 20; z += .25) {
+    for (const l of CIVIC_LANDMARKS) for (let z = l.z; z < l.z + 20; z += .25) {
       for (const dx of [-3, 0, 3]) expect(plantingAllowed(l.x + dx, z, 1)).toBe(false);
     }
     expect(plantingAllowed(70, -40, 1)).toBe(true);
@@ -29,13 +29,15 @@ describe('garden circulation', () => {
     createBridge(group, colliders, material, material, material);
     const physics = await Physics.create(colliders);
     try {
-      physics.teleport({ x: 0, y: 1, z: 42 });
-      for (let i = 0; i < 510; i++) {
-        physics.step(0, -4); const p = physics.position();
-        expect(p.y).toBeGreaterThan(.8);
-        if (p.z > 13 && p.z < 39) expect(Math.abs(p.y - bridgeHeight(p.z) - .845)).toBeLessThan(.12);
+      for (const direction of [-1, 1]) {
+        physics.teleport({ x: 0, y: 1, z: direction < 0 ? 42 : 10 });
+        for (let i = 0; i < 510; i++) {
+          physics.step(0, direction * 4); const p = physics.position();
+          expect(p.y).toBeGreaterThan(.8);
+          if (p.z > 13 && p.z < 39) expect(Math.abs(p.y - bridgeHeight(p.z) - .845)).toBeLessThan(.12);
+        }
+        expect(direction * (physics.position().z - 26)).toBeGreaterThan(16);
       }
-      expect(physics.position().z).toBeLessThan(10);
       for (const z of [13, 26, 39]) for (const side of [-1, 1]) {
         physics.teleport({ x: 0, y: bridgeHeight(z) + .86, z });
         for (let i = 0; i < 90; i++) physics.step(side * 4, 0);

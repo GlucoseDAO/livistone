@@ -5,11 +5,16 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 const out = process.argv[2] ?? 'output/testing/landmarks'; mkdirSync(out, { recursive: true });
 const views = [
-  ['energy-front', -29, 16, 0], ['energy-side', -4, -9, Math.PI / 2], ['energy-inside', -29, -5, 0], ['energy-hall', -36.5, -9, -Math.PI / 2],
+  ['time-tower', 17, -15, 0, .4], ['west-tributary', -46, -12, Math.PI / 2], ['east-tributary', 67, -5, .8, .08],
+  ['energy-front', -29, 12, 0], ['energy-side', -4, -9, Math.PI / 2], ['energy-inside', -29, -5, 0], ['energy-hall', -36.5, -9, -Math.PI / 2],
   ['science-front', 29, 14, 0], ['science-side', 6, -11, -Math.PI / 2], ['science-inside', 29, -7, 0],
-  ['city-hall-front', 0, 4, 0], ['garden-overview', 0, 44, 0],
+  ['city-hall-front', 0, 4, 0], ['garden-overview', 0, 52, 0],
+  ['gateway-front', 0, 52, 0, .18], ['gateway-side', 9, 47, .92, .26], ['gateway-reverse', 0, 33, Math.PI, .25],
   ['bridge-bank', 14, 36, 1.0], ['bridge-crossing', 0, 36, 0], ['garden-path', -14, 8, 1.2],
   ['city-hall-gallery', -2.4, -24, -.23], ['energy-gallery', -31.4, -10.5, -.28], ['science-gallery', 26.6, -12.2, -.28],
+  ['embryo-station-front', -16, -37, 0, .31], ['embryo-station-platform', -16, -73, -1.1],
+  ['railway-east-portal', 85, -79, -Math.PI / 2, .13], ['railway-west-portal', -85, -79, Math.PI / 2, .13],
+  ['railway-detail', 55, -76.6, -Math.PI / 2, -.22], ['railway-inside', 135, -79, -Math.PI / 2, .07],
   ['catalogue-lectern', 3.5, -16.7, 0],
 ];
 const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', '--headless=new', '--use-gl=angle', '--use-angle=gl', '--ignore-gpu-blocklist'] });
@@ -18,8 +23,9 @@ page.on('pageerror', (e) => console.error('page error:', e.message));
 await page.goto('http://127.0.0.1:5173');
 await page.waitForFunction(() => window.__livistone?.snapshot().ready, null, { timeout: 60000 });
 await page.click('#enter'); await page.waitForTimeout(300);
-for (const [name, x, z, yaw] of views) {
+for (const [name, x, z, yaw, pitch = 0] of views) {
   await page.evaluate(([x, z, yaw]) => window.__livistone.teleport(x, z, yaw), [x, z, yaw]);
+  if (pitch) { await page.mouse.move(640, 400); await page.mouse.down(); await page.mouse.move(640, 400 - pitch / .0028, { steps: 4 }); await page.mouse.up(); }
   await page.waitForTimeout(600); await page.screenshot({ path: `${out}/${name}.png` });
 }
 await page.waitForFunction(() => window.__livistone.snapshot().interaction === 'nut');

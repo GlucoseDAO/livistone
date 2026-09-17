@@ -1,7 +1,11 @@
 import './style.css';
 import * as THREE from 'three';
+import { RAILWAY, railwayCorridor } from './world/station-layout';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createSky } from './world/sky';
+import { setGatewayQuality } from './world/gateway-materials';
+import { textAction } from './world/exhibition-text';
+import { COLLECTION, EXHIBITS } from './game/exhibits';
 import { Town } from './world/world';
 import { UI } from './ui/ui';
 import type { Mode } from './ui/ui';
@@ -29,6 +33,8 @@ class Game {
   private mode: Mode = 'welcome';
   private returnMode: 'walking' | 'map' = 'walking';
   private loreFromJournal = false;
+  private galleryReturn: 'walking' | 'lore' = 'walking';
+  private selectingPiece = false;
   private accumulator = 0;
   private lastTime = performance.now();
   private elapsed = 0;
@@ -92,7 +98,7 @@ class Game {
     this.ui.ready();
   }
   private get mapView(): boolean {
-    return this.mode === 'map' || this.mode === 'welcome' || (['lore', 'journal', 'paused'].includes(this.mode) && this.returnMode === 'map');
+    return this.mode === 'map' || this.mode === 'welcome' || (['lore', 'journal', 'paused', 'gallery'].includes(this.mode) && this.returnMode === 'map');
   }
   private resize(): void {
     const width = window.innerWidth, height = window.innerHeight;
@@ -114,6 +120,17 @@ class Game {
   async action(action: string): Promise<void> {
     if (action === 'reload') { location.reload(); return; }
     if (!this.physics) return;
+    if (action.startsWith('exhibit-key:') && this.mode === 'walking') {
+      const p = this.physics.position(), landmark = LANDMARKS.find((l) => Math.hypot((p.x - l.x) / l.stretch.x, (p.z - l.z) / l.stretch.z) < 6.7);
+      if (landmark) await this.exhibitionAction(`exhibit:${action.split(':')[1]}:${landmark.id}`); return;
+    }
+    if (action.startsWith('exhibit:')) { await this.exhibitionAction(action); return; }
+    if (action.startsWith('exhibit-photo:')) {
+      const [, id, index] = action.split(':'); const exhibit = COLLECTION.find((e) => e.discovery === id);
+      if (exhibit) { this.galleryReturn = this.mode === 'lore' ? 'lore' : 'walking'; this.ui.gallery.showPhoto(exhibit, Number(index)); this.setMode('gallery'); } return;
+    }
+    if (action.startsWith('tap:') && this.mode === 'walking') { this.clickPhoto(Number(action.split(':')[1]), Number(action.split(':')[2])); return; }
+    if (this.mode === 'gallery' && !['escape', 'close'].includes(action)) return;
     if (action === 'enter' || action === 'walk') {
       this.returnMode = 'walking'; this.setMode('walking');  this.ambience.resume();
       if (action === 'enter') this.ui.toast('Follow the white bridge into the civic gardens.');
@@ -122,9 +139,10 @@ class Game {
       else { this.returnMode = 'map'; this.resetMap(); this.setMode('map'); }
     } else if (action === 'pause' || action === 'escape') {
       if (this.mode === 'welcome') return;
-      if (['paused', 'lore', 'journal'].includes(this.mode)) { await this.action('close'); return; }
+      if (['paused', 'lore', 'journal', 'gallery'].includes(this.mode)) { await this.action('close'); return; }
       this.returnMode = this.mode === 'map' ? 'map' : 'walking'; this.setMode('paused');
     } else if (action === 'close') {
+      if (this.mode === 'gallery') { this.setMode(this.galleryReturn); return; }
       if (this.mode === 'lore' && this.loreFromJournal) { this.loreFromJournal = false; this.setMode('journal'); }
       else { this.setMode(this.returnMode);  }
     } else if (action === 'journal') {
@@ -135,7 +153,7 @@ class Game {
       const id = action.split(':')[1]; if (!this.progress.discovered.includes(id)) return;
       this.loreFromJournal = true; this.ui.showLore(DISCOVERIES.find((d) => d.id === id)!); this.setMode('lore');
     } else if (action.startsWith('activate:')) {
-      this.town.activate(action.split(':')[1]); this.ui.toast('A small spark of possibility.');
+      this.town.activate(action.split(':')[1]); this.ui.toast('Photo cylinder rotation changed.');
     } else if (action.startsWith('landmark:')) {
       const landmark = LANDMARKS.find((l) => l.id === action.split(':')[1]); if (!landmark) return;
       this.selection = landmark.id; this.ui.selectLandmark(landmark);
@@ -153,10 +171,42 @@ class Game {
   private discover(id: string): void {
     const discovery = DISCOVERIES.find((d) => d.id === id); if (!discovery) return;
     if (!this.progress.discovered.includes(id)) { this.progress.discovered.push(id); writeProgress(this.progress); this.ui.progress(this.progress); }
-    this.returnMode = 'walking'; this.loreFromJournal = false; this.ui.showLore(discovery); this.setMode('lore');
+    this.returnMode = 'walking'; this.loreFromJournal = false; this.ui.showLore(discovery, this.town.exhibitions.find((e) => EXHIBITS.find((original) => original.landmark === e.id)?.discovery === id)?.selected); this.setMode('lore');
+  }
+  private async exhibitionAction(action: string): Promise<void> {
+    const [, command, hall, piece] = action.split(':'); const exhibition = this.town.exhibitions.find((e) => e.id === hall); if (!exhibition) return;
+    if (command === 'info') { this.discover(EXHIBITS.find((e) => e.landmark === hall)!.discovery); }
+    else if (command === 'lore') { this.discover(hall === 'city-hall' ? 'artifactor' : hall === 'energy' ? 'shelter' : 'connections'); }
+    else if (command === 'browse') { this.galleryReturn = 'walking'; this.ui.gallery.showBrowse(hall, exhibition.selected); this.setMode('gallery'); }
+    else if (command === 'photo') { this.galleryReturn = 'walking'; this.ui.gallery.showPhoto(exhibition.selected); this.setMode('gallery'); }
+    else if (command === 'pause') exhibition.paused = !exhibition.paused;
+    else if (command === 'left' || command === 'right') exhibition.turn(command === 'left' ? -1 : 1);
+    else if (command === 'select' && !this.selectingPiece) {
+      const selected = COLLECTION.find((e) => e.discovery === piece); if (!selected) return;
+      this.selectingPiece = true; this.ui.gallery.dialog.setAttribute('aria-busy', 'true');
+      const success = await exhibition.select(selected); this.selectingPiece = false; this.ui.gallery.dialog.removeAttribute('aria-busy');
+      if (this.mode === 'gallery') this.setMode('walking');
+      this.ui.toast(success ? selected.title + ' is now on this cylinder.' : 'The photographs could not load. The previous piece is still on display.');
+    }
+  }
+  private clickPhoto(x: number, y: number): void {
+    this.raycaster.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, 1 - y / innerHeight * 2), this.walkCamera); this.raycaster.far = 9;
+    const hit = this.raycaster.intersectObjects(this.town.exhibitions.flatMap((e) => [...e.photos, ...e.textSurfaces]), false)[0]; if (!hit) return;
+    const wall = this.raycaster.intersectObjects(this.town.occluders, false)[0]; if (wall && wall.distance < hit.distance) return;
+    const exhibition = this.town.exhibitions.find((e) => e.id === hit.object.userData.exhibition)!;
+    if (hit.object.userData.information && hit.uv) {
+      const command = textAction(hit.uv.x, hit.uv.y); if (command) void this.exhibitionAction(`exhibit:${command}:${exhibition.id}`); return;
+    }
+    this.galleryReturn = 'walking'; this.ui.gallery.showPhoto(exhibition.selected, hit.object.userData.photoIndex as number); this.setMode('gallery');
+  }
+  private updateExhibitionControls(): void {
+    const p = this.physics?.position(); this.ui.gallery.floating.hidden = true; if (!p || this.mode !== 'walking') return;
+    const landmark = LANDMARKS.find((l) => Math.hypot((p.x - l.x) / l.stretch.x, (p.z - l.z) / l.stretch.z) < 6.7); if (!landmark) return;
+    const exhibition = this.town.exhibitions.find((e) => e.id === landmark.id); if (!exhibition) return;
+    this.ui.gallery.accessibleControls(exhibition.id, exhibition.selected, exhibition.paused);
   }
   private resetMap(): void {
-    this.mapCamera.position.set(56, 62, 68); this.orbit.target.set(0, 1, -8); this.orbit.update();
+    this.mapCamera.position.set(65, 82, 76); this.orbit.target.set(0, 1, -24); this.orbit.update();
   }
   private quality(low: boolean): void {
     this.lowQuality = low; this.renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1 : 1.5));
@@ -164,7 +214,11 @@ class Game {
     this.town.root.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of materials) if (material instanceof THREE.MeshPhysicalMaterial) { material.transmission = low ? 0 : 0.45; material.opacity = material.userData.clearGallery ? (low ? .18 : .26) : (low ? .32 : .65); material.needsUpdate = true; }
+      for (const material of materials) if (material instanceof THREE.MeshPhysicalMaterial) {
+        if (material.userData.gatewayGem) { setGatewayQuality(material, low); continue; }
+        material.transmission = low ? 0 : material.userData.stationAmber ? .8 : .45;
+        material.opacity = material.userData.stationAmber ? 1 : material.userData.clearGallery ? (low ? .18 : .26) : (low ? .32 : .65); if (material.userData.stationAmber) material.emissiveIntensity = low ? .23 : .2; material.needsUpdate = true;
+      }
     });
     this.resize(); this.ui.toast(low ? 'Gentle visual detail enabled.' : 'Rich visual detail enabled.');
   }
@@ -176,7 +230,7 @@ class Game {
       this.physics.step(movement.x * movement.speed, movement.z * movement.speed); this.accumulator -= 1 / 60;
     }
     const pos = this.physics.position();
-    if (pos.y < -0.5 || Math.abs(pos.x) > 103 || Math.abs(pos.z) > 88) { this.physics.teleport(); this.ui.toast('Let’s stay on the garden paths.'); }
+    if (pos.y < -0.5 || ((Math.abs(pos.x) > 103 || Math.abs(pos.z) > 88) && !railwayCorridor(pos.x, pos.z))) { this.physics.teleport(); this.ui.toast('Let’s stay on the garden paths.'); }
     const current = this.physics.position(); this.walkCamera.position.set(current.x, current.y + 0.78, current.z); this.walkCamera.rotation.set(this.input.pitch, this.input.yaw, 0, 'YXZ');
     this.updateClock += dt;
     if (this.updateClock > 0.12) { this.updateClock = 0; this.findInteraction(); this.findLocation(); }
@@ -187,7 +241,7 @@ class Game {
     if (inside) {
       this.ui.setLocation(inside.name);
       if (!this.progress.visited.includes(inside.id)) { this.progress.visited.push(inside.id); writeProgress(this.progress); this.ui.toast('Welcome to ' + inside.name + '.'); }
-    } else this.ui.setLocation(p.z > 33 ? 'Riverside Gardens' : p.z > 16 ? 'The White Bridge' : 'The Civic Gardens');
+    } else this.ui.setLocation(railwayCorridor(p.x, p.z) && Math.abs(p.x) > RAILWAY.portalX ? 'Dark Nut Mountain Passage' : p.z > 33 ? 'Riverside Gardens' : p.z > 16 ? 'The White Bridge' : 'The Civic Gardens');
   }
   private findInteraction(): void {
     const camera = this.walkCamera; camera.getWorldDirection(this.direction); let candidate: string | null = null, nearest = 4.8;
@@ -220,7 +274,8 @@ class Game {
     const rawDt = (now - this.lastTime) / 1000; const dt = Math.min(rawDt, 0.1); this.lastTime = now; this.elapsed += dt;
     if (this.mode === 'walking') this.updateWalking(dt);
     if (this.mode === 'map') { this.orbit.update(); this.updateMarkers(); }
-    this.town.update(this.elapsed, dt);
+    this.town.update(this.elapsed, this.mode === 'walking' ? dt : 0);
+    this.updateExhibitionControls();
     const camera = this.mapView ? this.mapCamera : this.walkCamera;
     this.renderer.render(this.scene, camera);
     this.fpsFrames++; this.fpsTime += rawDt;

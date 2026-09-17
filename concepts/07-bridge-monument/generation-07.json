@@ -1,0 +1,17 @@
+{
+  "date": "2026-09-18",
+  "tool": "image_gen.imagegen",
+  "mode": "built-in reference-guided edit",
+  "request": "Make the arch closer to the original two-finger ring design and make the stone longer.",
+  "name": "King’s Chapel — long-stone ring arch",
+  "image": "images/07-kings-chapel-long-stone-arch.png",
+  "prompt": "prompts/07-kings-chapel-long-stone-arch.txt",
+  "inputImages": [
+    "/home/antonkulaga/sources/livistone/concepts/07-bridge-monument/images/06-kings-chapel-bridge-arch.png",
+    "/home/antonkulaga/sources/livia/assets/RJW2022/LiviaZaharia-ring-King_s Chapel-1-2022-silver_enhanced tourmaline-3x5x1.5cm.jpg",
+    "/home/antonkulaga/sources/livia/assets/RJW2022/LiviaZaharia-ring-King_s Chapel-2-2022-silver_enhanced tourmaline-3x5x1.5cm.jpg"
+  ],
+  "generatedSource": "/home/antonkulaga/.codex/generated_images/01a0b04d-1c4a-7250-ae51-f33becbd258e/exec-b1cde7a4-de96-4341-81ae-b8a0d5540ac9.png",
+  "status": "Revised design concept for review; not implemented",
+  "visualReview": "The stone is visibly much longer, running almost the full span within a thin capsule bezel. Rounded fan-spoked bezel ends and paired inward-facing open silver tips more closely echo the jewelry. Side ribs and abutments leave the central walking route clear. Earlier concepts are preserved."
+}

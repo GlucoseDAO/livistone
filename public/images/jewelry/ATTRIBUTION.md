@@ -16,3 +16,22 @@ Catalogue facts (type, materials, dimensions, year) were checked against the sit
 
 Reproduction command, run for each source image with ImageMagick installed:
 `magick ../livia/assets/RJW2025/IMG_3433.jpg -auto-orient -resize 1024x1024 -strip -quality 88 public/images/jewelry/IMG_3433.jpg`
+
+
+## Additional selectable pieces
+
+Six more authentic studio images are bundled from the same website repository. Each
+keeps its original aspect ratio and complete framing, resized to fit within 1600 × 1600
+with `magick SOURCE -auto-orient -resize '1600x1600>' -strip -quality 88 DESTINATION`.
+Metadata is taken from the website's `content/pieces.md`; no synthetic jewelry images
+are used. The same project-owner reuse and rights notice above applies.
+
+| Local files | Original archive files (under `../livia/assets/`) |
+| --- | --- |
+| amberbow-1.jpg, amberbow-2.jpg | RJW2023/LiviaZaharia_ring_Amberbow_2023_silver_amber_1.8x3.8x3.3cm_1.jpg, …_2.jpg |
+| ammonite-1.jpg, ammonite-2.jpg | RJW2024/LiviaZaharia_ring_amonite_2023_sterlingsilver_agate_4.2x3.5x2.6cm.jpg, …_1.jpg |
+| beanut-1.jpg, beanut-2.jpg | RJW2021/LiviaZaharia_pendant_Fasolaluna(Beanut)_2019_sterlingsilver_epidote-and-prehnite_1.9x1.5x6.8cm.jpg, …cm1.jpg |
+
+Online originals use the same filenames beneath `https://livia.glucosedao.org/RJW2023/`,
+`/RJW2024/`, and `/RJW2021/`, respectively. The in-game collection links to the full
+[Pieces catalogue](https://livia.glucosedao.org/pieces/).

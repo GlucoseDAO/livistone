@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RAILWAY, STATION } from './station-layout';
 
 function hash(x: number, z: number): number { const n = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return n - Math.floor(n); }
 function noise(x: number, z: number): number {
@@ -12,13 +13,36 @@ export function mountainHeight(x: number, z: number): number {
   const crest = 20 + 18 * Math.sin(phi * 3 + 1) ** 2 + 20 * Math.sin(phi * 5 - .8) ** 6;
   const gullies = 3 * noise(x * .075, z * .075) + .7 * noise(x * .19, z * .19);
   const riverValley = .18 + .82 * THREE.MathUtils.smoothstep(Math.abs(z - 26), 12, 72);
-  return -2 + rise * fall * riverValley * (crest + ridge * ridge * 26 + gullies);
+  const original = -2 + rise * fall * riverValley * (crest + ridge * ridge * 26 + gullies);
+  const spur = 24 * Math.exp(-(((Math.abs(x) - RAILWAY.portalX - 40) / 28) ** 2) - ((z - STATION.trackZ) / 28) ** 2) - 2;
+  return Math.max(original, spur);
 }
 
-export class Mountains extends THREE.Group {
-  readonly ready: Promise<void>;
-  constructor(mobile: boolean) {
-    super(); this.name = 'Ridged mountain landscape';
+/** Subtract the rail clearance from the actual hillside triangles, including both far exits. */
+function cutRailwayOpening(source: THREE.BufferGeometry): THREE.BufferGeometry {
+  const pos = source.getAttribute('position'), color = source.getAttribute('color'), normal = source.getAttribute('normal'), positions: number[] = [], colors: number[] = [], normals: number[] = [];
+  type Vertex = number[];
+  const planes = [(v: Vertex): number => v[2] - STATION.trackZ + 4.55, (v: Vertex): number => STATION.trackZ + 4.55 - v[2], (v: Vertex): number => RAILWAY.clearanceHeight - v[1]];
+  const clip = (polygon: Vertex[], distance: (v: Vertex) => number, inside: boolean): Vertex[] => {
+    const result: Vertex[] = [];
+    for (let i = 0; i < polygon.length; i++) {
+      const a = polygon[i], b = polygon[(i + 1) % polygon.length], da = distance(a) * (inside ? 1 : -1), db = distance(b) * (inside ? 1 : -1);
+      if (da >= 0) result.push(a);
+      if ((da > 0 && db < 0) || (da < 0 && db > 0)) { const t = da / (da - db); result.push(a.map((value, k) => value + (b[k] - value) * t)); }
+    }
+    return result;
+  };
+  const emit = (polygon: Vertex[]): void => { for (let i = 1; i < polygon.length - 1; i++) for (const v of [polygon[0], polygon[i], polygon[i + 1]]) { positions.push(...v.slice(0, 3)); colors.push(...v.slice(3, 6)); normals.push(...v.slice(6)); } };
+  const index = source.index!;
+  for (let i = 0; i < index.count; i += 3) {
+    let polygon = [0, 1, 2].map((j) => { const n = index.getX(i + j); return [pos.getX(n), pos.getY(n), pos.getZ(n), color.getX(n), color.getY(n), color.getZ(n), normal.getX(n), normal.getY(n), normal.getZ(n)]; });
+    if (planes.some((plane) => polygon.every((v) => plane(v) <= 0))) { emit(polygon); continue; }
+    for (const plane of planes) { emit(clip(polygon, plane, false)); polygon = clip(polygon, plane, true); if (!polygon.length) break; }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3)); g.normalizeNormals(); source.dispose(); return g;
+}
+
+export function mountainGeometry(mobile: boolean): THREE.BufferGeometry {
     const angular = mobile ? 256 : 512, radial = mobile ? 60 : 112;
     const positions: number[] = [], colors: number[] = [], indices: number[] = [], color = new THREE.Color();
     for (let j = 0; j <= radial; j++) for (let i = 0; i <= angular; i++) {
@@ -30,6 +54,14 @@ export class Mountains extends THREE.Group {
       if (i < angular && j < radial) { const n = j * (angular + 1) + i; indices.push(n, n + angular + 1, n + 1, n + 1, n + angular + 1, n + angular + 2); }
     }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geo.setIndex(indices); geo.computeVertexNormals();
+    return cutRailwayOpening(geo);
+}
+
+export class Mountains extends THREE.Group {
+  readonly ready: Promise<void>;
+  constructor(mobile: boolean) {
+    super(); this.name = 'Ridged mountain landscape';
+    const geo = mountainGeometry(mobile);
     const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .96 });
     const landscape = new THREE.Mesh(geo, material); landscape.receiveShadow = true; this.add(landscape);
     const loader = new THREE.TextureLoader();

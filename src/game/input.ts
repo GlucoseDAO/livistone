@@ -8,6 +8,8 @@ export class Input {
   private lookPointer: number | null = null;
   private joystickPointer: number | null = null;
   private last = { x: 0, y: 0 };
+  private pendingTap: { x: number; y: number } | null = null;
+  private tap = { x: 0, y: 0, time: 0, moved: false };
   private origin = { x: 0, y: 0 };
   private readonly knob: HTMLElement;
   constructor(private canvas: HTMLCanvasElement, private joystick: HTMLElement, private onAction: (action: string) => void) {
@@ -17,6 +19,8 @@ export class Input {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code) && this.active) e.preventDefault();
       if (this.active) this.keys.add(e.code);
       if (!e.repeat && e.code === 'KeyM') this.onAction('map');
+      const exhibitKey = ({ Digit1: 'info', Digit2: 'browse', Digit3: 'photo', Digit4: 'lore', KeyP: 'pause', BracketLeft: 'left', BracketRight: 'right' } as Record<string, string>)[e.code];
+      if (!e.repeat && this.active && exhibitKey) this.onAction('exhibit-key:' + exhibitKey);
       if (!e.repeat && e.code === 'KeyE' && this.active) this.onAction('interact');
       if (!e.repeat && e.code === 'Escape') this.onAction('escape');
     });
@@ -26,7 +30,7 @@ export class Input {
     canvas.addEventListener('pointerdown', (e) => {
       if (!this.active || this.lookPointer !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
       e.preventDefault();
-      this.lookPointer = e.pointerId;
+      this.pendingTap = null; this.lookPointer = e.pointerId; this.tap = { x: e.clientX, y: e.clientY, time: performance.now(), moved: false };
       this.last = { x: e.clientX, y: e.clientY };
       canvas.setPointerCapture(e.pointerId);
       canvas.focus({ preventScroll: true });
@@ -35,12 +39,22 @@ export class Input {
       if (!this.active || this.lookPointer !== e.pointerId) return;
       // Button state is independent of the keyboard, and repairs a missed pointerup.
       if (e.pointerType === 'mouse' && !(e.buttons & 1)) { this.releaseLook(); return; }
+      if (Math.hypot(e.clientX - this.tap.x, e.clientY - this.tap.y) > 6) this.tap.moved = true;
       this.look(e.clientX - this.last.x, e.clientY - this.last.y);
       this.last = { x: e.clientX, y: e.clientY };
     });
     const stopLook = (e: PointerEvent): void => { if (this.lookPointer === e.pointerId) this.releaseLook(); };
-    document.addEventListener('pointerup', stopLook);
-    document.addEventListener('pointercancel', stopLook);
+    document.addEventListener('pointerup', (e) => {
+      const clicked = this.active && this.lookPointer === e.pointerId && !this.tap.moved && performance.now() - this.tap.time < 450;
+      stopLook(e); this.pendingTap = clicked ? { x: e.clientX, y: e.clientY } : null;
+    });
+    // Wait for the native click: opening a dialog on touch pointerup retargets the
+    // subsequent synthesized click to its newly focused Close button.
+    canvas.addEventListener('click', () => {
+      const tap = this.pendingTap; this.pendingTap = null;
+      if (tap && this.active) this.onAction(`tap:${tap.x}:${tap.y}`);
+    });
+    document.addEventListener('pointercancel', (e) => { stopLook(e); this.pendingTap = null; });
     // Mouse dragging survives capture loss through document events; touch cancellation stops that finger.
     canvas.addEventListener('lostpointercapture', (e) => { if (e.pointerType !== 'mouse') stopLook(e); });
     joystick.addEventListener('pointerdown', (e) => {
@@ -87,7 +101,7 @@ export class Input {
     return { x: x * Math.cos(this.yaw) - z * Math.sin(this.yaw), z: -x * Math.sin(this.yaw) - z * Math.cos(this.yaw), speed: this.keys.has('ShiftLeft') ? 6.5 : 4.2 };
   }
   clear(): void {
-    this.keys.clear(); this.moveX = 0; this.moveZ = 0; this.releaseLook();
+    this.pendingTap = null; this.keys.clear(); this.moveX = 0; this.moveZ = 0; this.releaseLook();
     const pointer = this.joystickPointer; this.joystickPointer = null; this.knob.style.transform = '';
     if (pointer !== null && this.joystick.hasPointerCapture(pointer)) this.joystick.releasePointerCapture(pointer);
   }

@@ -1,7 +1,9 @@
+import { GalleryUI } from './gallery';
+import type { Exhibit } from '../game/exhibits';
 import { DISCOVERIES, LANDMARKS } from '../game/content';
 import { EXHIBITS, CATALOGUE_URL, photoURL } from '../game/exhibits';
 import type { Progress, Discovery, Landmark } from '../game/content';
-export type Mode = 'welcome' | 'walking' | 'map' | 'lore' | 'journal' | 'paused';
+export type Mode = 'welcome' | 'walking' | 'map' | 'lore' | 'journal' | 'paused' | 'gallery';
 const icons: Record<string, string> = {
   map: '<path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5Z"/><path d="M9 3v16M15 5v16"/>',
   book: '<path d="M12 5v16M12 5C9 3 5 3 2 4v15c4-1 7 0 10 2 3-2 6-3 10-2V4c-3-1-7-1-10 1Z"/>',
@@ -15,6 +17,7 @@ const icons: Record<string, string> = {
 };
 export function icon(name: string): string { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + icons[name] + '</svg>'; }
 export class UI {
+  readonly gallery: GalleryUI;
   readonly canvas: HTMLCanvasElement;
   readonly joystick: HTMLElement;
   private readonly app: HTMLElement;
@@ -33,10 +36,10 @@ export class UI {
       '<section id="welcome" class="welcome" aria-labelledby="welcome-title"><div class="eyebrow"><span class="tiny-line"></span>A TOWN LIKE NO OTHER</div><h1 id="welcome-title">Welcome to<br><em>Livistone.</em></h1><p>A place where jewelry becomes architecture,<br class="desktop-break"> science sparks wonder, and nature feels like home.</p><div class="welcome-actions"><button id="enter" class="primary" data-action="enter" disabled><span>Preparing your visit</span>' + icon('arrow') + '</button><button id="preview-map" class="text-button" data-action="preview-map" disabled>' + icon('map') + 'Look around from above</button></div><div class="welcome-foot"><span class="status-dot"></span>TAKE YOUR TIME. THERE IS MUCH TO DISCOVER.</div></section>',
       '<div id="welcome-caption" class="welcome-caption"><span>01 / THE CIVIC GARDENS</span><p>Small artifacts.<br>Extraordinary places.</p><span class="caption-rule"></span></div>',
       '<div id="crosshair" class="crosshair" aria-hidden="true" hidden></div>',
-      '<footer id="walk-footer" class="walk-footer" hidden><div class="place-card"><span class="eyebrow">YOU ARE EXPLORING</span><strong id="location">Riverside Gardens</strong><span id="discoveries">0 of 6 discoveries</span></div><div class="controls-hint"><span><kbd>W A S D</kbd> Walk</span><span><kbd>← →</kbd> Turn</span><span id="look-hint">Hold left mouse to look</span><span><kbd>E</kbd> Discover</span></div></footer>',
+      '<footer id="walk-footer" class="walk-footer" hidden><div class="place-card"><span class="eyebrow">YOU ARE EXPLORING</span><strong id="location">Riverside Gardens</strong><span id="discoveries">0 of 7 discoveries</span></div><div class="controls-hint"><span><kbd>W A S D</kbd> Walk</span><span><kbd>← →</kbd> Turn</span><span id="look-hint">Hold left mouse to look</span><span><kbd>E</kbd> Discover</span></div></footer>',
       '<button id="interact" class="interaction" data-action="interact" hidden><span class="interaction-key">E</span><span id="interact-label">Discover</span>' + icon('arrow') + '</button>',
       '<div id="touch-controls" class="touch-controls" hidden><div id="joystick" class="joystick" role="group" aria-label="Touch movement control"><div class="stick-knob"></div></div><span class="touch-look">Drag to look around</span></div>',
-      '<section id="map-panel" class="map-panel" hidden aria-labelledby="map-title"><div class="eyebrow">THE CITY AT A GLANCE</div><h2 id="map-title">Find your wonder.</h2><p>Three extraordinary buildings.<br>A town of possibilities between them.</p><div class="landmark-list">' + LANDMARKS.map((l, i) => '<button class="landmark-item" data-action="landmark:' + l.id + '"><span class="landmark-number">0' + (i + 1) + '</span><span><strong>' + l.name + '</strong><small>' + l.artifact + '</small></span>' + icon('arrow') + '</button>').join('') + '</div><div id="map-description" class="map-description">Select a landmark to learn more.</div><button class="primary full" data-action="walk">' + icon('walk') + 'Return to walking</button></section>',
+      '<section id="map-panel" class="map-panel" hidden aria-labelledby="map-title"><div class="eyebrow">THE CITY AT A GLANCE</div><h2 id="map-title">Find your wonder.</h2><p>Three civic landmarks and a railway station.<br>New paths. New beginnings.</p><div class="landmark-list">' + LANDMARKS.map((l, i) => '<button class="landmark-item" data-action="landmark:' + l.id + '"><span class="landmark-number">0' + (i + 1) + '</span><span><strong>' + l.name + '</strong><small>' + l.artifact + '</small></span>' + icon('arrow') + '</button>').join('') + '</div><div id="map-description" class="map-description">Select a landmark to learn more.</div><button class="primary full" data-action="walk">' + icon('walk') + 'Return to walking</button></section>',
       '<div id="map-controls" class="map-controls" hidden><button class="tool square" data-action="zoom-in" aria-label="Zoom map in">+</button><button class="tool square" data-action="zoom-out" aria-label="Zoom map out">−</button><button class="tool square" data-action="reset-map" aria-label="Reset map view">' + icon('compass') + '</button><span>Drag to orbit · Pinch or scroll to zoom</span></div>',
       '<div id="map-markers" hidden>' + LANDMARKS.map((l, i) => '<button class="map-marker" id="marker-' + l.id + '" data-action="landmark:' + l.id + '" aria-label="View ' + l.name + '"><span>0' + (i + 1) + '</span><b>' + l.name + '</b></button>').join('') + '<div id="player-marker" class="player-marker"><span></span>You are here</div></div>',
       '<div id="scrim" class="scrim" hidden></div>',
@@ -46,6 +49,7 @@ export class UI {
       '<div id="toast" class="toast" role="status" hidden></div><div id="live" class="sr-only" aria-live="polite"></div>',
       '<section id="error" class="error-screen" hidden><div class="eyebrow">LIVISTONE</div><h2>Let’s try that again.</h2><p id="error-message"></p><button class="primary" data-action="reload">Reload the town</button></section>',
     ].join('');
+    this.gallery = new GalleryUI(this.app);
     this.canvas = this.app.querySelector('#world')!; this.joystick = this.app.querySelector('#joystick')!;
     this.modeLabel = this.app.querySelector('#mode-label')!; this.location = this.app.querySelector('#location')!; this.prompt = this.app.querySelector('#interact')!; this.live = this.app.querySelector('#live')!;
     this.app.addEventListener('click', (e) => {
@@ -58,7 +62,7 @@ export class UI {
       if (e.key !== 'Tab') return;
       const dialog = this.app.querySelector<HTMLElement>('.dialog:not([hidden])');
       if (!dialog) return;
-      const focusable = [...dialog.querySelectorAll<HTMLElement>('button:not([hidden]), a[href], select, [tabindex="0"]')];
+      const focusable = [...dialog.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], select, [tabindex="0"]')].filter((el) => el.getClientRects().length > 0);
       const first = focusable[0], last = focusable.at(-1);
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
@@ -73,10 +77,11 @@ export class UI {
       welcome: mode === 'welcome', 'welcome-caption': mode === 'welcome', tools: mode !== 'welcome',
       'walk-footer': mode === 'walking', crosshair: mode === 'walking', 'touch-controls': mode === 'walking',
       'map-panel': mode === 'map', 'map-controls': mode === 'map', 'map-markers': mode === 'map',
-      scrim: ['lore', 'journal', 'paused'].includes(mode), lore: mode === 'lore', journal: mode === 'journal', pause: mode === 'paused',
+      scrim: ['lore', 'journal', 'paused', 'gallery'].includes(mode), lore: mode === 'lore', journal: mode === 'journal', pause: mode === 'paused', gallery: mode === 'gallery',
     };
     Object.entries(visible).forEach(([id, value]) => { this.app.querySelector<HTMLElement>('#' + id)!.hidden = !value; });
-    this.app.dataset.mode = mode;
+    this.app.dataset.mode = mode; this.gallery.floating.hidden = true;
+    this.app.querySelector<HTMLElement>('#toast')!.hidden = true;
     this.modeLabel.textContent = mode === 'welcome' ? 'ART, SCIENCE & NATURE' : mode === 'map' ? 'A DIFFERENT PERSPECTIVE' : 'EXPLORE AT YOUR OWN PACE';
     if (mode !== 'walking') this.prompt.hidden = true;
     const dialog = this.app.querySelector<HTMLElement>('.dialog:not([hidden])');
@@ -97,19 +102,25 @@ export class UI {
       list.append(button);
     });
   }
-  showLore(discovery: Discovery): void {
+  showLore(discovery: Discovery, selected?: Exhibit): void {
     this.app.querySelector('#lore-category')!.textContent = discovery.category;
     this.app.querySelector('#lore-title')!.textContent = discovery.title;
     this.app.querySelector('#lore-body')!.textContent = discovery.body;
-    const catalogue = this.app.querySelector<HTMLElement>('#exhibit-catalogue')!, exhibit = EXHIBITS.find((e) => e.discovery === discovery.id);
+    const catalogue = this.app.querySelector<HTMLElement>('#exhibit-catalogue')!, exhibit = selected ?? EXHIBITS.find((e) => e.discovery === discovery.id);
+    const changed = !!exhibit && exhibit.discovery !== discovery.id;
+    this.app.querySelector('#lore-title')!.textContent = changed ? exhibit.title : discovery.title;
+    this.app.querySelector('#lore-category')!.textContent = changed ? 'ON THE PHOTO CYLINDER' : discovery.category;
+    this.app.querySelector<HTMLElement>('#lore-body')!.hidden = changed;
+    this.app.querySelector<HTMLElement>('.lore-source')!.hidden = changed;
     catalogue.replaceChildren(); catalogue.hidden = !exhibit;
     if (exhibit) {
       const gallery = document.createElement('div'); gallery.className = 'exhibit-photos';
-      for (const photo of exhibit.photos) {
+      for (const [index, photo] of exhibit.photos.entries()) {
         const figure = document.createElement('figure'), image = document.createElement('img'), caption = document.createElement('figcaption');
-        image.src = photoURL(photo.file); image.alt = photo.alt; image.width = image.height = 1024;
+        image.src = photoURL(photo.file); image.alt = photo.alt; image.loading = 'eager';
         caption.textContent = 'Livia Zaharia · Studio archive'; image.onerror = () => { image.hidden = true; caption.textContent = 'Photograph unavailable. The catalogue information remains below.'; };
-        figure.append(image, caption); gallery.append(figure);
+        const open = document.createElement('button'); open.className = 'photo-open'; open.dataset.action = `exhibit-photo:${exhibit.discovery}:${index}`; open.setAttribute('aria-label', 'Enlarge photograph ' + (index + 1)); open.append(image);
+        figure.append(open, caption); gallery.append(figure);
       }
       const heading = document.createElement('h3'); heading.textContent = 'The original jewelry';
       const description = document.createElement('p'); description.textContent = exhibit.description;
@@ -119,10 +130,10 @@ export class UI {
       }
       const source = document.createElement('a'); source.href = CATALOGUE_URL; source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = 'View Livia’s jewelry catalogue ↗';
       const loreHeading = document.createElement('h3'); loreHeading.textContent = 'Livia Lore & Livistone fiction';
-      catalogue.append(gallery, heading, description, table, source, loreHeading);
+      catalogue.append(gallery, heading, description, table, source); if (!changed) catalogue.append(loreHeading);
     }
     const button = this.app.querySelector<HTMLButtonElement>('#artifact-action')!;
-    button.hidden = !discovery.action; button.textContent = discovery.action ?? ''; button.dataset.action = 'activate:' + discovery.id;
+    button.hidden = changed || !discovery.action; button.textContent = discovery.action ? 'Pause / resume the photo cylinder' : ''; button.dataset.action = 'activate:' + discovery.id;
     this.live.textContent = 'Discovered: ' + discovery.title;
   }
   setLocation(name: string): void { if (this.location.textContent !== name) this.location.textContent = name; }

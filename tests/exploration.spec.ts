@@ -1,8 +1,23 @@
+import * as THREE from 'three';
+import { INFORMATION_COLUMN } from '../src/world/exhibition';
+import { TEXT_ACTIONS, TEXT_WIDTH, TEXT_HEIGHT } from '../src/world/exhibition-text';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 interface Snapshot { ready: boolean; mode: string; position: { x: number; y: number; z: number }; yaw: number; pitch: number; interaction: string | null; progress: { discovered: string[] }; }
 const snapshot = (page: Page): Promise<Snapshot> => page.evaluate(() => (window as unknown as { __livistone: { snapshot(): Snapshot } }).__livistone.snapshot());
 const teleport = (page: Page, x: number, z: number, yaw = 0): Promise<void> => page.evaluate(({ x, z, yaw }) => (window as unknown as { __livistone: { teleport(x: number, z: number, yaw: number): void } }).__livistone.teleport(x, z, yaw), { x, z, yaw });
+
+async function clickColumn(page: Page, x: number, z: number, action: string, touch = false): Promise<void> {
+  const info = INFORMATION_COLUMN, target = TEXT_ACTIONS.find((r) => r.action === action)!;
+  await teleport(page, x + 3.5, z + 4.1, -Math.atan2(info.x - 3.5, 4.1 - info.z)); await page.waitForTimeout(250);
+  const state = await snapshot(page), viewport = page.viewportSize()!;
+  const camera = new THREE.PerspectiveCamera(66, viewport.width / viewport.height, .08, 700);
+  camera.position.set(state.position.x, state.position.y + .78, state.position.z); camera.rotation.set(state.pitch, state.yaw, 0, 'YXZ'); camera.updateMatrixWorld();
+  const u = (target.x + target.width / 2) / TEXT_WIDTH, v = (target.y + target.height / 2) / TEXT_HEIGHT, angle = (u - .5) * info.arcWidth / info.radius;
+  const point = new THREE.Vector3(x + info.x + Math.sin(angle) * info.radius, .16 + info.y + (.5 - v) * info.height, z + info.z + Math.cos(angle) * info.radius).project(camera);
+  const px = (point.x * .5 + .5) * viewport.width, py = (.5 - point.y * .5) * viewport.height;
+  if (touch) await page.touchscreen.tap(px, py); else await page.mouse.click(px, py);
+}
 
 test('explore City Hall, preserve position through map mode, and retain discoveries', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
@@ -191,12 +206,14 @@ test('left/right arrows turn in place, A/D strafe, and keyboard turning preserve
 });
 
 test('every civic exhibition displays real local photos and readable catalogue facts', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const failed: string[] = []; page.on('requestfailed', (request) => { if (/images\/jewelry|textures\/mountains/.test(request.url())) failed.push(request.url()); });
   page.on('console', (message) => { if (message.type() === 'error' && /Shader|WebGLProgram/.test(message.text())) failed.push(message.text()); });
   await page.goto('/'); await expect(page.locator('#enter')).toBeEnabled({ timeout: 60000 }); await page.click('#enter');
   for (const [x, z, material, dimensions] of [[0, -21, 'Brass, walnut, amethyst', '3.4 × 3.4 cm'], [-29, -9, 'Amber, sterling silver', '3.2 × 2.2 cm'], [29, -11, 'Sterling silver', '3.2 × 3.2 cm']] as const) {
-    // Stand in front of the right-hand information table, looking north into the hall.
+    // Wait for interaction refresh after teleporting to another hall.
     await teleport(page, x + 3.5, z + 4.3);
+    await expect.poll(async () => (await snapshot(page)).interaction).toBe(x === 0 ? 'nut' : x < 0 ? 'mitoring' : 'nanot');
     await expect(page.locator('#interact')).toBeVisible(); await page.keyboard.press('KeyE');
     await expect(page.getByRole('table')).toContainText(material); await expect(page.getByRole('table')).toContainText(dimensions);
     await expect(page.getByRole('heading', { name: 'The original jewelry', exact: true })).toBeVisible();
@@ -204,6 +221,64 @@ test('every civic exhibition displays real local photos and readable catalogue f
     await expect.poll(() => page.locator('.exhibit-photos img').evaluateAll((images) => images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
     await expect(page.getByRole('link', { name: /View Livia/ })).toHaveAttribute('href', 'https://livia.glucosedao.org/pieces/');
     await page.getByRole('button', { name: 'Continue exploring' }).click();
+    await clickColumn(page, x, z, 'lore');
+    await expect(page.locator('#lore-title')).toHaveText(x === 0 ? 'The Artifactor & the Herbalist' : x < 0 ? 'A garden for every season' : 'A world of connections');
+    await page.getByRole('button', { name: 'Continue exploring' }).click();
   }
   expect(failed).toEqual([]);
+});
+
+test('photo cylinders switch pieces, pause, open curved photos, zoom and return without moving the player', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/'); await expect(page.locator('#enter')).toBeEnabled({ timeout: 60000 }); await page.click('#enter');
+  await teleport(page, 0, -17.5); await expect(page.locator('#exhibition-controls')).toBeVisible();
+  const before = await snapshot(page);
+  await page.keyboard.press('KeyP');
+  await expect(page.locator('#cylinder-pause')).toHaveText('Resume rotation');
+  // The central photograph itself is clickable, without a modal being triggered by a look drag.
+  await page.mouse.click(640, 390); await expect(page.locator('#gallery')).toBeVisible();
+  await expect(page.locator('#viewer-image')).toHaveAttribute('src', /IMG_349/);
+  await page.getByRole('button', { name: 'Zoom photograph in' }).click(); await expect(page.locator('#photo-zoom')).toHaveText('130%');
+  await page.keyboard.press('+'); await expect(page.locator('#photo-zoom')).toHaveText('169%');
+  await page.mouse.move(520, 420); await page.mouse.down(); await page.mouse.move(620, 470); await page.mouse.up();
+  await expect(page.locator('#viewer-image')).not.toHaveCSS('transform', 'none');
+  await page.getByRole('button', { name: 'Fit image' }).click(); await expect(page.locator('#photo-zoom')).toHaveText('100%');
+  const first = await page.locator('#viewer-image').getAttribute('src'); await page.keyboard.press('ArrowRight');
+  expect(await page.locator('#viewer-image').getAttribute('src')).not.toBe(first);
+  await page.keyboard.press('Escape'); await expect(page.locator('#gallery')).toBeHidden();
+  expect((await snapshot(page)).position.z).toBeCloseTo(before.position.z, 2); expect((await snapshot(page)).yaw).toBe(before.yaw);
+  for (const [x, z, piece] of [[0, -17.5, 'Amberbow Ring'], [-29, -5.5, 'Ammonite Ring'], [29, -7.5, 'Beanut (Fasolaluna)']] as const) {
+    await teleport(page, x, z); await expect(page.locator('#exhibition-controls')).toBeVisible();
+    await page.keyboard.press('Digit2');
+    await expect(page.locator('.piece-card')).toHaveCount(6);
+    await page.locator('.piece-card').filter({ has: page.getByText(piece, { exact: true }) }).click();
+    await expect(page.locator('#gallery')).toBeHidden(); await expect(page.locator('#cylinder-title')).toHaveText(piece);
+    await page.keyboard.press('Digit3');
+    await expect(page.locator('#gallery-title')).toHaveText(piece);
+    await expect.poll(() => page.locator('#viewer-image').evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Digit1');
+    await expect(page.getByRole('table')).toContainText(piece.startsWith('Amber') ? '2023' : piece.startsWith('Ammonite') ? 'agate' : 'prehnite');
+    await page.keyboard.press('Escape');
+  }
+  // The first hall keeps its selection when another hall changes.
+  await teleport(page, 0, -17.5); await expect(page.locator('#cylinder-title')).toHaveText('Amberbow Ring');
+  await page.screenshot({ path: 'output/testing/cylinder-selected.png' });
+  expect(errors).toEqual([]);
+});
+
+test('phone photo viewer supports touch, zoom controls and switching the cylinder', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1, reducedMotion: 'reduce' });
+  const page = await context.newPage(); await page.goto('/'); await expect(page.locator('#enter')).toBeEnabled({ timeout: 60000 }); await page.locator('#enter').tap();
+  await teleport(page, 29, -7.5); await expect(page.locator('#exhibition-controls')).toBeVisible();
+  await clickColumn(page, 29, -11, 'browse', true); await expect(page.locator('#gallery')).toBeVisible();
+  await page.locator('.piece-card').filter({ has: page.getByText('Beanut (Fasolaluna)', { exact: true }) }).tap();
+  await expect(page.locator('#cylinder-title')).toHaveText('Beanut (Fasolaluna)');
+  await clickColumn(page, 29, -11, 'photo', true);
+  await page.getByRole('button', { name: 'Zoom photograph in' }).tap(); await expect(page.locator('#photo-zoom')).toHaveText('130%');
+  await page.getByRole('button', { name: 'Next photograph' }).tap(); await expect(page.locator('#photo-count')).toHaveText('2 / 2');
+  expect(await page.locator('#gallery').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await page.waitForTimeout(500); await page.screenshot({ path: 'output/testing/cylinder-photo-mobile.png' });
+  await page.getByRole('button', { name: 'Close gallery' }).tap(); await expect(page.locator('#joystick')).toBeVisible();
+  await context.close();
 });

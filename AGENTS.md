@@ -7,7 +7,8 @@
 
 Livistone is a browser-playable 3D town: a first-person walk through an art-and-science
 fantasy settlement whose three civic buildings are inhabitable interpretations of Livia
-Zaharia's jewelry (the Nut of Power, the Mitoring, and the Nanot of Power). Read
+Zaharia's jewelry (the Nut of Power, the Mitoring, and the Nanot of Power). The Embryo
+Ring also becomes a walkable railway station at the northern edge. Read
 [README.md](README.md) for what the project is and [docs/3d-game-plan.md](docs/3d-game-plan.md)
 for where it is going.
 
@@ -17,7 +18,7 @@ A TypeScript + Vite single-page app. Three.js renders the town on WebGL 2; Rapie
 (WebAssembly) provides a kinematic capsule character controller. There is no backend, no
 API key, no database, and no account system — the entire game is static files plus
 `localStorage`. Every building, tree placement, path, and piece of jewelry geometry in the
-current build is generated in code at load time; binary assets are two tree GLBs, six real jewelry photographs, and two CC0 rock maps.
+current build is generated in code at load time; binary assets are two tree GLBs, twelve real jewelry photographs, two CC0 rock maps, and nine CC0 railway maps.
 
 ## Commands
 
@@ -54,18 +55,31 @@ src/
     input.ts         Keyboard, held-button drag-to-look mouse, and touch thumbstick input
     audio.ts         Procedural filtered-noise ambience via WebAudio
   world/
-    world.ts         Town: terrain, river, paths, bridge, landmarks, interiors, homes,
+    world.ts         Town: terrain, river, paths, bridges, landmarks, interiors, tower,
                      gardens, hills; emits colliders, interactives, occluders, animated
     jewelry.ts       Rebuilds the extracted jewelry strands as cast-silver ribbons; ENERGY_HALL sizes the amber cup
     walnut.ts        Procedural walnut shell relief and material
     strands/         mitoring.json, nanot.json: preserved wire centerlines from the STLs
     forest.ts        Batched GLB tree instancing with a mobile foliage reduction
-    landscape.ts     Shared path curves, home sites, and planting clearance
+    landscape.ts     Shared path curves and planting clearance
+    station.ts       Embryo station ring, glazed foyer, signs, train, and matching colliders
+    station-amber.ts Closed resin body, procedural textures, refraction, and inner core geometry
+    station-ring.ts  Deep curved silver shank, organic side-wall piercings, and clasp anchors
+    station-layout.ts Shared station, tunnel, railway planting and walking clearance
+    railway.ts       Textured rail geometry, Dark Nut portals, lined bores and matching colliders
     planting.ts      Spatially batched leafy shrubs, blossoms, blade grass, meadow texture
     bridge.ts        Solid arch bridge, deck, rails, and matching colliders
+    gateway.ts       King's Chapel entrance arch, faceted tourmaline, raised lettering and colliders
+    gateway-materials.ts Procedural silver, limestone and colour-zoned gem materials
+    gateway-layout.ts Shared gateway footprint and arrival-path planting clearance
     sky.ts           Startup-baked cloud/daylight cubemap and reflection environment
     mountains.ts     Ridged backdrop with triplanar rock maps and reduced mobile detail
-    exhibition.ts    Local-photo frames, catalogue lecterns, and matching colliders
+    exhibition.ts    Photo and information cylinders, async piece selection, and colliders
+    exhibition-text.ts  Aspect-matched text canvas and shared UV control regions
+    river.ts         Environment-lit water with downstream ripples
+    waterways.ts     Shared river/tributary boundaries, bridge sites and tower footprint
+    time-tower.ts    Open silver hourglass sculpture and matching collision geometry
+  ui/gallery.ts      Floating exhibit controls, piece browser, flat photo zoom/pan viewer
   ui/ui.ts           DOM overlay: HUD, map panel, lore panel, journal, pause menu
 tests/               *.test.ts → Vitest, *.spec.ts → Playwright
 scripts/             Tree asset generation, agent-doc sync
@@ -90,6 +104,35 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   tuft radius, including flowers; keep civic doorway approaches and the bridge clear.
   Shrubs and grass are spatially instanced, with reduced mobile density. Bridge rail
   colliders follow the deck height; update their physics tests when changing the span.
+- **The bridge gateway follows the approved King's Chapel ring concept.** Keep its paired
+  inward-facing silver tips, fan-spoked bezel, long green tourmaline and raised LIVISTONE
+  letters above the stone. `gateway-layout.ts` reserves the side abutments and paved approach;
+  trees also reserve their full canopy near the arch. `createGateway` is DOM-independent
+  and derives colliders from its meshes. Keep the gem's quality settings separate from hall
+  glazing and station amber; low detail uses an opaque reflective fallback. The serif glyph
+  outlines are bundled, with their licence under `public/fonts/`. Spawn is at `(0, 52)`.
+- **The station is a fourth landmark, not a fourth civic exhibition.** `CIVIC_LANDMARKS`
+  selects the three ministries/City Hall for galleries and circular gardens. Guard exhibition
+  lookups when iterating all `LANDMARKS`. `station-layout.ts` owns the station and railway
+  clearing; paths and full plant footprints must respect it. The open ring threshold and
+  platform and glazed foyer have matching colliders, and the parked train sits behind the platform screens.
+  Train travel is not implemented. Keep the amber material settings distinct when switching
+  visual quality. The amber is a closed, lobed volume with a recessed resin core on desktop;
+  do not flatten it into a canopy sheet. The silver entrance is a deep cylindrical shank
+  with a narrow rolled lip and irregular holes through its curved sides. Do not replace
+  it with a flat washer, evenly spaced face holes, or wire hoops. Clasp roots share its
+  surface coordinates through `stationRingAnchor`.
+  Keep the central foyer doorway and eastern side entrance open, with glass colliders only
+  where panes are rendered. `createStationStructure` remains DOM-independent for Rapier tests.
+- **Railways pass through real mountain openings.** `station-layout.ts` shares the track extent,
+  tunnel mouth/exit positions, bore clearance, and narrow extended walking corridor.
+  `railway.ts` keeps geometry/collider creation DOM-independent and loads attributed local
+  gravel, timber and metal maps separately. Preserve the polished rail heads, open gauge,
+  instanced sleepers/fastenings, maintenance ledges, and both far exits. `mountains.ts` clips
+  actual hillside triangles from the clearance volume; do not hide the railway with a black
+  entrance plane. Dark Nut shells and bronze ornaments are new architecture inspired by the
+  supplied photo, distinct from City Hall. Mobile omits railway normal maps and reduces
+  shell/rib detail. Preserve railway clearance and full-passage physics tests.
 - **Physics is a kinematic capsule, not a rigid body.** `Physics.step(x, z, dt)` applies
   horizontal intent plus its own gravity accumulation, then Rapier's character controller
   resolves the movement. Autostep, snap-to-ground, and slope limits are configured once in
@@ -97,7 +140,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **The loop is fixed-timestep.** `main.ts` accumulates real time and steps physics at
   1/60 s. Rendering is per animation frame. Anything time-dependent takes `dt` explicitly.
 - **Modes drive the UI.** `Mode` is `'welcome' | 'walking' | 'map' | 'lore' | 'journal' |
-  'paused'`. Mode changes are the single place where input capture, the active camera, and
+  'paused' | 'gallery'`. Mode changes are the single place where input capture, the active camera, and
   DOM visibility all change together. Do not bypass them with ad-hoc DOM toggling.
 - **Mouse rotation requires a held left mouse button; Left/Right arrows also turn.** Never request pointer lock or turn on
   entering/resuming. A drag starts on the canvas, uses client-coordinate deltas on document
@@ -115,9 +158,26 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   reach the base; their returned geometry is also a world-space collider. Do not restore
   radial spokes through the inhabited glass hall. Preserve the extracted source JSON.
 - **Jewelry displays use real local photos.** `exhibits.ts` holds catalogue facts and source
-  links; `exhibition.ts` loads bundled images with labelled fallbacks. Keep photos framed
-  on freestanding panels, paths clear, and factual catalogue information separate from
-  lore in the accessible discovery dialog. Attribute new photos and texture assets.
+  links; `exhibition.ts` caches bundled images and sizes curved photo panels from their
+  natural dimensions using `photoSize`. Do not crop or force arbitrary photos into squares.
+  Each hall has independent in-memory piece selection, with atomic replacement after images
+  load; a failed replacement leaves the previous piece. `gallery` mode suspends walking and
+  cylinder rotation for browsing and flat-photo inspection. Keep catalogue facts separate
+  from lore, and attribute new photos. Both photo and information cylinders rotate, with the text column moving more slowly; their pause state is shared. Reduced-motion preferences start cylinders paused.
+  Do not reintroduce pedestal tables or lore lecterns: the secondary hall stories are
+  accessed through “About this place” on the information cylinder. Its texture is matched
+  to unwrapped arc width / height. Text control hit regions share the canvas coordinates
+  in `exhibition-text.ts`; click them using mesh UVs, not screen-aligned HTML overlays.
+  Native controls stay visually hidden until keyboard focus, and 1–4, P, [ / ] provide shortcuts.
+- **Photo clicking must not break looking.** A short scene press with no drag can raycast
+  a curved photo or text label. Activate on the native click after pointerup, so a
+  synthesized touch click cannot hit a newly focused dialog button. Track its pointer independently from the joystick; cancelled gestures,
+  long holds, and look drags must not open photos. Gallery arrows operate on photos,
+  while walking arrows still turn. Keep visible buttons for zoom, fit, next/previous, and close.
+- **River gardens share one channel field.** `waterways.ts` owns the main river, both tributaries, garden bridge placements, and the silver hourglass tower site. `waterDistance` drives terrain, clipped water, and full-footprint planting clearance. `createGardenBridge` transforms both render meshes and every collider together. Keep the tower’s ground-level north–south passage open and its approach free of trees. Placeholder dome homes are removed; `HOME_SITES` is empty.
+- **Water and its banks share their outline.** `terrainHeight` and the water/shore meshes use
+  the same river centre and width variation. Match terrain colliders to the rendered bank;
+  the river shader uses the baked sky environment and needs no extra reflection camera.
 - **The Mitoring hall is not a sphere.** `createEnergyHall` builds an amber cup with a domed lid
   from `ENERGY_HALL` (`a`, `b` semi-axes, wall and dome heights, door angle); the basket strands
   below the rim are projected onto its outside, and the crown loops curl onto the lower roof.

@@ -1,0 +1,15 @@
+{
+  "date": "2026-09-18",
+  "tool": "image_gen.imagegen",
+  "mode": "built-in reference-guided edit",
+  "request": "Move the city name to the top of the ring.",
+  "name": "King’s Chapel — city name above the ring",
+  "image": "images/08-kings-chapel-name-on-top.png",
+  "prompt": "prompts/08-kings-chapel-name-on-top.txt",
+  "inputImages": [
+    "/home/antonkulaga/sources/livistone/concepts/07-bridge-monument/images/07-kings-chapel-long-stone-arch.png"
+  ],
+  "generatedSource": "/home/antonkulaga/.codex/generated_images/01a0b04d-1c4a-7250-ae51-f33becbd258e/exec-29e5e3d5-098b-4977-af99-6275843c97cb.png",
+  "status": "Revised design concept for review; not implemented",
+  "visualReview": "LIVISTONE is readable as raised silver capitals mounted above the top bezel. The old base inscription is removed. The long green stone, open silver curves, fan details, and bridge setting are retained."
+}

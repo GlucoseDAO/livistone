@@ -1,0 +1,70 @@
+{
+  "date": "2026-09-17",
+  "tool": "image_gen.imagegen",
+  "mode": "built-in",
+  "status": "Concept alternatives for review; not implemented or approved",
+  "nameSpelling": "Livistone, following the repository's established spelling",
+  "artDirection": "concepts/01-garden-town/brief.md",
+  "outputs": [
+    {
+      "id": "01-ribbon-gateway",
+      "name": "The Ribbon Gateway",
+      "image": "images/01-ribbon-gateway.png",
+      "prompt": "prompts/01-ribbon-gateway.txt",
+      "generatedSource": "/home/antonkulaga/.codex/generated_images/01a0b04d-1c4a-7250-ae51-f33becbd258e/exec-b6829ea6-21ef-46db-9b06-cf37bb8007c3.png",
+      "inputImages": [],
+      "method": "New image from written prompt"
+    },
+    {
+      "id": "02-city-seed",
+      "name": "The City Seed",
+      "image": "images/02-city-seed.png",
+      "prompt": "prompts/02-city-seed.txt",
+      "generatedSource": "/home/antonkulaga/.codex/generated_images/01a0b04d-1c4a-7250-ae51-f33becbd258e/exec-506f1743-3eb2-4575-adc6-7d2a025ebc60.png",
+      "inputImages": [],
+      "method": "New image from written prompt"
+    },
+    {
+      "id": "03-riverstone-welcome",
+      "name": "The Riverstone Welcome",
+      "image": "images/03-riverstone-welcome.png",
+      "prompt": "prompts/03-riverstone-welcome.txt",
+      "generatedSource": "/home/antonkulaga/.codex/generated_images/01a0b04d-1c4a-7250-ae51-f33becbd258e/exec-e969d7fb-31c1-49ef-a395-f1648f16da96.png",
+      "inputImages": [],
+      "method": "New image from written prompt"
+    },
+    {
+      "id": "04-confluence-orb",
+      "name": "The Confluence",
+      "image": "images/04-confluence-orb.png",
+      "prompt": "prompts/04-confluence-orb.txt",
+      "generatedSource": "/home/antonkulaga/.codex/generated_images/01a0b04d-1c4a-7250-ae51-f33becbd258e/exec-26e9549f-a7e6-4b2d-abd4-30775cb6eabc.png",
+      "inputImages": [],
+      "method": "New image from written prompt"
+    },
+    {
+      "id": "05-kings-chapel-double-ring",
+      "name": "King’s Chapel Double Ring",
+      "image": "images/05-kings-chapel-double-ring.png",
+      "prompt": "prompts/05-kings-chapel-double-ring.txt",
+      "generatedSource": "/home/antonkulaga/.codex/generated_images/01a0b04d-1c4a-7250-ae51-f33becbd258e/exec-d0d24738-ab27-4ab9-9c89-3b342c73aa4c.png",
+      "inputImages": [
+        "/home/antonkulaga/sources/livistone/concepts/07-bridge-monument/images/03-riverstone-welcome.png",
+        "/home/antonkulaga/sources/livia/assets/RJW2022/LiviaZaharia-ring-King_s Chapel-1-2022-silver_enhanced tourmaline-3x5x1.5cm.jpg",
+        "/home/antonkulaga/sources/livia/assets/RJW2022/LiviaZaharia-ring-King_s Chapel-2-2022-silver_enhanced tourmaline-3x5x1.5cm.jpg",
+        "/home/antonkulaga/sources/livia/assets/RJW2022/kingchapel-circle.jpg",
+        "/home/antonkulaga/sources/livistone/concepts/01-garden-town/images/01-town-overview.png"
+      ],
+      "method": "Reference-guided edit of concept 03"
+    }
+  ],
+  "sourceCatalogue": {
+    "path": "/home/antonkulaga/sources/livia/content/pieces.md",
+    "heading": "King's Chapel Double Ring",
+    "line": 440,
+    "materials": "Silver, enhanced tourmaline",
+    "dimensions": "3 × 5 × 1.5 cm",
+    "year": 2022
+  },
+  "review": "Visually inspected all five outputs. All show the monument before the bridge with LIVISTONE lettering. Concept 05 retains paired open silver loops, fan ribs, and the long green prism from the jewelry photos. Concept backgrounds and dimensions are illustrative, not a fixed game layout."
+}
