@@ -6,9 +6,9 @@ A welcoming art-and-science fantasy town inspired by Livia Lore and Livia Zahari
 
 | Artifact | Civic role | Architectural identity |
 | --- | --- | --- |
-| The Nut of Power | **City Hall** | Joined walnut and crystal halves, brass connections, the town's center |
-| The Mitoring | **Ministry of Energy** | Warm amber enclosed by folded silver-white ribs |
-| The Nanot of Power | **Ministry of Science** | A rounded volume inside an irregular open silver lattice |
+| The Nut of Power | **City Hall** | A furrowed walnut half joined to smoky crystal, a dark seam, broad brass clasps and hexagonal fasteners |
+| The Mitoring | **Ministry of Energy** | A long, low amber hall with visible folded inner membranes and the ring's silver loops curled over its roof; the shank becomes an entrance gateway |
+| The Nanot of Power | **Ministry of Science** | The pendant's own lattice: struts radiating from the hub into angular folded strands, with dark inclusions and the bail on top |
 
 The project has two halves: a **concept package** that fixed the visual direction, and a **playable prototype** that turns it into a browsable 3D town. Both live in this repository.
 
@@ -56,14 +56,14 @@ For a phone on the same Wi-Fi, use the **Network** URL that Vite prints, such as
 | Action | Desktop | Touch |
 | --- | --- | --- |
 | Walk | WASD or arrow keys; Shift to walk faster | Left thumbstick |
-| Look | Hold the left mouse button and drag | Drag the scene with your other finger |
+| Look | Hold the left mouse button and drag; release it to stop turning | Drag the scene with your other finger |
 | Discover | Face a nearby artifact or plaque, then E | Tap the discovery prompt |
 | Aerial map | M or City map | Map icon in the top bar |
 | Orbit / zoom map | Drag / scroll | Drag / pinch |
 | Journal | Journal button | Book icon |
 | Pause | Escape or menu | Menu icon |
 
-The cursor stays free — only a held drag turns the view. The map returns you to the same walking position. The menu offers visual detail, optional ambient sound, and a return-to-entrance action. Discoveries are saved locally in this browser; clearing site data resets them.
+Rotation happens only while the left mouse button is held on a drag begun in the scene. WASD and arrow keys move the player without changing the mouse-button state or camera rotation. Entering, resuming, and moving an unpressed mouse do not turn the camera; the game never requests pointer lock. The map returns you to the same walking position. The menu offers visual detail, optional ambient sound, and a return-to-entrance action. Discoveries are saved locally in this browser; clearing site data resets them.
 
 ## Build and verify
 
@@ -87,17 +87,20 @@ src/
   game/
     content.ts       Landmarks, discoveries, spawn point, saved progress
     physics.ts       Rapier world and kinematic character controller
-    input.ts         Keyboard, drag-to-look, and touch thumbstick input
+    input.ts         Keyboard, held-button drag-to-look mouse, and touch thumbstick input
     audio.ts         Procedural ambient sound
   world/
     world.ts         The whole town: terrain, river, paths, bridge, buildings, gardens
-    jewelry.ts       Cast-silver ribbon geometry for the Mitoring and Nanot cages
+    jewelry.ts       Cast-silver ribbons built from the extracted jewelry strands
+    walnut.ts        Procedural walnut relief, furrows, and material
+    strands/         mitoring.json, nanot.json — wire centerlines derived from the STL models
     forest.ts        Batched tree instancing from GLB models
   ui/ui.ts           HUD, aerial map panel, lore panel, journal, pause menu
 tests/               Vitest unit tests (*.test.ts) and Playwright browser tests (*.spec.ts)
-scripts/             Tree asset generation, agent-doc synchronization
+scripts/             Tree asset generation, landmark screenshots, agent-doc sync
 public/models/trees/ Generated oak and ash GLB models with attribution
-concepts/            Approved concept image, design brief, prompts, generation record
+data/models/         Livia's original jewelry STL files (git-ignored: 50–110 MB each), reference only
+concepts/            Approved concept image, design brief, prompts, generation record, jewelry model notes
 docs/                Implementation plan
 .githooks/           Version-controlled git hooks
 ```
@@ -106,7 +109,7 @@ docs/                Implementation plan
 
 **Rendering.** Three.js with `WebGLRenderer` on WebGL 2, a room-environment probe for soft indirect light, and a directional sun with shadows. WebGPU is a later evaluation, not a current dependency.
 
-**The town is generated in code.** `Town` in [src/world/world.ts](src/world/world.ts) builds the vertex-coloured terrain, a shader-animated river, garden paths, the white river bridge, the three landmarks with their ground-floor interiors, homes, planting, and surrounding hills. Building shells are parametric surface patches, so each landmark keeps its artifact's silhouette — walnut-and-brass bands for City Hall, folded ribs for the Mitoring, an open lattice for the Nanot.
+**The town is generated in code.** `Town` in [src/world/world.ts](src/world/world.ts) builds the vertex-coloured terrain, a shader-animated river, garden paths, the white river bridge, the three landmarks with their ground-floor interiors, homes, planting, and surrounding hills. Building shells are parametric surfaces: furrowed walnut and smoky crystal joined by broad brass clasps for City Hall, an elongated amber hall with folded membranes for Mitoring, and a glazed hall within Nanot's angular lattice. The supplied models survive as about 40 KB of extracted centerlines under `src/world/strands/`. [src/world/jewelry.ts](src/world/jewelry.ts) adapts those curves into bevelled silver ribbons, clears the doors and walking space, and merges each building's silver into one draw call. The Mitoring hall is 28 × 13.2 m and 8.4 m high; its folds remain visible in the aerial map. Mobile uses fewer curve samples.
 
 **Physics is separate from what you see.** `Town` emits a list of `ColliderSpec` values — boxes and trimeshes — that [src/game/physics.ts](src/game/physics.ts) loads into a Rapier world. The player is a kinematic capsule driven by Rapier's character controller, with autostep for stairs, snap-to-ground, and slope limits. New walkable or blocking geometry needs a matching collider; nothing is derived from the render meshes automatically.
 
@@ -134,7 +137,7 @@ bun scripts/generate-trees.mjs
 
 This needs real Google Chrome and rewrites the committed GLBs. See [public/models/trees/ATTRIBUTION.md](public/models/trees/ATTRIBUTION.md) for the exact settings.
 
-Livia's original STL — and, if needed, Grasshopper — jewelry files are still to come. They will guide the landmark shapes, which then need designed interiors, doors, and floors before they can be walked through.
+Livia's two original STL files are in `data/models/` and remain offline. The small extracted JSON centerlines are the runtime source assets. The earlier extraction script was missing from the recovered working tree; the current checkout does not provide a regeneration command. Preserve the JSON and original STLs. The recovery and architectural changes are recorded in [the design update](concepts/02-jewelry-models/recovery-and-refinement.md).
 
 ## Testing
 
@@ -143,9 +146,11 @@ bun run test          # Vitest unit tests
 bun run test:browser  # Playwright browser tests in Google Chrome
 ```
 
-Use `bun run test`, not `bun test` — these are Vitest tests. Unit tests cover save parsing and headless Rapier walking behaviour. Browser tests drive the real game, including a mobile viewport with touch emulation: entering the town, drag-to-look, crossing into City Hall, opening the map and returning to the same position, and persisting discoveries.
+Use `bun run test`, not `bun test` — these are Vitest tests. Unit tests cover save parsing and headless Rapier walking behaviour. Browser tests drive the real game, including a mobile viewport with touch emulation: entering the town, held-mouse looking while walking with WASD and arrows, stable entry orientation, pointer-capture loss, opening the menu, crossing into City Hall, opening the map and returning to the same position, and persisting discoveries.
 
-If Chrome is missing, install it or run `bunx playwright install chrome`. The tests start a development server automatically if one is not already running, and use software WebGL for repeatable graphics availability — their frame rates do not measure real-device GPU performance. Screenshots go to `output/testing/`; failure reports and traces to `test-results/`.
+For a visual review of the buildings, `node scripts/screenshot-landmarks.mjs` saves ten views of the three landmarks to `output/testing/landmarks/` (the dev server must be running). It launches headless Chrome with hardware WebGL flags; the reported frame rate is a local diagnostic, not a physical-device benchmark.
+
+If Chrome is missing, install it or run `bunx playwright install chrome`. The tests start a development server automatically if one is not already running. Headless Chrome renders on the GPU when the machine has one; set `LIVISTONE_SOFTWARE_GL=1` to force SwiftShader instead, which is reproducible anywhere but slow enough on a busy machine that the 120 s test budget can run out. Neither mode measures real-device performance. Screenshots go to `output/testing/`; failure reports and traces to `test-results/`.
 
 ## Agent and contributor docs
 
@@ -172,7 +177,7 @@ The hook lives in the version-controlled [.githooks/](.githooks/) directory, ena
 
 This is the first procedural prototype; the honest limits are:
 
-- Buildings and vegetation are generated in code. The original STL/Grasshopper jewelry models have not arrived yet.
+- Buildings and vegetation are generated in code. Livia's STL models of the Mitoring and the Nanot are in `data/models/` (not committed because of their size); only their extracted wire centerlines (about 40 KB of JSON) ship, rebuilt as ribbons around procedural halls. The historical extraction settings are recorded in the model notes; the extraction script itself was not present in the recovered tree.
 - Homes are exterior scenery, and each civic building has one accessible floor.
 - There are no NPCs, quests, or multiplayer, and no final production assets.
 - Performance on physical phones, and Safari/iOS compatibility, still need device testing.
@@ -187,6 +192,7 @@ Next come multi-room interiors, authored GLB assets replacing procedural stand-i
 - [City Hall close-up prompt](concepts/01-garden-town/prompts/02-city-hall.txt)
 - [Ministry of Energy close-up prompt](concepts/01-garden-town/prompts/03-ministry-of-energy.txt)
 - [Ministry of Science close-up prompt](concepts/01-garden-town/prompts/04-ministry-of-science.txt)
+- [Jewelry model notes](concepts/02-jewelry-models/notes.md): what the STL files contain and how the buildings reinterpret them
 
 The town overview above is the approved generated image. The three close-up prompts are prepared but their images have not been generated yet. The image is an artistic concept, not a settled masterplan or engineering design: it fixes the shared appearance and the individual landmark identities, while dimensions, topology, and building performance are design development work.
 

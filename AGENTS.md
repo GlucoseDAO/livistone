@@ -32,6 +32,7 @@ current build is generated in code at load time; the only binary assets are two 
 | Sync agent docs | `bun run docs:sync` | What the pre-commit hook runs |
 | Install git hooks | `bun run hooks:install` | Sets `core.hooksPath` to `.githooks` |
 | Regenerate tree GLBs | `bun scripts/generate-trees.mjs` | Needs the dev server running |
+| Landmark screenshots | `node scripts/screenshot-landmarks.mjs [outDir]` | Needs the dev server; headless Chrome with GPU WebGL flags |
 
 `bun run test` uses Vitest; `bun test` would invoke Bun's own runner and fail. Playwright
 reuses an already-running dev server, so leave one up while iterating.
@@ -49,18 +50,22 @@ src/
   game/
     content.ts       LANDMARKS, DISCOVERIES, SPAWN, progress parse/read/write
     physics.ts       Rapier world, collider specs, kinematic character controller
-    input.ts         Keyboard, drag-to-look, and touch thumbstick input
+    input.ts         Keyboard, held-button drag-to-look mouse, and touch thumbstick input
     audio.ts         Procedural filtered-noise ambience via WebAudio
   world/
     world.ts         Town: terrain, river, paths, bridge, landmarks, interiors, homes,
                      gardens, hills; emits colliders, interactives, occluders, animated
-    jewelry.ts       Cast-silver ribbon geometry for the Mitoring/Nanot cages
+    jewelry.ts       Rebuilds the extracted jewelry strands as cast-silver ribbons; ENERGY_HALL sizes the amber cup
+    walnut.ts        Procedural walnut shell relief and material
+    strands/         mitoring.json, nanot.json: preserved wire centerlines from the STLs
     forest.ts        Batched GLB tree instancing with a mobile foliage reduction
   ui/ui.ts           DOM overlay: HUD, map panel, lore panel, journal, pause menu
 tests/               *.test.ts → Vitest, *.spec.ts → Playwright
 scripts/             Tree asset generation, agent-doc sync
 public/models/trees/ oak.glb, ash.glb + attribution and MIT licence
-concepts/            Approved concept image, design brief, generation record, prompts
+data/models/         Livia's original STL jewelry models (git-ignored, ~50–110 MB); reference only
+concepts/            Approved concept image, design brief, generation record, prompts,
+                     02-jewelry-models/notes.md = what the STLs contain and how buildings use them
 docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 .githooks/           Version-controlled git hooks
 ```
@@ -82,6 +87,22 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **Modes drive the UI.** `Mode` is `'welcome' | 'walking' | 'map' | 'lore' | 'journal' |
   'paused'`. Mode changes are the single place where input capture, the active camera, and
   DOM visibility all change together. Do not bypass them with ad-hoc DOM toggling.
+- **Desktop rotation requires a held left mouse button.** Never request pointer lock or turn on
+  entering/resuming. A drag starts on the canvas, uses client-coordinate deltas on document
+  pointer events, and checks `buttons & 1`. Keyboard events only affect movement; they must not
+  reset a held drag. Mouse capture loss is handled through document events, while release,
+  cancellation, blur, and mode changes clear the appropriate inputs. Keep touch pointer IDs
+  independent so looking and the thumbstick can work together.
+- **The ministries' silver is data, not hand-drawn geometry.** `jewelry.ts` maps the strands in
+  `src/world/strands/*.json` into hall space, rejects points in the doorway, below ground, or at
+  head height inside the hall (splitting strands there), and drops fragments under 1.2 m. Change
+  the look through the architectural transforms and clipping rules, not by editing the JSON.
+- **The Mitoring hall is not a sphere.** `createEnergyHall` builds an amber cup with a domed lid
+  from `ENERGY_HALL` (`a`, `b` semi-axes, wall and dome heights, door angle); the basket strands
+  below the rim are projected onto its outside, and the crown loops curl onto the lower roof.
+  Structural cristae remain visible in map mode. `Landmark.stretch` in `content.ts` must match
+  `a / 7.1` and `b / 7.1`, because tree clearing, garden rings, and the "inside a landmark" test in
+  `main.ts` read it.
 - **Map mode must not move the player.** It swaps to `mapCamera` with `OrbitControls`;
   returning restores the exact walking position. A browser test asserts this.
 - **Progress is local only.** `readProgress` / `writeProgress` use the
@@ -117,10 +138,13 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   `snapshot()` (mode, position, yaw, fps, draw calls, triangles, progress) and
   `teleport(x, z, yaw)`. **That hook is test infrastructure — keep it working and keep its
   shape stable**, including the mobile-viewport run with touch emulation.
-- Browser tests run with software WebGL for reproducibility, so their frame rates say
-  nothing about real GPU performance. Do not treat them as a performance benchmark.
+- Browser tests launch headless Chrome with GPU flags and fall back to whatever Chrome
+  provides; `LIVISTONE_SOFTWARE_GL=1` forces SwiftShader, which can exceed the 120 s test
+  budget on a loaded machine. Neither mode says anything about real GPU performance.
 - After changing anything in `src/`, run `bun run build` and `bun run test`. Run
   `bun run test:browser` for changes to input, modes, interaction, world layout, or the UI.
+- `node scripts/screenshot-landmarks.mjs` is the quickest visual check after touching
+  `world.ts` or `jewelry.ts`; it renders on the GPU when one is available. Look at the images.
 - Screenshots land in `output/testing/`; failure traces in `test-results/`. Both are
   git-ignored — do not commit them, `dist/`, or `node_modules/`.
 
@@ -135,6 +159,12 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - Interiors are hidden by occluder geometry, not by physics. Moving a landmark means moving
   its occluders and colliders too.
 - Fonts load from Google Fonts with local fallbacks; the game must stay usable offline.
+- The STL files in `data/models/` are jewelry with 1–2 million triangles each. They never load in
+  the browser. Their extracted JSON strands survived the recovery, but the historical
+  `scripts/derive-strands.mjs` did not; do not document a working regeneration command until
+  that tool is restored and verified. Preserve the source JSON. Tooling here is Bun/Node.
+- Browser tests forbid pointer-lock requests and compare identical drags across WASD and
+  arrow-key states. Include key presses during a held drag and unpressed movement after release.
 
 ## Documentation duties
 

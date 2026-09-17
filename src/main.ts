@@ -63,6 +63,7 @@ class Game {
     this.orbit.enableDamping = true; this.orbit.dampingFactor = 0.08; this.orbit.minDistance = 30; this.orbit.maxDistance = 170;
     this.orbit.minPolarAngle = 0.16; this.orbit.maxPolarAngle = Math.PI * 0.44;
     this.input = new Input(ui.canvas, ui.joystick, (action) => void this.action(action));
+    ui.setLookHint('Hold left mouse to look');
     ui.progress(this.progress); ui.setMode('welcome');
     document.querySelector<HTMLSelectElement>('#quality')!.value = this.coarse ? 'low' : 'high';
     window.addEventListener('resize', () => this.resize());
@@ -109,6 +110,7 @@ class Game {
     this.mode = mode; this.interaction = null; this.input.active = mode === 'walking'; this.input.clear(); this.accumulator = 0;
     this.orbit.enabled = mode === 'map';
     this.ui.setMode(mode); this.town.setMapMode(this.mapView); this.renderer.shadowMap.needsUpdate = true; this.resize();
+    if (mode === 'walking') this.ui.canvas.focus({ preventScroll: true });
   }
   async action(action: string): Promise<void> {
     if (action === 'reload') { location.reload(); return; }
@@ -163,7 +165,7 @@ class Game {
     this.town.root.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of materials) if (material instanceof THREE.MeshPhysicalMaterial) { material.transmission = low ? 0 : 0.45; material.opacity = low ? 0.32 : 0.65; material.needsUpdate = true; }
+      for (const material of materials) if (material instanceof THREE.MeshPhysicalMaterial) { material.transmission = low ? 0 : 0.45; material.opacity = material.userData.clearGallery ? (low ? .18 : .26) : (low ? .32 : .65); material.needsUpdate = true; }
     });
     this.resize(); this.ui.toast(low ? 'Gentle visual detail enabled.' : 'Rich visual detail enabled.');
   }
@@ -180,7 +182,7 @@ class Game {
   }
   private findLocation(): void {
     const p = this.physics!.position();
-    const inside = LANDMARKS.find((l) => Math.hypot(p.x - l.x, p.z - l.z) < 7.1);
+    const inside = LANDMARKS.find((l) => Math.hypot((p.x - l.x) / l.stretch.x, (p.z - l.z) / l.stretch.z) < 7.1);
     if (inside) {
       this.ui.setLocation(inside.name);
       if (!this.progress.visited.includes(inside.id)) { this.progress.visited.push(inside.id); writeProgress(this.progress); this.ui.toast('Welcome to ' + inside.name + '.'); }

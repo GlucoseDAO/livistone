@@ -29,16 +29,20 @@ export class Input {
       this.lookPointer = e.pointerId;
       this.last = { x: e.clientX, y: e.clientY };
       canvas.setPointerCapture(e.pointerId);
+      canvas.focus({ preventScroll: true });
     });
-    canvas.addEventListener('pointermove', (e) => {
+    document.addEventListener('pointermove', (e) => {
       if (!this.active || this.lookPointer !== e.pointerId) return;
+      // Button state is independent of the keyboard, and repairs a missed pointerup.
+      if (e.pointerType === 'mouse' && !(e.buttons & 1)) { this.releaseLook(); return; }
       this.look(e.clientX - this.last.x, e.clientY - this.last.y);
       this.last = { x: e.clientX, y: e.clientY };
     });
-    const stopLook = (e: PointerEvent): void => { if (this.lookPointer === e.pointerId) this.lookPointer = null; };
-    canvas.addEventListener('pointerup', stopLook);
-    canvas.addEventListener('pointercancel', stopLook);
-    canvas.addEventListener('lostpointercapture', stopLook);
+    const stopLook = (e: PointerEvent): void => { if (this.lookPointer === e.pointerId) this.releaseLook(); };
+    document.addEventListener('pointerup', stopLook);
+    document.addEventListener('pointercancel', stopLook);
+    // Mouse dragging survives capture loss through document events; touch cancellation stops that finger.
+    canvas.addEventListener('lostpointercapture', (e) => { if (e.pointerType !== 'mouse') stopLook(e); });
     joystick.addEventListener('pointerdown', (e) => {
       if (!this.active || this.joystickPointer !== null) return;
       e.preventDefault();
@@ -55,6 +59,10 @@ export class Input {
     joystick.addEventListener('pointerup', stopStick);
     joystick.addEventListener('pointercancel', stopStick);
     joystick.addEventListener('lostpointercapture', stopStick);
+  }
+  private releaseLook(): void {
+    const pointer = this.lookPointer; this.lookPointer = null;
+    if (pointer !== null && this.canvas.hasPointerCapture(pointer)) this.canvas.releasePointerCapture(pointer);
   }
   private updateStick(e: PointerEvent): void {
     const dx = e.clientX - this.origin.x;
@@ -76,6 +84,8 @@ export class Input {
     return { x: x * Math.cos(this.yaw) - z * Math.sin(this.yaw), z: -x * Math.sin(this.yaw) - z * Math.cos(this.yaw), speed: this.keys.has('ShiftLeft') ? 6.5 : 4.2 };
   }
   clear(): void {
-    this.keys.clear(); this.moveX = 0; this.moveZ = 0; this.lookPointer = null; this.joystickPointer = null; this.knob.style.transform = '';
+    this.keys.clear(); this.moveX = 0; this.moveZ = 0; this.releaseLook();
+    const pointer = this.joystickPointer; this.joystickPointer = null; this.knob.style.transform = '';
+    if (pointer !== null && this.joystick.hasPointerCapture(pointer)) this.joystick.releasePointerCapture(pointer);
   }
 }

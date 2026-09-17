@@ -7,11 +7,13 @@ export interface Landmark {
   x: number;
   z: number;
   color: string;
+  /** Horizontal footprint scale of the building shell; the Mitoring hall is an elongated ellipsoid. */
+  stretch: { x: number; z: number };
 }
 export const LANDMARKS: Landmark[] = [
-  { id: 'city-hall', name: 'City Hall', artifact: 'The Nut of Power', x: 0, z: -21, color: '#b89a5d', description: 'Walnut, crystal, and brass come together at the heart of Livistone. Step into the atrium and discover the artifact that connects them all.' },
-  { id: 'energy', name: 'Ministry of Energy', artifact: 'The Mitoring', x: -29, z: -9, color: '#c88a38', description: 'Folded silver embraces warm amber. Explore a garden of energy, inspired by the tiny structures that power living cells.' },
-  { id: 'science', name: 'Ministry of Science', artifact: 'The Nanot of Power', x: 29, z: -11, color: '#819e96', description: 'An intricate silver lattice shelters a place of curiosity. Inside, small structures reveal extraordinary possibilities.' },
+  { id: 'city-hall', name: 'City Hall', artifact: 'The Nut of Power', x: 0, z: -21, color: '#b89a5d', stretch: { x: 1, z: 1 }, description: 'Walnut, crystal, and brass come together at the heart of Livistone. Step into the atrium and discover the artifact that connects them all.' },
+  { id: 'energy', name: 'Ministry of Energy', artifact: 'The Mitoring', x: -29, z: -9, color: '#c88a38', stretch: { x: 14 / 7.1, z: 6.6 / 7.1 }, description: 'A long amber hall wrapped in folded silver cristae, entered through the ring itself. Explore a garden of energy, inspired by the tiny structures that power living cells.' },
+  { id: 'science', name: 'Ministry of Science', artifact: 'The Nanot of Power', x: 29, z: -11, color: '#819e96', stretch: { x: 1, z: 1 }, description: 'An intricate silver lattice of struts and folded strands shelters a place of curiosity. Inside, small structures reveal extraordinary possibilities.' },
 ];
 export interface Discovery {
   id: string;
