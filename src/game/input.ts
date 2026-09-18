@@ -15,11 +15,13 @@ export class Input {
   constructor(private canvas: HTMLCanvasElement, private joystick: HTMLElement, private onAction: (action: string) => void) {
     this.knob = joystick.querySelector<HTMLElement>('.stick-knob')!;
     window.addEventListener('keydown', (e) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return;
+      // Focused controls keep native Space/Enter activation and arrow-key behavior.
+      if (e.target instanceof Element && e.target.closest('button, a, [contenteditable="true"]') && !['KeyM', 'Escape'].includes(e.code)) return;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code) && this.active) e.preventDefault();
       if (this.active) this.keys.add(e.code);
       if (!e.repeat && e.code === 'KeyM') this.onAction('map');
-      const exhibitKey = ({ Digit1: 'info', Digit2: 'browse', Digit3: 'photo', Digit4: 'lore', KeyP: 'pause', BracketLeft: 'left', BracketRight: 'right' } as Record<string, string>)[e.code];
+      const exhibitKey = ({ Digit1: 'info', Digit2: 'browse', Digit3: 'photo', Digit4: 'lore', BracketLeft: 'left', BracketRight: 'right' } as Record<string, string>)[e.code];
       if (!e.repeat && this.active && exhibitKey) this.onAction('exhibit-key:' + exhibitKey);
       if (!e.repeat && e.code === 'KeyE' && this.active) this.onAction('interact');
       if (!e.repeat && e.code === 'Escape') this.onAction('escape');

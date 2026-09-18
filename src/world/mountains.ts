@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { RAILWAY, STATION } from './station-layout';
+import { RAILWAY } from './station-layout';
 
 function hash(x: number, z: number): number { const n = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return n - Math.floor(n); }
 function noise(x: number, z: number): number {
@@ -14,7 +14,7 @@ export function mountainHeight(x: number, z: number): number {
   const gullies = 3 * noise(x * .075, z * .075) + .7 * noise(x * .19, z * .19);
   const riverValley = .18 + .82 * THREE.MathUtils.smoothstep(Math.abs(z - 26), 12, 72);
   const original = -2 + rise * fall * riverValley * (crest + ridge * ridge * 26 + gullies);
-  const spur = 24 * Math.exp(-(((Math.abs(x) - RAILWAY.portalX - 40) / 28) ** 2) - ((z - STATION.trackZ) / 28) ** 2) - 2;
+  const spur = 24 * Math.exp(-(((Math.abs(x) - RAILWAY.portalX - 40) / 28) ** 2) - ((z - RAILWAY.centerZ) / 28) ** 2) - 2;
   return Math.max(original, spur);
 }
 
@@ -22,7 +22,7 @@ export function mountainHeight(x: number, z: number): number {
 function cutRailwayOpening(source: THREE.BufferGeometry): THREE.BufferGeometry {
   const pos = source.getAttribute('position'), color = source.getAttribute('color'), normal = source.getAttribute('normal'), positions: number[] = [], colors: number[] = [], normals: number[] = [];
   type Vertex = number[];
-  const planes = [(v: Vertex): number => v[2] - STATION.trackZ + 4.55, (v: Vertex): number => STATION.trackZ + 4.55 - v[2], (v: Vertex): number => RAILWAY.clearanceHeight - v[1]];
+  const planes = [(v: Vertex): number => v[2] - RAILWAY.centerZ + (RAILWAY.boreHalfWidth + .45), (v: Vertex): number => RAILWAY.centerZ + (RAILWAY.boreHalfWidth + .45) - v[2], (v: Vertex): number => RAILWAY.clearanceHeight - v[1]];
   const clip = (polygon: Vertex[], distance: (v: Vertex) => number, inside: boolean): Vertex[] => {
     const result: Vertex[] = [];
     for (let i = 0; i < polygon.length; i++) {

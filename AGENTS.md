@@ -18,7 +18,7 @@ A TypeScript + Vite single-page app. Three.js renders the town on WebGL 2; Rapie
 (WebAssembly) provides a kinematic capsule character controller. There is no backend, no
 API key, no database, and no account system — the entire game is static files plus
 `localStorage`. Every building, tree placement, path, and piece of jewelry geometry in the
-current build is generated in code at load time; binary assets are two tree GLBs, twelve real jewelry photographs, two CC0 rock maps, and nine CC0 railway maps.
+current build is generated in code at load time; binary assets are two tree GLBs, local derivatives of 70 real jewelry photographs, two CC0 rock maps, and nine CC0 railway maps.
 
 ## Commands
 
@@ -54,15 +54,19 @@ src/
     physics.ts       Rapier world, collider specs, kinematic character controller
     input.ts         Keyboard, held-button drag-to-look mouse, and touch thumbstick input
     audio.ts         Procedural filtered-noise ambience via WebAudio
+    journey.ts       Fixed-step departure, loading and arrival state
+    research.ts      GlucoseDAO facts and source links
+    jewelry-catalogue.json Generated source-hashed catalogue and image manifest
   world/
     world.ts         Town: terrain, river, paths, bridges, landmarks, interiors, tower,
-                     gardens, hills; emits colliders, interactives, occluders, animated
+                     gardens, hills; emits colliders, interactives, occluders
     jewelry.ts       Rebuilds the extracted jewelry strands as cast-silver ribbons; ENERGY_HALL sizes the amber cup
     walnut.ts        Procedural walnut shell relief and material
     strands/         mitoring.json, nanot.json: preserved wire centerlines from the STLs
     forest.ts        Batched GLB tree instancing with a mobile foliage reduction
     landscape.ts     Shared path curves and planting clearance
     station.ts       Embryo station ring, glazed foyer, signs, train, and matching colliders
+    train.ts         Maglev shell with true glazed apertures, lounge cabin, and matching colliders
     station-amber.ts Closed resin body, procedural textures, refraction, and inner core geometry
     station-ring.ts  Deep curved silver shank, organic side-wall piercings, and clasp anchors
     station-layout.ts Shared station, tunnel, railway planting and walking clearance
@@ -74,8 +78,12 @@ src/
     gateway-layout.ts Shared gateway footprint and arrival-path planting clearance
     sky.ts           Startup-baked cloud/daylight cubemap and reflection environment
     mountains.ts     Ridged backdrop with triplanar rock maps and reduced mobile detail
-    exhibition.ts    Photo and information cylinders, async piece selection, and colliders
-    exhibition-text.ts  Aspect-matched text canvas and shared UV control regions
+    planar-exhibition.ts Permanent photo posters, aspect-matched captions and stand colliders
+    poster-layout.ts Curated hall and station panel placements
+    glucose-pavilion.ts Source-derived insulin ribbons, glucose sculpture and research panels
+    glucose-layout.ts Shared molecular court and planting clearance
+    living-waters.ts Separately loaded lake, pavilion, umbrella garden and return platform
+    living-waters-layout.ts Shared lake cells, paths and full canopy clearance
     river.ts         Environment-lit water with downstream ripples
     waterways.ts     Shared river/tributary boundaries, bridge sites and tower footprint
     time-tower.ts    Open silver hourglass sculpture and matching collision geometry
@@ -94,10 +102,9 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 ## How the pieces fit together
 
 - **`Town` builds the world and hands out everything else.** Its constructor runs all the
-  `create*` methods and fills four public arrays: `colliders` (fed to `Physics`),
+  `create*` methods and fills three public arrays: `colliders` (fed to `Physics`),
   `interactives` (raycast targets for the E key), `occluders` (invisible boxes used to hide
-  interiors until you are inside), and `animated` (objects the artifact interactions spin
-  or pulse). If you add geometry that the player can walk into, you must push a matching
+  interiors until you are inside). If you add geometry that the player can walk into, you must push a matching
   `ColliderSpec` — the renderer and the physics world share no geometry automatically.
 - **Paths and planting share one layout.** `landscape.ts` owns the path curves and
   `plantingAllowed(x, z, radius)`. Every plant placement must reserve its full canopy or
@@ -111,12 +118,14 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   and derives colliders from its meshes. Keep the gem's quality settings separate from hall
   glazing and station amber; low detail uses an opaque reflective fallback. The serif glyph
   outlines are bundled, with their licence under `public/fonts/`. Spawn is at `(0, 52)`.
-- **The station is a fourth landmark, not a fourth civic exhibition.** `CIVIC_LANDMARKS`
-  selects the three ministries/City Hall for galleries and circular gardens. Guard exhibition
+- **The station keeps its transport role.** Its seven-poster collection stays in the concourse. `CIVIC_LANDMARKS`
+  selects only the three ministries/City Hall for circular gardens and civic construction. Guard exhibition
   lookups when iterating all `LANDMARKS`. `station-layout.ts` owns the station and railway
   clearing; paths and full plant footprints must respect it. The open ring threshold and
-  platform and glazed foyer have matching colliders, and the parked train sits behind the platform screens.
-  Train travel is not implemented. Keep the amber material settings distinct when switching
+  platform and glazed foyer have matching colliders, and the parked train has two open boarding bays at x = -14 and 10. Keep ramps, screen gaps, body apertures and the cabin floor aligned. Train windows are holes
+  in the curved shell with separate transparent panes and colliders; never cover them with solid
+  body geometry. Keep the aisle clear and subdivide curved window panels before projection.
+  Train travel shares `train.ts` between the town and garden stop. Keep the amber material settings distinct when switching
   visual quality. The amber is a closed, lobed volume with a recessed resin core on desktop;
   do not flatten it into a canopy sheet. The silver entrance is a deep cylindrical shank
   with a narrow rolled lip and irregular holes through its curved sides. Do not replace
@@ -127,12 +136,14 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **Railways pass through real mountain openings.** `station-layout.ts` shares the track extent,
   tunnel mouth/exit positions, bore clearance, and narrow extended walking corridor.
   `railway.ts` keeps geometry/collider creation DOM-independent and loads attributed local
-  gravel, timber and metal maps separately. Preserve the polished rail heads, open gauge,
-  instanced sleepers/fastenings, maintenance ledges, and both far exits. `mountains.ts` clips
+  gravel and metal maps separately. Preserve both concrete maglev guideways, guidance beams,
+  motor strips, maintenance ledges, and both far exits. RAILWAY.centerZ centers the shared bore;
+  RAILWAY.tracks gives the two line centers. Keep mountain clipping and planting aligned. `mountains.ts` clips
   actual hillside triangles from the clearance volume; do not hide the railway with a black
   entrance plane. Dark Nut shells and bronze ornaments are new architecture inspired by the
   supplied photo, distinct from City Hall. Mobile omits railway normal maps and reduces
   shell/rib detail. Preserve railway clearance and full-passage physics tests.
+- **Glucose Commons uses scientific source coordinates.** `glucose-pavilion.ts` lifts the A/B backbone of human insulin PDB 1TRZ above an open, walkable court. Preserve the uniformly scaled fold, three disulfides and separate GLC glucose identity. `data/molecules/` keeps attributed originals; `bun scripts/extract-molecules.mjs` rebuilds hashed compact data. `glucose-layout.ts` shares poster/planting clearance; architecture creation stays DOM-independent for Rapier tests. Research facts and source links belong in `game/research.ts`, separate from jewelry lore. Only verified public tools and research workflows count as achievements. Keep the pavilion out of `CIVIC_LANDMARKS`, preserve old save IDs, and keep source dialogs keyboard/touch accessible.
 - **Physics is a kinematic capsule, not a rigid body.** `Physics.step(x, z, dt)` applies
   horizontal intent plus its own gravity accumulation, then Rapier's character controller
   resolves the movement. Autostep, snap-to-ground, and slope limits are configured once in
@@ -140,8 +151,13 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **The loop is fixed-timestep.** `main.ts` accumulates real time and steps physics at
   1/60 s. Rendering is per animation frame. Anything time-dependent takes `dt` explicitly.
 - **Modes drive the UI.** `Mode` is `'welcome' | 'walking' | 'map' | 'lore' | 'journal' |
-  'paused' | 'gallery'`. Mode changes are the single place where input capture, the active camera, and
+  'paused' | 'gallery' | 'travel'`. `welcome` is the loading state; ready opens the map without an entry gate. Mode changes are the single place where input capture, the active camera, and
   DOM visibility all change together. Do not bypass them with ad-hoc DOM toggling.
+  Keep the labeled First person / Top view switch (M), journal, and menu usable across
+  panels. Dialogs leave navigation accessible and make the scene inert; native control
+  keys must not be consumed as movement. Map markers sit below map panels and navigation.
+  All journal stories are readable from the start; reading records progress without
+  requiring a landmark visit. Preserve existing save IDs.
 - **Mouse rotation requires a held left mouse button; Left/Right arrows also turn.** Never request pointer lock or turn on
   entering/resuming. A drag starts on the canvas, uses client-coordinate deltas on document
   pointer events, and checks `buttons & 1`. A/D strafe, W/S or Up/Down move forward/backward, and Left/Right turn
@@ -157,20 +173,11 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   sampling, keeping every ribbon outside the glass. Continuous supporting ribs and rings
   reach the base; their returned geometry is also a world-space collider. Do not restore
   radial spokes through the inhabited glass hall. Preserve the extracted source JSON.
-- **Jewelry displays use real local photos.** `exhibits.ts` holds catalogue facts and source
-  links; `exhibition.ts` caches bundled images and sizes curved photo panels from their
-  natural dimensions using `photoSize`. Do not crop or force arbitrary photos into squares.
-  Each hall has independent in-memory piece selection, with atomic replacement after images
-  load; a failed replacement leaves the previous piece. `gallery` mode suspends walking and
-  cylinder rotation for browsing and flat-photo inspection. Keep catalogue facts separate
-  from lore, and attribute new photos. Both photo and information cylinders rotate, with the text column moving more slowly; their pause state is shared. Reduced-motion preferences start cylinders paused.
-  Do not reintroduce pedestal tables or lore lecterns: the secondary hall stories are
-  accessed through “About this place” on the information cylinder. Its texture is matched
-  to unwrapped arc width / height. Text control hit regions share the canvas coordinates
-  in `exhibition-text.ts`; click them using mesh UVs, not screen-aligned HTML overlays.
-  Native controls stay visually hidden until keyboard focus, and 1–4, P, [ / ] provide shortcuts.
+- **Jewelry collections have permanent homes.** `data/catalogue/selection.json` contains reviewed source facts; `scripts/build-catalogue.mjs` generates `game/jewelry-catalogue.json` and local WebP derivatives using offline Sharp tooling. City Hall/Energy/Science/station have 8/8/9/7 physical works; the journal has 35. Keep one physical assignment per work. `planar-exhibition.ts` uses uncropped thumbnails, aspect-matched caption canvases and simple stand colliders; full images load only for inspection. `poster-layout.ts` keeps the central axes and entrances clear. Do not restore rotating cylinders, pedestal tables or lore lecterns. Source facts and artist descriptions stay separate from Livistone fiction; never invent missing catalogue data. Native in-hall controls remain hidden until keyboard focus; 1–4 give facts, collection, photo and place story. Failed photographs leave facts available.
+- **The train excursion is a stateful zone transition.** `Journey` advances only through the fixed timestep in `travel` mode. Map, journal and pause freeze the passenger position and ride; the view toggle resumes `travel` while a trip exists. Load `LivingWaters` and its independent Rapier world before the dark-tunnel transfer. Failures restore the departure cabin and allow retry; reload safely starts in town. Keep the existing snapshot fields and save version, with additive `zone`/`journey` diagnostics. Do not move a walking capsule using an animated train collider.
+- **Living Waters shares render and collision layout.** `living-waters-layout.ts` defines the asymmetrical water cells, 2.2 m nerve network and garden paths. The remote origin is east of the existing mountain exit. Keep two pavilion entries, shallow-water escape, both boarding bays and the dry Mycelium loop traversable in both quality tiers. Full umbrella crowns must clear paths. The lake is an architectural interpretation of Vittoria; the pavilion borrows Dewdrop’s silhouette, whose original stone is topaz, not aquamarine. Rain/drainage respects reduced motion; audio remains opt-in. The destination is loaded once and reused; comprehensive resource eviction and physical-device performance remain release work.
 - **Photo clicking must not break looking.** A short scene press with no drag can raycast
-  a curved photo or text label. Activate on the native click after pointerup, so a
+  a planar photograph or caption. Activate on the native click after pointerup, so a
   synthesized touch click cannot hit a newly focused dialog button. Track its pointer independently from the joystick; cancelled gestures,
   long holds, and look drags must not open photos. Gallery arrows operate on photos,
   while walking arrows still turn. Keep visible buttons for zoom, fit, next/previous, and close.
@@ -184,8 +191,13 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   Structural cristae remain visible in map mode. `Landmark.stretch` in `content.ts` must match
   `a / 7.1` and `b / 7.1`, because tree clearing, garden rings, and the "inside a landmark" test in
   `main.ts` read it.
-- **Map mode must not move the player.** It swaps to `mapCamera` with `OrbitControls`;
-  returning restores the exact walking position. A browser test asserts this.
+- **View switching preserves the player; map destinations deliberately relocate them.**
+  Top view / First person (M) and Start / Resume exploring preserve walking position and
+  direction. Map labels and list entries use `Landmark.entrance` to arrive just outside
+  a clear entrance, facing inward, then enter walking mode. Keep these approaches aligned
+  with geometry and colliders. Load a remote destination before switching its render and
+  physics worlds; a failed or superseded request must not move the player. Keep the large
+  Start exploring button visible above the map list on desktop and touch screens.
 - **Progress is local only.** `readProgress` / `writeProgress` use the
   `livistone-progress-v1` key and every access is wrapped so that blocked or damaged
   storage degrades to an empty-but-playable state. If the shape changes, bump the key and

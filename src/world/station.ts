@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
-import { STATION } from './station-layout';
+import { createMaglevTrain } from './train';
+import { RAILWAY, STATION } from './station-layout';
 import { stationRingGeometry, stationRingAnchor } from './station-ring';
 import { stationAmberGeometry, stationAmberMaterial, stationAmberPoint, stationAmberSoffit } from './station-amber';
 
-const TAU = Math.PI * 2;
 type Point = [number, number, number];
 function tube(points: Point[], radius: number, mobile: boolean, closed = false): THREE.BufferGeometry {
   const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p)), closed);
@@ -83,35 +83,10 @@ function createFoyer(station: THREE.Group, colliders: ColliderSpec[], mobile: bo
   add(station, merge(jambs), silver, 'Ring foyer vault');
 }
 
-function cabWindow(end: number): THREE.BufferGeometry {
-  const positions: number[] = [], indices: number[] = [];
-  for (let j = 0; j <= 8; j++) for (let i = 0; i <= 12; i++) {
-    const x = 21.1 + j / 8 * 3.25, t = (x - 21) / 3.5, scale = 1 - t * .27, center = 2.02 - t * .37, z = (i / 12 - .5) * 1.95 * scale;
-    const sine = Math.pow(Math.abs(z / (1.38 * scale)), 1 / .68), cosine = Math.sqrt(1 - sine * sine);
-    positions.push(STATION.x + x * end, center + 1.52 * scale * Math.pow(cosine, .78) + .035, STATION.trackZ + z);
-    if (i < 12 && j < 8) { const n = j * 13 + i; indices.push(n, n + 13, n + 1, n + 1, n + 13, n + 14); }
-  }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); g.setIndex(indices); g.computeVertexNormals(); return g;
-}
-
-function trainBody(): THREE.BufferGeometry {
-  const sections = [[-27, .03, 1.0], [-26, .38, 1.25], [-24.5, .73, 1.65], [-21, 1, 2.02], [-18, 1, 2.02], [18, 1, 2.02], [21, 1, 2.02], [24.5, .73, 1.65], [26, .38, 1.25], [27, .03, 1.0]];
-  const p: number[] = [], uv: number[] = [], ix: number[] = [], sides = 24;
-  sections.forEach(([x, scale, y], j) => {
-    for (let i = 0; i <= sides; i++) {
-      const a = i / sides * TAU, s = Math.sin(a), c = Math.cos(a);
-      p.push(STATION.x + x, y + Math.sign(c) * Math.pow(Math.abs(c), .78) * 1.52 * scale, STATION.trackZ + Math.sign(s) * Math.pow(Math.abs(s), .68) * 1.38 * scale); uv.push(j / (sections.length - 1), i / sides);
-      if (j < sections.length - 1 && i < sides) { const n = j * (sides + 1) + i; ix.push(n, n + 1, n + sides + 1, n + 1, n + sides + 2, n + sides + 1); }
-    }
-  });
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(ix); g.computeVertexNormals(); return g;
-}
-
 export function createStationStructure(root: THREE.Group, colliders: ColliderSpec[], mobile: boolean, paving: THREE.Material): THREE.Group {
   const station = new THREE.Group(); station.name = 'Embryo Station'; root.add(station);
   const silver = new THREE.MeshStandardMaterial({ color: '#eee7db', metalness: .82, roughness: .23, envMapIntensity: 1.6 });
-  const white = new THREE.MeshStandardMaterial({ color: '#ede9dc', metalness: .18, roughness: .43 });
-  const dark = new THREE.MeshStandardMaterial({ color: '#17302f', metalness: .45, roughness: .24 });
+  const white = new THREE.MeshStandardMaterial({ color: '#ede9dc', metalness: .18, roughness: .43, side: THREE.DoubleSide });
   const brass = new THREE.MeshStandardMaterial({ color: '#b28d42', metalness: .65, roughness: .3 });
   const amber = stationAmberMaterial(mobile), roof = stationAmberGeometry(mobile);
   const stone = add(station, roof, amber, 'Sculpted amber body'); stone.castShadow = false; solid(colliders, roof);
@@ -150,15 +125,27 @@ export function createStationStructure(root: THREE.Group, colliders: ColliderSpe
 
   const matrix = new THREE.Matrix4();
 
-  // A continuous platform screen keeps the walking capsule away from the train and track.
+  // Open boarding bays align with real apertures in the parked train.
   const rails: THREE.BufferGeometry[] = [], screens: THREE.BufferGeometry[] = [];
-  for (const z of [STATION.back, STATION.trackZ - 3]) {
-    rails.push(box(0, 1.26, z, 214, .07, .07));
-    for (let x = -105; x <= 105; x += 3) {
-      rails.push(box(x, .72, z, .07, 1.15, .07));
-      if (x >= -30 && x < 27) screens.push(box(x + 1.5, .77, z, 2.9, .92, .025));
+  for (const z of [STATION.back, RAILWAY.centerZ - 7]) {
+    const spans = z === STATION.back ? [[-107, -15.2], [-12.8, 8.8], [11.2, 107]] : [[-107, 107]];
+    for (const [left, right] of spans) {
+      rails.push(box((left + right) / 2, 1.26, z, right - left, .07, .07));
+      colliders.push({ type: 'box', position: [(left + right) / 2, .72, z], size: [(right - left) / 2, .6, .08] });
+      for (let x = left; x <= right; x += 3) rails.push(box(x, .72, z, .07, 1.15, .07));
+      const l = Math.max(-30, left), r = Math.min(27, right);
+      if (r > l) screens.push(box((l + r) / 2, .77, z, r - l, .92, .025));
     }
-    colliders.push({ type: 'box', position: [0, .72, z], size: [107, .6, .08] });
+  }
+  for (const x of [-14, 10]) {
+    const ramp = box(x, .38, -75.25, 2.4, .12, 4.5);
+    const pos = ramp.getAttribute('position');
+    for (let i = 0; i < pos.count; i++) pos.setY(i, pos.getY(i) + (-pos.getZ(i) - 75.25) * (.52 / 4.5));
+    ramp.computeVertexNormals(); add(station, ramp, paving, 'Step-free boarding ramp'); solid(colliders, ramp);
+    const bridge = box(x, .64, -77.7, 2.4, .12, .7); add(station, bridge, silver, 'Boarding threshold'); solid(colliders, bridge);
+    for (const dx of [-1.24, 1.24]) {
+      const rail = box(x + dx, .92, -76.7, .06, .9, 2.2); add(station, rail, brass, 'Boarding bridge handrail'); solid(colliders, rail);
+    }
   }
   add(station, merge(rails), silver, 'Track and platform railings');
   add(station, merge(screens), new THREE.MeshStandardMaterial({ color: '#bbd6cc', roughness: .13, metalness: .22, transparent: true, opacity: .2, depthWrite: false }), 'Platform safety glass');
@@ -167,31 +154,7 @@ export function createStationStructure(root: THREE.Group, colliders: ColliderSpe
   for (let i = 0; i < dots.count; i++) dots.setMatrixAt(i, matrix.makeTranslation(-30 + (i % 180) * .32, .2, STATION.back + .85 + Math.floor(i / 180) * .16));
   dots.name = 'Platform tactile edge'; dots.computeBoundingSphere(); station.add(dots);
 
-  const train = trainBody(); add(station, train, white, 'Ultra-fast passenger train'); solid(colliders, train);
-  const windows: THREE.BufferGeometry[] = [], fittings: THREE.BufferGeometry[] = [], lights: THREE.BufferGeometry[] = [];
-  for (const side of [-1, 1]) {
-    for (let x = -19; x < 19; x += 2.3) {
-      const shape = new THREE.Shape(); shape.moveTo(-.73, -.32); shape.lineTo(.73, -.32); shape.quadraticCurveTo(.83, -.32, .83, -.22); shape.lineTo(.83, .22); shape.quadraticCurveTo(.83, .32, .73, .32); shape.lineTo(-.73, .32); shape.quadraticCurveTo(-.83, .32, -.83, .22); shape.lineTo(-.83, -.22); shape.quadraticCurveTo(-.83, -.32, -.73, -.32);
-      const g = new THREE.ShapeGeometry(shape); if (side < 0) g.rotateY(Math.PI); g.translate(STATION.x + x, 2.55, STATION.trackZ + side * 1.405); windows.push(g);
-    }
-    for (const x of [-16, -4, 8, 17]) {
-      fittings.push(box(STATION.x + x, 1.85, STATION.trackZ + side * 1.39, .035, 2.2, .015));
-      fittings.push(box(STATION.x + x + 1.15, 1.85, STATION.trackZ + side * 1.39, .035, 2.2, .015));
-    }
-    trim.push(box(STATION.x, 1.05, STATION.trackZ + side * 1.22, 41.5, .12, .04));
-  }
-  for (const end of [-1, 1]) {
-    for (const side of [-1, 1]) lights.push(new THREE.SphereGeometry(1, 8, 6).scale(.2, .08, .2).translate(STATION.x + end * 25.2, 1.48, STATION.trackZ + side * .46));
-  }
-  for (const x of [-8.8, 5.6]) {
-    const seam = new THREE.TorusGeometry(1, .035, 5, 28); seam.rotateY(Math.PI / 2); seam.scale(1, 1.51, 1.38); seam.translate(STATION.x + x, 2.02, STATION.trackZ); fittings.push(seam);
-  }
-  for (const x of [-18, -15.5, -6, -3.5, 6, 8.5, 17, 19.5]) {
-    fittings.push(box(STATION.x + x, .66, STATION.trackZ, 1.4, .33, 1.7));
-    for (const side of [-1, 1]) fittings.push(new THREE.CylinderGeometry(.24, .24, .16, 12).rotateX(Math.PI / 2).translate(STATION.x + x, .5, STATION.trackZ + side * .86));
-  }
-  add(station, merge(windows), dark, 'Train passenger windows'); add(station, merge(fittings), dark, 'Train cab and door seams'); add(station, merge(lights), new THREE.MeshBasicMaterial({ color: '#fff6d4' }), 'Train headlights');
-  add(station, merge([cabWindow(-1), cabWindow(1)]), new THREE.MeshStandardMaterial({ color: '#142c30', metalness: .6, roughness: .19, side: THREE.DoubleSide }), 'Curved cab windshields');
+  createMaglevTrain(station, colliders, mobile);
 
   const benches: THREE.BufferGeometry[] = [];
   for (const x of [-25, 5, 19]) {
@@ -218,7 +181,8 @@ export function createStation(root: THREE.Group, colliders: ColliderSpec[], mobi
     return add(station, new THREE.PlaneGeometry(width, height), new THREE.MeshStandardMaterial({ map, roughness: .8, side: THREE.DoubleSide, emissive: '#d4c69a', emissiveMap: map, emissiveIntensity: .25 }), title);
   };
   const entrance = sign(5.4, 1.3, 'EMBRYO', 'LIVISTONE  /  RAILWAY STATION'); entrance.position.set(-16, 4.25, -61.85);
-  const platform = sign(5.2, 1.3, '01  /  NEW HORIZONS', 'ULTRA-FAST RAIL  ·  LIVISTONE'); platform.position.set(6, 3.8, -73.4);
+  const platform = sign(5.2, 1.3, '01  /  NEW HORIZONS', 'MAGLEV  ·  BOARD AT THE OPEN GATES'); platform.position.set(6, 3.8, -73.4);
+  const boarding = sign(3.6, .8, 'BOARD HERE', 'PARKED TRAIN  ·  NO DEPARTURES'); boarding.position.set(-14, 3.6, -76.1);
   const hangers: THREE.BufferGeometry[] = [];
   for (const board of [entrance, platform]) for (const dx of [-2, 2]) {
     const x = board.position.x + dx, z = board.position.z, bottom = board.position.y + .65, top = stationAmberSoffit(x, z).y;

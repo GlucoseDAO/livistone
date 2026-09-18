@@ -28,6 +28,14 @@ describe('Embryo Station circulation', () => {
         expect(direction * physics.position().z).toBeGreaterThan(direction < 0 ? 71 : -57);
         expect(physics.position().x).toBeCloseTo(STATION.entranceX, 1);
       }
+      for (const x of [-14, 10]) {
+        physics.teleport({ x, y: 1.05, z: -72.7 });
+        for (let i = 0; i < 110; i++) physics.step(0, -4);
+        expect(physics.position().z).toBeLessThan(-78.2);
+        expect(physics.position().y).toBeGreaterThan(1.4);
+        for (let i = 0; i < 110; i++) physics.step(0, 4);
+        expect(physics.position().z).toBeGreaterThan(-73);
+      }
       // Glazed bays stop the capsule, while the ring door and side entrance stay open.
       for (const x of [-18.6, 10.5]) {
         physics.teleport({ x, y: 1.05, z: -61.4 });

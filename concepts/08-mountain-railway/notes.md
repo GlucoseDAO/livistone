@@ -13,3 +13,12 @@ Mobile uses fewer shell/vault samples and support ribs, and skips railway normal
 ## Verification
 
 `bun run build` passed and `bun run test` passed all 33 checks in the shared working tree. The full browser run passed 11 of 13 tests; live Vite reload interrupted the input test, and concurrent test runs removed the desktop railway test's trace files. Both affected tests passed when rerun with separate output directories; all three railway browser cases passed together. No runtime defect remained from those interruptions. Twenty-eight landmark screenshots were generated, and east/west portals, track surfaces, passage interiors, and touch passage rendering were inspected. Screenshots remain ignored under `output/testing/railway/` and `output/testing/railway-landmarks/`.
+
+
+## 18 September: maglev and boarding revision
+
+In response to the supplied in-game screenshot and Dark Nut photo, the single conventional track is replaced by two parallel concrete maglev guideways. The parked train loses wheel geometry and gains open boarding apertures, a cabin floor and seats. Two platform gates and gentle ramps connect the concourse to the cabin. The Dark Nut portals are broader, darker shells with heavier irregular bronze ornaments; both lined bores, mountain cutouts, maintenance ledges and planting clearances expand together. Train departures remain out of scope.
+
+### Passenger cabin refinement
+
+The user’s interior screenshot exposed the opaque shell behind the old window decals and the block-shaped seats. The replacement cabin uses actual rounded apertures with transparent curved glazing on both sides, sculpted teal upholstery with pale headrests, metal armrests and bases, a carpeted aisle, continuous warm ceiling light strips, and separate driving-cab bulkheads. Curved panels are subdivided before projection so large triangles do not cut across the windows. Boarding and glass containment have physics checks; window sightlines are checked from inside and outside.

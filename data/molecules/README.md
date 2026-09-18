@@ -1,0 +1,8 @@
+# Molecular source records
+
+Retrieved from RCSB PDB on 18 September 2026. PDB archive data are available under CC0; see <https://www.rcsb.org/pages/policies>.
+
+- `1TRZ.pdb`: <https://files.rcsb.org/download/1TRZ.pdb>; [entry](https://www.rcsb.org/structure/1TRZ), [DOI](https://doi.org/10.2210/pdb1TRZ/pdb). Ciszak E., Smith G.D. (1994), *Crystallographic evidence for dual coordination around zinc in the T3R3 human insulin hexamer*, Biochemistry 33, 1512–1517, <https://doi.org/10.1021/bi00172a030>. Human insulin, X-ray diffraction, 1.60 Å. The game selects the A/B insulin unit from the deposited asymmetric unit, not the complete hexamer. It uses 51 alpha-carbon coordinates and the three A/B SSBOND records with their cysteine sulfur coordinates and CA–CB–SG side-chain paths, so the bond markers connect to the backbone. Alternate positions are limited to blank/A.
+- `GLC_ideal.sdf`: <https://files.rcsb.org/ligands/download/GLC_ideal.sdf>; [component](https://www.rcsb.org/ligand/GLC). Ideal coordinates of **alpha-D-glucopyranose**, not coordinates extracted from an insulin structure. Only the 12 carbon/oxygen atoms and the 12 bonds between them are displayed; hydrogens are omitted.
+
+Regenerate the compact browser data with `bun scripts/extract-molecules.mjs`. The extractor reads only these local files and records their SHA-256 hashes in `src/world/molecules/*.json`. The original coordinates remain unchanged. Runtime architecture applies a uniform scale, rigid axis rotation and translation. Smoothed broad ribbons are architectural representations of backbone traces, not a secondary-structure assignment or an atomically complete model. Added columns, floor, signs and gallery panels are Livistone fiction. Insulin and glucose remain separately labelled.

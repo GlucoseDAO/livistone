@@ -1,14 +1,12 @@
 # Livistone: browser game implementation plan
 
-Status: implementation plan following the design interview, 16 September 2026. The user approved the visual direction and confirmed exploration/lore, first-person walking plus a 3D aerial map, and desktop/mobile support from the start. The original STL jewelry models have been supplied; Grasshopper files remain optional. The engine choice below is made under the user's delegation. A first procedural prototype now implements town walking, the bridge, ground-floor interiors for all three landmarks, six discoveries, interactive photo exhibitions, local journal persistence, an aerial map, and desktop/touch input. See the README for Bun setup and running instructions. On 17 September 2026 the original STL models of the Mitoring and the Nanot were supplied and placed in `data/models/` (git-ignored because of size); their preserved wire centerlines (about 40 KB of JSON) are rebuilt as silver ribbons around the Ministry of Energy and Ministry of Science. Recovery restored missing jewelry exports and repaired mouse handling. Mouse looking requires holding the left button throughout a drag. Left/Right arrows turn, A/D strafe, and W/S or Up/Down walk forward/backward; startup/resume never capture the mouse. The Mitoring is a lower, elongated 28 × 13.2 m amber hall with folded cristae visible from the aerial map. City Hall now has walnut relief, a dark seam, and broad brass clasps with hexagonal fasteners, based on the pendant photographs. The historical strand extractor was not present in the recovered tree. The STLs themselves are not loaded at runtime. The landscape now includes a baked daylight/cloud skybox shared with reflections, a solid masonry bridge arch with jointed paving and colliding railings, instanced shrubs with individual leaves and flowers, and blade grass over textured ground. Shared path curves reserve planting-free approaches through every civic doorway. Headless bridge crossing/railing checks and desktop/mobile-emulation browser checks cover circulation; physical-device performance has not been verified. The mountain backdrop now uses ridged terrain and CC0 scanned rock maps. Nanot has a grounded exterior frame, with its silver sampled outside the glazing. Each civic hall now has a rotating cylinder of curved jewelry photographs in place of its central sculpture and lectern. An adjacent information cylinder carries proportioned curved text and clickable browsing/rotation labels. The information cylinder rotates slowly alongside the photo cylinder, with shared pause/resume controls. Both cylinder diameters have been enlarged by 35%; their heights and photo aspect ratios remain unchanged. The camera-facing overlay is removed from normal viewing; native controls appear only when focused using the keyboard. All remaining pedestal tables have been removed; their lore is reached through “About this place” on the same controls. Six catalogue pieces can be selected independently per hall; photos unfold into a flat viewer with aspect-preserving zoom and pan. The information dialog shows source-linked facts for the selected piece. The river uses environment-lit ripples and irregular gravel shores. The garden refinement adds world-scaled jointed limestone with bump relief, narrower 2.6 m winding paths and reduced civic paving, occasional flower patches, and textured river rocks emerging along the waterline. The bridge deck now rises 2.35 m above its ends, with raised arch mouldings and branching side ribs; render and collision surfaces share the same deck profile. These landscape details are procedural and mobile uses fewer flowers and rocks. These changes do not establish structural engineering performance. The multi-room interiors, authored GLB assets, and physical-device performance targets below remain roadmap work.
+Status: procedural implementation updated 18 September 2026, following the 16 September design interview. The playable prototype includes all three civic ground floors, Embryo Station and its boardable train, Glucose Commons, the separate Living Waters excursion, town bridges and river gardens, local progress, first-person walking and an aerial map. Loading opens the aerial view with a prominent **Start exploring** button. Clicking a landmark label or map list entry places the visitor outside its entrance, facing inward, in first person. Garden destinations load before switching the scene and physics world; failed or superseded requests do not move the player. The view switch preserves position; the persistent **First person / Top view** button (M), journal and menu remain available across browsing panels. Mouse look requires a held left button; desktop and simultaneous touch movement/look are supported.
 
-The 17 September town extension adds the approved Embryo Station at the northern edge: a concourse and platform beneath a thick sculpted amber body, a walk-through pierced silver ring and glazed foyer, a static ultra-fast train, two connecting garden paths, a fourth map landmark, and a seventh lore discovery. The 18 September refinement replaces the shallow roof with a closed, lobed resin volume, refractive skin and internal core, substantial rounded clasps, a deep silver shank with thin rolled rims and irregular piercings through its curved sides, and warm-lit entrance glazing. A northern home moves west and nearby trees leave the ring visible. Rail and station clearings share their layout data with planting; ring, floor, supports, foyer glazing, and platform barriers have collision geometry. Train boarding and journeys remain future work. The Eye of Winter remains a concept: the latest direction is a **double moon gate**, with two adjacent circular passages joined by the blue-stone setting and localized snow and ice. The generated single-gate image is an earlier study; the double-gate image request reached the image-generation usage limit. See [the extension record](../concepts/06-town-extension/notes.md).
+The curated gallery expansion replaces the rotating cylinders with **32 permanent planar posters** across four collections and a **35-work searchable, filterable journal catalogue**. Facts and 70 photographs come from the adjacent Livia archive, with local thumbnail/full-size derivatives, provenance and attribution. Full images load on demand. The insulin pavilion adds six research posters sourced from GlucoseDAO’s public repositories and scientific molecular records. The Living Waters prototype adds outbound/return cabin travel, concealed destination loading, Vittoria’s irregular water eyes and silver routes, the Dewdrop-inspired aquamarine pavilion, Mycelium umbrella planting and drainage, and three source-linked garden stories.
 
-The 18 September river-garden revision replaces the single-channel layout with a winding main river and two woodland tributaries, three traversable masonry bridges, shared water/terrain/planting boundaries, cool grey river rocks, and denser oak/ash planting. The white dome placeholder houses are removed. A 27 m silver hourglass tower northeast of City Hall interprets the supplied jewelry photograph; its base is walk-through, and its crown and looped strands remain open. It is a sculptural landmark rather than a functioning clock or climbable building. Mobile retains reduced forest density. See [the revision record](../concepts/09-river-gardens/notes.md). Physical-device performance remains unverified.
+Existing architectural work is preserved: STL-derived Mitoring/Nanot silver, walnut City Hall, the deep pierced Embryo ring and thick amber, two real mountain railway bores, the King’s Chapel entrance gateway, three masonry bridges, tributaries and a walk-through silver hourglass tower. Placeholder dome homes remain removed. Original STLs stay offline; their extracted JSON strands are preserved, and their historical extractor is still missing. The earlier design and implementation history is retained in [concepts/](../concepts/), including [the station](../concepts/06-town-extension/notes.md), [railway](../concepts/08-mountain-railway/notes.md), [river gardens](../concepts/09-river-gardens/notes.md), [rail excursion](../concepts/10-rail-gardens/notes.md), [glucose pavilion](../concepts/11-glucose-pavilion/notes.md) and [curated galleries](../concepts/12-curated-galleries/notes.md).
 
-The 18 September railway extension carries textured rails, timber sleepers, and gravel ballast through both sides of the mountain ring. The supplied dark Nut of Power inspires sculpted charcoal portals with bronze ornament. Actual openings in the hillside lead into lined passages with maintenance ledges and far exits; the walking boundary permits this narrow corridor. Shared layout data reserves the full track and portal footprint from planting. CC0 maps are bundled locally, with fewer geometry samples and no railway normal maps on mobile. The train remains static. See [the railway record](../concepts/08-mountain-railway/notes.md).
-
-The 18 September entrance refinement implements the approved King's Chapel bridge gateway: open paired silver curves and fan ribs, a long faceted green prism, textured limestone side abutments, and extruded LIVISTONE lettering above the setting. The start point moves to the paved approach at `(0, 52)` so the whole monument can be seen. A shared footprint reserves the approach and tree canopies; geometry supplies matching colliders. The gem uses physical transmission on rich detail and an opaque reflective fallback on gentle detail, with dedicated quality handling. Procedural colour/roughness/bump textures and a licensed local serif outline subset require no additional runtime dependency. This adapts concept 08 under `concepts/07-bridge-monument/`; physical-device performance remains unverified.
+This is a playable procedural implementation, not a completed production release. Multi-room civic interiors, authored housing/GLB replacements, optional hands-on ministry exhibits, full zone unloading/context-loss recovery, and measured physical-phone/Safari performance remain open. Sunfinder and the Eye of Winter double moon gate remain design proposals. The milestone table describes acceptance gates; automation and desktop touch emulation do not establish physical-device performance or release readiness.
 
 ## 1. Product direction
 
@@ -23,9 +21,64 @@ Confirmed landmarks:
 | Nut of Power — City Hall | Joined walnut and smoky crystal halves, broad brass connections, dominant civic position | Sheltered entrance, public atrium, council room, garden-facing balcony |
 | Mitoring — Ministry of Energy | Warm amber enclosed by irregular folded silver-white ribs | Public energy hall, a small interactive energy exhibit, enclosed winter garden |
 | Nanot — Ministry of Science | Rounded volume with angular, nonuniform silver-white lattice and restrained dark inclusions | Public science gallery, an accessible demonstration laboratory, planted reading court |
-| Embryo Ring — Railway Station | Deep openwork silver band entrance, glazed foyer, and thick raw amber body clasped by asymmetrical silver prongs | Glazed entrance foyer, open concourse, waiting benches, platform, parked ultra-fast train; travel is future work |
+| Embryo Ring — Railway Station | Deep openwork silver band entrance, glazed foyer, and thick raw amber body clasped by asymmetrical silver prongs | Glazed entrance foyer, open concourse, waiting benches, platform, boardable ultra-fast train and return excursion to Living Waters |
 
 Interior functions beyond the ministry assignments are design proposals. We will preserve the distinction between source lore and new game fiction.
+
+### Glucose Commons: molecular architecture and open research
+
+The user requested one additional place for Livia’s glucose-prediction work. This building uses scientific molecular data rather than assigning a new civic role to another jewelry piece. It sits at `(38, -40)`, between Science and the eastern approach to Embryo Station.
+
+- Preserve the deposited fold through a uniform scale, axis rotation and translation; never hand-draw the insulin chains or call insulin “glucose.” Select and label the A/B unit from 1TRZ rather than implying a full hexamer. The smaller GLC graph is an ideal alpha-D-glucopyranose model, with hydrogens omitted.
+- Keep the insulin ribbons overhead, with two open entrances and a level north–south passage. Match floors, poster stands, columns and solid molecular geometry with colliders. Keep full plant canopies clear of the footprint and approaches.
+- Use six independent, source-linked planar research posters: Livia and GlucoseDAO; Sugar-Sugar; cgm_format and data processing; GluMind/SugarOne and model evaluation; gluRPC; molecular provenance. Accessible dialogs expose ordinary repository/source links and remain readable on phones.
+- Present achievements as verified public tools and research work. Do not invent clinical efficacy, benchmark winners or study outcomes. The town has no prediction backend and does not need participant glucose data.
+- Bundle scientific coordinates and poster text locally; external links are optional visitor actions. Source review date, attribution, extraction script and checksums are recorded in `data/molecules/README.md` and the concept record.
+- Preserve the existing version-1 save shape. Research discoveries and the new landmark are additional recognized IDs; old progress stays valid. The pavilion stays separate from `CIVIC_LANDMARKS` and jewelry-photo exhibition lookups.
+
+Acceptance checks cover two-way walking, all poster approaches, desktop/touch source dialogs, correct molecule labels, save reload, unchanged position/yaw after map mode, and mobile horizontal overflow. Physical-device and Safari/iOS performance remain unverified.
+
+### Collection hierarchy and interior photo galleries
+
+Do not translate every piece of Livia's jewelry into a building. The adjacent Livia catalogue currently lists a larger archive of works in [`content/pieces.md`](../../livia/content/pieces.md), while only a minority have a silhouette, inhabitable void, distinct civic use, and sufficient source geometry or multi-angle photography to justify architectural enlargement. A town made from dozens of equally prominent jewelry buildings would weaken the legibility of the four established landmarks and turn the landscape into an object showroom.
+
+Use four levels of representation:
+
+| Level | Treatment | Scope |
+| --- | --- | --- |
+| Primary architecture | Fully inhabitable translation with a real town or transport function | Keep Nut of Power, Mitoring, Nanot, and Embryo; add no more than one or two future buildings after concept and walk-through review |
+| Landscape landmark | Gate, tower, pavilion, garden, bridge, portal, or sculpture | King's Chapel gateway, Dark Nut portals, Timeface tower, Eye of Winter gate, Vittoria Lake, Mycelium Rain Garden, and similarly strong site-scale adaptations |
+| Physical photo exhibition | Flat, freestanding poster panels placed inside existing buildings | Approximately 25–35 well-documented works at first, divided into building-specific themes |
+| Journal catalogue | Searchable flat-photo and factual archive | Eventually all verified pieces, including older works that do not receive a physical poster in the current exhibition |
+
+The **Sunfinder** remains the strongest candidate for one additional inhabitable building: its transparent enclosure, lens, directional purpose, and crown-like cage could become a small observatory or house of light near the mountain/science district. This is a candidate, not an approved implementation. Vittoria and Mycelium are approved as landscapes rather than additional buildings. Pieces such as Rotary Magnetic Fields, La Navette, Inline, Ice, Splash, Mountain of Gold, Blooming Pins, and Ceartari may become small installations or interactions without receiving interiors.
+
+Replace the “same selectable catalogue in every hall” model with collections that belong to particular places. A visitor should have a reason to travel between buildings. Keep the architectural source piece as the permanent anchor in each location, then arrange the supporting posters as follows:
+
+| Location | Curatorial identity | Priority pieces and collections |
+| --- | --- | --- |
+| **City Hall** | Materials, memory, identity, and the practice archive | Nut of Power and Dark Nut; *Beloved Food*: Bubinga Heart, Nucalong, Ammonite/Amonite, Nest, Nocciola; wood, walnut, stone, brass, and personal/custom works; a concise chronology from architecture and computation to jewelry |
+| **Ministry of Energy** | Amber, light, heat, ice, and transformation | Mitoring; Amberbow; Amberear; Rotary Magnetic Fields; Berrynova; Ice; Splash; Eye of Winter photographs; selected cosmic/light pieces such as Sound of Stars, White Dwarf, and Supernova |
+| **Ministry of Science** | Parametric nature, biology, morphology, and mechanisms | Nanot; the 2021 *Parametric (by) Nature* group—Ceartari, Beanut, Ice, Splash, Mountain of Gold, Mycelium; Vittoria Amazonica, Hessonite, Ludisia, Toxic; Brain, Funghi, Roots, Greentooth, and Peas in Pod; adaptive/mechanical pieces such as Cabochon, Bracelet Extension, and La Navette |
+| **Embryo Station concourse** | Paths, memories, guides, and travel | A restrained transport-poster display for the 2022 group: La Navette, Piguen, Sticks and Stones, Sunfinder, Amberear, Inline, and King's Chapel. Keep this to approximately five to seven panels so the station remains a station, not a fourth civic museum |
+
+The prototype resolves the overlapping priority lists into unique physical assignments: Ice, Splash and Amberear belong to Energy; La Navette belongs to the station. City Hall has eight panels, Energy eight, Science nine and the station seven. Eyelense, Timeface and Deep Sea Pearl are additional journal-only works. The full assignment and provenance are in `data/catalogue/selection.json` and `src/game/jewelry-catalogue.json`. Cross-references in the journal connect themes without duplicating physical posters.
+
+The implemented poster system replaces the rotating photo cylinders; do not reintroduce pedestal tables or lore lecterns. Use quiet freestanding planar panels in shallow side bays and along interior perimeters, leaving central axes, windows, doors, gallery controls, and building-specific spatial features unobstructed. Initial capacity targets are eight to ten panels in City Hall, six to eight in Energy, eight to ten in Science, and five to seven in the station. Do not attempt to display all catalogue items simultaneously.
+
+Each physical panel contains:
+
+- one large uncropped photograph and, when useful, one smaller alternate/detail view;
+- the verified title, collection, year, type, materials, and dimensions;
+- a short artist-sourced description, clearly separated from Livistone fiction;
+- an indication when the surrounding building or landscape is an interpretation of the piece; and
+- a keyboard-, mouse-, and touch-accessible action that opens the existing flat aspect-preserving viewer for zoom, pan, next/previous, fit, and close.
+
+Use approximately 60–90 words of body text at most. Panels must be readable at a comfortable first-person distance without requiring the player to collide with them. They need simple shared collision or stand-clearance volumes only where necessary; do not make every trim detail physical. On mobile, retain text legibility and the full photo viewer while reducing panel frame geometry, shadows, and the number of simultaneously loaded full-resolution images.
+
+Content production begins with the approximately 35 works that already have structured type/material/dimension/year data in [`pieces.md`](../../livia/content/pieces.md) and the collection files under [`content/art-design/`](../../livia/content/art-design/). Older entries that have photographs but incomplete captions remain “studio archive” items until their facts are curated. Normalize title aliases such as Amonite/Ammonite in presentation data without renaming or deleting source files. Never invent missing materials, dates, exhibition history, or artist intent.
+
+Bundle reviewed image derivatives locally; the runtime must not depend on the live Livia website. Keep original aspect ratios, attribution, source paths, and a build-time manifest that assigns stable IDs, physical exhibition location, collection tags, thumbnail/full-image files, and factual fields. Load thumbnails for the room first and full-resolution photographs only when a panel or viewer needs them. The journal can expose collection, year, material, type, and location filters after sufficient content exists.
 
 ## 2. Technology decision
 
@@ -61,9 +114,9 @@ Choose and pin compatible package versions at implementation time. The renderer,
 
 The confirmed scope is **exploration and lore, first-person walking plus a 3D aerial map, on desktop and mobile browsers from the beginning**. Single-player is the implementation choice for this exploration release.
 
-The player can walk through the whole civic garden district and all three primary buildings, inspect the artifacts, and discover approximately six to nine short lore interactions. Exploration is welcoming and unhurried. A small optional route can connect the buildings, with one hands-on exhibit in each ministry. Doors to the principal buildings are available without completing a quest.
+The player can walk through the whole civic garden district and all three primary buildings, inspect the artifacts, and read the original place stories, curated jewelry captions and six research posters. The initial six-to-nine-story target has expanded without making reading mandatory. Exploration is welcoming and unhurried. A small optional route can connect the buildings, with one hands-on exhibit in each ministry. Doors to the principal buildings are available without completing a quest.
 
-Start with roughly 10–14 supporting homes or workshops, built from a small modular kit. These establish the town and initially provide exterior streetscape; three complete landmark interiors take priority. More homes, Livia's personal workshop, residents, and additional districts can follow.
+The original target of roughly 10–14 supporting homes or workshops remains future art production; the later approved garden revision removed the placeholder domes. Use a small modular kit when housing is developed. These establish the town and initially provide exterior streetscape; three complete landmark interiors take priority. More homes, Livia's personal workshop, residents, and additional districts can follow.
 
 A short optional discovery sequence could be: inspect the artifact relationships in City Hall, adjust an amber energy exhibit at Mitoring, inspect a molecular model at Nanot, and record the discoveries in a journal. These are proposed game interactions, not literal demonstrations of medical efficacy.
 
@@ -92,6 +145,100 @@ This is a route diagram, not the final geographic map.
 Use metres throughout. Block out a player eye height around 1.65–1.7 m and a comfortable walking speed around 3 m/s. Initial landmark dimensions can range from roughly 18–28 m across and 10–18 m high, adjusted after walking the scene. Avoid copying the illustration's proportions so literally that ordinary doors become enormous or stairs become unusable.
 
 Draw floor plans and sections before detailing landmark shells. Every visible entrance needs an actual opening and valid circulation. Floors must fit inside the curved envelopes. Trees, overhangs, courtyards, and interior winter gardens should create visible shelter rather than merely decorate an exposed plaza.
+
+### Approved rail excursion: Vittoria Lake and Mycelium Rain Garden
+
+#### Status, role, and route
+
+This approved landscape expansion now has a **playable procedural prototype** in a separately loaded zone. The two gardens form one remote destination reached by train from Embryo Station. Do not place them within walking distance of City Hall, the ministries, or the current woodland boundary. Their separation is intentional: boarding a train should feel like leaving the town for a living-water landscape shaped by two pieces of jewelry.
+
+Use one destination stop and one compact excursion zone rather than separate train stops for each garden. The default layout places the destination beyond the **eastern** mountain exit, preserving the western line for a later district; this east-side choice may move if a future whole-world layout study gives a stronger reason. The current railway already runs east-west through real bores and outer portals, and the prototype train follows a bounded departure/arrival ride with a dark loading interval. The travel loop is:
+
+```mermaid
+flowchart LR
+    A[Embryo Station concourse] --> B[Board through an aligned train bay]
+    B --> C[First-person train journey through the eastern tunnel]
+    C --> D[Living Waters garden stop]
+    D --> E[Vittoria Lake nerve bridges]
+    D --> F[Mycelium Rain Garden]
+    E --> G[Dewdrop aquamarine pavilion]
+    E --> D
+    F --> D
+    D --> H[Return train to Embryo Station]
+```
+
+The ride may use the dark mountain tunnel as a concealed zone-loading interval, but it must still read as a train journey rather than an unexplained teleport. Keep the player in the cabin in first person, show departure and arrival, preserve orientation coherently, and make the return train continuously available so the player cannot be stranded. Full railway simulation across a seamless landscape is optional; a convincing bounded ride and safe zone transition are sufficient. The garden stop should be modest—platform, shelter, sign, and two clear exits—so the jewelry landscapes, not a second large station, dominate arrival.
+
+#### Authoritative jewelry references
+
+The adjacent `livia` repository is the source archive. Its large photographs may be Git LFS pointer files in a checkout that has not pulled LFS objects, so each row also gives a live website fallback. Do not search for substitute imagery or redesign the pieces from their names alone.
+
+| Source piece | Facts and image references | Features that must survive the landscape translation |
+| --- | --- | --- |
+| **Vittoria Amazonica pendant** | Silver and aquamarine, 4.5 × 4.5 × 1.0 cm, 2022; collection source: [`9_Survival (RJW 2023).md`](<../../livia/content/art-design/9_Survival (RJW 2023).md>); principal photographs: [`..._1.jpg`](<../../livia/assets/RJW2023/LiviaZaharia_pendant_VittoriaAmazonica_2022_silver_aquamarine_4.5x4.5x1.0cm_1.jpg>) and [`..._2.jpg`](<../../livia/assets/RJW2023/LiviaZaharia_pendant_VittoriaAmazonica_2022_silver_aquamarine_4.5x4.5x1.0cm_2.jpg>); [website fallback](https://livia.glucosedao.org/RJW2023/LiviaZaharia_pendant_VittoriaAmazonica_2022_silver_aquamarine_4.5x4.5x1.0cm_1.jpg) | A broad circular/lily-pad body, irregular branching silver veins, open cells between the veins, and a pale blue central stone. Preserve the asymmetrical biological network; do not simplify it into equal radial spokes or a generic circular plaza. |
+| **Mycelium ring** | Sterling silver and opal, 2.1 × 2.0 × 2.8 cm, 2021; collection source: [`12_Parametric (by) nature (RJW 2021).md`](<../../livia/content/art-design/12_Parametric (by) nature (RJW 2021).md>); principal photographs: [`Mycelium...cm.jpg`](<../../livia/assets/RJW2021/LiviaZaharia_ring_Mycelium_2021_sterlingsilver_opal_2.1x2.0x2.8cm.jpg>) and [`...cm1.jpg`](<../../livia/assets/RJW2021/LiviaZaharia_ring_Mycelium_2021_sterlingsilver_opal_2.1x2.0x2.8cm1.jpg>); [website fallback](https://livia.glucosedao.org/RJW2021/LiviaZaharia_ring_Mycelium_2021_sterlingsilver_opal_2.1x2.0x2.8cm.jpg) | The opal is surrounded by a crown of repeated folded silver loops. Livia's source description explains that the setting was developed to let water drain away from porous opal, with mushrooms and fungi informing the solution. Preserve that relationship between umbrella/crown forms, water capture, and visible drainage. |
+| **Dewdrop ring** | Adjustable cast-silver ring with treated Swiss blue topaz; catalogue entry: [`pieces.md`](../../livia/content/pieces.md); selected photographs: [`2313241738992752.jpg`](<../../livia/assets/pieces/Dewdrop ring/2313241738992752.jpg>) and [`2386235421693383.jpg`](<../../livia/assets/pieces/Dewdrop ring/2386235421693383.jpg>); [website fallback](https://livia.glucosedao.org/pieces/Dewdrop%20ring/2313241738992752.jpg) | A small faceted light-blue stone sits at the open end of a curling silver ring. Use its compact droplet silhouette, pointed facets, and open silver embrace to shape the pavilion. Dewdrop's stone is **topaz, not aquamarine**; the destination pavilion combines this silhouette with the aquamarine material identity already belonging to Vittoria. |
+
+These references describe real jewelry. The lake, pavilion, train service, garden ecology, and architecture are new Livistone fiction and must be labelled as interpretations rather than claims about the original objects.
+
+#### Vittoria Lake: the pendant as walkable water geography
+
+Enlarge Vittoria Amazonica into an approximately **80–110 m wide shallow lake landscape**. The pendant's silver network becomes a set of raised, walkable “nerve” bridges. The open areas between branches become many irregular water cells, visually related to terraced Japanese rice paddies: thin raised edges define neighboring pools at subtly different levels, reflections change from cell to cell, and the whole lake can be read as one cultivated living surface. This is a spatial and hydrological reference only; do not add generic Japanese gates, lanterns, buildings, or ornamental motifs.
+
+The lake cells are **water eyes**. Each should have a distinct outline and a readable edge: pale wet stone or gravel at the rim, shallow luminous water, and a somewhat darker or more reflective center. Some eyes can contain reeds, aquatic leaves, submerged stones, or small ripples, but they must remain parts of one coherent Vittoria pattern. Avoid a regular grid, identical circles, or a single undivided pond. Use a shared lake/network field so water meshes, edge elevations, bridge supports, terrain, planting clearance, and collision agree.
+
+The silver nerves are the primary walking routes. They must:
+
+- follow the source pendant's irregular branching logic rather than equally spaced spokes;
+- provide at least two choices around several water eyes, creating a small exploratory loop rather than one forced path;
+- maintain roughly **1.8–2.4 m of clear walkable width**, with wider pauses at junctions;
+- rise only enough to read above the water and remain comfortable for the capsule controller;
+- use low organic lips, occasional widened edges, or restrained rails where a fall would otherwise be frustrating, without turning the lake into a conventional road bridge system;
+- provide collision surfaces derived from the same curves and elevations as the rendered nerves; and
+- include safe recovery points so stepping or falling into shallow water never traps the player.
+
+The outer bank should feel like the broad margin of a lily pad, not a circular concrete quay. Use low planted berms, wet gravel, reeds, and a few woodland frames. Preserve long views from the arrival platform across the branching network to the blue center. Trees must not conceal the overall pendant silhouette in aerial map mode.
+
+#### Central Dewdrop aquamarine pavilion
+
+At the convergence of the nerve bridges, the Vittoria aquamarine becomes a small inhabitable pavilion. Its massing takes the **faceted droplet** and open-ended silver embrace from the Dewdrop ring, but its blue mineral identity comes from Vittoria's documented aquamarine. Working size is approximately **10–14 m across and 8–12 m high**, subject to a walk-through blockout.
+
+The pavilion should be a destination, not a jewel placed on a pedestal. At least two nerves must enter it at floor level. A translucent pale-aquamarine shell or cluster of facets encloses a quiet room, lookout, or water observatory; a curling silver structural band holds it without hiding the blue volume. Openings should frame the surrounding water eyes, and the interior floor must remain dry and level. Use restrained refraction near the player and a cheaper opaque/reflective blue material at distance and on mobile. Do not describe the pavilion as the literal Dewdrop jewel, and do not label Dewdrop's source stone as aquamarine.
+
+Possible content is deliberately limited: one concise story panel can explain Vittoria, Dewdrop, the landscape transformation, and the distinction between the two stones. Do not fill the pavilion with a second large gallery or unrelated furniture. Its reward is the view back across the nerves and water eyes.
+
+#### Mycelium Rain Garden: umbrella planting and visible drainage
+
+Place the Mycelium Rain Garden beside, but not inside, Vittoria Lake. A short path from the garden stop should divide clearly: one branch approaches the open lake; the other descends into a denser, sheltered rain garden. The gardens may exchange overflow water through a visible channel, but Mycelium keeps its own identity and must not become another lake cell.
+
+Translate the ring's large crown into the entire planting language. Plants should read as a family of **small living umbrellas**: arched stems or clustered supports carry cupped, fluted, or overlapping canopies inspired by the ring's repeated folded loops. Use several sizes and irregular rotations so the garden feels grown rather than stamped. Most umbrellas should be approximately **1.2–3 m high**, with a few larger gathering canopies; retain ordinary low groundcover beneath them so the scene does not become a field of identical props. The shapes may recall mushrooms, broad leaves, or silver-edged botanical structures, but they are plants within Livistone rather than literal oversized jewelry copies.
+
+Water behavior is part of the design. Rain or collected mist should strike the umbrella crowns, run along visible ribs, drip from selected edges, and enter silver-lined rills leading to planted infiltration basins. Shallow pools can gather temporarily around an opalescent central wetland stone before draining toward the Vittoria system. The paths remain usable in all presentation states: rainfall is atmospheric and educational, never a gameplay hazard or a timed gate.
+
+Raised porous-stone walks and short silver-edged crossings should provide an accessible loop through the garden, generally **1.8–2.4 m clear**. Keep canopies and dripping edges out of the capsule's head space. Reserve every plant's full canopy from paths, the arrival platform, drainage rills, and sightlines. Render geometry and physics must share the same path elevations; decorative roots and fine drainage ribs should not create snagging collision.
+
+The garden's interpretation panel should mention the real Mycelium design problem: the porous opal needed a setting that allowed water to drain, and fungi informed the solution. Do not turn that factual material story into a medical, ecological, or efficacy claim.
+
+#### Shared implementation constraints
+
+- Treat the excursion as a separately loadable zone. The tunnel ride can hide loading, but failed loading must leave the player safely at Embryo Station with a clear retry action.
+- Add the remote stop and both gardens to the aerial map as a separate destination card or inset. Entering map mode must not move the player, including while aboard the train or inside the destination zone.
+- Keep one coherent set of world-space curves/fields for Vittoria nerves, water-eye boundaries, Mycelium drainage, paths, terrain, planting clearance, and colliders. Do not hand-align independent render and physics versions.
+- Water eyes may share one animated material and atlas/mask data. Do not create a reflection camera, render target, or expensive transparent stack for every cell.
+- Instance Mycelium plants by size/material family and spatial cell. Mobile reduces umbrella count, rib segments, water-edge geometry, refraction, and distant shadows while preserving the overall crown silhouette and a continuous walking route.
+- The garden destination needs its own ambience, but audio begins only after user interaction and respects the existing mute/volume controls.
+- Train doors, boarding apertures, platform edges, destination paths, nerves, pavilion entries, and return boarding must all have matching simple colliders and headless traversal tests.
+- Train travel is a mode/state transition integrated with the existing fixed-timestep loop; it must clear walking/look inputs at the correct boundaries and must not break `window.__livistone.snapshot()` or save compatibility.
+
+#### Acceptance criteria and remaining release gate
+
+1. From the town, the player can enter Embryo Station, board the train, experience a legible departure and arrival, and disembark at the garden stop on desktop and touch controls.
+2. The player can traverse multiple Vittoria nerve routes, reach and enter the central pavilion, fall or step into permitted shallow water without becoming trapped, and return to the platform.
+3. An aerial view clearly reads as the Vittoria pendant: one broad organic disc, irregular branching nerves, many water eyes, and a blue center—not a wheel, regular paddy grid, or generic lake.
+4. The Mycelium garden reads as a family of umbrella crowns, visibly gathers and drains water, provides a complete dry walking loop, and preserves the real opal-drainage story.
+5. The central pavilion reads as Vittoria's aquamarine interpreted through Dewdrop's silhouette; labels correctly identify Vittoria's aquamarine and Dewdrop's treated Swiss blue topaz.
+6. The return journey always works, progress survives a reload at a safe supported location, and map mode returns the player to the exact prior position/orientation.
+7. Desktop and mobile quality tiers preserve the same routes and landmark identities. Physical-phone and Safari/iOS performance must be measured before claiming the expansion is release-ready.
 
 ## 5. Turning jewelry and concept art into 3D assets
 
@@ -139,7 +286,7 @@ Interaction uses a short-range raycast and line-of-sight test. The nearest eligi
 
 The map is an orbitable, zoomable 3D representation of the same city, with a player marker and selectable landmark names. Reuse the world placements with simplified exterior meshes, terrain, river, and tree clusters. Detailed interiors and fine foliage are not needed in map mode. This avoids loading or drawing the entire detailed town just to look at it from above.
 
-Use one renderer/canvas and explicit `walking`, `map`, `lore`, `gallery`, `loading`, and `paused` modes. Save the player position and facing before entering the map, suspend walking input, and retain the occupied interior's resources. On return, restore the same location and orientation. Desktop Resume restores walking without turning the camera; the next held-button scene drag starts a new look gesture. Do not run both cameras as simultaneous full-screen renders.
+Use one renderer/canvas and explicit `walking`, `map`, `lore`, `journal`, `gallery`, `travel`, `welcome` (loading), and `paused` modes. Save the player position and facing before entering the map, suspend walking input, and retain the occupied interior's resources. On return, restore the same location and orientation. Desktop Resume restores walking without turning the camera; the next held-button scene drag starts a new look gesture. Do not run both cameras as simultaneous full-screen renders.
 
 Mouse orbit/pan/zoom and touch gestures control the map; provide visible zoom and reset-view buttons as alternatives. Clamp the camera above the ground and within sensible zoom limits. Three.js OrbitControls supplies the camera interaction foundation. [OrbitControls documentation](https://threejs.org/docs/pages/OrbitControls.html)
 
@@ -216,14 +363,19 @@ On mobile, cap internal pixel density, prefer baked shadows and simpler glass, k
 | 1. Walkable blockout | River, bridge, routes, three recognizable landmark shells, City Hall floor plan/interior, and a basic 3D map | Walk from arrival into City Hall and back without clipping or getting trapped; inspect the map and resume at the same position on desktop and touch |
 | 2. Finished sample route | Polished arrival garden, one bridge, City Hall exterior/atrium, materials, lighting, sound, and one lore interaction | Compare concept and street-level views; validate visual direction and sustained phone/laptop performance |
 | 3. Complete civic district | Energy and Science buildings with interiors, supporting homes, paths, and gardens | All three buildings are enterable, spatially consistent, and connected by a comfortable walking loop |
-| 4. Playable discovery layer | Journal, six to nine interactions, optional discovery sequence, map landmark cards/routes, saved progress, settings, and loading/error handling | Complete the route, reload, recover progress, and reset with keyboard/mouse or touch; no mandatory task prevents free exploration |
+| 4. Playable discovery layer | Journal, source-linked place/jewelry/research stories, optional discovery sequence, map landmark cards/routes, saved progress, settings, and loading/error handling | Complete the route, reload, recover progress, and reset with keyboard/mouse or touch; no mandatory task prevents free exploration |
 | 5. Browser release candidate | Compression, detail levels, quality settings, movement fixes, responsive interface, accessibility checks, and reproducible build | Pass the desktop/mobile device matrix, sustained performance check, and full traversal checklist; build is ready for hosting |
+| 6. Curated jewelry galleries | Building-specific planar poster exhibitions, the first 25–35 verified works, local image derivatives, and a filterable journal catalogue | Every physical poster has verified facts and attribution; hall circulation remains clear; images retain their aspect ratios; desktop/touch browsing and memory budgets pass |
+| 7. Living Waters rail excursion | Working outbound/return train journey, remote stop, Vittoria Lake nerve routes and water eyes, Dewdrop aquamarine pavilion, and Mycelium Rain Garden | Meet all seven acceptance criteria in the rail-excursion section, including exact-return map behavior, safe recovery, mobile identity, and measured physical-device performance |
+| 8. Glucose Commons | Human-insulin pavilion, separate glucose sculpture, six verified GlucoseDAO research posters and repository links | Shared geometry/collision, molecular provenance, accessible source dialogs, compatible saves and exact map return; physical-device performance remains a separate release gate |
 
 The first milestone worth showing is an actual walk into City Hall. The finished sample route is the major quality gate: if it cannot retain the intended architectural character within the browser budget, adjust art production before multiplying assets across the town.
 
 Do not estimate a polished-town delivery date from the concept image alone. Estimate the remaining landmarks after completing the sample route, when modeling/export effort and performance costs are known. This is likely to be an asset-production-heavy project rather than a mostly engine-coding project.
 
 ## 11. Validation and deployment
+
+Verified in this checkout on 18 September 2026: production build, **42 Vitest tests**, and all **24 Playwright scenarios across the final runs** in Linux Chrome 153 (desktop and touch emulation), with Node 24.19.0 and Bun 1.4.2. The seven expansion scenarios were rerun after the final gallery, molecular and garden changes. These cover catalogue search/filtering, photograph inspection, all research sources, outbound/return travel, exact map pause and destination-load failure/retry. Landmark, glucose and garden screenshots were inspected. The 33-view landmark capture reported a rich Energy aerial snapshot at 11,298,654 triangles, 613 draw calls and 5 fps in headless Chrome. This exceeds the provisional workload budgets; it is a local automation diagnostic, not a physical-device benchmark. Rendering optimization, physical phones, Safari/iOS, sustained frame-time/memory budgets and final authored-art review remain open release gates.
 
 Automate only checks with useful failure signals: movement through a doorway and over stairs, ground collision and safe recovery, interaction occlusion, walking/map state restoration, simultaneous touch inputs and cancellation, discovery state transitions, save-version handling, missing-asset recovery, and a browser startup/route smoke test. Add an asset check for missing textures, inconsistent transforms, required anchors, and published file sizes.
 
@@ -240,4 +392,4 @@ The first version can be a standalone Livistone URL linked from Livia's site. Pr
 3. **Devices:** desktop and mobile browsers from the beginning.
 4. **Assets:** the user can supply STL files and possibly original Grasshopper files later.
 
-Begin implementation with milestones 0 and 1: prove the browser rendering/physics/asset pipeline, then produce the playable river-to-City-Hall blockout with touch controls and the aerial map. This can proceed before the original jewelry files arrive. Detailed landmark art should incorporate those files when available, without making the browser depend on the original design software.
+The browser blockout and the approved gallery, rail-garden and glucose extensions now exist. Next validate the sample route on physical reference devices, review the procedural architecture against the source jewelry, and develop the remaining interiors and authored assets. Preserve the working controls, source provenance, circulation and save compatibility throughout that production work.

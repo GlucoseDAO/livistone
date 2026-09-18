@@ -9,7 +9,7 @@ import { gatewayClearing } from './gateway-layout';
 import { createPlanting, meadowMaterial } from './planting';
 import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from './landscape';
 import { Mountains } from './mountains';
-import { Exhibition } from './exhibition';
+import { PlanarExhibition } from './planar-exhibition';
 import { GARDEN_BRIDGES, riverCenter, tributaryCenter, waterDistance } from './waterways';
 import { createTimeTower } from './time-tower';
 import { riverMaterial } from './river';
@@ -17,8 +17,9 @@ import { pavingMaterial, rockGeometry, rockMaterial } from './stone';
 import { walnutMaterial, walnutRadius } from './walnut';
 import { CIVIC_LANDMARKS } from '../game/content';
 import { createStation } from './station';
-import { STATION, stationClearing } from './station-layout';
+import { RAILWAY, STATION, stationClearing } from './station-layout';
 import { createRailwayStructure, loadRailwayTextures } from './railway';
+import { createGlucosePavilion } from './glucose-pavilion';
 import type { Landmark } from '../game/content';
 
 export interface Interactive { id: string; object: THREE.Object3D; position: THREE.Vector3; }
@@ -35,7 +36,7 @@ export function terrainHeight(x: number, z: number): number {
   const edge = Math.max(0, Math.hypot(x * 0.8, z * 0.65) - 58) / 30;
   const height = Math.sin(x * 0.06) * Math.cos(z * 0.09) * edge * 3;
   if (stationClearing(x, z, 0)) return 0;
-  return height * THREE.MathUtils.smoothstep(Math.abs(z - STATION.trackZ), 4, 9);
+  return height * THREE.MathUtils.smoothstep(Math.abs(z - RAILWAY.centerZ), 7, 12);
 }
 function mesh(geometry: THREE.BufferGeometry, material: THREE.Material, parent: THREE.Object3D, x = 0, y = 0, z = 0): THREE.Mesh {
   const m = new THREE.Mesh(geometry, material); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
@@ -74,9 +75,10 @@ export class Town {
   readonly colliders: ColliderSpec[] = [];
   readonly interactives: Interactive[] = [];
   readonly occluders: THREE.Object3D[] = [];
-  readonly animated: { object: THREE.Object3D; id: string; speed: number }[] = [];
   readonly water: THREE.MeshStandardMaterial;
-  readonly exhibitions: Exhibition[] = [];
+  readonly exhibitions: PlanarExhibition[] = [];
+  readonly train: THREE.Object3D;
+  readonly researchPanels: THREE.Mesh[] = [];
   private readonly mountains: Mountains;
   private readonly railway: THREE.Group;
   private readonly white = new THREE.MeshStandardMaterial({ color: '#f4f0df', roughness: 0.57, metalness: 0.07 });
@@ -94,9 +96,12 @@ export class Town {
     createGateway(this.root, this.colliders, mobile, this.paving);
     for (const landmark of CIVIC_LANDMARKS) landmark.id === 'energy' ? this.createEnergyHall(landmark.x, landmark.z) : this.createLandmark(landmark.id, landmark.x, landmark.z);
     this.interactives.push({ id: 'embryo-station', ...createStation(this.root, this.colliders, mobile, this.paving) });
+    this.train = this.root.getObjectByName('Panoramic maglev')!;
+    this.exhibitions.push(new PlanarExhibition('station', this.interiors, 0, 0, this.colliders, this.interactives));
     this.railway = createRailwayStructure(this.root, this.colliders, mobile);
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.white, this.paving, this.gold, bridge);
     createTimeTower(this.root, this.colliders, this.mobile);
+    const research = createGlucosePavilion(this.root, this.colliders, mobile, this.paving); this.researchPanels.push(...research.panels); this.interactives.push(...research.interactives);
     this.createTrees(); this.createGardens();
     this.mountains = new Mountains(mobile); this.root.add(this.mountains);
   }
@@ -285,12 +290,7 @@ export class Town {
       const shelves = new THREE.Mesh(mergeGeometries(fins, false)!, amber); shelves.position.y = -0.16; structure.add(shelves);
       for (const fin of fins) fin.dispose();
     }
-    this.exhibitions.push(new Exhibition(id, group, x, z, this.colliders, this.interactives));
-    for (const angle of [1.6, 2.1, 4.2, 4.65]) {
-      const px = Math.sin(angle) * (floorR - 1.35), pz = Math.cos(angle) * (floorR - 1.35);
-      const seat = mesh(new THREE.BoxGeometry(1.7, 0.13, 0.65), this.wood, group, px, 0.65, pz); seat.rotation.y = angle;
-      for (const offset of [-0.55, 0.55]) mesh(new THREE.BoxGeometry(0.13, 0.5, 0.5), this.white, group, px + offset * Math.cos(angle), 0.34, pz - offset * Math.sin(angle));
-    }
+    this.exhibitions.push(new PlanarExhibition(id, group, x, z, this.colliders, this.interactives));
     const light = new THREE.PointLight(id === 'energy' ? '#ffc56d' : '#fff2d5', this.mobile ? 7 : 12, 18, 1.8); light.position.set(0, 5.5, 0); group.add(light);
     const lantern = mesh(new THREE.TorusGeometry(2.7, 0.025, 6, 50), new THREE.MeshBasicMaterial({ color: '#f4dfad' }), group, 0, 6, 0); lantern.rotation.x = Math.PI / 2;
   }
@@ -337,14 +337,6 @@ export class Town {
       const globe = mesh(this.sphere, new THREE.MeshStandardMaterial({ color: '#f3e8c9', emissive: '#e4c881', emissiveIntensity: 0.35, roughness: 0.6 }), this.root, x, 2.8, z); globe.scale.setScalar(0.23); pole.castShadow = false;
     }
   }
-  update(time: number, dt: number): void {
-    this.water.userData.time.value = time;
-    for (const exhibition of this.exhibitions) exhibition.update(dt);
-    for (const item of this.animated) { item.object.rotation.y += dt * item.speed; item.object.position.y = 1.8 + Math.sin(time * 0.8) * 0.055; }
-  }
-  activate(id: string): void {
-    const exhibition = this.exhibitions.find((item) => item.selected.discovery === id);
-    if (exhibition) exhibition.paused = !exhibition.paused;
-  }
+  update(time: number): void { this.water.userData.time.value = time; }
   setMapMode(active: boolean): void { this.interiors.visible = !active; this.details.visible = !active; }
 }

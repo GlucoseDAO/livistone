@@ -17,7 +17,7 @@ describe('Mountain railway', () => {
     for (const sign of [-1, 1]) {
       expect(plantingAllowed(sign * RAILWAY.portalX, STATION.trackZ + 9, 2)).toBe(false);
       expect(railwayCorridor(sign * 200, STATION.trackZ + 3.2)).toBe(true);
-      expect(railwayCorridor(sign * 200, STATION.trackZ + 8)).toBe(false);
+      expect(railwayCorridor(sign * 200, RAILWAY.centerZ + 8)).toBe(false);
       expect(railwayCorridor(sign * 500, STATION.trackZ)).toBe(false);
       expect(mountainHeight(sign * 150, STATION.trackZ)).toBeGreaterThan(RAILWAY.clearanceHeight);
     }
@@ -28,25 +28,25 @@ describe('Mountain railway', () => {
       const root = new THREE.Group(), colliders: ColliderSpec[] = []; createRailwayStructure(root, colliders, mobile);
       root.add(new THREE.Mesh(mountainGeometry(mobile), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }))); root.updateMatrixWorld(true);
       try {
-        for (const sign of [-1, 1]) for (const height of [1, 2.6, 4.2]) for (const dz of [-1.45, 0, 1.45]) {
+        for (const sign of [-1, 1]) for (const height of [1, 2.6, 4.2]) for (const dz of [-7.45, -6, -4.55, -1.45, 0, 1.45]) {
           const ray = new THREE.Raycaster(new THREE.Vector3(sign * 90, height, STATION.trackZ + dz), new THREE.Vector3(sign, 0, 0), 0, 370);
           expect(ray.intersectObject(root, true).map((hit) => hit.object.name)).toEqual([]);
         }
         const down = new THREE.Raycaster(new THREE.Vector3(70, 2, STATION.trackZ + 1.8), new THREE.Vector3(0, -1, 0));
-        expect(down.intersectObject(root, true)[0]?.object.name).toBe('Crushed stone ballast');
+        expect(down.intersectObject(root, true)[0]?.object.name).toBe('Railway service foundation');
       } finally { dispose(root); }
     });
 
     it(`crosses both tunnel mouths and exits, with solid floors and side walls (${mobile ? 'mobile' : 'desktop'})`, async () => {
       const root = new THREE.Group(), colliders: ColliderSpec[] = []; createRailwayStructure(root, colliders, mobile); const physics = await Physics.create(colliders);
       try {
-        for (const sign of [-1, 1]) {
-          physics.teleport({ x: sign * 98, y: 1.05, z: STATION.trackZ });
-          for (let i = 0; i < 1320; i++) { physics.step(sign * 16, 0); expect(physics.position().y).toBeGreaterThan(.8); expect(physics.position().y).toBeLessThan(1.4); }
+        for (const sign of [-1, 1]) for (const track of RAILWAY.tracks) {
+          physics.teleport({ x: sign * 98, y: 1.05, z: track });
+          for (let i = 0; i < 1800 && sign * physics.position().x < RAILWAY.exitX + 9; i++) { physics.step(sign * 16, 0); expect(physics.position().y).toBeGreaterThan(.8); expect(physics.position().y).toBeLessThan(1.4); }
           expect(sign * physics.position().x).toBeGreaterThan(RAILWAY.exitX + 8);
-          physics.teleport({ x: sign * 180, y: 1.05, z: STATION.trackZ + 3.1 });
+          physics.teleport({ x: sign * 180, y: 1.05, z: RAILWAY.centerZ + 6.1 });
           for (let i = 0; i < 180; i++) physics.step(0, 4);
-          expect(physics.position().z).toBeLessThan(STATION.trackZ + RAILWAY.boreHalfWidth); expect(physics.position().z).toBeGreaterThan(STATION.trackZ + 3.5);
+          expect(physics.position().z).toBeLessThan(RAILWAY.centerZ + RAILWAY.boreHalfWidth); expect(physics.position().z).toBeGreaterThan(RAILWAY.centerZ + 6.5);
         }
       } finally { physics.dispose(); dispose(root); }
     }, 20000);

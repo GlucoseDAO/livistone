@@ -15,20 +15,21 @@ const views = [
   ['embryo-station-front', -16, -37, 0, .31], ['embryo-station-platform', -16, -73, -1.1],
   ['railway-east-portal', 85, -79, -Math.PI / 2, .13], ['railway-west-portal', -85, -79, Math.PI / 2, .13],
   ['railway-detail', 55, -76.6, -Math.PI / 2, -.22], ['railway-inside', 135, -79, -Math.PI / 2, .07],
-  ['catalogue-lectern', 3.5, -16.7, 0],
+  ['glucose-pavilion', 38, -23, 0, .23], ['glucose-interior', 38, -40, -Math.PI / 2, .22],
+  ['catalogue-poster', 2.51, -18.21, -2.409],
 ];
 const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', '--headless=new', '--use-gl=angle', '--use-angle=gl', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.on('pageerror', (e) => console.error('page error:', e.message));
 await page.goto('http://127.0.0.1:5173');
 await page.waitForFunction(() => window.__livistone?.snapshot().ready, null, { timeout: 60000 });
-await page.click('#enter'); await page.waitForTimeout(300);
+await page.click('#view-toggle'); await page.waitForTimeout(300);
 for (const [name, x, z, yaw, pitch = 0] of views) {
   await page.evaluate(([x, z, yaw]) => window.__livistone.teleport(x, z, yaw), [x, z, yaw]);
   if (pitch) { await page.mouse.move(640, 400); await page.mouse.down(); await page.mouse.move(640, 400 - pitch / .0028, { steps: 4 }); await page.mouse.up(); }
   await page.waitForTimeout(600); await page.screenshot({ path: `${out}/${name}.png` });
 }
-await page.waitForFunction(() => window.__livistone.snapshot().interaction === 'nut');
+await page.waitForFunction(() => window.__livistone.snapshot().interaction === 'ammonite');
 await page.keyboard.press('KeyE'); await page.waitForTimeout(600); await page.screenshot({ path: `${out}/catalogue-desktop.png` });
 await page.getByRole('button', { name: 'Continue exploring' }).click();
 await page.keyboard.press('KeyM');
