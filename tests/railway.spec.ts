@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { RAILWAY, STATION } from '../src/world/station-layout';
 
 for (const mobile of [false, true]) test(`textured railway and mountain passage render and remain traversable on ${mobile ? 'touch' : 'desktop'}`, async ({ browser }) => {
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 800 }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: 1 });
@@ -9,9 +10,10 @@ for (const mobile of [false, true]) test(`textured railway and mountain passage 
     page.on('response', (response) => { if (response.url().includes('/textures/railway/') && response.ok()) textures.add(response.url().split('/').at(-1)!); });
     await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.locator('#view-toggle').click();
     for (const name of ['ballast', 'rail']) for (const suffix of mobile ? ['color', 'roughness'] : ['color', 'normal', 'roughness']) expect(textures.has(`${name}-${suffix}.jpg`)).toBe(true);
-    await page.evaluate(() => (window as any).__livistone.teleport(99, -79, -Math.PI / 2));
+    await page.evaluate(({ x, z }) => (window as any).__livistone.teleport(x, z, -Math.PI / 2), { x: RAILWAY.portalX - 13, z: STATION.trackZ });
+    await page.waitForTimeout(400); await page.screenshot({ path: `output/testing/railway/approach-${mobile ? 'mobile' : 'desktop'}.png` });
     await page.keyboard.down('ShiftLeft'); await page.keyboard.down('KeyW');
-    await expect.poll(() => page.evaluate(() => (window as any).__livistone.snapshot().position.x), { timeout: 15000 }).toBeGreaterThan(124);
+    await expect.poll(() => page.evaluate(() => (window as any).__livistone.snapshot().position.x), { timeout: 15000 }).toBeGreaterThan(RAILWAY.portalX + 12);
     await page.keyboard.up('KeyW'); await page.keyboard.up('ShiftLeft');
     await expect(page.locator('#location')).toHaveText('Dark Nut Mountain Passage');
     const before = await page.evaluate(() => (window as any).__livistone.snapshot()); expect(before.position.y).toBeGreaterThan(.8);
@@ -25,21 +27,21 @@ for (const mobile of [false, true]) test(`textured railway and mountain passage 
 test('missing railway maps preserve a playable passage', async ({ page }) => {
   await page.route('**/textures/railway/**', (route) => route.abort());
   await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.click('#view-toggle');
-  await page.evaluate(() => (window as any).__livistone.teleport(-180, -79, Math.PI / 2));
+  await page.evaluate(({ x, z }) => (window as any).__livistone.teleport(x, z, Math.PI / 2), { x: -RAILWAY.portalX - 68, z: STATION.trackZ });
   await expect(page.locator('#location')).toHaveText('Dark Nut Mountain Passage');
-  await page.keyboard.down('KeyW'); await expect.poll(() => page.evaluate(() => (window as any).__livistone.snapshot().position.x)).toBeLessThan(-182); await page.keyboard.up('KeyW');
+  await page.keyboard.down('KeyW'); await expect.poll(() => page.evaluate(() => (window as any).__livistone.snapshot().position.x)).toBeLessThan(-RAILWAY.portalX - 70); await page.keyboard.up('KeyW');
 });
 
 for (const mobile of [false, true]) test(`boards the parked maglev and returns to the concourse (${mobile ? 'touch' : 'desktop'})`, async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, hasTouch: mobile, isMobile: mobile });
   try {
     const page = await context.newPage(); await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.click('#view-toggle');
-    await page.evaluate(() => (window as any).__livistone.teleport(-14, -72.7, 0));
+    await page.evaluate(() => (window as any).__livistone.teleport(-2, 72.7, Math.PI));
     await page.keyboard.down('KeyW');
-    await expect.poll(() => page.evaluate(() => (window as any).__livistone.snapshot().position.z)).toBeLessThan(-78.2);
+    await expect.poll(() => page.evaluate(() => (window as any).__livistone.snapshot().position.z)).toBeGreaterThan(78.2);
     await page.keyboard.up('KeyW'); await page.screenshot({ path: `output/testing/railway/boarding-${mobile ? 'mobile' : 'desktop'}.png` });
     await page.keyboard.down('KeyS');
-    await expect.poll(() => page.evaluate(() => (window as any).__livistone.snapshot().position.z)).toBeGreaterThan(-73);
+    await expect.poll(() => page.evaluate(() => (window as any).__livistone.snapshot().position.z)).toBeLessThan(73);
     await page.keyboard.up('KeyS');
   } finally { await context.close(); }
 });

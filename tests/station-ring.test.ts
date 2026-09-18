@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { stationRingGeometry } from '../src/world/station-ring';
-import { STATION } from '../src/world/station-layout';
+import { STATION_LOCAL as STATION } from '../src/world/station-layout';
 
 describe('Embryo ring shank', () => {
   for (const mobile of [false, true]) it(`has actual openwork through a deep curved wall (${mobile ? 'mobile' : 'desktop'})`, () => {

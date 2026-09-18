@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { createMaglevTrain } from '../src/world/train';
-import { STATION } from '../src/world/station-layout';
+import { STATION_LOCAL as STATION } from '../src/world/station-layout';
 import { Physics } from '../src/game/physics';
 import type { ColliderSpec } from '../src/game/physics';
 

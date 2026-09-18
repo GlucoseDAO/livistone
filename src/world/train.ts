@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
-import { STATION } from './station-layout';
+import { STATION_LOCAL as STATION } from './station-layout';
 
 const DOORS = [-12, 12], WINDOWS = [-18.2, -15.2, -8.6, -5.7, -2.8, .1, 3, 5.9, 8.6, 15.2, 18.2];
 const LOW = 2.02 - 1.52 * Math.pow(Math.SQRT1_2, .78), HIGH = 4.04 - LOW;

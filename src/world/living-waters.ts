@@ -1,37 +1,26 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { Forest } from './forest';
-import { meadowMaterial } from './planting';
 import type { ColliderSpec } from '../game/physics';
 import type { Interactive } from './world';
-import { createMaglevTrain } from './train';
-import { GARDENS, GARDEN_PATHS, LAKE_OUTLINE, WATER_EYES, gardenHeight, rainPlantAllowed } from './living-waters-layout';
+import { GARDENS, GARDEN_PANELS, GARDEN_PATHS, LAKE_OUTLINE, WATER_EYES, gardenHeight, rainPlantAllowed } from './living-waters-layout';
 import type { Point } from './living-waters-layout';
+import { MYCELIUM_RADIUS, myceliumCrown, myceliumStem, myceliumOpal } from './mycelium';
 
 function shape(points: Point[]): THREE.Shape { return new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, -z))); }
 export class LivingWaters {
   readonly root = new THREE.Group();
   readonly colliders: ColliderSpec[] = [];
   readonly interactives: Interactive[] = [];
-  readonly train: THREE.Group;
   readonly panels: THREE.Mesh[] = [];
   private readonly water = new THREE.MeshStandardMaterial({ color: '#7bafaa', vertexColors: true, metalness: .34, roughness: .25, envMapIntensity: 1.2 });
   private readonly waterTime = { value: 0 };
-  private readonly terrain: THREE.Mesh;
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#d9e0d6', metalness: .63, roughness: .32 });
   private readonly stone = new THREE.MeshStandardMaterial({ color: '#d4cfbc', roughness: .91 });
   private readonly rain: THREE.Points;
   private readonly drips: THREE.Points;
   private readonly drainage: THREE.Curve<THREE.Vector3>[] = [];
-  private readonly forest = new Forest();
   constructor(private mobile: boolean) {
-    this.root.name = 'Living Waters'; this.root.position.x = GARDENS.x;
-    const terrain = new THREE.PlaneGeometry(500, 450, 125, 113).rotateX(-Math.PI / 2).translate(25, 0, -10), position = terrain.getAttribute('position');
-    const colors: number[] = [], color = new THREE.Color();
-    for (let i = 0; i < position.count; i++) { const x = position.getX(i), z = position.getZ(i), distance = Math.hypot(x - 25, z); position.setY(i, gardenHeight(x, z) + Math.max(0, distance - 105) * .09 * (1 + Math.sin(x * .025) * Math.cos(z * .033)) * THREE.MathUtils.smoothstep(Math.abs(z + 82), 9, 24));
-      color.setHSL(.23 + Math.sin(x * .07 + z * .08) * .009, .24, .33 + Math.sin(x * .05) * Math.cos(z * .07) * .035); colors.push(color.r, color.g, color.b); }
-    terrain.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); terrain.computeVertexNormals();
-    this.terrain = this.mesh(terrain, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), true);
+    this.root.name = 'Living Waters · town gardens'; this.root.position.set(GARDENS.x, 0, GARDENS.z);
     this.water.onBeforeCompile = (shader) => {
       shader.uniforms.waterTime = this.waterTime;
       shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWater;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWater = position;');
@@ -50,17 +39,14 @@ export class LivingWaters {
       this.mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(outline, false, 'catmullrom', 0), cell.length * 3, .085, 5, false), this.stone, false);
     });
     for (const path of GARDEN_PATHS) this.path(path, 2.2);
-    this.pavilion(); this.platform();
-    const local: ColliderSpec[] = []; this.train = createMaglevTrain(this.root, local, mobile);
-    for (const spec of local) {
-      if (spec.type === 'box') this.colliders.push({ ...spec, position: [spec.position[0] + GARDENS.x, spec.position[1], spec.position[2]] });
-      else { const vertices = spec.vertices.slice(); for (let i = 0; i < vertices.length; i += 3) vertices[i] += GARDENS.x; this.colliders.push({ ...spec, vertices }); }
+    this.pavilion();
+    this.mushrooms(); this.wetlandPlanting();
+    for (const [name, [x, z]] of Object.entries(GARDEN_PANELS)) {
+      const id = 'living-' + name;
+      for (const dx of [-1, 1]) this.mesh(new THREE.CylinderGeometry(.045, .065, 1.35, 6), this.silver, true, x + dx, .675, z);
+      const panel = this.mesh(new THREE.BoxGeometry(2.6, 1.65, .1), new THREE.MeshBasicMaterial({ color: '#f0ecdf' }), true, x, 1.8, z);
+      panel.userData.discovery = id; this.panels.push(panel); this.interactives.push({ id, object: panel, position: new THREE.Vector3(x + GARDENS.x, 1.8, z + GARDENS.z) });
     }
-    for (const z of [-79, -85]) for (const dz of [-.8, .8]) this.mesh(new THREE.BoxGeometry(300, .18, .24), this.silver, true, -100, .12, z + dz);
-    this.umbrellas(); this.wetlandPlanting();
-    for (let i = 0; i < (mobile ? 34 : 64); i++) { const angle = i * 2.399, x = Math.cos(angle) * (55 + i % 5 * 3), z = Math.sin(angle) * (53 + i % 7 * 2); if (z < -35 || x > 48) continue;
-      this.forest.sites.push(new THREE.Vector3(x, 0, z)); this.colliders.push({ type: 'box', position: [GARDENS.x + x, 2, z], size: [.3, 2, .3] }); }
-    this.root.add(this.forest);
     const channel = new THREE.CatmullRomCurve3([[75, 0], [72, 10], [63, 17], [53, 14], [42, 8]].map(([x, z]) => new THREE.Vector3(x, .035, z)));
     this.drainage.push(channel);
     this.mesh(new THREE.TubeGeometry(channel, 70, .28, 6, false), this.silver, false);
@@ -121,53 +107,40 @@ export class LivingWaters {
     const embrace = Array.from({ length: 40 }, (_, i) => { const a = -.5 + i / 39 * Math.PI * 1.65; return new THREE.Vector3(x + Math.sin(a) * 6.3, 2.8 + i / 39 * 3.7, z + Math.cos(a) * 6.3); });
     this.mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(embrace), this.mobile ? 60 : 120, .27, 8, false), this.silver, true);
   }
-  private platform(): void {
-    this.mesh(new THREE.BoxGeometry(64, .18, 10), this.stone, true, -2, .09, -70.5);
-    for (const x of [-14, 10]) {
-      const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute([x - 1.16, .18, -75.5, x + 1.16, .18, -75.5, x - 1.16, .7, -77.75, x + 1.16, .7, -77.75], 3)); geometry.setIndex([0, 2, 1, 1, 2, 3]); geometry.computeVertexNormals(); this.mesh(geometry, this.stone, true);
-    }
-    for (const [left, right] of [[-34, -15.4], [-12.6, 8.6], [11.4, 30]]) this.mesh(new THREE.BoxGeometry(right - left, .85, .11), this.silver, true, (left + right) / 2, .6, -75.6);
-    for (const x of [-25, -20, 20, 25]) this.mesh(new THREE.CylinderGeometry(.1, .12, 3.4, 8), this.silver, true, x, 1.7, -68);
-    this.mesh(new THREE.BoxGeometry(56, .15, 5), this.stone, true, 0, 3.45, -68);
-  }
-  private umbrellas(): void {
-    const vertices: number[] = [], indices: number[] = [], segments = this.mobile ? 40 : 80, rings = 8;
-    for (let row = 0; row <= rings; row++) for (let col = 0; col <= segments; col++) { const a = col / segments * Math.PI * 2, t = row / rings, r = .13 + t * 1.25, y = Math.sin(t * Math.PI) * .4 - t * .17 + Math.sin(a * 10) * t * .11;
-      vertices.push(Math.cos(a) * r, y, Math.sin(a) * r); if (row < rings && col < segments) { const n = row * (segments + 1) + col; indices.push(n, n + 1, n + segments + 1, n + 1, n + segments + 2, n + segments + 1); }
-    }
-    const crown = new THREE.BufferGeometry(); crown.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); crown.setIndex(indices); crown.computeVertexNormals();
+  private mushrooms(): void {
     const sites: { x: number; z: number; scale: number; height: number }[] = [];
-    for (let i = 0; i < 700 && sites.length < (this.mobile ? 44 : 90); i++) { const x = 55 + (i * 19.718 % 45), z = -30 + (i * 13.337 % 58), scale = .65 + (i * .618 % .7), height = 1.45 + (i * .31 % 1.4);
-      if (!rainPlantAllowed(x, z, scale * 1.45) || sites.some((p) => Math.hypot(x - p.x, z - p.z) < (p.scale + scale) * 1.4)) continue; sites.push({ x, z, scale, height });
+    for (let i = 0; i < 900 && sites.length < (this.mobile ? 26 : 44); i++) {
+      const x = 55 + (i * 19.718 % 45), z = -30 + (i * 13.337 % 58), scale = .8 + (i * .618 % .55), height = 3.6 + (i * .31 % 2.8);
+      if (!rainPlantAllowed(x, z, scale * MYCELIUM_RADIUS) || sites.some(p => Math.hypot(x - p.x, z - p.z) < (p.scale + scale) * MYCELIUM_RADIUS + .4)) continue;
+      sites.push({ x, z, scale, height });
     }
-    const skin = new THREE.MeshStandardMaterial({ color: '#71998a', roughness: .53, metalness: .28, side: THREE.DoubleSide });
-    const crowns = new THREE.InstancedMesh(crown, skin, sites.length), stems = new THREE.InstancedMesh(new THREE.CylinderGeometry(.07, .12, 1, 6), this.silver, sites.length), matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion();
-    const ribs: THREE.BufferGeometry[] = [];
+    const silver = new THREE.MeshStandardMaterial({ color: '#c7c3b7', roughness: .27, metalness: .9 });
+    const opal = new THREE.MeshPhysicalMaterial({ color: '#ffffff', vertexColors: true, metalness: .15, roughness: .18, iridescence: this.mobile ? .35 : 1, iridescenceIOR: 1.38, iridescenceThicknessRange: [180, 420], clearcoat: .9 });
+    opal.userData.myceliumOpal = true;
+    const crowns = new THREE.InstancedMesh(myceliumCrown(this.mobile), silver, sites.length), stems = new THREE.InstancedMesh(myceliumStem(this.mobile), silver, sites.length);
+    const stones = new THREE.InstancedMesh(myceliumOpal(this.mobile), opal, sites.length), matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion();
+    crowns.name = 'Mycelium · curled open silver gills'; stones.name = 'Mycelium · opal hearts'; stems.name = 'Mycelium · branching stems';
     sites.forEach((site, i) => {
-      matrix.compose(new THREE.Vector3(site.x, site.height, site.z), rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i), new THREE.Vector3(site.scale, site.scale, site.scale)); crowns.setMatrixAt(i, matrix);
-      matrix.compose(new THREE.Vector3(site.x, site.height / 2, site.z), new THREE.Quaternion(), new THREE.Vector3(1, site.height, 1)); stems.setMatrixAt(i, matrix);
-      this.colliders.push({ type: 'box', position: [GARDENS.x + site.x, site.height / 2, site.z], size: [.12, site.height / 2, .12] });
-      this.colliders.push({ type: 'box', position: [GARDENS.x + site.x, site.height + .08, site.z], size: [site.scale * 1.38, .3 * site.scale, site.scale * 1.38] });
-      // Radial silver ribs articulate the folded crown and carry visible water toward its rim.
-      for (let rib = 0; rib < (this.mobile ? 5 : 10); rib++) { const a = rib * Math.PI * 2 / (this.mobile ? 5 : 10) + i, points = Array.from({ length: 7 }, (_, j) => { const t = j / 6, r = (.13 + t * 1.25) * site.scale; return new THREE.Vector3(site.x + Math.cos(a) * r, site.height + (Math.sin(t * Math.PI) * .4 - t * .17) * site.scale + .025, site.z + Math.sin(a) * r); });
-        ribs.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 9, .018, 3, false));
-        if (rib === 0 && i % 3 === 0) { const drop = points.slice(3), edge = drop[drop.length - 1]; drop.push(new THREE.Vector3(edge.x, .12, edge.z)); this.drainage.push(new THREE.CatmullRomCurve3(drop)); }
-      }
+      rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * 2.399);
+      matrix.compose(new THREE.Vector3(site.x, site.height, site.z), rotation, new THREE.Vector3(site.scale, site.scale, site.scale)); crowns.setMatrixAt(i, matrix);
+      matrix.compose(new THREE.Vector3(site.x, 0, site.z), rotation, new THREE.Vector3(site.scale, site.height - .4 * site.scale, site.scale)); stems.setMatrixAt(i, matrix);
+      matrix.compose(new THREE.Vector3(site.x, site.height + .5 * site.scale, site.z), rotation, new THREE.Vector3(site.scale, site.scale * .72, site.scale)); stones.setMatrixAt(i, matrix);
+      this.colliders.push({ type: 'box', position: [GARDENS.x + site.x, site.height / 2, GARDENS.z + site.z], size: [.38 * site.scale, site.height / 2, .38 * site.scale] });
+      this.colliders.push({ type: 'box', position: [GARDENS.x + site.x, site.height + .15 * site.scale, GARDENS.z + site.z], size: [site.scale * MYCELIUM_RADIUS, .75 * site.scale, site.scale * MYCELIUM_RADIUS] });
+      if (i % 2 === 0) this.drainage.push(new THREE.CatmullRomCurve3([
+        new THREE.Vector3(site.x + .6 * site.scale, site.height + .65 * site.scale, site.z), new THREE.Vector3(site.x + 2.15 * site.scale, site.height + .35 * site.scale, site.z),
+        new THREE.Vector3(site.x + 2.4 * site.scale, site.height - .15 * site.scale, site.z), new THREE.Vector3(site.x + 2.4 * site.scale, .12, site.z),
+      ]));
     });
-    if (ribs.length) { this.mesh(mergeGeometries(ribs)!, this.silver); ribs.forEach((geometry) => geometry.dispose()); }
-    crowns.castShadow = true; crowns.receiveShadow = true; crowns.computeBoundingSphere(); stems.computeBoundingSphere(); this.root.add(crowns, stems);
+    for (const object of [crowns, stems, stones]) { object.castShadow = object.receiveShadow = true; object.computeBoundingSphere(); this.root.add(object); }
   }
-  addInterpretation(id: string, title: string, body: string, x: number, z: number): void {
+  addInterpretation(id: string, title: string, body: string): void {
     const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 640; const ctx = canvas.getContext('2d')!;
     ctx.fillStyle = '#f0ecdf'; ctx.fillRect(0, 0, 1024, 640); ctx.fillStyle = '#2a5044'; ctx.font = '56px Georgia'; ctx.fillText(title, 45, 90); ctx.font = '31px sans-serif';
     let y = 170, line = ''; for (const word of body.split(' ')) { if (ctx.measureText(line + word).width > 910) { ctx.fillText(line, 45, y); y += 45; line = ''; } line += word + ' '; } ctx.fillText(line, 45, y); ctx.font = '28px sans-serif'; ctx.fillText('E / tap to read the story and sources', 45, 585);
     const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
-    for (const dx of [-1, 1]) this.mesh(new THREE.CylinderGeometry(.045, .065, 1.35, 6), this.silver, true, x + dx, .675, z);
-    const panel = this.mesh(new THREE.BoxGeometry(2.6, 1.65, .1), new THREE.MeshBasicMaterial({ map }), true, x, 1.8, z); panel.userData.discovery = id; this.panels.push(panel); this.interactives.push({ id, object: panel, position: new THREE.Vector3(x + GARDENS.x, 1.8, z) });
-  }
-  async loadAssets(): Promise<void> {
-    (this.terrain.material as THREE.Material).dispose(); const meadow = meadowMaterial(); meadow.map!.repeat.set(155, 140); this.terrain.material = meadow;
-    await this.forest.load(this.mobile);
+    const panel = this.panels.find(p => p.userData.discovery === id); if (!panel) { map.dispose(); return; }
+    const material = panel.material as THREE.MeshBasicMaterial; material.color.set('#ffffff'); material.map = map; material.needsUpdate = true;
   }
   update(time: number, dt: number, reducedMotion: boolean): void {
     if (reducedMotion) return; this.waterTime.value = time;

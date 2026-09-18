@@ -8,7 +8,7 @@
 Livistone is a browser-playable 3D town: a first-person walk through an art-and-science
 fantasy settlement whose three civic buildings are inhabitable interpretations of Livia
 Zaharia's jewelry (the Nut of Power, the Mitoring, and the Nanot of Power). The Embryo
-Ring also becomes a walkable railway station at the northern edge. Read
+Ring also becomes a walkable railway station on the southern arrival bank. Read
 [README.md](README.md) for what the project is and [docs/3d-game-plan.md](docs/3d-game-plan.md)
 for where it is going.
 
@@ -54,7 +54,6 @@ src/
     physics.ts       Rapier world, collider specs, kinematic character controller
     input.ts         Keyboard, held-button drag-to-look mouse, and touch thumbstick input
     audio.ts         Procedural filtered-noise ambience via WebAudio
-    journey.ts       Fixed-step departure, loading and arrival state
     research.ts      GlucoseDAO facts and source links
     jewelry-catalogue.json Generated source-hashed catalogue and image manifest
   world/
@@ -77,13 +76,16 @@ src/
     gateway-materials.ts Procedural silver, limestone and colour-zoned gem materials
     gateway-layout.ts Shared gateway footprint and arrival-path planting clearance
     sky.ts           Startup-baked cloud/daylight cubemap and reflection environment
-    mountains.ts     Ridged backdrop with triplanar rock maps and reduced mobile detail
+    mountains.ts     Continuous ground and ridges with triplanar rock maps and reduced mobile detail
     planar-exhibition.ts Permanent photo posters, aspect-matched captions and stand colliders
     poster-layout.ts Curated hall and station panel placements
     glucose-pavilion.ts Source-derived insulin ribbons, glucose sculpture and research panels
     glucose-layout.ts Shared molecular court and planting clearance
-    living-waters.ts Separately loaded lake, pavilion, umbrella garden and return platform
+    living-waters.ts Integrated lake, pavilion, silver mushroom grove and garden platform
     living-waters-layout.ts Shared lake cells, paths and full canopy clearance
+    mycelium.ts     Curled silver mushroom folds and branching stems
+    terrain.ts      One continuous town terrain and physics mesh
+    town-layout.ts  Walking bounds and rigid collider transforms
     river.ts         Environment-lit water with downstream ripples
     waterways.ts     Shared river/tributary boundaries, bridge sites and tower footprint
     time-tower.ts    Open silver hourglass sculpture and matching collision geometry
@@ -117,15 +119,15 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   trees also reserve their full canopy near the arch. `createGateway` is DOM-independent
   and derives colliders from its meshes. Keep the gem's quality settings separate from hall
   glazing and station amber; low detail uses an opaque reflective fallback. The serif glyph
-  outlines are bundled, with their licence under `public/fonts/`. Spawn is at `(0, 52)`.
+  outlines are bundled, with their licence under `public/fonts/`. Spawn is at `(0, 58)`, leaving the station toward the bridge.
 - **The station keeps its transport role.** Its seven-poster collection stays in the concourse. `CIVIC_LANDMARKS`
   selects only the three ministries/City Hall for circular gardens and civic construction. Guard exhibition
   lookups when iterating all `LANDMARKS`. `station-layout.ts` owns the station and railway
   clearing; paths and full plant footprints must respect it. The open ring threshold and
-  platform and glazed foyer have matching colliders, and the parked train has two open boarding bays at x = -14 and 10. Keep ramps, screen gaps, body apertures and the cabin floor aligned. Train windows are holes
+  platform and glazed foyer have matching colliders, and the authored train has boarding bays at local x = -14 and 10. `STATION_LOCAL` preserves that geometry; the southern station applies a half-turn and x = -16 translation to its structure, gallery, interactions and every collider, putting the bays at world x = -2 and -26. `STATION` describes the placed footprint. Keep ramps, screen gaps, body apertures and the cabin floor aligned. Train windows are holes
   in the curved shell with separate transparent panes and colliders; never cover them with solid
   body geometry. Keep the aisle clear and subdivide curved window panels before projection.
-  Train travel shares `train.ts` between the town and garden stop. Keep the amber material settings distinct when switching
+  `train.ts` creates the single parked train at the southern station. Keep the amber material settings distinct when switching
   visual quality. The amber is a closed, lobed volume with a recessed resin core on desktop;
   do not flatten it into a canopy sheet. The silver entrance is a deep cylindrical shank
   with a narrow rolled lip and irregular holes through its curved sides. Do not replace
@@ -151,7 +153,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **The loop is fixed-timestep.** `main.ts` accumulates real time and steps physics at
   1/60 s. Rendering is per animation frame. Anything time-dependent takes `dt` explicitly.
 - **Modes drive the UI.** `Mode` is `'welcome' | 'walking' | 'map' | 'lore' | 'journal' |
-  'paused' | 'gallery' | 'travel'`. `welcome` is the loading state; ready opens the map without an entry gate. Mode changes are the single place where input capture, the active camera, and
+  'paused' | 'gallery'`. `welcome` is the loading state; ready opens the map without an entry gate. Mode changes are the single place where input capture, the active camera, and
   DOM visibility all change together. Do not bypass them with ad-hoc DOM toggling.
   Keep the labeled First person / Top view switch (M), journal, and menu usable across
   panels. Dialogs leave navigation accessible and make the scene inert; native control
@@ -174,8 +176,9 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   reach the base; their returned geometry is also a world-space collider. Do not restore
   radial spokes through the inhabited glass hall. Preserve the extracted source JSON.
 - **Jewelry collections have permanent homes.** `data/catalogue/selection.json` contains reviewed source facts; `scripts/build-catalogue.mjs` generates `game/jewelry-catalogue.json` and local WebP derivatives using offline Sharp tooling. City Hall/Energy/Science/station have 8/8/9/7 physical works; the journal has 35. Keep one physical assignment per work. `planar-exhibition.ts` uses uncropped thumbnails, aspect-matched caption canvases and simple stand colliders; full images load only for inspection. `poster-layout.ts` keeps the central axes and entrances clear. Do not restore rotating cylinders, pedestal tables or lore lecterns. Source facts and artist descriptions stay separate from Livistone fiction; never invent missing catalogue data. Native in-hall controls remain hidden until keyboard focus; 1–4 give facts, collection, photo and place story. Failed photographs leave facts available.
-- **The train excursion is a stateful zone transition.** `Journey` advances only through the fixed timestep in `travel` mode. Map, journal and pause freeze the passenger position and ride; the view toggle resumes `travel` while a trip exists. Load `LivingWaters` and its independent Rapier world before the dark-tunnel transfer. Failures restore the departure cabin and allow retry; reload safely starts in town. Keep the existing snapshot fields and save version, with additive `zone`/`journey` diagnostics. Do not move a walking capsule using an animated train collider.
-- **Living Waters shares render and collision layout.** `living-waters-layout.ts` defines the asymmetrical water cells, 2.2 m nerve network and garden paths. The remote origin is east of the existing mountain exit. Keep two pavilion entries, shallow-water escape, both boarding bays and the dry Mycelium loop traversable in both quality tiers. Full umbrella crowns must clear paths. The lake is an architectural interpretation of Vittoria; the pavilion borrows Dewdrop’s silhouette, whose original stone is topaz, not aquamarine. Rain/drainage respects reduced motion; audio remains opt-in. The destination is loaded once and reused; comprehensive resource eviction and physical-device performance remain release work.
+- **All rail facilities belong to southern Embryo Station.** Keep one parked train and its platform at the placed station, with both main guideways at z = 79/85. There is no northern platform, duplicate train or garden rail loop. Preserve snapshot diagnostics (`zone: 'town'`, `journey: null`) and the save version. Garden access is by continuous walking paths.
+- **Terrain is continuous, not a flat town inside a mountain ring.** `terrain.ts` owns the shared river banks, lake depression, woodland foothills and asymmetrical elongated ridges. `mountains.ts` renders the whole ground with meadow/rock blending and actual tunnel apertures. The two-metre near grid agrees with the terrain collider. Grade railway approaches and far exits; reserve full tree canopies and taper planting naturally up slopes.
+- **Living Waters belongs to the town.** `living-waters-layout.ts` defines the lake at `(0, -110)`, asymmetrical water cells, 2.2 m nerve network and paths into the civic gardens. Use the shared `terrain.ts` ground and town Rapier world; never restore remote scene switching or a second terrain. Keep both pavilion entries, shallow-water escape and the dry Mycelium loop traversable in both quality tiers. The mushroom crowns use the actual Mycelium photographs: curled open silver folds around opal hearts, with branching stems, never fabric umbrellas. Reserve their full crown radius from paths. The pavilion borrows Dewdrop’s silhouette, whose original stone is topaz, not aquamarine. Rain/drainage respects reduced motion; audio remains opt-in. Physical-device performance remains release work.
 - **Photo clicking must not break looking.** A short scene press with no drag can raycast
   a planar photograph or caption. Activate on the native click after pointerup, so a
   synthesized touch click cannot hit a newly focused dialog button. Track its pointer independently from the joystick; cancelled gestures,
@@ -195,8 +198,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   Top view / First person (M) and Start / Resume exploring preserve walking position and
   direction. Map labels and list entries use `Landmark.entrance` to arrive just outside
   a clear entrance, facing inward, then enter walking mode. Keep these approaches aligned
-  with geometry and colliders. Load a remote destination before switching its render and
-  physics worlds; a failed or superseded request must not move the player. Keep the large
+  with geometry and colliders. All destinations use the already loaded town scene and physics world. Keep the large
   Start exploring button visible above the map list on desktop and touch screens.
 - **Progress is local only.** `readProgress` / `writeProgress` use the
   `livistone-progress-v1` key and every access is wrapped so that blocked or damaged

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { TessellateModifier } from 'three/addons/modifiers/TessellateModifier.js';
-import { STATION } from './station-layout';
+import { STATION_LOCAL as STATION } from './station-layout';
 
 const TAU = Math.PI * 2, RADIUS = 6.85, WIDTH = 4.4, WALL = .28;
 const CELLS = [

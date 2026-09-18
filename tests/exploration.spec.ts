@@ -10,7 +10,7 @@ const teleport = (page: Page, x: number, z: number, yaw = 0): Promise<void> => p
 async function facePiece(page: Page, id: string): Promise<void> {
   const piece = COLLECTION.find((p) => p.discovery === id)!, hall = piece.location!, pieces = COLLECTION.filter((p) => p.location === hall), site = posterLayout(hall, pieces.length)[pieces.indexOf(piece)], landmark = LANDMARKS.find((l) => l.id === hall)!;
   const x = (hall === 'station' ? 0 : landmark.x) + site.x + Math.sin(site.yaw) * 2.7, z = (hall === 'station' ? 0 : landmark.z) + site.z + Math.cos(site.yaw) * 2.7;
-  await teleport(page, x, z, site.yaw); await expect.poll(async () => (await snapshot(page)).interaction).toBe(id);
+  await teleport(page, hall === 'station' ? -16 - x : x, hall === 'station' ? -z : z, site.yaw + (hall === 'station' ? Math.PI : 0)); await expect.poll(async () => (await snapshot(page)).interaction).toBe(id);
 }
 
 test('explore City Hall, preserve position through map mode, and retain discoveries', async ({ page }) => {

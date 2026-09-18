@@ -3,7 +3,7 @@ import type { Exhibit } from '../game/exhibits';
 import { DISCOVERIES, LANDMARKS } from '../game/content';
 import { COLLECTION, CATALOGUE_URL, photoURL } from '../game/exhibits';
 import type { Progress, Discovery } from '../game/content';
-export type Mode = 'welcome' | 'walking' | 'map' | 'lore' | 'journal' | 'paused' | 'gallery' | 'travel';
+export type Mode = 'welcome' | 'walking' | 'map' | 'lore' | 'journal' | 'paused' | 'gallery';
 const icons: Record<string, string> = {
   map: '<path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5Z"/><path d="M9 3v16M15 5v16"/>',
   book: '<path d="M12 5v16M12 5C9 3 5 3 2 4v15c4-1 7 0 10 2 3-2 6-3 10-2V4c-3-1-7-1-10 1Z"/>',
@@ -35,7 +35,6 @@ export class UI {
       '<div class="vignette" aria-hidden="true"></div>',
       '<header class="topbar"><div class="brand" aria-label="Livistone">' + icon('leaf') + '<span>LIVISTONE<span class="brand-sub">A LIVING WORLD</span></span></div><div class="top-center"><span class="status-dot"></span><span id="mode-label">ART, SCIENCE & NATURE</span></div><nav id="tools" aria-label="Explore Livistone"><button id="view-toggle" class="tool view-toggle" data-action="map" aria-label="First person" aria-keyshortcuts="M" disabled>' + icon('walk') + '<span>First person</span><kbd>M</kbd></button><button class="tool" data-action="journal" aria-label="Open discovery journal" aria-expanded="false" aria-controls="journal" disabled>' + icon('book') + '<span>Journal</span></button><button class="tool square" data-action="pause" aria-label="Open menu" aria-expanded="false" aria-controls="pause" disabled>' + icon('menu') + '</button></nav></header>',
       '<div id="welcome" class="loading-notice" role="status">Preparing Livistone…</div>',
-      '<div id="journey-shade" class="journey-shade" aria-hidden="true" hidden></div><div id="journey-status" class="journey-status" role="status" hidden>Departing for Living Waters</div>',
       '<div id="crosshair" class="crosshair" aria-hidden="true" hidden></div>',
       '<footer id="walk-footer" class="walk-footer" hidden><div class="place-card"><span class="eyebrow">YOU ARE EXPLORING</span><strong id="location">Riverside Gardens</strong><span id="discoveries">0 discoveries</span></div><div class="controls-hint"><span><kbd>W A S D</kbd> Walk</span><span><kbd>← →</kbd> Turn</span><span id="look-hint">Hold left mouse to look</span><span><kbd>E</kbd> Discover</span></div></footer>',
       '<button id="interact" class="interaction" data-action="interact" hidden><span class="interaction-key">E</span><span id="interact-label">Discover</span>' + icon('arrow') + '</button>',
@@ -75,7 +74,7 @@ export class UI {
     const previousDialog = this.app.querySelector<HTMLElement>('.dialog:not([hidden])');
     if (!previousDialog) this.lastFocus = document.activeElement as HTMLElement;
     const visible: Record<string, boolean> = {
-      'journey-shade': mode === 'travel', 'journey-status': mode === 'travel', welcome: mode === 'welcome', tools: true,
+      welcome: mode === 'welcome', tools: true,
       'walk-footer': mode === 'walking', crosshair: mode === 'walking', 'touch-controls': mode === 'walking',
       'map-panel': mode === 'map', 'map-controls': mode === 'map', 'map-markers': mode === 'map',
       scrim: ['lore', 'journal', 'paused', 'gallery'].includes(mode), lore: mode === 'lore', journal: mode === 'journal', pause: mode === 'paused', gallery: mode === 'gallery',
@@ -151,15 +150,12 @@ export class UI {
     for (const link of discovery.links ?? []) { const anchor = document.createElement('a'); anchor.href = link.url; anchor.textContent = link.label + ' ↗'; anchor.target = '_blank'; anchor.rel = 'noopener noreferrer'; sources.append(anchor); }
     this.live.textContent = 'Discovered: ' + discovery.title;
   }
-  journey(label: string, darkness: number): void {
-    this.app.querySelector('#journey-status')!.textContent = label;
-    this.app.querySelector<HTMLElement>('#journey-shade')!.style.opacity = String(darkness);
-  }
+
   setLocation(name: string): void { if (this.location.textContent !== name) this.location.textContent = name; }
   setLookHint(text: string): void { this.app.querySelector("#look-hint")!.textContent = text; }
   setInteraction(id: string | null): void {
     this.prompt.hidden = !id;
-    if (id) this.app.querySelector('#interact-label')!.textContent = id === 'travel:gardens' ? 'Travel to Living Waters' : id === 'travel:town' ? 'Return to Embryo Station' : DISCOVERIES.find((d) => d.id === id)?.title ?? 'Discover';
+    if (id) this.app.querySelector('#interact-label')!.textContent = DISCOVERIES.find((d) => d.id === id)?.title ?? 'Discover';
   }
   mapStatus(text: string): void { this.app.querySelector('#map-description')!.textContent = text; }
   toast(message: string): void {

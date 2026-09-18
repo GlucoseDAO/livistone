@@ -77,13 +77,16 @@ export function createRailwayStructure(root: THREE.Group, colliders: ColliderSpe
   const foundation = box(0, -.12, RAILWAY.centerZ, length, .24, 14), fp = foundation.getAttribute('position'), ft = foundation.getAttribute('uv');
   for (let i = 0; i < fp.count; i++) ft.setXY(i, fp.getX(i) / 2, fp.getZ(i) / 2);
   add(railway, foundation, materials.ballast, 'Railway service foundation');
-  colliders.push({ type: 'box', position: [0, -.12, RAILWAY.centerZ], size: [length / 2, .12, 7] });
+  const support = (y: number, z: number, halfHeight: number, halfWidth: number): void => {
+    for (let x = -STATION.railHalfLength; x < STATION.railHalfLength; x += 32) { const span = Math.min(32, STATION.railHalfLength - x); colliders.push({ type: 'box', position: [x + span / 2, y, z], size: [span / 2 + .01, halfHeight, halfWidth] }); }
+  };
+  support(-.12, RAILWAY.centerZ, .12, 7);
   const guides: THREE.BufferGeometry[] = [], coils: THREE.BufferGeometry[] = [], joints: THREE.BufferGeometry[] = [];
   for (const z of RAILWAY.tracks) {
     add(railway, box(0, .08, z, length, .16, 2.5), concrete, 'Concrete maglev guideway');
-    colliders.push({ type: 'box', position: [0, .08, z], size: [length / 2, .08, 1.25] });
+    support(.08, z, .08, 1.25);
     for (const side of [-1, 1]) {
-      colliders.push({ type: 'box', position: [0, .24, z + side * 1.06], size: [length / 2, .08, .11] });
+      support(.24, z + side * 1.06, .08, .11);
       guides.push(box(0, .24, z + side * 1.06, length, .16, .22));
       coils.push(box(0, .22, z + side * 1.19, length, .1, .035));
     }

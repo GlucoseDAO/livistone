@@ -42,13 +42,10 @@ for (const mobile of [false, true]) test(`map labels arrive outside walkable ent
   } finally { await context.close(); }
 });
 
-test('a failed map destination leaves the current view playable and can be retried', async ({ page }) => {
-  await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); const before = await snapshot(page);
-  await page.route('**/models/trees/*.glb', (route) => route.abort());
-  await page.locator('[data-action="landmark:living-waters"]').first().click();
-  await expect(page.locator('#map-description')).toContainText('Could not open Vittoria Lake', { timeout: 30000 });
-  const failed = await snapshot(page); expect(failed.mode).toBe('map'); expect(failed.zone).toBe('town'); expect(failed.position).toEqual(before.position);
-  await page.unroute('**/models/trees/*.glb');
+test('garden navigation uses the already loaded town even when later asset requests are blocked', async ({ page }) => {
+  await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 });
+  await page.route('**/models/trees/*.glb', route => route.abort());
   await page.locator('.landmark-item[data-action="landmark:living-waters"]').click();
-  await expect.poll(async () => (await snapshot(page)).zone, { timeout: 30000 }).toBe('gardens'); expect((await snapshot(page)).mode).toBe('walking');
+  const arrived = await snapshot(page); expect(arrived.mode).toBe('walking'); expect(arrived.zone).toBe('town');
+  expect(arrived.position.z).toBeCloseTo(LANDMARKS.find(l => l.id === 'living-waters')!.entrance.z);
 });

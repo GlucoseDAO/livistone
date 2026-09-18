@@ -3,13 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { Physics } from '../src/game/physics';
 import type { ColliderSpec } from '../src/game/physics';
 import { createStationStructure } from '../src/world/station';
-import { STATION } from '../src/world/station-layout';
+import { STATION_LOCAL as STATION, STATION as ARRIVAL } from '../src/world/station-layout';
 import { PATH_CURVES, plantingAllowed } from '../src/world/landscape';
 
 describe('Embryo Station circulation', () => {
   it('reserves the station, railway, and garden approaches from planting', () => {
-    for (let x = -100; x <= 100; x += 2) expect(plantingAllowed(x, STATION.trackZ, 2.5)).toBe(false);
-    for (let x = -30; x <= 26; x += 2) for (let z = -76; z <= -60; z += 2) expect(plantingAllowed(x, z, .7)).toBe(false);
+    for (let x = -100; x <= 100; x += 2) expect(plantingAllowed(x, ARRIVAL.trackZ, 2.5)).toBe(false);
+    for (let x = -42; x <= 12; x += 2) for (let z = 60; z <= 76; z += 2) expect(plantingAllowed(x, z, .7)).toBe(false);
     for (const route of PATH_CURVES.slice(-2)) for (const point of route.getPoints(160)) {
       expect(plantingAllowed(point.x, point.z, .7)).toBe(false);
     }

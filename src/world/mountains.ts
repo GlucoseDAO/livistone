@@ -1,28 +1,18 @@
 import * as THREE from 'three';
-import { RAILWAY } from './station-layout';
+import { RAILWAY, STATION } from './station-layout';
 
-function hash(x: number, z: number): number { const n = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return n - Math.floor(n); }
-function noise(x: number, z: number): number {
-  const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz, u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
-  return THREE.MathUtils.lerp(THREE.MathUtils.lerp(hash(ix, iz), hash(ix + 1, iz), u), THREE.MathUtils.lerp(hash(ix, iz + 1), hash(ix + 1, iz + 1), u), v);
-}
-export function mountainHeight(x: number, z: number): number {
-  const r = Math.hypot(x / 1.12, z), phi = Math.atan2(x, z);
-  const rise = THREE.MathUtils.smoothstep(r, 115, 230), fall = 1 - THREE.MathUtils.smoothstep(r, 300, 440);
-  const ridge = 1 - Math.abs(noise(x * .027 + noise(x * .009, z * .009) * 3, z * .027) * 2 - 1);
-  const crest = 20 + 18 * Math.sin(phi * 3 + 1) ** 2 + 20 * Math.sin(phi * 5 - .8) ** 6;
-  const gullies = 3 * noise(x * .075, z * .075) + .7 * noise(x * .19, z * .19);
-  const riverValley = .18 + .82 * THREE.MathUtils.smoothstep(Math.abs(z - 26), 12, 72);
-  const original = -2 + rise * fall * riverValley * (crest + ridge * ridge * 26 + gullies);
-  const spur = 24 * Math.exp(-(((Math.abs(x) - RAILWAY.portalX - 40) / 28) ** 2) - ((z - RAILWAY.centerZ) / 28) ** 2) - 2;
-  return Math.max(original, spur);
-}
+export { landscapeHeight as mountainHeight } from './terrain';
+import { landscapeHeight, terrainNoise } from './terrain';
+import { meadowMaterial } from './planting';
 
 /** Subtract the rail clearance from the actual hillside triangles, including both far exits. */
 function cutRailwayOpening(source: THREE.BufferGeometry): THREE.BufferGeometry {
   const pos = source.getAttribute('position'), color = source.getAttribute('color'), normal = source.getAttribute('normal'), positions: number[] = [], colors: number[] = [], normals: number[] = [];
   type Vertex = number[];
-  const planes = [(v: Vertex): number => v[2] - RAILWAY.centerZ + (RAILWAY.boreHalfWidth + .45), (v: Vertex): number => RAILWAY.centerZ + (RAILWAY.boreHalfWidth + .45) - v[2], (v: Vertex): number => RAILWAY.clearanceHeight - v[1]];
+  // The Dark Nut mouths flare wider than the lined bore; cut that same apron out of the hillside.
+  const flare = (v: Vertex): number => 1 - THREE.MathUtils.smoothstep(Math.min(Math.abs(Math.abs(v[0]) - RAILWAY.portalX), Math.abs(Math.abs(v[0]) - RAILWAY.exitX)), 7, 20);
+  const tunnelPlanes = [(v: Vertex): number => v[2] - RAILWAY.centerZ + RAILWAY.boreHalfWidth + .45 + flare(v) * 2.2, (v: Vertex): number => RAILWAY.centerZ + RAILWAY.boreHalfWidth + .45 + flare(v) * 2.2 - v[2], (v: Vertex): number => RAILWAY.clearanceHeight + flare(v) * 2 - v[1]];
+  const floorPlanes = [(v: Vertex): number => v[2] - RAILWAY.centerZ + 7, (v: Vertex): number => RAILWAY.centerZ + 7 - v[2], (v: Vertex): number => STATION.railHalfLength - Math.abs(v[0])];
   const clip = (polygon: Vertex[], distance: (v: Vertex) => number, inside: boolean): Vertex[] => {
     const result: Vertex[] = [];
     for (let i = 0; i < polygon.length; i++) {
@@ -36,6 +26,7 @@ function cutRailwayOpening(source: THREE.BufferGeometry): THREE.BufferGeometry {
   const index = source.index!;
   for (let i = 0; i < index.count; i += 3) {
     let polygon = [0, 1, 2].map((j) => { const n = index.getX(i + j); return [pos.getX(n), pos.getY(n), pos.getZ(n), color.getX(n), color.getY(n), color.getZ(n), normal.getX(n), normal.getY(n), normal.getZ(n)]; });
+    const planes = polygon.every(v => v[1] <= .02) ? floorPlanes : tunnelPlanes;
     if (planes.some((plane) => polygon.every((v) => plane(v) <= 0))) { emit(polygon); continue; }
     for (const plane of planes) { emit(clip(polygon, plane, false)); polygon = clip(polygon, plane, true); if (!polygon.length) break; }
   }
@@ -43,15 +34,20 @@ function cutRailwayOpening(source: THREE.BufferGeometry): THREE.BufferGeometry {
 }
 
 export function mountainGeometry(mobile: boolean): THREE.BufferGeometry {
-    const angular = mobile ? 256 : 512, radial = mobile ? 60 : 112;
-    const positions: number[] = [], colors: number[] = [], indices: number[] = [], color = new THREE.Color();
-    for (let j = 0; j <= radial; j++) for (let i = 0; i <= angular; i++) {
-      const phi = i / angular * Math.PI * 2, r = 101 + j / radial * 345, x = Math.sin(phi) * r * 1.12, z = Math.cos(phi) * r, y = mountainHeight(x, z);
+    // Two-metre cells match the walking terrain; distant ridges use wider cells in both quality tiers.
+    const axis = (start: number, end: number, nearStart: number, nearEnd: number): number[] => {
+      const values: number[] = []; for (let value = start; value <= end; value += value >= nearStart && value < nearEnd ? 2 : Math.abs(value) > 520 ? 32 : mobile ? 8 : 4) values.push(value); return values;
+    };
+    const xs = axis(-1400, 1400, -240, 240), zs = axis(-1280, 1280, -270, 150);
+    const positions: number[] = [], colors: number[] = [], indices: number[] = [], color = new THREE.Color(), grass = new THREE.Color('#50663b'), stone = new THREE.Color('#a6a294');
+    for (let j = 0; j < zs.length; j++) for (let i = 0; i < xs.length; i++) {
+      const x = xs[i], z = zs[j], y = landscapeHeight(x, z);
       positions.push(x, y, z);
-      const slope = Math.hypot(mountainHeight(x + 1, z) - mountainHeight(x - 1, z), mountainHeight(x, z + 1) - mountainHeight(x, z - 1)) / 2;
-      const rock = THREE.MathUtils.smoothstep(slope, .65, 1.6) * .85 + THREE.MathUtils.smoothstep(y, 48, 80) * .45;
-      color.set('#577943').lerp(new THREE.Color('#c0beb2'), Math.min(1, rock)); color.multiplyScalar(.8 + noise(x * .13, z * .13) * .35); colors.push(color.r, color.g, color.b);
-      if (i < angular && j < radial) { const n = j * (angular + 1) + i; indices.push(n, n + angular + 1, n + 1, n + 1, n + angular + 1, n + angular + 2); }
+      const slope = Math.hypot(landscapeHeight(x + 1, z) - landscapeHeight(x - 1, z), landscapeHeight(x, z + 1) - landscapeHeight(x, z - 1)) / 2;
+      const rock = Math.min(1, THREE.MathUtils.smoothstep(slope, .6, 1.7) * .85 + THREE.MathUtils.smoothstep(y, 58, 100) * .65);
+      color.copy(grass).lerp(stone, rock).multiplyScalar(.88 + terrainNoise(x * .045, z * .045) * .24);
+      colors.push(color.r, color.g, color.b);
+      if (i < xs.length - 1 && j < zs.length - 1) { const n = j * xs.length + i; indices.push(n, n + xs.length, n + 1, n + 1, n + xs.length, n + xs.length + 1); }
     }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geo.setIndex(indices); geo.computeVertexNormals();
     return cutRailwayOpening(geo);
@@ -60,8 +56,9 @@ export function mountainGeometry(mobile: boolean): THREE.BufferGeometry {
 export class Mountains extends THREE.Group {
   readonly ready: Promise<void>;
   constructor(mobile: boolean) {
-    super(); this.name = 'Ridged mountain landscape';
+    super(); this.name = 'Continuous valley and mountain ridges';
     const geo = mountainGeometry(mobile);
+    const meadow = meadowMaterial(), grass = meadow.map!; meadow.dispose();
     const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .96 });
     const landscape = new THREE.Mesh(geo, material); landscape.receiveShadow = true; this.add(landscape);
     const loader = new THREE.TextureLoader();
@@ -70,20 +67,22 @@ export class Mountains extends THREE.Group {
       for (const texture of [rock, normal]) { texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.anisotropy = mobile ? 2 : 4; }
       // Triplanar maps keep scanned cliff detail at a consistent scale on steep faces.
       material.onBeforeCompile = (shader) => {
-        shader.uniforms.rockColor = { value: rock }; shader.uniforms.rockNormal = { value: normal };
+        shader.uniforms.grassColor = { value: grass }; shader.uniforms.rockColor = { value: rock }; shader.uniforms.rockNormal = { value: normal };
         shader.vertexShader = 'varying vec3 mountainPosition; varying vec3 mountainNormal;\n' + shader.vertexShader;
         shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nmountainPosition=position; mountainNormal=normal;');
-        shader.fragmentShader = 'uniform sampler2D rockColor; uniform sampler2D rockNormal; varying vec3 mountainPosition; varying vec3 mountainNormal;\n' + shader.fragmentShader;
+        shader.fragmentShader = 'uniform sampler2D grassColor; uniform sampler2D rockColor; uniform sampler2D rockNormal; varying vec3 mountainPosition; varying vec3 mountainNormal;\n' + shader.fragmentShader;
         shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
           vec3 weights=pow(abs(normalize(mountainNormal)),vec3(4.0)); weights/=max(dot(weights,vec3(1.0)),.001);
           vec3 p=mountainPosition*.065;
           vec3 rock=texture2D(rockColor,p.yz).rgb*weights.x+texture2D(rockColor,p.xz).rgb*weights.y+texture2D(rockColor,p.xy).rgb*weights.z;
-          diffuseColor.rgb*=rock*1.8;
+          float exposed=clamp(smoothstep(.18,.65,1.0-abs(normalize(mountainNormal).y)) + smoothstep(58.0,105.0,mountainPosition.y)*.5,0.0,1.0);
+          vec3 meadow=texture2D(grassColor,mountainPosition.xz/7.0).rgb;
+          diffuseColor.rgb*=mix(meadow*1.65,rock*1.8,exposed);
         `);
         if (!mobile) shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `
           vec2 nx=texture2D(rockNormal,p.yz).xy*2.0-1.0, ny=texture2D(rockNormal,p.xz).xy*2.0-1.0, nz=texture2D(rockNormal,p.xy).xy*2.0-1.0;
           vec3 detail=vec3(0.0,nx.y,nx.x)*weights.x+vec3(ny.x,0.0,ny.y)*weights.y+vec3(nz.x,nz.y,0.0)*weights.z;
-          normal=normalize(mat3(viewMatrix)*(normalize(mountainNormal)+detail*.32));
+          normal=normalize(mat3(viewMatrix)*(normalize(mountainNormal)+detail*.32*exposed));
         `);
       };
       material.needsUpdate = true;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { STATION } from './station-layout';
+import { STATION_LOCAL as STATION } from './station-layout';
 
 const TAU = Math.PI * 2;
 // The stone has a tall, knuckled crown behind the ring and tapers into the platform wing.

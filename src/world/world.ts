@@ -6,7 +6,7 @@ import { Forest } from './forest';
 import { createBridge, createGardenBridge } from './bridge';
 import { createGateway } from './gateway';
 import { gatewayClearing } from './gateway-layout';
-import { createPlanting, meadowMaterial } from './planting';
+import { createPlanting } from './planting';
 import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from './landscape';
 import { Mountains } from './mountains';
 import { PlanarExhibition } from './planar-exhibition';
@@ -17,7 +17,10 @@ import { pavingMaterial, rockGeometry, rockMaterial } from './stone';
 import { walnutMaterial, walnutRadius } from './walnut';
 import { CIVIC_LANDMARKS } from '../game/content';
 import { createStation } from './station';
-import { RAILWAY, STATION, stationClearing } from './station-layout';
+import { STATION } from './station-layout';
+import { LivingWaters } from './living-waters';
+import { terrainHeight, townTerrainGeometry } from './terrain';
+import { transformColliders } from './town-layout';
 import { createRailwayStructure, loadRailwayTextures } from './railway';
 import { createGlucosePavilion } from './glucose-pavilion';
 import type { Landmark } from '../game/content';
@@ -29,15 +32,7 @@ function seeded(seed: number): () => number {
   return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 }
 export { riverCenter } from './waterways';
-export function terrainHeight(x: number, z: number): number {
-  const distance = waterDistance(x, z);
-  if (distance < -2.6) return -2;
-  if (distance < 0) return distance / 2.6 * 2;
-  const edge = Math.max(0, Math.hypot(x * 0.8, z * 0.65) - 58) / 30;
-  const height = Math.sin(x * 0.06) * Math.cos(z * 0.09) * edge * 3;
-  if (stationClearing(x, z, 0)) return 0;
-  return height * THREE.MathUtils.smoothstep(Math.abs(z - RAILWAY.centerZ), 7, 12);
-}
+export { terrainHeight } from './terrain';
 function mesh(geometry: THREE.BufferGeometry, material: THREE.Material, parent: THREE.Object3D, x = 0, y = 0, z = 0): THREE.Mesh {
   const m = new THREE.Mesh(geometry, material); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
 }
@@ -78,6 +73,7 @@ export class Town {
   readonly water: THREE.MeshStandardMaterial;
   readonly exhibitions: PlanarExhibition[] = [];
   readonly train: THREE.Object3D;
+  readonly gardens: LivingWaters;
   readonly researchPanels: THREE.Mesh[] = [];
   private readonly mountains: Mountains;
   private readonly railway: THREE.Group;
@@ -95,10 +91,20 @@ export class Town {
     this.createTerrain(); this.createPaths(); createBridge(this.root, this.colliders, this.white, this.paving, this.gold);
     createGateway(this.root, this.colliders, mobile, this.paving);
     for (const landmark of CIVIC_LANDMARKS) landmark.id === 'energy' ? this.createEnergyHall(landmark.x, landmark.z) : this.createLandmark(landmark.id, landmark.x, landmark.z);
-    this.interactives.push({ id: 'embryo-station', ...createStation(this.root, this.colliders, mobile, this.paving) });
-    this.train = this.root.getObjectByName('Panoramic maglev')!;
-    this.exhibitions.push(new PlanarExhibition('station', this.interiors, 0, 0, this.colliders, this.interactives));
+    const arrival = new THREE.Group(), stationColliders: ColliderSpec[] = [], stationInteractions: Interactive[] = [];
+    stationInteractions.push({ id: 'embryo-station', ...createStation(arrival, stationColliders, mobile, this.paving) });
+    const gallery = new THREE.Group(); arrival.add(gallery);
+    this.exhibitions.push(new PlanarExhibition('station', gallery, 0, 0, stationColliders, stationInteractions));
+    arrival.rotation.y = Math.PI; arrival.position.x = -16; arrival.updateMatrix(); this.root.add(arrival);
+    this.colliders.push(...transformColliders(stationColliders, arrival.matrix, Math.PI));
+    this.interactives.push(...stationInteractions.map(item => ({ ...item, position: item.position.applyMatrix4(arrival.matrix) })));
+    this.train = arrival.getObjectByName('Panoramic maglev')!;
     this.railway = createRailwayStructure(this.root, this.colliders, mobile);
+    this.gardens = new LivingWaters(mobile); this.root.add(this.gardens.root);
+    this.gardens.addInterpretation('living-vittoria', 'Vittoria Lake', 'Silver nerves, shallow water eyes and a blue center. An imagined landscape from Livia’s silver and aquamarine pendant. The civic gardens continue along the southern paths.');
+    this.gardens.addInterpretation('living-dewdrop', 'Two stones, one pavilion', 'Vittoria supplies the aquamarine identity. Dewdrop supplies a faceted droplet and open silver embrace. Dewdrop’s real stone is treated Swiss blue topaz.');
+    this.gardens.addInterpretation('living-mycelium', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
+    this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.white, this.paving, this.gold, bridge);
     createTimeTower(this.root, this.colliders, this.mobile);
     const research = createGlucosePavilion(this.root, this.colliders, mobile, this.paving); this.researchPanels.push(...research.panels); this.interactives.push(...research.interactives);
@@ -106,17 +112,8 @@ export class Town {
     this.mountains = new Mountains(mobile); this.root.add(this.mountains);
   }
   private createTerrain(): void {
-    const geo = new THREE.PlaneGeometry(230, 200, 230, 200); geo.rotateX(-Math.PI / 2);
-    const pos = geo.getAttribute('position'); const colors: number[] = []; const color = new THREE.Color();
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), z = pos.getZ(i); pos.setY(i, terrainHeight(x, z));
-      color.setHSL(0.235 + Math.sin(x * 0.3) * 0.015, 0.42 + Math.sin(z) * 0.03, 0.13 + Math.sin(x * 0.12 + z * 0.08) * 0.028);
-      if (waterDistance(x, z) < .6) color.lerp(new THREE.Color('#929c96'), .82);
-      colors.push(color.r, color.g, color.b);
-    }
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geo.computeVertexNormals();
-    mesh(geo, meadowMaterial(), this.root).castShadow = false;
-    this.colliders.push({ type: 'mesh', vertices: new Float32Array(pos.array), indices: new Uint32Array(geo.index!.array) });
+    const geo = townTerrainGeometry();
+    this.colliders.push({ type: 'mesh', vertices: new Float32Array(geo.getAttribute('position').array), indices: new Uint32Array(geo.index!.array) }); geo.dispose();
     // Clip a single surface against the shared bank field: junctions have no overlapping water sheets.
     const vertices: number[] = [], uv: number[] = [];
     const level = -.546;
@@ -131,7 +128,7 @@ export class Town {
         vertices.push(p.x, -.42, p.y); uv.push(p.x / 23, .5 + .5 * Math.max(0, 1 + waterDistance(p.x, p.y) / 4));
       }
     };
-    for (let x = -115; x < 115; x++) for (let z = -100; z < 100; z++) {
+    for (let x = -600; x < 600; x++) for (let z = -60; z < 45; z++) {
       const a = new THREE.Vector2(x, z), b = new THREE.Vector2(x + 1, z), c = new THREE.Vector2(x, z + 1), d = new THREE.Vector2(x + 1, z + 1);
       emit([a, c, b]); emit([b, c, d]);
     }
@@ -296,11 +293,11 @@ export class Town {
   }
   private clearForTree(x: number, z: number): boolean {
     if (gatewayClearing(x, z, 6)) return false;
-    if (!plantingAllowed(x, z, 2.5)) return false;
+    if (!plantingAllowed(x, z, 6.9)) return false;
     if (Math.abs(x) < 6 && z > -13 && z < 49) return false;
     if (Math.abs(x - 17) < 6 && z > -45 && z < -19) return false;
-    // Keep the ring entrance visible from the northern gardens, framed by trees on either side.
-    if (x > -27 && x < 9 && z > -63 && z < -39) return false;
+    // Frame the station-to-bridge arrival with full tree crowns outside the sightline.
+    if (Math.abs(x) < 8 && z > 39 && z < STATION.front + 2) return false;
     if (CIVIC_LANDMARKS.some((l) => Math.hypot((x - l.x) / l.stretch.x, (z - l.z) / Math.max(1, l.stretch.z)) < 14)) return false;
     return true;
   }
@@ -308,9 +305,10 @@ export class Town {
   async loadAssets(): Promise<void> { await Promise.all([this.forest.load(this.mobile), this.mountains.ready, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
     const rand = seeded(3974); const sites: THREE.Vector3[] = [];
-    for (let i = 0; i < (this.mobile ? 1500 : 3000); i++) {
-      const x = (rand() - 0.5) * 185, z = (rand() - 0.5) * 155;
-      if (!this.clearForTree(x, z) || sites.some((p) => Math.hypot(p.x - x, p.z - z) < (this.mobile ? 6 : 4.8))) continue;
+    for (let i = 0; i < (this.mobile ? 2600 : 5400); i++) {
+      const x = (rand() - 0.5) * 410, z = (rand() - 0.5) * 385 - 62;
+      const height = terrainHeight(x, z), slope = Math.hypot(terrainHeight(x + 2, z) - height, terrainHeight(x, z + 2) - height) / 2;
+      if (height > 47 + rand() * 13 || slope > .95 || Math.hypot(x / 218, (z + 60) / 210) > .82 + rand() * .18 || !this.clearForTree(x, z) || sites.some((p) => Math.hypot(p.x - x, p.z - z) < (this.mobile ? 6 : 4.8))) continue;
       sites.push(new THREE.Vector3(x, terrainHeight(x, z), z));
       this.colliders.push({ type: 'box', position: [x, terrainHeight(x, z) + 2, z], size: [0.3, 2, 0.3] });
     }

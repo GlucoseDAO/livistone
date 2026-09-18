@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-export const GARDENS = { x: 540, z: 0, radius: 44, pavilionX: -10, pavilionZ: 0, platformZ: -73, trainX: 0, trainZ: -79 };
+export const GARDENS = { x: 0, z: -110, radius: 44, pavilionX: -10, pavilionZ: 0 };
+export const GARDEN_PANELS = { vittoria: [-16, -52], dewdrop: [-13, -1.5], mycelium: [70, -23] } as const;
 export type Point = [number, number];
 const outline: Point[] = Array.from({ length: 80 }, (_, i) => { const angle = i * Math.PI / 40, r = 44 + Math.sin(angle * 3 + .5) * 1.2 + Math.sin(angle * 5) * .7; return [Math.cos(angle) * r, Math.sin(angle) * r]; });
 const seeds: Point[] = [[-10, 0], [-16, -17], [-3, -19], [11, -23], [22, -13], [22, 4], [13, 19], [-3, 23], [-20, 19], [-30, 5], [-31, -12], [-24, -28], [-11, -35], [2, -36], [14, -35], [28, -27], [36, -16], [37, -4], [36, 11], [29, 26], [16, 35], [1, 36], [-13, 34], [-29, 29], [-39, 17], [-39, -3], [-35, -24], [4, -5], [7, 8]];
@@ -24,13 +25,22 @@ export function pointInPolygon(x: number, z: number, polygon: Point[]): boolean 
 }
 export function gardenHeight(x: number, z: number): number { return -.15 * (1 - THREE.MathUtils.smoothstep(Math.hypot(x, z), 42, 47)); }
 export const GARDEN_PATHS = [
-  [[-14, -73], [-14, -61], [-12, -49], [-10, -40], [-10, 0]],
-  [[10, -73], [18, -59], [39, -49], [63, -37], [74, -25]],
+  [[-10, 0], [-10, -20], [-10, -40], [-16, -48], [-36, -40], [-48, -15], [-44, 16], [-23, 43], [-18, 45]],
+  [[-16, -48], [12, -49], [39, -43], [61, -34], [74, -25]],
   [[-10, 0], [3, -1], [25, -3], [43, -4], [57, -13], [64, -23], [74, -25]],
   [[74, -25], [89, -19], [94, -2], [87, 19], [70, 22], [59, 9], [60, -9], [64, -23], [74, -25]],
+  [[-10, 0], [-1, 0], [-1, 18], [-13, 34], [-18, 45], [-23, 56]],
+  [[74, -25], [61, -34], [56, -21], [56, 5], [60, 27], [48, 46], [38, 58]],
 ].map((points) => new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(x, .13, z))));
 const pathSamples = GARDEN_PATHS.map((path) => path.getPoints(120));
 export function rainPlantAllowed(x: number, z: number, radius: number): boolean {
   if (Math.hypot(x - 75, z) < 5 + radius) return false;
   return pathSamples.every((points) => points.every((point) => Math.hypot(point.x - x, point.z - z) > 1.4 + radius));
+}
+
+/** Living Waters is a district in the town, with shared ground and full-footprint planting reservations. */
+export function gardenClearing(x: number, z: number, radius: number): boolean {
+  x -= GARDENS.x; z -= GARDENS.z;
+  return Object.values(GARDEN_PANELS).some(([px, pz]) => Math.hypot(px - x, pz - z) < 2 + radius) || Math.hypot(x, z) < 47 + radius || (x > 51 - radius && x < 104 + radius && z > -35 - radius && z < 32 + radius)
+    || pathSamples.some(points => points.some(p => Math.hypot(p.x - x, p.z - z) < 1.5 + radius));
 }

@@ -12,10 +12,12 @@ const views = [
   ['gateway-front', 0, 52, 0, .18], ['gateway-side', 9, 47, .92, .26], ['gateway-reverse', 0, 33, Math.PI, .25],
   ['bridge-bank', 14, 36, 1.0], ['bridge-crossing', 0, 36, 0], ['garden-path', -14, 8, 1.2],
   ['city-hall-gallery', -2.4, -24, -.23], ['energy-gallery', -31.4, -10.5, -.28], ['science-gallery', 26.6, -12.2, -.28],
-  ['embryo-station-front', -16, -37, 0, .31], ['embryo-station-platform', -16, -73, -1.1],
-  ['railway-east-portal', 85, -79, -Math.PI / 2, .13], ['railway-west-portal', -85, -79, Math.PI / 2, .13],
-  ['railway-detail', 55, -76.6, -Math.PI / 2, -.22], ['railway-inside', 135, -79, -Math.PI / 2, .07],
+  ['embryo-station-front', 0, 43, Math.PI, .31], ['embryo-station-platform', 0, 73, Math.PI - 1.1],
+  ['railway-east-portal', 130, 79, -Math.PI / 2, .13], ['railway-west-portal', -130, 79, Math.PI / 2, .13],
+  ['railway-detail', 55, 76.6, -Math.PI / 2, -.22], ['railway-inside', 200, 79, -Math.PI / 2, .07],
   ['glucose-pavilion', 38, -23, 0, .23], ['glucose-interior', 38, -40, -Math.PI / 2, .22],
+  ['vittoria-lake', -18, -64, 0, .08], ['mycelium-grove', 74, -138, Math.PI, .18],
+  ['station-arrival', 0, 58, 0],
   ['catalogue-poster', 2.51, -18.21, -2.409],
 ];
 const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', '--headless=new', '--use-gl=angle', '--use-angle=gl', '--ignore-gpu-blocklist'] });
@@ -34,8 +36,8 @@ await page.keyboard.press('KeyE'); await page.waitForTimeout(600); await page.sc
 await page.getByRole('button', { name: 'Continue exploring' }).click();
 await page.keyboard.press('KeyM');
 await page.waitForTimeout(600); await page.screenshot({ path: `${out}/town-aerial.png` });
-await page.click('#marker-energy'); await page.click('[data-action="zoom-in"]'); await page.click('[data-action="zoom-in"]');
-await page.waitForTimeout(600); await page.screenshot({ path: `${out}/energy-aerial.png` });
+await page.click('[data-action="zoom-in"]'); await page.click('[data-action="zoom-in"]');
+await page.waitForTimeout(600); await page.screenshot({ path: `${out}/town-aerial-close.png` });
 const s = await page.evaluate(() => window.__livistone.snapshot());
 console.log(`saved ${views.length + 3} views to ${out}; fps ${s.fps}, draw calls ${s.calls}, triangles ${s.triangles}`);
 await browser.close();

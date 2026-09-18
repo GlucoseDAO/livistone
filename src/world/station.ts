@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
 import { createMaglevTrain } from './train';
-import { RAILWAY, STATION } from './station-layout';
+import { RAILWAY_LOCAL as RAILWAY, STATION_LOCAL as STATION } from './station-layout';
 import { stationRingGeometry, stationRingAnchor } from './station-ring';
 import { stationAmberGeometry, stationAmberMaterial, stationAmberPoint, stationAmberSoffit } from './station-amber';
 
@@ -182,7 +182,7 @@ export function createStation(root: THREE.Group, colliders: ColliderSpec[], mobi
   };
   const entrance = sign(5.4, 1.3, 'EMBRYO', 'LIVISTONE  /  RAILWAY STATION'); entrance.position.set(-16, 4.25, -61.85);
   const platform = sign(5.2, 1.3, '01  /  NEW HORIZONS', 'MAGLEV  ·  BOARD AT THE OPEN GATES'); platform.position.set(6, 3.8, -73.4);
-  const boarding = sign(3.6, .8, 'BOARD HERE', 'PARKED TRAIN  ·  NO DEPARTURES'); boarding.position.set(-14, 3.6, -76.1);
+  const boarding = sign(3.6, .8, 'BOARD HERE', 'LIVISTONE  ·  ARRIVALS'); boarding.position.set(-14, 3.6, -76.1);
   const hangers: THREE.BufferGeometry[] = [];
   for (const board of [entrance, platform]) for (const dx of [-2, 2]) {
     const x = board.position.x + dx, z = board.position.z, bottom = board.position.y + .65, top = stationAmberSoffit(x, z).y;
