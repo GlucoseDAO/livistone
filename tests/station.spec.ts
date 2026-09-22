@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { TRAIN_ANNOUNCEMENTS } from '../src/world/train';
+import { stationPoint } from '../src/world/station-layout';
 
 interface Snapshot { ready: boolean; mode: string; position: { x: number; y: number; z: number }; yaw: number; progress: { discovered: string[]; visited: string[] }; }
 const snapshot = (page: Page): Promise<Snapshot> => page.evaluate(() => (window as unknown as { __livistone: { snapshot(): Snapshot } }).__livistone.snapshot());
@@ -21,9 +23,29 @@ test('enter the Embryo ring, explore the station, discover its story, and resume
   await page.getByRole('button', { name: 'Continue exploring' }).click();
   await page.keyboard.press('KeyM');
   await page.locator('.landmark-item[data-action="landmark:station"]').click(); const after = await snapshot(page);
-  expect(after.mode).toBe('walking'); expect(after.position.x).toBeCloseTo(0, 2); expect(after.position.z).toBeCloseTo(56, 2); expect(after.yaw).toBe(Math.PI);
+  expect(after.mode).toBe('walking'); expect(after.position.x).toBeCloseTo(0, 2); expect(after.position.z).toBeCloseTo(56, 2); expect(after.yaw).toBe(0);
   await page.reload(); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 });
   expect((await snapshot(page)).progress.discovered).toContain('embryo-station'); expect((await snapshot(page)).progress.visited).toContain('station'); expect(errors).toEqual([]);
+});
+
+test('train cabin announcements point to science, art and the pieces site', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 });
+  await expect(page.locator('#error')).toBeHidden();
+  await page.locator('#start-exploring').click();
+  const science = TRAIN_ANNOUNCEMENTS.find((board) => board.id === 'train-science')!, art = TRAIN_ANNOUNCEMENTS.find((board) => board.id === 'train-art')!;
+  const look = (board: typeof science) => { const world = stationPoint(board.x, board.z); return page.evaluate(({ x, z }) => (window as unknown as { __livistone: { teleport(x: number, z: number, yaw: number): void } }).__livistone.teleport(x, z, Math.PI), { x: world.x, z: world.z - 1.4 }); };
+  await look(science);
+  await expect(page.locator('#interact')).toContainText('Science this way');
+  await page.keyboard.press('KeyE');
+  await expect(page.locator('#lore-title')).toHaveText('Science this way');
+  await expect(page.getByRole('link', { name: /Livia’s works/ })).toHaveAttribute('href', 'https://livia.glucosedao.org/pieces/');
+  await page.getByRole('button', { name: 'Continue exploring' }).click();
+  await look(art);
+  await expect(page.locator('#interact')).toContainText('Art and geometry this way');
+  await page.keyboard.press('KeyE');
+  await expect(page.locator('#lore-title')).toHaveText('Art and geometry this way');
+  expect(errors).toEqual([]);
 });
 
 test('station map and discovery are usable on a touch viewport', async ({ browser }) => {

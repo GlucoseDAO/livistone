@@ -1,9 +1,10 @@
 import catalogue from './jewelry-catalogue.json' with { type: 'json' };
 import type { LandmarkId } from './content';
+import { PIECE_STORIES } from './piece-stories';
 
 export interface Exhibit {
   landmark?: LandmarkId; discovery: string; title: string; type: string; materials: string; dimensions: string; year: string;
-  description: string; location?: LandmarkId | null; collection?: string; source?: string; photos: { file: string; thumb?: string; alt: string }[];
+  description: string; story?: string; location?: LandmarkId | null; collection?: string; source?: string; photos: { file: string; thumb?: string; alt: string }[];
 }
 export const CATALOGUE_URL = 'https://livia.glucosedao.org/pieces/';
 export const EXHIBITS: Exhibit[] = [
@@ -18,7 +19,7 @@ export const EXHIBITS: Exhibit[] = [
     photos: [{ file: 'IMG_3433.jpg', alt: 'Nanot pendant: an open silver lattice with angular folds and dark inclusions' }, { file: 'IMG_3434.jpg', alt: 'A second studio photograph of the Nanot pendant and its folded metal structure' }] },
 ];
 /** Curated manifest: every physical piece belongs to exactly one place. Full photographs are viewer-only. */
-export const COLLECTION: Exhibit[] = catalogue.map((piece) => ({ ...piece, location: piece.location as LandmarkId | null, landmark: EXHIBITS.find((anchor) => anchor.discovery === piece.discovery)?.landmark }));
+export const COLLECTION: Exhibit[] = catalogue.map((piece) => ({ ...piece, location: piece.location as LandmarkId | null, landmark: EXHIBITS.find((anchor) => anchor.discovery === piece.discovery)?.landmark, story: PIECE_STORIES[piece.discovery] }));
 /** Contain the entire photograph within the available panel or viewer area. */
 export function photoSize(width: number, height: number, maxWidth = 2.8, maxHeight = 2.3): { width: number; height: number } {
   const ratio = width > 0 && height > 0 ? width / height : 1;

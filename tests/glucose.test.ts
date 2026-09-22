@@ -25,6 +25,8 @@ describe('Glucose Commons', () => {
     }
     expect(CIVIC_LANDMARKS.map((l) => l.id)).toEqual(['city-hall', 'energy', 'science']);
     expect(RESEARCH_POSTERS).toHaveLength(GLUCOSE_POSTERS.length);
+    expect(RESEARCH_POSTERS.map((p) => p.id)).toEqual(['glucose-livia', 'glucose-format', 'glucose-service', 'glucose-game', 'glucose-models', 'glucose-molecule']);
+    for (const poster of RESEARCH_POSTERS) { expect(poster.slides.length).toBeGreaterThan(1); expect(poster.slides[0].title.length).toBeGreaterThan(0); }
     expect(parseProgress(JSON.stringify({ version: 1, discovered: ['nut', 'glucose-models'], visited: ['city-hall', 'glucose'] }))).toEqual({ version: 1, discovered: ['nut', 'glucose-models'], visited: ['city-hall', 'glucose'] });
     for (const poster of RESEARCH_POSTERS) for (const link of poster.links!) expect(new URL(link.url).protocol).toBe('https:');
   });

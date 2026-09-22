@@ -55,7 +55,11 @@ src/
     input.ts         Keyboard, held-button drag-to-look mouse, and touch thumbstick input
     audio.ts         Procedural filtered-noise ambience via WebAudio
     graphics.ts      Coarse-pointer / software-GL / laptop-iGPU probe that selects reduced town meshes
-    research.ts      GlucoseDAO facts and source links
+    daylight.ts      Local-clock night test; optional latitude, never a GPS prompt
+    research.ts      GlucoseDAO chapter posters, Kyiv 2026 slides and source links
+    research-art.ts  Shared chapter illustrations for posters and the slide dialog
+    jewelry-art.ts   Drawn Dewdrop stand-in when no local studio photograph exists
+    piece-stories.ts Artist and exhibition stories overlaid on the jewellery catalogue
     jewelry-catalogue.json Generated source-hashed catalogue and image manifest
   world/
     world.ts         Town: terrain, river, paths, bridges, landmarks, interiors, tower,
@@ -66,7 +70,7 @@ src/
     forest.ts        Batched GLB tree instancing, mobile foliage cut, and distance LOD
     landscape.ts     Shared path curves and planting clearance
     station.ts       Embryo station ring, glazed foyer, signs, train, and matching colliders
-    train.ts         Maglev shell with true glazed apertures, lounge cabin, and matching colliders
+    train.ts         Maglev shell with true glazed apertures, lounge cabin, cabin announcements and matching colliders
     station-amber.ts Closed resin body, procedural textures, refraction, and inner core geometry
     station-ring.ts  Deep curved silver shank, organic side-wall piercings, and clasp anchors
     station-layout.ts Shared station, tunnel, railway planting and walking clearance
@@ -76,7 +80,7 @@ src/
     gateway.ts       King's Chapel entrance arch, faceted tourmaline, raised lettering and colliders
     gateway-materials.ts Procedural silver, limestone and colour-zoned gem materials
     gateway-layout.ts Shared gateway footprint and arrival-path planting clearance
-    sky.ts           Startup-baked cloud/daylight cubemap and reflection environment
+    sky.ts           Startup-baked daylight or night cubemap and reflection environment
     mountains.ts     Continuous ground and ridges with triplanar rock maps and reduced mobile detail
     planar-exhibition.ts Permanent photo posters, aspect-matched captions and stand colliders
     poster-layout.ts Curated hall and station panel placements
@@ -120,7 +124,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   trees also reserve their full canopy near the arch. `createGateway` is DOM-independent
   and derives colliders from its meshes. Keep the gem's quality settings separate from hall
   glazing and station amber; low detail uses an opaque reflective fallback. The serif glyph
-  outlines are bundled, with their licence under `public/fonts/`. Spawn is at `(0, 58)`, leaving the station toward the bridge.
+  outlines are bundled, with their licence under `public/fonts/`. Spawn is at `(0, 58)` with yaw `0`, looking from Embryo Station toward the city gate.
 - **The station keeps its transport role.** Its seven-poster collection stays in the concourse. `CIVIC_LANDMARKS`
   selects only the three ministries/City Hall for circular gardens and civic construction. Guard exhibition
   lookups when iterating all `LANDMARKS`. `station-layout.ts` owns the station and railway
@@ -128,7 +132,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   platform and glazed foyer have matching colliders, and the authored train has boarding bays at local x = -14 and 10. `STATION_LOCAL` preserves that geometry; the southern station applies a half-turn and x = -16 translation to its structure, gallery, interactions and every collider, putting the bays at world x = -2 and -26. `STATION` describes the placed footprint. Keep ramps, screen gaps, body apertures and the cabin floor aligned. Train windows are holes
   in the curved shell with separate transparent panes and colliders; never cover them with solid
   body geometry. Keep the aisle clear and subdivide curved window panels before projection.
-  `train.ts` creates the single parked train at the southern station. Keep the amber material settings distinct when switching
+  `train.ts` creates the single parked train at the southern station. Cabin announcements (`createTrainCabinGraphics`) face the boarding bays at eye level in front of the seats, with matching bulkhead and overhead boards: “Step into the future,” science one way with double-triangle arrowheads, art/geometry the opposite way. They add no colliders, never cover window holes, stay clickable via `researchPanels`, and open https://livia.glucosedao.org/pieces. Keep the amber material settings distinct when switching
   visual quality. The amber is a closed, lobed volume with a recessed resin core on desktop;
   do not flatten it into a canopy sheet. The silver entrance is a deep cylindrical shank
   with a narrow rolled lip and irregular holes through its curved sides. Do not replace
@@ -146,7 +150,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   entrance plane. Dark Nut shells and bronze ornaments are new architecture inspired by the
   supplied photo, distinct from City Hall. Mobile omits railway normal maps and reduces
   shell/rib detail. Preserve railway clearance and full-passage physics tests.
-- **Glucose Commons uses scientific source coordinates.** `glucose-pavilion.ts` lifts the A/B backbone of human insulin PDB 1TRZ above an open, walkable court. Preserve the uniformly scaled fold, three disulfides and separate GLC glucose identity. `data/molecules/` keeps attributed originals; `bun scripts/extract-molecules.mjs` rebuilds hashed compact data. `glucose-layout.ts` shares poster/planting clearance; architecture creation stays DOM-independent for Rapier tests. Research facts and source links belong in `game/research.ts`, separate from jewelry lore. Only verified public tools and research workflows count as achievements. Keep the pavilion out of `CIVIC_LANDMARKS`, preserve old save IDs, and keep source dialogs keyboard/touch accessible.
+- **Glucose Commons uses scientific source coordinates.** `glucose-pavilion.ts` lifts the A/B backbone of human insulin PDB 1TRZ above an open, walkable court. Preserve the uniformly scaled fold, three disulfides and separate GLC glucose identity. `data/molecules/` keeps attributed originals; `bun scripts/extract-molecules.mjs` rebuilds hashed compact data. `glucose-layout.ts` shares poster/planting clearance; architecture creation stays DOM-independent for Rapier tests. Research facts, chapter slides and source links belong in `game/research.ts`, separate from jewelry lore. The public Kyiv 2026 talk is the current glucose slide source; do not treat its unpublished benchmark claims as verified results. Each of the six posters opens a multi-slide dialog (←/→ or on-screen buttons). Only verified public tools and research workflows count as achievements. Keep the pavilion out of `CIVIC_LANDMARKS`, preserve old save IDs (`glucose-livia`, `glucose-format`, `glucose-service`, `glucose-game`, `glucose-models`, `glucose-molecule`), and keep source dialogs keyboard/touch accessible. Do not invent clinical outcomes.
 - **Physics is a kinematic capsule, not a rigid body.** `Physics.step(x, z, dt)` applies
   horizontal intent plus its own gravity accumulation, then Rapier's character controller
   resolves the movement. Autostep, snap-to-ground, and slope limits are configured once in
@@ -176,10 +180,10 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   sampling, keeping every ribbon outside the glass. Continuous supporting ribs and rings
   reach the base; their returned geometry is also a world-space collider. Do not restore
   radial spokes through the inhabited glass hall. Preserve the extracted source JSON.
-- **Jewelry collections have permanent homes.** `data/catalogue/selection.json` contains reviewed source facts; `scripts/build-catalogue.mjs` generates `game/jewelry-catalogue.json` and local WebP derivatives using offline Sharp tooling. City Hall/Energy/Science/station have 8/8/9/7 physical works; the journal has 35. Keep one physical assignment per work. `planar-exhibition.ts` uses uncropped thumbnails, aspect-matched caption canvases and simple stand colliders; full images load only for inspection. `poster-layout.ts` keeps the central axes and entrances clear. Do not restore rotating cylinders, pedestal tables or lore lecterns. Source facts and artist descriptions stay separate from Livistone fiction; never invent missing catalogue data. Native in-hall controls remain hidden until keyboard focus; 1–4 give facts, collection, photo and place story. Failed photographs leave facts available.
+- **Jewelry collections have permanent homes.** `data/catalogue/selection.json` contains reviewed source facts; `scripts/build-catalogue.mjs` generates `game/jewelry-catalogue.json` and local WebP derivatives using offline Sharp tooling. City Hall/Energy/Science/station have 8/8/9/7 physical works; the journal has 35. Keep one physical assignment per work. `piece-stories.ts` overlays artist texts from https://livia.glucosedao.org/pieces and official Romanian Jewelry Week collection pages; do not invent a studio story when the public tab has none. Rotary Magnetic keeps the 2026 amber caption and does not mix the older tourmaline note. `planar-exhibition.ts` uses uncropped thumbnails, aspect-matched caption canvases and simple stand colliders; full images load only for inspection. `poster-layout.ts` keeps the central axes and entrances clear. Do not restore rotating cylinders, pedestal tables or lore lecterns. Source facts and artist descriptions stay separate from Livistone fiction. Native in-hall controls remain hidden until keyboard focus; 1–4 give facts, collection, photo and place story. Failed photographs leave facts available.
 - **All rail facilities belong to southern Embryo Station.** Keep one parked train and its platform at the placed station, with both main guideways at z = 79/85. There is no northern platform, duplicate train or garden rail loop. Preserve snapshot diagnostics (`zone: 'town'`, `journey: null`) and the save version. Garden access is by continuous walking paths.
 - **Terrain is continuous, not a flat town inside a mountain ring.** `terrain.ts` owns the shared river banks, lake depression, woodland foothills and asymmetrical elongated ridges. `mountains.ts` renders the whole ground with meadow/rock blending and actual tunnel apertures. The two-metre near grid agrees with the terrain collider. Grade railway approaches and far exits; reserve full tree canopies and taper planting naturally up slopes.
-- **Living Waters belongs to the town.** `living-waters-layout.ts` defines the lake at `(0, -110)`, asymmetrical water cells, 2.2 m nerve network and paths into the civic gardens. Use the shared `terrain.ts` ground and town Rapier world; never restore remote scene switching or a second terrain. Keep both pavilion entries, shallow-water escape and the dry Mycelium loop traversable in both quality tiers. Place mushrooms, reeds, lily pads and rain with seeded scatter and path clearance, not a modular lattice. The mushroom crowns use the actual Mycelium photographs: curled open silver folds around opal hearts, with branching stems, never fabric umbrellas. Reserve their full crown radius from paths. The pavilion borrows Dewdrop’s silhouette, whose original stone is topaz, not aquamarine. Rain/drainage respects reduced motion; audio remains opt-in. Physical-device performance remains release work.
+- **Living Waters belongs to the town.** `living-waters-layout.ts` defines the lake at `(0, -110)`, asymmetrical water cells, 2.2 m nerve network and paths into the civic gardens. Use the shared `terrain.ts` ground and town Rapier world; never restore remote scene switching or a second terrain. Keep both pavilion entries, shallow-water escape and the dry Mycelium loop traversable in both quality tiers. Place mushrooms, reeds, lily pads and rain with seeded scatter and path clearance, not a modular lattice. The mushroom crowns use the actual Mycelium photographs: curled open silver folds around opal hearts, with branching stems, never fabric umbrellas. Also instance a lower shrub-scale ring population. Reserve every crown’s full radius from paths. Vittoria and Dewdrop garden stands present both jewels (studio photo for Vittoria; drawn figure for Dewdrop, which has no local catalogue photograph). The pavilion borrows Dewdrop’s silhouette, whose original stone is topaz, not aquamarine. Rain/drainage respects reduced motion; audio remains opt-in. Physical-device performance remains release work.
 - **Photo clicking must not break looking.** A short scene press with no drag can raycast
   a planar photograph or caption. Activate on the native click after pointerup, so a
   synthesized touch click cannot hit a newly focused dialog button. Track its pointer independently from the joystick; cancelled gestures,
@@ -198,7 +202,8 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **View switching preserves the player; map destinations deliberately relocate them.**
   Top view / First person (M) and Start / Resume exploring preserve walking position and
   direction. Map labels and list entries use `Landmark.entrance` to arrive just outside
-  a clear entrance, facing inward, then enter walking mode. Keep these approaches aligned
+  a clear entrance, then enter walking mode. Embryo Station arrivals look toward the city
+  gate (yaw 0); other halls still face inward. Keep these approaches aligned
   with geometry and colliders. All destinations use the already loaded town scene and physics world. Keep the large
   Start exploring button visible above the map list on desktop and touch screens.
 - **Progress is local only.** `readProgress` / `writeProgress` use the
@@ -219,6 +224,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **No new runtime dependencies without a reason.** Runtime deps are Three.js and Rapier
   only; EZ-Tree is a dev-time asset generator. Prefer generating geometry over adding a
   library.
+- **Night follows the visitor’s local clock.** `daylight.ts` decides night from the local hour, or from an optional latitude without requesting GPS. `createSky` bakes the matching cubemap once. Do not add a location prompt or rebuild town meshes when switching light.
 - **Mobile is a first-class target, not a later port.** `Town` takes a `mobile` flag
   (coarse pointer, software GL, or a typical laptop iGPU — not a discrete card) and
   materials/foliage are already reduced for it. Walking hides far vegetation and thins

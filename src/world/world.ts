@@ -92,7 +92,13 @@ export class Town {
     createGateway(this.root, this.colliders, mobile, this.paving);
     for (const landmark of CIVIC_LANDMARKS) landmark.id === 'energy' ? this.createEnergyHall(landmark.x, landmark.z) : this.createLandmark(landmark.id, landmark.x, landmark.z);
     const arrival = new THREE.Group(), stationColliders: ColliderSpec[] = [], stationInteractions: Interactive[] = [];
-    stationInteractions.push({ id: 'embryo-station', ...createStation(arrival, stationColliders, mobile, this.paving) });
+    const station = createStation(arrival, stationColliders, mobile, this.paving);
+    stationInteractions.push({ id: 'embryo-station', object: station.object, position: station.position });
+    for (const panel of station.posters) {
+      panel.updateWorldMatrix(true, false);
+      stationInteractions.push({ id: panel.userData.discovery as string, object: panel, position: panel.getWorldPosition(new THREE.Vector3()) });
+    }
+    this.researchPanels.push(...station.posters);
     const gallery = new THREE.Group(); arrival.add(gallery);
     this.exhibitions.push(new PlanarExhibition('station', gallery, 0, 0, stationColliders, stationInteractions));
     arrival.rotation.y = Math.PI; arrival.position.x = -16; arrival.updateMatrix(); this.root.add(arrival);
@@ -101,9 +107,8 @@ export class Town {
     this.train = arrival.getObjectByName('Panoramic maglev')!;
     this.railway = createRailwayStructure(this.root, this.colliders, mobile);
     this.gardens = new LivingWaters(mobile); this.root.add(this.gardens.root);
-    this.gardens.addInterpretation('living-vittoria', 'Vittoria Lake', 'Silver nerves, shallow water eyes and a blue center. An imagined landscape from Livia’s silver and aquamarine pendant. The civic gardens continue along the southern paths.');
-    this.gardens.addInterpretation('living-dewdrop', 'Two stones, one pavilion', 'Vittoria supplies the aquamarine identity. Dewdrop supplies a faceted droplet and open silver embrace. Dewdrop’s real stone is treated Swiss blue topaz.');
-    this.gardens.addInterpretation('living-mycelium', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
+    this.gardens.presentLakeJewelry();
+    this.gardens.addInterpretation('living-mycelium', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
     this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.white, this.paving, this.gold, bridge);
     createTimeTower(this.root, this.colliders, this.mobile);

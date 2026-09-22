@@ -41,9 +41,10 @@ export class Physics {
     if (this.controller.computedGrounded()) this.verticalVelocity = -0.3;
   }
   position(): { x: number; y: number; z: number } { return this.body.translation(); }
-  teleport(position = SPAWN): void {
-    this.body.setTranslation(position, true);
-    this.body.setNextKinematicTranslation(position);
+  teleport(position: { x: number; y: number; z: number } = SPAWN): void {
+    const next = { x: position.x, y: position.y, z: position.z };
+    this.body.setTranslation(next, true);
+    this.body.setNextKinematicTranslation(next);
     this.verticalVelocity = 0;
   }
   dispose(): void { this.world.free(); }

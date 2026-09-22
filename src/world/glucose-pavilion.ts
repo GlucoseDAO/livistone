@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { ColliderSpec } from '../game/physics';
 import type { Interactive } from './world';
 import { RESEARCH_POSTERS } from '../game/research';
+import { drawResearchFigure } from '../game/research-art';
 import { GLUCOSE_PAVILION as SITE, GLUCOSE_POSTERS } from './glucose-layout';
 import insulin from './molecules/insulin.json';
 import glucose from './molecules/glucose.json';
@@ -85,16 +86,11 @@ function posterTexture(index: number): THREE.CanvasTexture {
   ctx.fillStyle = '#244f46'; ctx.fillRect(0, 0, 1000, 118); ctx.fillStyle = '#f8f2df'; ctx.font = '500 32px sans-serif'; ctx.fillText('GLUCOSE COMMONS', 60, 72);
   ctx.fillStyle = '#977246'; ctx.font = '24px sans-serif'; ctx.fillText(poster.category, 60, 176);
   ctx.fillStyle = '#23473f'; ctx.font = '54px Georgia, serif'; const end = wrapped(ctx, poster.title, 60, 253, 880, 65);
-  // Projection of the very same source chains serves as the exhibition's visual identity.
-  const top = end + 12;
-  insulin.chains.forEach((chain, i) => {
-    ctx.strokeStyle = i ? '#bd765f' : '#65948a'; ctx.lineWidth = 10; ctx.beginPath();
-    chain.residues.forEach((r, j) => { const x = 500 + (r.position[0] - center.x) * 15, y = top + 90 + (r.position[1] - center.y) * 9; if (j) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); ctx.stroke();
-  });
-  ctx.fillStyle = '#52655c'; ctx.font = '21px sans-serif'; ctx.fillText('INSULIN A + B  /  PDB 1TRZ', 60, top + 203);
-  ctx.fillStyle = '#304b44'; ctx.font = '30px sans-serif'; wrapped(ctx, poster.body, 60, top + 262, 880, 43);
-  ctx.fillStyle = '#d6cdb8'; ctx.fillRect(60, 1063, 880, 2); ctx.fillStyle = '#315a4f'; ctx.font = '28px sans-serif'; ctx.fillText('Read & open sources  ·  click / tap / E', 60, 1120);
-  ctx.font = '22px sans-serif'; ctx.fillText(index === 5 ? 'rcsb.org  /  1TRZ + GLC' : 'github.com/GlucoseDAO', 60, 1164);
+  drawResearchFigure(ctx, poster.slides[0].figure ?? 'trace', 60, end + 8, 880, 320);
+  ctx.fillStyle = '#304b44'; ctx.font = '28px sans-serif'; wrapped(ctx, poster.body, 60, end + 360, 880, 40);
+  ctx.fillStyle = '#d6cdb8'; ctx.fillRect(60, 1063, 880, 2); ctx.fillStyle = '#315a4f'; ctx.font = '28px sans-serif';
+  ctx.fillText(`${poster.slides.length} slides  ·  click / tap / E`, 60, 1120);
+  ctx.font = '22px sans-serif'; ctx.fillText(poster.category.startsWith('06') ? 'rcsb.org  /  1TRZ + GLC' : 'glucosedao.github.io', 60, 1164);
   const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 4; return texture;
 }
 export function createGlucosePavilion(root: THREE.Object3D, colliders: ColliderSpec[], mobile: boolean, paving: THREE.Material): { panels: THREE.Mesh[]; interactives: Interactive[] } {

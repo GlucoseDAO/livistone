@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
-import { createMaglevTrain } from './train';
+import { createMaglevTrain, createTrainCabinGraphics } from './train';
 import { RAILWAY_LOCAL as RAILWAY, STATION_LOCAL as STATION } from './station-layout';
 import { stationRingGeometry, stationRingAnchor } from './station-ring';
 import { stationAmberGeometry, stationAmberMaterial, stationAmberPoint, stationAmberSoffit } from './station-amber';
@@ -167,7 +167,7 @@ export function createStationStructure(root: THREE.Group, colliders: ColliderSpe
   return station;
 }
 
-export function createStation(root: THREE.Group, colliders: ColliderSpec[], mobile: boolean, paving: THREE.Material): { object: THREE.Object3D; position: THREE.Vector3 } {
+export function createStation(root: THREE.Group, colliders: ColliderSpec[], mobile: boolean, paving: THREE.Material): { object: THREE.Object3D; position: THREE.Vector3; posters: THREE.Mesh[] } {
   const station = createStationStructure(root, colliders, mobile, paving);
   const white = new THREE.MeshStandardMaterial({ color: '#ede9dc', roughness: .43 }), silver = new THREE.MeshStandardMaterial({ color: '#e1e8e8', metalness: .86, roughness: .21 });
   // Signs are world-space surfaces; the ordinary discovery input remains the only interaction.
@@ -192,5 +192,6 @@ export function createStation(root: THREE.Group, colliders: ColliderSpec[], mobi
   const story = sign(2.8, 1.3, 'NEW BEGINNINGS', 'The story of the Embryo Ring'); story.position.set(-8.5, 1.75, -66.3);
   const storyBack = box(-8.5, 1.75, -66.4, 3, 1.5, .16); add(station, storyBack, white, 'Station story panel'); solid(colliders, storyBack);
   for (const x of [-9.65, -7.35]) { const leg = box(x, .72, -66.4, .08, 1.1, .08); add(station, leg, silver, 'Story panel support'); solid(colliders, leg); }
-  return { object: story, position: story.position.clone() };
+  const posters = createTrainCabinGraphics(station.getObjectByName('Panoramic maglev') as THREE.Group);
+  return { object: story, position: story.position.clone(), posters };
 }

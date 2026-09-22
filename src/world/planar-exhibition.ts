@@ -23,9 +23,9 @@ function caption(piece: Exhibit, width: number): THREE.CanvasTexture {
   y = textLines(ctx, piece.materials, y, 25, '#445c4b');
   y = textLines(ctx, piece.dimensions, y, 24, '#445c4b');
   y = textLines(ctx, piece.collection ?? '', y + 8, 23, '#687461');
-  textLines(ctx, piece.description, y + 8, 25, '#445c4b');
+  textLines(ctx, piece.story ?? piece.description, y + 8, 25, '#445c4b');
   textLines(ctx, 'Livia Zaharia · studio photograph', canvas.height - 67, 23, '#687461');
-  textLines(ctx, 'Click photo to enlarge · E / tap for facts', canvas.height - 25, 23, '#25473b');
+  textLines(ctx, 'Click photo to enlarge · E / tap for the story', canvas.height - 25, 23, '#25473b');
   const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace; return map;
 }
 

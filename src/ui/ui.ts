@@ -3,6 +3,7 @@ import type { Exhibit } from '../game/exhibits';
 import { DISCOVERIES, LANDMARKS } from '../game/content';
 import { COLLECTION, CATALOGUE_URL, photoURL } from '../game/exhibits';
 import type { Progress, Discovery } from '../game/content';
+import { drawResearchFigure } from '../game/research-art';
 export type Mode = 'welcome' | 'walking' | 'map' | 'lore' | 'journal' | 'paused' | 'gallery';
 const icons: Record<string, string> = {
   map: '<path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5Z"/><path d="M9 3v16M15 5v16"/>',
@@ -28,6 +29,8 @@ export class UI {
   private readonly live: HTMLElement;
   private toastTimer = 0;
   private hasExplored = false;
+  private slide = 0;
+  private openDiscovery: Discovery | null = null;
   constructor(private action: (id: string) => void) {
     this.app = document.querySelector('#app')!;
     this.app.innerHTML = [
@@ -43,7 +46,7 @@ export class UI {
       '<div id="map-controls" class="map-controls" hidden><button class="tool square" data-action="zoom-in" aria-label="Zoom map in">+</button><button class="tool square" data-action="zoom-out" aria-label="Zoom map out">−</button><button class="tool square" data-action="reset-map" aria-label="Reset map view">' + icon('compass') + '</button><span>Drag to orbit · Pinch or scroll to zoom</span></div>',
       '<div id="map-markers" hidden>' + LANDMARKS.map((l, i) => '<button class="map-marker" id="marker-' + l.id + '" data-action="landmark:' + l.id + '" aria-label="Go to ' + l.name + '"><span>0' + (i + 1) + '</span><b>' + l.name + '</b></button>').join('') + '<div id="player-marker" class="player-marker"><span></span>You are here</div></div>',
       '<div id="scrim" class="scrim" data-action="close" aria-hidden="true" hidden></div>',
-      '<section id="lore" class="dialog lore" role="dialog" aria-labelledby="lore-title" hidden><button class="close-button" data-action="close" aria-label="Close discovery">' + icon('close') + '</button><div class="eyebrow" id="lore-category"></div><div id="lore-emblem" class="lore-emblem">✧</div><h2 id="lore-title"></h2><div id="exhibit-catalogue" hidden></div><p id="lore-body"></p><div class="lore-source">From Livia’s artifacts to a living town.</div><button class="text-button full" data-action="close">Continue exploring ' + icon('arrow') + '</button></section>',
+      '<section id="lore" class="dialog lore" role="dialog" aria-labelledby="lore-title" hidden><button class="close-button" data-action="close" aria-label="Close discovery">' + icon('close') + '</button><div class="eyebrow" id="lore-category"></div><div id="lore-emblem" class="lore-emblem">✧</div><h2 id="lore-title"></h2><figure id="lore-figure" class="lore-figure" hidden><canvas id="lore-figure-canvas" width="720" height="280"></canvas></figure><div id="lore-slides" hidden><p id="lore-slide-title"></p><p id="lore-slide-body"></p><div class="slide-controls" aria-label="Chapter slides"><button data-action="slide-prev" aria-label="Previous slide">←</button><span id="lore-slide-count" aria-live="polite"></span><button data-action="slide-next" aria-label="Next slide">→</button></div><p class="viewer-help">← / → slides · Esc close</p></div><div id="exhibit-catalogue" hidden></div><p id="lore-body"></p><div class="lore-source">From Livia’s artifacts to a living town.</div><button class="text-button full" data-action="close">Continue exploring ' + icon('arrow') + '</button></section>',
       '<section id="journal" class="dialog journal" role="dialog" aria-labelledby="journal-title" hidden><button class="close-button" data-action="close" aria-label="Close journal">' + icon('close') + '</button><div class="eyebrow">YOUR FIELD NOTES</div><h2 id="journal-title">A little more wonder.</h2><p>Browse every story and photograph. Read in any order, or find them as you walk.</p><button class="primary full" data-action="catalogue">Browse the jewelry catalogue</button><div id="journal-list"></div></section>',
       '<section id="pause" class="dialog pause" role="dialog" aria-labelledby="pause-title" hidden><button class="close-button" data-action="close" aria-label="Close menu">' + icon('close') + '</button><div class="eyebrow">MAKE YOURSELF AT HOME</div><h2 id="pause-title">A moment of quiet.</h2><button class="primary full" data-action="close">Continue exploring ' + icon('arrow') + '</button><button class="menu-item" data-action="open-map">' + icon('map') + 'Open city map</button><button class="menu-item" data-action="reset-position">' + icon('compass') + 'Return to the river entrance</button><button class="menu-item" id="sound-toggle" data-action="sound" aria-pressed="false">' + icon('sound') + 'Ambient sound: off</button><label class="quality-label">Visual detail<select id="quality"><option value="low">Gentle — lower detail</option><option value="high">Rich — higher detail</option></select></label><p class="menu-note">Move forward/back with W/S or ↑/↓. Strafe with A/D. Turn with ←/→, or hold the left mouse button and drag to look. On touch screens, use the left stick and drag to look. Your discoveries are saved on this device.</p></section>',
       '<div id="toast" class="toast" role="status" hidden></div><div id="live" class="sr-only" aria-live="polite"></div>',
@@ -58,6 +61,8 @@ export class UI {
     });
     this.app.querySelector('#quality')!.addEventListener('change', (e) => action('quality:' + (e.target as HTMLSelectElement).value));
     document.addEventListener('keydown', (e) => {
+      const loreOpen = !this.app.querySelector<HTMLElement>('#lore')!.hidden && (this.openDiscovery?.slides?.length ?? 0) > 1;
+      if (loreOpen && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); e.stopPropagation(); this.action(e.key === 'ArrowRight' ? 'slide-next' : 'slide-prev'); return; }
       if (e.key !== 'Tab') return;
       const dialog = this.app.querySelector<HTMLElement>('.dialog:not([hidden])');
       if (!dialog) return;
@@ -114,16 +119,19 @@ export class UI {
     });
   }
   showLore(discovery: Discovery, selected?: Exhibit): void {
-    this.app.querySelector('#lore-category')!.textContent = discovery.category;
-    this.app.querySelector('#lore-title')!.textContent = discovery.title;
-    this.app.querySelector('#lore-body')!.textContent = discovery.body;
-    const catalogue = this.app.querySelector<HTMLElement>('#exhibit-catalogue')!, exhibit = selected ?? COLLECTION.find((e) => e.discovery === discovery.id);
-    const changed = !!exhibit && !['nut', 'mitoring', 'nanot'].includes(discovery.id);
-    this.app.querySelector('#lore-title')!.textContent = changed ? exhibit.title : discovery.title;
-    this.app.querySelector('#lore-category')!.textContent = changed ? 'IN THE JEWELRY GALLERY' : discovery.category;
-    this.app.querySelector<HTMLElement>('#lore-body')!.hidden = changed;
-    const attribution = this.app.querySelector<HTMLElement>('.lore-source')!; attribution.hidden = changed;
-    attribution.textContent = discovery.links ? 'Public project sources · reviewed September 2026. Architecture is Livistone fiction.' : 'From Livia’s artifacts to a living town.';
+    this.openDiscovery = discovery; this.slide = 0;
+    const exhibit = selected ?? COLLECTION.find((e) => e.discovery === discovery.id);
+    const jewelry = !!exhibit && !discovery.slides;
+    const civic = !!exhibit && ['nut', 'mitoring', 'nanot'].includes(discovery.id);
+    this.app.querySelector('#lore-title')!.textContent = jewelry ? exhibit.title : discovery.title;
+    this.app.querySelector('#lore-category')!.textContent = jewelry ? (exhibit.collection ?? 'IN THE JEWELRY GALLERY') : discovery.category;
+    this.app.querySelector<HTMLElement>('#lore-emblem')!.hidden = !!discovery.slides;
+    this.app.querySelector<HTMLElement>('#lore-body')!.hidden = jewelry && !civic;
+    this.app.querySelector('#lore-body')!.textContent = civic ? discovery.body : discovery.body;
+    const attribution = this.app.querySelector<HTMLElement>('.lore-source')!;
+    attribution.hidden = jewelry && !civic;
+    attribution.textContent = discovery.links ? 'Public project sources · reviewed September 2026. Glucose chapters follow the public Kyiv 2026 slides and repositories. Architecture is Livistone fiction.' : 'Artist stories from Livia’s public catalogue; Livistone fiction is labelled separately.';
+    const catalogue = this.app.querySelector<HTMLElement>('#exhibit-catalogue')!;
     catalogue.replaceChildren(); catalogue.hidden = !exhibit;
     if (exhibit) {
       const gallery = document.createElement('div'); gallery.className = 'exhibit-photos';
@@ -134,21 +142,40 @@ export class UI {
         const open = document.createElement('button'); open.className = 'photo-open'; open.dataset.action = `exhibit-photo:${exhibit.discovery}:${index}`; open.setAttribute('aria-label', 'Enlarge photograph ' + (index + 1)); open.append(image);
         figure.append(open, caption); gallery.append(figure);
       }
-      const heading = document.createElement('h3'); heading.textContent = 'The original jewelry';
-      const description = document.createElement('p'); description.textContent = exhibit.description;
+      const heading = document.createElement('h3'); heading.textContent = 'The story of this piece';
+      const description = document.createElement('p'); description.textContent = exhibit.story ?? exhibit.description;
       const table = document.createElement('table'); table.className = 'exhibit-facts'; table.setAttribute('aria-label', exhibit.title + ' catalogue information');
       for (const [key, value] of [['Artist', 'Livia Zaharia'], ['Object', exhibit.type], ['Materials', exhibit.materials], ['Dimensions', exhibit.dimensions], ['Year', exhibit.year]]) {
         const row = table.insertRow(), th = document.createElement('th'); th.scope = 'row'; th.textContent = key; row.append(th); row.insertCell().textContent = value;
       }
-      const source = document.createElement('a'); source.href = CATALOGUE_URL; source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = 'View Livia’s jewelry catalogue ↗';
+      const source = document.createElement('a'); source.href = exhibit.source ?? CATALOGUE_URL; source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = 'Read this work on Livia’s website ↗';
       const loreHeading = document.createElement('h3'); loreHeading.textContent = 'Livia Lore & Livistone fiction';
-      catalogue.append(gallery, heading, description, table, source); if (!changed) catalogue.append(loreHeading);
+      catalogue.append(gallery, heading, description, table, source); if (civic) catalogue.append(loreHeading);
     }
     let sources = this.app.querySelector<HTMLElement>('#research-sources');
     if (!sources) { sources = document.createElement('div'); sources.id = 'research-sources'; sources.className = 'research-sources'; attribution.before(sources); }
     sources.replaceChildren(); sources.hidden = !discovery.links;
     for (const link of discovery.links ?? []) { const anchor = document.createElement('a'); anchor.href = link.url; anchor.textContent = link.label + ' ↗'; anchor.target = '_blank'; anchor.rel = 'noopener noreferrer'; sources.append(anchor); }
+    this.renderSlide();
     this.live.textContent = 'Discovered: ' + discovery.title;
+  }
+  turnSlide(step: number): void {
+    const slides = this.openDiscovery?.slides; if (!slides?.length) return;
+    this.slide = (this.slide + step + slides.length) % slides.length; this.renderSlide();
+  }
+  private renderSlide(): void {
+    const slides = this.openDiscovery?.slides ?? [], pane = this.app.querySelector<HTMLElement>('#lore-slides')!, figure = this.app.querySelector<HTMLElement>('#lore-figure')!;
+    pane.hidden = slides.length === 0; figure.hidden = slides.length === 0;
+    if (!slides.length) return;
+    const slide = slides[this.slide];
+    this.app.querySelector('#lore-slide-title')!.textContent = slide.title;
+    this.app.querySelector('#lore-slide-body')!.textContent = slide.body;
+    this.app.querySelector('#lore-slide-count')!.textContent = `${this.slide + 1} / ${slides.length}`;
+    this.app.querySelector<HTMLElement>('#lore-body')!.hidden = true;
+    const canvas = this.app.querySelector<HTMLCanvasElement>('#lore-figure-canvas')!, ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (slide.figure) drawResearchFigure(ctx, slide.figure, 0, 0, canvas.width, canvas.height);
+    else { figure.hidden = true; }
   }
 
   setLocation(name: string): void { if (this.location.textContent !== name) this.location.textContent = name; }

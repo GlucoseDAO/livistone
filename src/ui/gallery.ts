@@ -100,7 +100,7 @@ export class GalleryUI {
   private renderPhoto(): void {
     const photo = this.exhibit.photos[this.index]; this.zoom = 1; this.pan = { x: 0, y: 0 }; this.pointers.clear();
     this.dialog.querySelector('#gallery-title')!.textContent = this.exhibit.title;
-    this.dialog.querySelector('#viewer-facts')!.textContent = `${this.exhibit.type} · ${this.exhibit.year} · ${this.exhibit.materials} · ${this.exhibit.dimensions}. ${this.exhibit.description}`;
+    this.dialog.querySelector('#viewer-facts')!.textContent = `${this.exhibit.type} · ${this.exhibit.year} · ${this.exhibit.materials} · ${this.exhibit.dimensions}. ${this.exhibit.story ?? this.exhibit.description}`;
     this.dialog.querySelector<HTMLAnchorElement>('#viewer-source')!.href = this.exhibit.source ?? CATALOGUE_URL;
     this.image.alt = photo.alt; this.image.src = photoURL(photo.file); this.image.hidden = false; this.dialog.querySelector<HTMLElement>('#photo-error')!.hidden = true;
     this.dialog.querySelector('#photo-count')!.textContent = `${this.index + 1} / ${this.exhibit.photos.length}`;

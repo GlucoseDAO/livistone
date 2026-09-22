@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { createMaglevTrain } from '../src/world/train';
-import { STATION_LOCAL as STATION } from '../src/world/station-layout';
+import { createMaglevTrain, TRAIN_ANNOUNCEMENTS } from '../src/world/train';
+import { STATION_LOCAL as STATION, stationPoint } from '../src/world/station-layout';
 import { Physics } from '../src/game/physics';
 import type { ColliderSpec } from '../src/game/physics';
 
@@ -25,5 +25,22 @@ for (const mobile of [false, true]) describe(`Panoramic maglev (${mobile ? 'mobi
       physics.dispose(); const materials = new Set<THREE.Material>();
       root.traverse((object) => { if (object instanceof THREE.Mesh) { object.geometry.dispose(); materials.add(object.material as THREE.Material); } }); materials.forEach((m) => m.dispose());
     }
+  });
+});
+
+describe('train cabin announcements', () => {
+  it('faces the boarding bays with science toward local −X and art toward local +X', () => {
+    expect(TRAIN_ANNOUNCEMENTS.map((board) => board.id)).toEqual(expect.arrayContaining(['train-science', 'train-future', 'train-art']));
+    for (const board of TRAIN_ANNOUNCEMENTS) {
+      expect(board.yaw).toBe(0);
+      expect(board.y).toBeGreaterThan(1.4);
+      expect(board.z).toBeGreaterThan(STATION.trackZ - .4);
+      expect(board.z).toBeLessThan(STATION.trackZ);
+    }
+    const science = TRAIN_ANNOUNCEMENTS.filter((board) => board.id === 'train-science');
+    const art = TRAIN_ANNOUNCEMENTS.filter((board) => board.id === 'train-art');
+    expect(science.every((board) => art.some((other) => other.x > board.x && Math.abs(other.z - board.z) < .01))).toBe(true);
+    const world = stationPoint(science[0].x, science[0].z);
+    expect(world.z).toBeCloseTo(79.32, 1);
   });
 });

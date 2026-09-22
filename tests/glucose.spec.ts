@@ -18,6 +18,14 @@ for (const mobile of [false, true]) test(`Glucose Commons posters, sources, map 
       if (!mobile && i === 0) await page.screenshot({ path: 'output/testing/glucose/poster.png' });
       if (mobile) await page.locator('#interact').tap(); else if (i === 1) await page.mouse.click(640, 400); else await page.keyboard.press('KeyE');
       await expect(page.locator('#lore-title')).toHaveText(RESEARCH_POSTERS[i].title);
+      await expect(page.locator('#lore-slides')).toBeVisible();
+      await expect(page.locator('#lore-slide-count')).toHaveText(`1 / ${RESEARCH_POSTERS[i].slides.length}`);
+      await expect(page.locator('#lore-slide-title')).toHaveText(RESEARCH_POSTERS[i].slides[0].title);
+      if (RESEARCH_POSTERS[i].slides.length > 1) {
+        await page.getByRole('button', { name: 'Next slide' }).click();
+        await expect(page.locator('#lore-slide-count')).toHaveText(`2 / ${RESEARCH_POSTERS[i].slides.length}`);
+        await expect(page.locator('#lore-slide-title')).toHaveText(RESEARCH_POSTERS[i].slides[1].title);
+      }
       for (const link of RESEARCH_POSTERS[i].links!) { const anchor = page.locator('#research-sources').getByRole('link', { name: link.label }); await expect(anchor).toHaveAttribute('href', link.url); await expect(anchor).toHaveAttribute('rel', 'noopener noreferrer'); }
       expect(await page.locator('#lore').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
       if (i === 0) { await page.waitForTimeout(550); await page.screenshot({ path: `output/testing/glucose/sources-${mobile ? 'mobile' : 'desktop'}.png` }); }

@@ -13,6 +13,7 @@ import { Input } from './game/input';
 import { Ambience } from './game/audio';
 import { LANDMARKS, DISCOVERIES, SPAWN, readProgress, writeProgress } from './game/content';
 import { probeGraphics } from './game/graphics';
+import { isNightNow } from './game/daylight';
 import type { Physics } from './game/physics';
 
 const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 };
@@ -34,6 +35,8 @@ class Game {
   private readonly point = new THREE.Vector3();
   private readonly graphics: { reduced: boolean; coarse: boolean; software: boolean };
   private readonly reduced: boolean;
+  private readonly night: boolean;
+  private readonly hemi: THREE.HemisphereLight;
   private physics?: Physics;
   private readonly zone = 'town';
 
@@ -57,19 +60,22 @@ class Game {
     this.renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: !coarse, powerPreference: 'high-performance' });
     this.graphics = probeGraphics(this.renderer.getContext() as WebGL2RenderingContext);
     this.reduced = this.graphics.reduced; this.lowQuality = this.reduced;
+    this.night = isNightNow();
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.reduced ? 1 : 1.5));
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 0.96;
-    this.scene.fog = new THREE.Fog('#c3d8df', MAP_FOG.near, MAP_FOG.far);
-    this.scene.add(new THREE.HemisphereLight('#e9f4f0', '#73805c', 1.2));
-    this.sun = new THREE.DirectionalLight('#fff0ce', 2.4); this.sun.castShadow = true;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = this.night ? 0.58 : 0.96;
+    const haze = this.night ? '#1a2433' : '#c3d8df';
+    this.scene.fog = new THREE.Fog(haze, MAP_FOG.near, MAP_FOG.far);
+    this.hemi = new THREE.HemisphereLight(this.night ? '#8ea4c6' : '#e9f4f0', this.night ? '#121820' : '#73805c', this.night ? 0.4 : 1.2);
+    this.scene.add(this.hemi);
+    this.sun = new THREE.DirectionalLight(this.night ? '#c9d6ee' : '#fff0ce', this.night ? 0.5 : 2.4); this.sun.castShadow = true;
     this.sun.shadow.mapSize.setScalar(this.reduced ? 1024 : 2048);
     const shadow = this.reduced ? 90 : 160;
     this.sun.shadow.camera.left = -shadow; this.sun.shadow.camera.right = shadow; this.sun.shadow.camera.top = shadow; this.sun.shadow.camera.bottom = shadow;
     this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = 360; this.sun.shadow.normalBias = 0.035; this.sun.shadow.bias = -0.00015;
-    this.sun.position.set(-55, 150, 40); this.sun.target.position.set(0, 0, -60); this.scene.add(this.sun, this.sun.target);
-    const sky = createSky(this.renderer, this.reduced); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = sky.environment;
-    this.scene.environmentIntensity = 0.5;
+    this.sun.position.set(this.night ? 40 : -55, this.night ? 90 : 150, this.night ? -50 : 40); this.sun.target.position.set(0, 0, -60); this.scene.add(this.sun, this.sun.target);
+    const sky = createSky(this.renderer, this.reduced, this.night); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = sky.environment;
+    this.scene.environmentIntensity = this.night ? 0.2 : 0.5;
     this.town = new Town(this.reduced); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
     // The town and sun are static; refresh shadows only when scene visibility changes.
     this.renderer.shadowMap.autoUpdate = false; this.renderer.shadowMap.needsUpdate = true;
@@ -125,9 +131,10 @@ class Game {
   private setMode(mode: Mode): void {
     this.mode = mode; this.interaction = null; this.input.active = mode === 'walking'; this.input.clear(); this.accumulator = 0;
     this.orbit.enabled = mode === 'map';
-    this.scene.background = this.mapView ? new THREE.Color('#c3d8df') : this.skyBackground;
+    const haze = this.night ? '#1a2433' : '#c3d8df';
+    this.scene.background = this.mapView ? new THREE.Color(haze) : this.skyBackground;
     const fog = this.mapView ? MAP_FOG : WALK_FOG;
-    this.scene.fog = new THREE.Fog('#c3d8df', fog.near, fog.far);
+    this.scene.fog = new THREE.Fog(haze, fog.near, fog.far);
     this.ui.setMode(mode, this.mapView); this.town.setMapMode(this.mapView); this.renderer.shadowMap.needsUpdate = true; this.resize();
     if (mode === 'walking') this.ui.canvas.focus({ preventScroll: true });
   }
@@ -176,8 +183,10 @@ class Game {
     else if (action === 'zoom-in' || action === 'zoom-out') {
       const offset = this.mapCamera.position.clone().sub(this.orbit.target); const distance = THREE.MathUtils.clamp(offset.length() * (action === 'zoom-in' ? 0.82 : 1.2), 30, 410);
       this.mapCamera.position.copy(this.orbit.target).add(offset.setLength(distance)); this.orbit.update();
+    } else if (action === 'slide-prev' || action === 'slide-next') {
+      if (this.mode === 'lore') this.ui.turnSlide(action === 'slide-next' ? 1 : -1);
     } else if (action === 'reset-position') {
-      this.physics.teleport(); this.input.yaw = 0; this.input.pitch = 0; this.returnMode = 'walking'; this.setMode('walking');  this.ui.toast('Back at the station exit, facing Livistone.');
+      this.physics.teleport(); this.input.yaw = SPAWN.yaw; this.input.pitch = 0; this.returnMode = 'walking'; this.setMode('walking');  this.ui.toast('Back at the station exit, facing the city gate.');
     } else if (action === 'sound') {
       try { this.ui.setSound(await this.ambience.toggle()); } catch { this.ui.toast('Sound is unavailable in this browser.'); }
     } else if (action.startsWith('quality:')) this.quality(action.split(':')[1] === 'low');
@@ -212,8 +221,12 @@ class Game {
     this.raycaster.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, 1 - y / innerHeight * 2), this.walkCamera); this.raycaster.far = 9;
     const hit = this.raycaster.intersectObjects([...this.town.researchPanels, ...this.town.exhibitions.flatMap((e) => [...e.photos, ...e.textSurfaces])], false)[0]; if (!hit) return;
     const wall = this.raycaster.intersectObjects(this.town.occluders, false)[0]; if (wall && wall.distance < hit.distance) return;
+    const piece = COLLECTION.find((p) => p.discovery === hit.object.userData.piece);
+    if (piece && !hit.object.userData.posterInfo && hit.object.userData.kind !== 'caption') {
+      this.galleryReturn = 'walking'; this.ui.gallery.showPhoto(piece, hit.object.userData.photoIndex as number ?? 0); this.setMode('gallery'); return;
+    }
     if (hit.object.userData.discovery) { this.discover(hit.object.userData.discovery as string); return; }
-    const piece = COLLECTION.find((p) => p.discovery === hit.object.userData.piece); if (!piece) return;
+    if (!piece) return;
     if (hit.object.userData.posterInfo) { this.discover(piece.discovery); return; }
     this.galleryReturn = 'walking'; this.ui.gallery.showPhoto(piece, hit.object.userData.photoIndex as number); this.setMode('gallery');
   }
@@ -251,7 +264,7 @@ class Game {
     }
     const pos = this.physics.position();
     const b = TOWN_BOUNDS;
-    if (pos.y < -.5 || ((pos.x < b.minX || pos.x > b.maxX || pos.z < b.minZ || pos.z > b.maxZ) && !railwayCorridor(pos.x, pos.z))) { this.physics.teleport(SPAWN); this.ui.toast('Back on the station garden path.'); }
+    if (pos.y < -.5 || ((pos.x < b.minX || pos.x > b.maxX || pos.z < b.minZ || pos.z > b.maxZ) && !railwayCorridor(pos.x, pos.z))) { this.physics.teleport(SPAWN); this.input.yaw = SPAWN.yaw; this.ui.toast('Back on the station garden path.'); }
     this.ambience.setGarden(pos.z < -60);
 
     const current = this.physics.position(); this.walkCamera.position.set(current.x, current.y + 0.78, current.z); this.walkCamera.rotation.set(this.input.pitch, this.input.yaw, 0, 'YXZ');
