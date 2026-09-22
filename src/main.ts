@@ -12,13 +12,16 @@ import type { Mode } from './ui/ui';
 import { Input } from './game/input';
 import { Ambience } from './game/audio';
 import { LANDMARKS, DISCOVERIES, SPAWN, readProgress, writeProgress } from './game/content';
+import { probeGraphics } from './game/graphics';
 import type { Physics } from './game/physics';
+
+const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 };
 
 class Game {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly skyBackground: THREE.CubeTexture;
-  private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, 700);
+  private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, 150);
   private readonly mapCamera = new THREE.PerspectiveCamera(44, 1, 0.2, 800);
   private readonly orbit: OrbitControls;
   private readonly town: Town;
@@ -29,7 +32,8 @@ class Game {
   private readonly raycaster = new THREE.Raycaster();
   private readonly direction = new THREE.Vector3();
   private readonly point = new THREE.Vector3();
-  private readonly coarse = matchMedia('(pointer: coarse)').matches;
+  private readonly graphics: { reduced: boolean; coarse: boolean; software: boolean };
+  private readonly reduced: boolean;
   private physics?: Physics;
   private readonly zone = 'town';
 
@@ -46,23 +50,27 @@ class Game {
   private fpsTime = 0;
   private fps = 0;
   private frameId = 0;
-  private lowQuality = this.coarse;
+  private lowQuality = false;
   private selection: string | null = null;
   constructor(private ui: UI) {
-    this.renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: !this.coarse, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.coarse ? 1 : 1.5));
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    this.renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: !coarse, powerPreference: 'high-performance' });
+    this.graphics = probeGraphics(this.renderer.getContext() as WebGL2RenderingContext);
+    this.reduced = this.graphics.reduced; this.lowQuality = this.reduced;
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.reduced ? 1 : 1.5));
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 0.96;
-    this.scene.fog = new THREE.Fog('#c3d8df', 240, 630);
+    this.scene.fog = new THREE.Fog('#c3d8df', MAP_FOG.near, MAP_FOG.far);
     this.scene.add(new THREE.HemisphereLight('#e9f4f0', '#73805c', 1.2));
     this.sun = new THREE.DirectionalLight('#fff0ce', 2.4); this.sun.castShadow = true;
-    this.sun.shadow.mapSize.setScalar(this.coarse ? 1024 : 2048);
-    this.sun.shadow.camera.left = -160; this.sun.shadow.camera.right = 160; this.sun.shadow.camera.top = 160; this.sun.shadow.camera.bottom = -160;
+    this.sun.shadow.mapSize.setScalar(this.reduced ? 1024 : 2048);
+    const shadow = this.reduced ? 90 : 160;
+    this.sun.shadow.camera.left = -shadow; this.sun.shadow.camera.right = shadow; this.sun.shadow.camera.top = shadow; this.sun.shadow.camera.bottom = shadow;
     this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = 360; this.sun.shadow.normalBias = 0.035; this.sun.shadow.bias = -0.00015;
     this.sun.position.set(-55, 150, 40); this.sun.target.position.set(0, 0, -60); this.scene.add(this.sun, this.sun.target);
-    const sky = createSky(this.renderer, this.coarse); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = sky.environment;
+    const sky = createSky(this.renderer, this.reduced); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = sky.environment;
     this.scene.environmentIntensity = 0.5;
-    this.town = new Town(this.coarse); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
+    this.town = new Town(this.reduced); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
     // The town and sun are static; refresh shadows only when scene visibility changes.
     this.renderer.shadowMap.autoUpdate = false; this.renderer.shadowMap.needsUpdate = true;
     this.mapCamera.position.set(62, 44, 69); this.mapCamera.lookAt(0, 2, -13);
@@ -72,7 +80,7 @@ class Game {
     this.input = new Input(ui.canvas, ui.joystick, (action) => void this.action(action));
     ui.setLookHint('Hold left mouse to look');
     ui.progress(this.progress); ui.setMode('welcome');
-    document.querySelector<HTMLSelectElement>('#quality')!.value = this.coarse ? 'low' : 'high';
+    document.querySelector<HTMLSelectElement>('#quality')!.value = this.reduced ? 'low' : 'high';
     window.addEventListener('resize', () => this.resize());
     document.addEventListener('visibilitychange', () => {
       this.lastTime = performance.now(); this.accumulator = 0;
@@ -86,7 +94,7 @@ class Game {
     this.resize(); this.frameId = requestAnimationFrame(this.frame);
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: !!this.physics, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection }),
+        snapshot: () => ({ ready: !!this.physics, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced }),
         teleport: (x: number, z: number, yaw = 0) => { this.physics?.teleport({ x, y: 1.05, z }); this.input.yaw = yaw; this.input.pitch = 0; this.accumulator = 0; },
       } });
     }
@@ -96,6 +104,7 @@ class Game {
     const { Physics } = await import('./game/physics');
     this.physics = await Physics.create(this.town.colliders);
     await assets;
+    this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true);
     this.renderer.shadowMap.needsUpdate = true;
     this.ui.ready(); this.returnMode = 'map'; this.resetMap(); this.setMode('map');
   }
@@ -117,6 +126,8 @@ class Game {
     this.mode = mode; this.interaction = null; this.input.active = mode === 'walking'; this.input.clear(); this.accumulator = 0;
     this.orbit.enabled = mode === 'map';
     this.scene.background = this.mapView ? new THREE.Color('#c3d8df') : this.skyBackground;
+    const fog = this.mapView ? MAP_FOG : WALK_FOG;
+    this.scene.fog = new THREE.Fog('#c3d8df', fog.near, fog.far);
     this.ui.setMode(mode, this.mapView); this.town.setMapMode(this.mapView); this.renderer.shadowMap.needsUpdate = true; this.resize();
     if (mode === 'walking') this.ui.canvas.focus({ preventScroll: true });
   }
@@ -301,9 +312,9 @@ class Game {
     if (this.mode === 'walking') this.updateWalking(dt);
     this.town.gardens.update(this.elapsed, this.mode === 'walking' ? dt : 0, matchMedia('(prefers-reduced-motion: reduce)').matches);
     if (this.mode === 'map') { this.orbit.update(); this.updateMarkers(); }
-    this.town.update(this.elapsed);
-    this.updateExhibitionControls();
     const camera = this.mapView ? this.mapCamera : this.walkCamera;
+    this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : WALK_FOG.far, this.mapView);
+    this.updateExhibitionControls();
     this.renderer.render(this.scene, camera);
     this.fpsFrames++; this.fpsTime += rawDt;
     if (this.fpsTime >= 1) { this.fps = Math.round(this.fpsFrames / this.fpsTime); this.fpsFrames = 0; this.fpsTime = 0; }
@@ -316,5 +327,6 @@ try {
   game.load().catch((error: unknown) => { console.error('Town initialization failed', error); ui.error('The town could not finish loading. Check your connection and try again.'); });
 } catch (error) {
   console.error('Graphics initialization failed', error);
-  ui.error('Livistone needs a browser with WebGL 2 graphics enabled. Try an updated browser with hardware acceleration, then reload.');
+  const detail = error instanceof Error && error.message ? ' ' + error.message : '';
+  ui.error('Livistone needs a browser with WebGL 2 graphics enabled. Try an updated browser with hardware acceleration, then reload.' + detail);
 }

@@ -1,5 +1,5 @@
 // Screenshots each civic building from outside and inside for visual review.
-// Needs the dev server (bun run dev) and Google Chrome; uses the GPU when one is available.
+// Needs the dev server (bun run dev) and Google Chrome; uses the GPU when one is available (D3D11 on Windows).
 // Usage: node scripts/screenshot-landmarks.mjs [outDir]   (default output/testing/landmarks)
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -20,8 +20,10 @@ const views = [
   ['station-arrival', 0, 58, 0],
   ['catalogue-poster', 2.51, -18.21, -2.409],
 ];
-const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', '--headless=new', '--use-gl=angle', '--use-angle=gl', '--ignore-gpu-blocklist'] });
+const gpu = process.platform === 'win32' ? ['--use-angle=d3d11', '--ignore-gpu-blocklist'] : ['--use-gl=angle', '--use-angle=gl', '--ignore-gpu-blocklist'];
+const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', '--headless=new', ...gpu] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+page.setDefaultNavigationTimeout(90000); page.setDefaultTimeout(90000);
 page.on('pageerror', (e) => console.error('page error:', e.message));
 await page.goto('http://127.0.0.1:5173');
 await page.waitForFunction(() => window.__livistone?.snapshot().ready, null, { timeout: 60000 });

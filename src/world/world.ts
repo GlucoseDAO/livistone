@@ -6,7 +6,7 @@ import { Forest } from './forest';
 import { createBridge, createGardenBridge } from './bridge';
 import { createGateway } from './gateway';
 import { gatewayClearing } from './gateway-layout';
-import { createPlanting } from './planting';
+import { createPlanting, updatePlanting } from './planting';
 import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from './landscape';
 import { Mountains } from './mountains';
 import { PlanarExhibition } from './planar-exhibition';
@@ -335,6 +335,11 @@ export class Town {
       const globe = mesh(this.sphere, new THREE.MeshStandardMaterial({ color: '#f3e8c9', emissive: '#e4c881', emissiveIntensity: 0.35, roughness: 0.6 }), this.root, x, 2.8, z); globe.scale.setScalar(0.23); pole.castShadow = false;
     }
   }
-  update(time: number): void { this.water.userData.time.value = time; }
+  update(time: number, camera?: THREE.Camera, fogFar = 220, mapView = false): void {
+    this.water.userData.time.value = time;
+    if (!camera) return;
+    this.forest.update(camera, fogFar, mapView);
+    updatePlanting([this.root, this.details], camera, mapView ? 200 : 38);
+  }
   setMapMode(active: boolean): void { this.interiors.visible = !active; this.details.visible = !active; }
 }

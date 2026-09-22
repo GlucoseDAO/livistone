@@ -91,7 +91,11 @@ function batches(parent: THREE.Group, name: string, sites: Site[], geometry: THR
       matrix.compose(new THREE.Vector3(s.x, s.y, s.z), q.setFromAxisAngle(UP, s.angle), new THREE.Vector3(s.scale, s.scale, s.scale)); batch.setMatrixAt(i, matrix);
       color.setHSL(.15, .08, .75 + (i % 5) * .035); batch.setColorAt(i, color);
     });
-    batch.castShadow = shadow; batch.receiveShadow = true; batch.computeBoundingSphere(); parent.add(batch);
+    batch.castShadow = shadow; batch.receiveShadow = true; batch.computeBoundingSphere();
+    batch.userData.plantLod = true;
+    batch.userData.lodX = cell.reduce((sum, s) => sum + s.x, 0) / cell.length;
+    batch.userData.lodZ = cell.reduce((sum, s) => sum + s.z, 0) / cell.length;
+    parent.add(batch);
   }
 }
 
@@ -149,4 +153,12 @@ export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: 
     grass.push({ x, y: height(x, z) + .012, z, scale, angle: rand() * TAU });
   }
   batches(details, 'Meadow grass', grass, grassGeometry(mobile), material, false);
+}
+
+export function updatePlanting(groups: THREE.Object3D[], camera: THREE.Camera, range: number): void {
+  const origin = camera.position;
+  for (const group of groups) group.traverse((object) => {
+    if (!(object instanceof THREE.InstancedMesh) || !object.userData.plantLod) return;
+    object.visible = Math.hypot(origin.x - object.userData.lodX, origin.z - object.userData.lodZ) < range;
+  });
 }

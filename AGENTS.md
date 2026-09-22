@@ -54,6 +54,7 @@ src/
     physics.ts       Rapier world, collider specs, kinematic character controller
     input.ts         Keyboard, held-button drag-to-look mouse, and touch thumbstick input
     audio.ts         Procedural filtered-noise ambience via WebAudio
+    graphics.ts      Coarse-pointer / software-GL / laptop-iGPU probe that selects reduced town meshes
     research.ts      GlucoseDAO facts and source links
     jewelry-catalogue.json Generated source-hashed catalogue and image manifest
   world/
@@ -62,7 +63,7 @@ src/
     jewelry.ts       Rebuilds the extracted jewelry strands as cast-silver ribbons; ENERGY_HALL sizes the amber cup
     walnut.ts        Procedural walnut shell relief and material
     strands/         mitoring.json, nanot.json: preserved wire centerlines from the STLs
-    forest.ts        Batched GLB tree instancing with a mobile foliage reduction
+    forest.ts        Batched GLB tree instancing, mobile foliage cut, and distance LOD
     landscape.ts     Shared path curves and planting clearance
     station.ts       Embryo station ring, glazed foyer, signs, train, and matching colliders
     train.ts         Maglev shell with true glazed apertures, lounge cabin, and matching colliders
@@ -70,7 +71,7 @@ src/
     station-ring.ts  Deep curved silver shank, organic side-wall piercings, and clasp anchors
     station-layout.ts Shared station, tunnel, railway planting and walking clearance
     railway.ts       Textured rail geometry, Dark Nut portals, lined bores and matching colliders
-    planting.ts      Spatially batched leafy shrubs, blossoms, blade grass, meadow texture
+    planting.ts      Spatially batched leafy shrubs, blossoms, blade grass, meadow texture, distance cull
     bridge.ts        Solid arch bridge, deck, rails, and matching colliders
     gateway.ts       King's Chapel entrance arch, faceted tourmaline, raised lettering and colliders
     gateway-materials.ts Procedural silver, limestone and colour-zoned gem materials
@@ -178,7 +179,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **Jewelry collections have permanent homes.** `data/catalogue/selection.json` contains reviewed source facts; `scripts/build-catalogue.mjs` generates `game/jewelry-catalogue.json` and local WebP derivatives using offline Sharp tooling. City Hall/Energy/Science/station have 8/8/9/7 physical works; the journal has 35. Keep one physical assignment per work. `planar-exhibition.ts` uses uncropped thumbnails, aspect-matched caption canvases and simple stand colliders; full images load only for inspection. `poster-layout.ts` keeps the central axes and entrances clear. Do not restore rotating cylinders, pedestal tables or lore lecterns. Source facts and artist descriptions stay separate from Livistone fiction; never invent missing catalogue data. Native in-hall controls remain hidden until keyboard focus; 1–4 give facts, collection, photo and place story. Failed photographs leave facts available.
 - **All rail facilities belong to southern Embryo Station.** Keep one parked train and its platform at the placed station, with both main guideways at z = 79/85. There is no northern platform, duplicate train or garden rail loop. Preserve snapshot diagnostics (`zone: 'town'`, `journey: null`) and the save version. Garden access is by continuous walking paths.
 - **Terrain is continuous, not a flat town inside a mountain ring.** `terrain.ts` owns the shared river banks, lake depression, woodland foothills and asymmetrical elongated ridges. `mountains.ts` renders the whole ground with meadow/rock blending and actual tunnel apertures. The two-metre near grid agrees with the terrain collider. Grade railway approaches and far exits; reserve full tree canopies and taper planting naturally up slopes.
-- **Living Waters belongs to the town.** `living-waters-layout.ts` defines the lake at `(0, -110)`, asymmetrical water cells, 2.2 m nerve network and paths into the civic gardens. Use the shared `terrain.ts` ground and town Rapier world; never restore remote scene switching or a second terrain. Keep both pavilion entries, shallow-water escape and the dry Mycelium loop traversable in both quality tiers. The mushroom crowns use the actual Mycelium photographs: curled open silver folds around opal hearts, with branching stems, never fabric umbrellas. Reserve their full crown radius from paths. The pavilion borrows Dewdrop’s silhouette, whose original stone is topaz, not aquamarine. Rain/drainage respects reduced motion; audio remains opt-in. Physical-device performance remains release work.
+- **Living Waters belongs to the town.** `living-waters-layout.ts` defines the lake at `(0, -110)`, asymmetrical water cells, 2.2 m nerve network and paths into the civic gardens. Use the shared `terrain.ts` ground and town Rapier world; never restore remote scene switching or a second terrain. Keep both pavilion entries, shallow-water escape and the dry Mycelium loop traversable in both quality tiers. Place mushrooms, reeds, lily pads and rain with seeded scatter and path clearance, not a modular lattice. The mushroom crowns use the actual Mycelium photographs: curled open silver folds around opal hearts, with branching stems, never fabric umbrellas. Reserve their full crown radius from paths. The pavilion borrows Dewdrop’s silhouette, whose original stone is topaz, not aquamarine. Rain/drainage respects reduced motion; audio remains opt-in. Physical-device performance remains release work.
 - **Photo clicking must not break looking.** A short scene press with no drag can raycast
   a planar photograph or caption. Activate on the native click after pointerup, so a
   synthesized touch click cannot hit a newly focused dialog button. Track its pointer independently from the joystick; cancelled gestures,
@@ -218,9 +219,12 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **No new runtime dependencies without a reason.** Runtime deps are Three.js and Rapier
   only; EZ-Tree is a dev-time asset generator. Prefer generating geometry over adding a
   library.
-- **Mobile is a first-class target, not a later port.** `Town` takes a `mobile` flag and
-  materials/foliage are already reduced for it. New heavy effects need a coarse-pointer
-  path, and touch input must keep simultaneous move + look working.
+- **Mobile is a first-class target, not a later port.** `Town` takes a `mobile` flag
+  (coarse pointer, software GL, or a typical laptop iGPU — not a discrete card) and
+  materials/foliage are already reduced for it. Walking hides far vegetation and thins
+  mid-range foliage; the pause-menu visual-detail switch does not rebuild meshes. New
+  heavy effects need a coarse-pointer path, and touch input must keep simultaneous
+  move + look working.
 - **Keep lore and invention separate.** Text in `DISCOVERIES` distinguishes Livia Lore
   source material from new Livistone fiction. Preserve that distinction, and do not turn
   the artifacts' fictional powers into health or efficacy claims.
@@ -230,11 +234,12 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - Vitest covers pure logic that is cheap to assert: save parsing, and physics behaviour
   driven headlessly through Rapier (`tests/physics.test.ts` walks a capsule into a wall).
 - Playwright drives the real game in Chrome through `window.__livistone`, which exposes
-  `snapshot()` (mode, position, yaw, fps, draw calls, triangles, progress) and
-  `teleport(x, z, yaw)`. **That hook is test infrastructure — keep it working and keep its
-  shape stable**, including the mobile-viewport run with touch emulation.
+  `snapshot()` (mode, position, yaw, fps, draw calls, triangles, progress,
+  `reducedGraphics`) and `teleport(x, z, yaw)`. **That hook is test infrastructure —
+  keep it working and keep its shape stable**, including the mobile-viewport run with
+  touch emulation.
 - Browser tests launch headless Chrome with GPU flags and fall back to whatever Chrome
-  provides; `LIVISTONE_SOFTWARE_GL=1` forces SwiftShader, which can exceed the 120 s test
+  provides (ANGLE D3D11 on Windows, native GL on Linux); `LIVISTONE_SOFTWARE_GL=1` forces SwiftShader, which can exceed the 120 s test
   budget on a loaded machine. Neither mode says anything about real GPU performance.
 - After changing anything in `src/`, run `bun run build` and `bun run test`. Run
   `bun run test:browser` for changes to input, modes, interaction, world layout, or the UI.

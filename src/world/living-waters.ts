@@ -7,6 +7,7 @@ import type { Point } from './living-waters-layout';
 import { MYCELIUM_RADIUS, myceliumCrown, myceliumStem, myceliumOpal } from './mycelium';
 
 function shape(points: Point[]): THREE.Shape { return new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, -z))); }
+function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
 export class LivingWaters {
   readonly root = new THREE.Group();
   readonly colliders: ColliderSpec[] = [];
@@ -53,8 +54,8 @@ export class LivingWaters {
     this.mesh(new THREE.TubeGeometry(channel, 70, .18, 5, false), this.water, false, 0, .08);
     this.mesh(new THREE.CylinderGeometry(3.6, 3.9, .14, 40), this.water, false, 75, .025, 0);
     this.mesh(new THREE.IcosahedronGeometry(1.1, 1), new THREE.MeshStandardMaterial({ color: '#bddacf', metalness: .45, roughness: .2 }), true, 75, .65, 0);
-    const rain = new Float32Array((mobile ? 150 : 460) * 3), drips = new Float32Array(this.drainage.length * 6 * 3);
-    for (let i = 0; i < rain.length; i += 3) { rain[i] = 56 + (i * 7.71 % 44); rain[i + 1] = i * .618 % 9; rain[i + 2] = -29 + (i * 3.37 % 57); }
+    const rain = new Float32Array((mobile ? 150 : 460) * 3), drips = new Float32Array(this.drainage.length * 6 * 3), fall = random(3304);
+    for (let i = 0; i < rain.length; i += 3) { rain[i] = -48 + fall() * 152; rain[i + 1] = fall() * 9; rain[i + 2] = -40 + fall() * 76; }
     for (let i = 0; i < drips.length / 3; i++) { const p = this.drainage[i % this.drainage.length].getPoint((i % 6) / 6); drips[i * 3] = p.x; drips[i * 3 + 1] = p.y + .1; drips[i * 3 + 2] = p.z; }
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.BufferAttribute(rain, 3)); this.rain = new THREE.Points(geometry, new THREE.PointsMaterial({ color: '#e1f3ef', size: .09, transparent: true, opacity: .7 })); this.root.add(this.rain);
     const dripGeo = new THREE.BufferGeometry(); dripGeo.setAttribute('position', new THREE.BufferAttribute(drips, 3)); this.drips = new THREE.Points(dripGeo, new THREE.PointsMaterial({ color: '#c7eeef', size: .16 })); this.root.add(this.drips);
@@ -70,14 +71,22 @@ export class LivingWaters {
     for (let i = 0; i < 9; i++) { const blade = new THREE.PlaneGeometry(.075, .6 + i % 3 * .18, 1, 3), p = blade.getAttribute('position');
       for (let j = 0; j < p.count; j++) { const y = p.getY(j) + .4; p.setXYZ(j, p.getX(j) + y * y * .4, y, 0); } blade.rotateY(i * 2.399); bladeParts.push(blade); }
     const geometry = mergeGeometries(bladeParts)!; bladeParts.forEach(g => g.dispose());
-    const sites: THREE.Vector3[] = [];
-    for (let i = 0; i < (this.mobile ? 420 : 900); i++) { const a = i * 2.399, r = 46.5 + i * .713 % 7, x = i % 3 ? Math.cos(a) * r : 54 + i * 7.717 % 48, z = i % 3 ? Math.sin(a) * r : -30 + i * 9.339 % 61;
-      if (rainPlantAllowed(x, z, .55)) sites.push(new THREE.Vector3(x, gardenHeight(x, z), z)); }
+    const sites: THREE.Vector3[] = [], rand = random(2201);
+    for (let i = 0; i < (this.mobile ? 420 : 900); i++) {
+      const lake = rand() < .7, a = rand() * Math.PI * 2, r = 44 + rand() * 10;
+      const x = lake ? Math.cos(a) * r : 54 + rand() * 48, z = lake ? Math.sin(a) * r : -30 + rand() * 61;
+      if (rainPlantAllowed(x, z, .55)) sites.push(new THREE.Vector3(x, gardenHeight(x, z), z));
+    }
     const reeds = new THREE.InstancedMesh(geometry, new THREE.MeshStandardMaterial({ color: '#466347', roughness: .9, side: THREE.DoubleSide }), sites.length), matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion();
-    sites.forEach((p, i) => { const scale = .4 + i * .618 % .5; matrix.compose(p, rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i), new THREE.Vector3(scale, scale, scale)); reeds.setMatrixAt(i, matrix); }); reeds.computeBoundingSphere(); this.root.add(reeds);
-    const leaves = new THREE.InstancedMesh(new THREE.CircleGeometry(.6, this.mobile ? 8 : 14, .1, Math.PI * 1.88).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#6a8c55', roughness: .65, side: THREE.DoubleSide }), WATER_EYES.length * 2);
-    WATER_EYES.forEach((cell, i) => { const x = cell.reduce((sum, p) => sum + p[0], 0) / cell.length, z = cell.reduce((sum, p) => sum + p[1], 0) / cell.length;
-      for (let j = 0; j < 2; j++) { matrix.compose(new THREE.Vector3(x + j * .8, -.045 + i % 3 * .012, z + j * .6), rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i + j), new THREE.Vector3(1, 1, 1)); leaves.setMatrixAt(i * 2 + j, matrix); } }); leaves.computeBoundingSphere(); this.root.add(leaves);
+    sites.forEach((p, i) => { const scale = .4 + rand() * .5; matrix.compose(p, rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI * 2), new THREE.Vector3(scale, scale, scale)); reeds.setMatrixAt(i, matrix); }); reeds.computeBoundingSphere(); this.root.add(reeds);
+    const pads: { x: number; y: number; z: number; angle: number; scale: number }[] = [], jitter = random(4417);
+    WATER_EYES.forEach((cell) => {
+      const x = cell.reduce((sum, p) => sum + p[0], 0) / cell.length, z = cell.reduce((sum, p) => sum + p[1], 0) / cell.length;
+      const count = 1 + (jitter() < .45 ? 1 : 0) + (jitter() < .2 ? 1 : 0);
+      for (let j = 0; j < count; j++) pads.push({ x: x + (jitter() - .5) * 1.8, y: -.05 + jitter() * .024, z: z + (jitter() - .5) * 1.8, angle: jitter() * Math.PI * 2, scale: .75 + jitter() * .45 });
+    });
+    const leaves = new THREE.InstancedMesh(new THREE.CircleGeometry(.6, this.mobile ? 8 : 14, .1, Math.PI * 1.88).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#6a8c55', roughness: .65, side: THREE.DoubleSide }), pads.length);
+    pads.forEach((pad, i) => { matrix.compose(new THREE.Vector3(pad.x, pad.y, pad.z), rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pad.angle), new THREE.Vector3(pad.scale, 1, pad.scale)); leaves.setMatrixAt(i, matrix); }); leaves.computeBoundingSphere(); this.root.add(leaves);
   }
   private mesh(geometry: THREE.BufferGeometry, material: THREE.Material, solid = false, x = 0, y = 0, z = 0): THREE.Mesh {
     if (material === this.water && !geometry.hasAttribute('color')) geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(geometry.getAttribute('position').count * 3).fill(1), 3));
@@ -108,9 +117,9 @@ export class LivingWaters {
     this.mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(embrace), this.mobile ? 60 : 120, .27, 8, false), this.silver, true);
   }
   private mushrooms(): void {
-    const sites: { x: number; z: number; scale: number; height: number }[] = [];
+    const sites: { x: number; z: number; scale: number; height: number }[] = [], rand = random(8142);
     for (let i = 0; i < 900 && sites.length < (this.mobile ? 26 : 44); i++) {
-      const x = 55 + (i * 19.718 % 45), z = -30 + (i * 13.337 % 58), scale = .8 + (i * .618 % .55), height = 3.6 + (i * .31 % 2.8);
+      const x = 55 + rand() * 45, z = -30 + rand() * 58, scale = .8 + rand() * .55, height = 3.6 + rand() * 2.8;
       if (!rainPlantAllowed(x, z, scale * MYCELIUM_RADIUS) || sites.some(p => Math.hypot(x - p.x, z - p.z) < (p.scale + scale) * MYCELIUM_RADIUS + .4)) continue;
       sites.push({ x, z, scale, height });
     }
@@ -121,7 +130,7 @@ export class LivingWaters {
     const stones = new THREE.InstancedMesh(myceliumOpal(this.mobile), opal, sites.length), matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion();
     crowns.name = 'Mycelium · curled open silver gills'; stones.name = 'Mycelium · opal hearts'; stems.name = 'Mycelium · branching stems';
     sites.forEach((site, i) => {
-      rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * 2.399);
+      rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI * 2);
       matrix.compose(new THREE.Vector3(site.x, site.height, site.z), rotation, new THREE.Vector3(site.scale, site.scale, site.scale)); crowns.setMatrixAt(i, matrix);
       matrix.compose(new THREE.Vector3(site.x, 0, site.z), rotation, new THREE.Vector3(site.scale, site.height - .4 * site.scale, site.scale)); stems.setMatrixAt(i, matrix);
       matrix.compose(new THREE.Vector3(site.x, site.height + .5 * site.scale, site.z), rotation, new THREE.Vector3(site.scale, site.scale * .72, site.scale)); stones.setMatrixAt(i, matrix);
