@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "bun --bun vite --host 0.0.0.0",
-    "build": "tsc --noEmit && bun --bun vite build",
+    "build": "node scripts/verify-audio-assets.mjs && tsc --noEmit && bun --bun vite build",
     "preview": "bun --bun vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:browser": "playwright test",
     "docs:sync": "bash scripts/sync-agent-docs.sh",
     "hooks:install": "git config core.hooksPath .githooks",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "git config core.hooksPath .githooks || true",
+    "check:hosts": "node scripts/check-hosts.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.20.0",
