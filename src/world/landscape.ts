@@ -1,3 +1,4 @@
+import { introductionClearing } from './introduction-layout';
 import { enhancementClearing } from './enhancement-layout';
 import * as THREE from 'three';
 import { CIVIC_LANDMARKS } from '../game/content';
@@ -38,6 +39,7 @@ const pathSamples = PATH_CURVES.map((curve) => curve.getPoints(160));
 
 /** Reserve the whole plant footprint, not just its stem, along the rendered routes. */
 export function plantingAllowed(x: number, z: number, radius: number): boolean {
+  if (introductionClearing(x, z, radius)) return false;
   if (futureClearing(x, z, radius) || enhancementClearing(x, z, radius)) return false;
   if (waterDistance(x, z) < radius + .35) return false;
   if (Math.hypot(x - TIME_TOWER.x, z - TIME_TOWER.z) < TIME_TOWER.radius + radius) return false;

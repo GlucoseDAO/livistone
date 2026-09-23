@@ -6,9 +6,26 @@
     <meta name="theme-color" content="#263d32" />
     <meta name="description" content="Walk into Livistone, a green town of art, science, and extraordinary architecture inspired by Livia's jewelry." />
     <title>Livistone — A living world</title>
+    <link rel="stylesheet" href="/src/loading.css" />
   </head>
   <body>
+    <section id="boot-loading" class="loading-screen" aria-labelledby="loading-title">
+      <div class="loading-layout">
+      <div class="loading-story">
+        <div class="loading-brand">LIVISTONE · ART, SCIENCE &amp; NATURE</div>
+        <h1 id="loading-title">A town from a jeweller’s imagination</h1>
+        <div class="loading-journey">Architect → parametric jewellery designer → citizen scientist</div>
+        <p>Livia Zaharia began with architecture, moved into parametric jewellery design, and became a citizen scientist. In Livistone, she brings these worlds together: her jewellery pieces become buildings you can walk into, while her machine learning and scientific projects have places of their own.</p>
+        <p class="loading-music">The background music is Livia herself playing kalimba, recorded live on her phone. You can turn the radio on or off in the menu.</p>
+        <div class="loading-meta"><span id="loading-status" role="status">Preparing your visit…</span><span id="loading-count">0%</span></div>
+        <progress id="loading-progress" value="0" max="100" aria-label="Town preparation"></progress>
+        <small>Preparing the town, its galleries and walking paths.</small>
+        <figure class="loading-portrait"><img src="/images/about/livia.jpg" width="1536" height="1024" alt="Artistic portrait of Livia Zaharia, framed by green scientific imagery and golden parametric forms" fetchpriority="high" /></figure>
+      </div>
+      </div>
+    </section>
+    <noscript>Enable JavaScript to explore Livistone.</noscript>
     <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/bootstrap.ts"></script>
   </body>
 </html>

@@ -18,7 +18,7 @@ A TypeScript + Vite single-page app. Three.js renders the town on WebGL 2; Rapie
 (WebAssembly) provides a kinematic capsule character controller. There is no backend, no
 API key, no database, and no account system — the entire game is static files plus
 `localStorage`. Every building, tree placement, path, and piece of jewelry geometry in the
-current build is generated in code at load time; binary assets are two tree GLBs, local derivatives of 70 real jewelry photographs, six Materialized Enhancements poster images, two CC0 rock maps, and nine CC0 railway maps.
+current build is generated in code at load time; binary assets are two tree GLBs, local derivatives of 70 real jewelry photographs, six Materialized Enhancements poster images, two CC0 rock maps, four CC0 ground-map derivatives, and nine CC0 railway maps.
 
 ## Commands
 
@@ -77,7 +77,7 @@ src/
     station-ring.ts  Deep curved silver shank, organic side-wall piercings, and clasp anchors
     station-layout.ts Shared station, tunnel, railway planting and walking clearance
     railway.ts       Textured rail geometry, Dark Nut portals, lined bores and matching colliders
-    planting.ts      Spatially batched leafy shrubs, blossoms, blade grass, meadow texture, distance cull
+    planting.ts      Spatially batched leafy shrubs, blossoms, blade grass, distance cull
     bridge.ts        Solid arch bridge, deck, rails, and matching colliders
     gateway.ts       King's Chapel entrance arch, faceted tourmaline, raised lettering and colliders
     gateway-materials.ts Procedural silver, limestone and colour-zoned gem materials
@@ -117,7 +117,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 
 ## How the pieces fit together
 
-- **`Town` builds the world and hands out everything else.** Its constructor runs all the
+- **`Town` builds the world and hands out everything else.** Its async `Town.create` factory runs all the
   `create*` methods and fills three public arrays: `colliders` (fed to `Physics`),
   `interactives` (raycast targets for the E key), `occluders` (invisible boxes used to hide
   interiors until you are inside). If you add geometry that the player can walk into, you must push a matching
@@ -167,9 +167,9 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **The loop is fixed-timestep.** `main.ts` accumulates real time and steps physics at
   1/60 s. Rendering is per animation frame. Anything time-dependent takes `dt` explicitly.
 - **Modes drive the UI.** `Mode` is `'welcome' | 'walking' | 'map' | 'lore' | 'journal' |
-  'paused' | 'gallery'`. `welcome` is the loading state; ready opens the map without an entry gate. Mode changes are the single place where input capture, the active camera, and
+  'paused' | 'gallery'`. `welcome` is the loading state; ready opens first person at SPAWN facing the city gate, without an entry gate. The static loading introduction precedes module loading; Town.create yields between construction stages and progress follows completed stages. Mode changes are the single place where input capture, the active camera, and
   DOM visibility all change together. Do not bypass them with ad-hoc DOM toggling.
-  Keep the labeled First person / Top view switch (M), journal, and menu usable across
+  Keep the labeled First person / Map switch (M), journal, and menu usable across
   panels. Dialogs leave navigation accessible and make the scene inert; native control
   keys must not be consumed as movement. Map markers sit below map panels and navigation.
   All journal stories are readable from the start; reading records progress without
@@ -191,7 +191,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   radial spokes through the inhabited glass hall. Preserve the extracted source JSON.
 - **Jewelry collections have permanent homes.** `data/catalogue/selection.json` contains reviewed source facts; `scripts/build-catalogue.mjs` generates `game/jewelry-catalogue.json` and local WebP derivatives using offline Sharp tooling. City Hall/Energy/Science/station keep 8/8/9/7 physical works. Timeface has six and Future House has three; the catalogue has 41. The additional attributed archive manifest is `game/archive-catalogue.json`. Keep one physical assignment per work. `piece-stories.ts` overlays artist texts from https://livia.glucosedao.org/pieces and official Romanian Jewelry Week collection pages; do not invent a studio story when the public tab has none. Rotary Magnetic keeps the 2026 amber caption and does not mix the older tourmaline note. `planar-exhibition.ts` uses uncropped thumbnails, aspect-matched caption canvases and simple stand colliders; full images load only for inspection. `poster-layout.ts` keeps the central axes and entrances clear. Do not restore rotating cylinders, pedestal tables or lore lecterns. Source facts and artist descriptions stay separate from Livistone fiction. Native in-hall controls remain hidden until keyboard focus; 1–4 give facts, collection, photo and place story. Failed photographs leave facts available.
 - **All rail facilities belong to southern Embryo Station.** Keep one parked train and its platform at the placed station, with both main guideways at z = 79/85. There is no northern platform, duplicate train or garden rail loop. Preserve snapshot diagnostics (`zone: 'town'`, `journey: null`) and the save version. Garden access is by continuous walking paths.
-- **Terrain is continuous, not a flat town inside a mountain ring.** `terrain.ts` owns the shared river banks, lake depression, woodland foothills and asymmetrical elongated ridges. `mountains.ts` renders the whole ground with meadow/rock blending and actual tunnel apertures. The two-metre near grid agrees with the terrain collider. Grade railway approaches and far exits; reserve full tree canopies and taper planting naturally up slopes.
+- **Terrain is continuous, not a flat town inside a mountain ring.** `terrain.ts` owns the shared river banks, lake depression, woodland foothills and asymmetrical elongated ridges. `mountains.ts` renders the whole ground with meadow/rock blending and actual tunnel apertures. Ground cover uses local meadow/soil WebP maps (512 px reduced, 1024 px rich), with path wear and bank soil baked by `ground-cover.ts` into existing vertices. Preserve soil attributes when clipping tunnels. No extra terrain draw call or per-frame CPU work is needed; reduced detail skips the mountain normal map. Regenerate derivatives with `python3 scripts/build-ground-textures.py`; provenance is under `public/textures/ground/`. The two-metre near grid agrees with the terrain collider. Grade railway approaches and far exits; reserve full tree canopies and taper planting naturally up slopes.
 - **Living Waters belongs to the town.** `living-waters-layout.ts` defines the lake at `(0, -110)`, asymmetrical water cells, 2.2 m nerve network and paths into the civic gardens. Use the shared `terrain.ts` ground and town Rapier world; never restore remote scene switching or a second terrain. Keep both pavilion entries, shallow-water escape and the dry Mycelium loop traversable in both quality tiers. Place mushrooms, reeds, lily pads and rain with seeded scatter and path clearance, not a modular lattice. The mushroom crowns use the actual Mycelium photographs: curled open silver folds around opal hearts, with branching stems, never fabric umbrellas. Also instance a lower shrub-scale ring population. Reserve every crown’s full radius from paths. Vittoria and Dewdrop garden stands present both jewels (studio photo for Vittoria; drawn figure for Dewdrop, which has no local catalogue photograph). The pavilion borrows Dewdrop’s silhouette, whose original stone is topaz, not aquamarine. Rain/drainage respects reduced motion; audio remains opt-in. Physical-device performance remains release work.
 - **Photo clicking must not break looking.** A short scene press with no drag can raycast
   a planar photograph or caption. Activate on the native click after pointerup, so a
@@ -211,12 +211,12 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   `a / 7.1` and `b / 7.1`, because tree clearing, garden rings, and the "inside a landmark" test in
   `main.ts` read it.
 - **View switching preserves the player; map destinations deliberately relocate them.**
-  Top view / First person (M) and Start / Resume exploring preserve walking position and
+  Map / First person (M) and Start / Resume exploring preserve walking position and
   direction. Map labels and list entries use `Landmark.entrance` to arrive just outside
   a clear entrance, then enter walking mode. Embryo Station arrivals look toward the city
   gate (yaw 0); other halls still face inward. Keep these approaches aligned
   with geometry and colliders. All destinations use the already loaded town scene and physics world. Keep the large
-  Start exploring button visible above the map list on desktop and touch screens.
+  Start / Resume exploring button visible above the map list on desktop and touch screens.
 - **Progress is local only.** `readProgress` / `writeProgress` use the
   `livistone-progress-v1` key and every access is wrapped so that blocked or damaged
   storage degrades to an empty-but-playable state. If the shape changes, bump the key and
@@ -339,3 +339,11 @@ directory, so the hook travels with the repository.
 - Building and place story signs (Embryo Station story, Mycelium grove, Enhancement join sign) use `place-sign.ts` so they are never mistaken for piece posters: a larger 3.5 × 2.5 m board, dark face in Livia's site style (warm near-black, letter-spaced serif capitals, amber-to-green rule) inside a pierced cast-gold lattice frame, lettered on both faces and clickable. Geometry and colliders are DOM-independent; `paintPlaceSign` draws the face. New place signs use the same component.
 
 - Town and garden roads share the 2.6 m path width, 0.13 m surface elevation and world-aligned paving. Round joints cover ribbon endpoint wedges. Keep the Glucose rear connection direct (38,-49 to 38,-52), with no redundant north spur.
+
+- The introduction poster uses `introduction-layout.ts` for full planting clearance, matching scaled colliders and clickable faces. Its creator story is available in the journal.
+
+- Poster body text uses `poster-text.ts` to fit the largest readable type into the space above footers; preserve all source text. The loading portrait is the unchanged local homepage artwork, with provenance under `public/images/about/`.
+
+- `game/nearby.ts` maps architecture to source-backed one-sentence stories. The ring gateway takes precedence at the arrival approach; close displays take precedence over buildings. Both the nearby card and desktop E control are real buttons, and keyboard E falls back to the nearby story without requiring precise aim. Keep lore explicitly labelled.
+
+Open grass areas have broad rolling contours, reaching roughly 1–2.5 metres where space allows, with a subdued spring-green palette. `meadow-relief.ts` bakes a clearance distance field once and tapers the contours around paths, buildings and other authored clearances, including a 2.5-metre interpolation margin. The existing terrain mesh and Rapier surface share these heights; plants follow the same field. Contours add no triangles or draw calls.

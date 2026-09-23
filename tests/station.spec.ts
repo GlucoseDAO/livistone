@@ -10,7 +10,7 @@ const teleport = (page: Page, x: number, z: number): Promise<void> => page.evalu
 test('enter the Embryo ring, explore the station, discover its story, and resume from its map card', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error' && /Shader|WebGLProgram/.test(message.text())) errors.push(message.text()); });
-  await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.click('#view-toggle');
+  await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.click('#view-toggle');
   await teleport(page, -16, -56); await page.keyboard.down('KeyW');
   await expect.poll(async () => (await snapshot(page)).position.z, { timeout: 20000 }).toBeGreaterThan(67); await page.keyboard.up('KeyW');
   await expect(page.locator('#location')).toHaveText('Embryo Station');
@@ -24,13 +24,13 @@ test('enter the Embryo ring, explore the station, discover its story, and resume
   await page.keyboard.press('KeyM');
   await page.locator('.landmark-item[data-action="landmark:station"]').click(); const after = await snapshot(page);
   expect(after.mode).toBe('walking'); expect(after.position.x).toBeCloseTo(0, 2); expect(after.position.z).toBeCloseTo(56, 2); expect(after.yaw).toBe(0);
-  await page.reload(); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 });
+  await page.reload(); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
   expect((await snapshot(page)).progress.discovered).toContain('embryo-station'); expect((await snapshot(page)).progress.visited).toContain('station'); expect(errors).toEqual([]);
 });
 
 test('train cabin announcements point to science, art and the pieces site', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 });
+  await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
   await expect(page.locator('#error')).toBeHidden();
   await page.locator('#start-exploring').click();
   const science = TRAIN_ANNOUNCEMENTS.find((board) => board.id === 'train-science')!, art = TRAIN_ANNOUNCEMENTS.find((board) => board.id === 'train-art')!;
@@ -50,7 +50,7 @@ test('train cabin announcements point to science, art and the pieces site', asyn
 
 test('clicking the two wall advertisements opens the science and art sites', async ({ page, context }) => {
   await context.route('https://livia.glucosedao.org/**', route => route.fulfill({ contentType: 'text/html', body: '<title>Artist website</title>' }));
-  await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.locator('#start-exploring').click();
+  await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.locator('#start-exploring').click();
   for (const [x, yaw, path] of [[3, -Math.PI / 2, 'science-tech/glucosedao/'], [-31, Math.PI / 2, 'pieces/']] as const) {
     await page.evaluate(({ x, yaw }) => (window as unknown as { __livistone: { teleport(x: number, z: number, yaw: number): void } }).__livistone.teleport(x, 79, yaw), { x, yaw });
     await expect(page.locator('#interact')).toContainText(path === 'pieces/' ? 'Art and geometry' : 'Science this way');
@@ -63,10 +63,10 @@ test('station map and discovery are usable on a touch viewport', async ({ browse
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
   try {
     const page = await context.newPage(), errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.locator('#view-toggle').tap();
+    await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.locator('#view-toggle').tap();
     await teleport(page, -8.5, -63.4); await expect(page.locator('#interact')).toBeVisible(); await page.locator('#interact').tap();
     await expect(page.locator('#lore-title')).toHaveText('A departure, a beginning'); await page.getByRole('button', { name: 'Continue exploring' }).tap();
-    await page.getByRole('button', { name: 'Top view' }).tap();
+    await page.getByRole('button', { name: 'Map' }).tap();
     expect(await page.locator('#map-panel').evaluate((panel) => panel.scrollWidth <= panel.clientWidth)).toBe(true);
     await page.waitForTimeout(600);
     await page.screenshot({ path: 'output/testing/station/map-mobile.png' });

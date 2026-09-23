@@ -1,3 +1,4 @@
+import { createIntroduction } from './introduction';
 import { createEnhancementHill, createEnhancementPanel } from './enhancement';
 import { createEnhancementGallery } from './enhancement-gallery';
 import * as THREE from 'three';
@@ -77,12 +78,12 @@ export class Town {
   readonly occluders: THREE.Object3D[] = [];
   readonly water: THREE.MeshStandardMaterial;
   readonly exhibitions: PlanarExhibition[] = [];
-  readonly train: THREE.Object3D;
-  readonly gardens: LivingWaters;
+  train!: THREE.Object3D;
+  gardens!: LivingWaters;
   readonly researchPanels: THREE.Mesh[] = [];
-  private readonly mountains: Mountains;
-  private readonly railway: THREE.Group;
-  private readonly researchReady: Promise<void>;
+  private mountains!: Mountains;
+  private railway!: THREE.Group;
+  private researchReady!: Promise<void>;
   private readonly white = new THREE.MeshStandardMaterial({ color: '#f4f0df', roughness: 0.57, metalness: 0.07 });
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#e2e7dd', roughness: 0.26, metalness: 0.65 });
   private readonly gold = new THREE.MeshStandardMaterial({ color: '#b99a55', roughness: 0.3, metalness: 0.7 });
@@ -91,12 +92,20 @@ export class Town {
   private readonly paving = pavingMaterial();
   private readonly dark = new THREE.MeshStandardMaterial({ color: '#3e5550', roughness: 0.25, metalness: 0.35 });
   private readonly sphere = new THREE.SphereGeometry(1, 16, 12);
-  constructor(private mobile: boolean) {
+  private constructor(private mobile: boolean) { this.water = riverMaterial(); }
+  static async create(mobile: boolean, stage: (value: number, label: string) => Promise<void>): Promise<Town> {
+    const town = new Town(mobile); await town.build(stage); return town;
+  }
+  private async build(stage: (value: number, label: string) => Promise<void>): Promise<void> {
+    const mobile = this.mobile;
+    await stage(20, 'Shaping the river, bridge and town entrance…');
     this.root.name = 'Livistone'; this.root.add(this.interiors, this.details);
-    this.water = riverMaterial();
     this.createTerrain(); this.createPaths(); createBridge(this.root, this.colliders, this.white, this.paving, this.gold);
     createGateway(this.root, this.colliders, mobile, this.paving);
+    const introduction = createIntroduction(this.root, this.colliders); this.researchPanels.push(...introduction.panels); this.interactives.push({ id: 'about-livistone', object: introduction.panels[0], position: introduction.position });
+    await stage(28, 'Turning jewellery into civic buildings…');
     for (const landmark of CIVIC_LANDMARKS) landmark.id === 'energy' ? this.createEnergyHall(landmark.x, landmark.z) : this.createLandmark(landmark.id, landmark.x, landmark.z);
+    await stage(38, 'Building Embryo Station and its train…');
     const arrival = new THREE.Group(), stationColliders: ColliderSpec[] = [], stationInteractions: Interactive[] = [];
     const station = createStation(arrival, stationColliders, mobile, this.paving);
     stationInteractions.push({ id: 'embryo-station', object: station.object, position: station.position });
@@ -112,6 +121,7 @@ export class Town {
     this.interactives.push(...stationInteractions.map(item => ({ ...item, position: item.position.applyMatrix4(arrival.matrix) })));
     this.train = arrival.getObjectByName('Panoramic maglev')!;
     this.railway = createRailwayStructure(this.root, this.colliders, mobile);
+    await stage(46, 'Growing the lake gardens and elevated galleries…');
     this.gardens = new LivingWaters(mobile, this.paving); this.root.add(this.gardens.root);
     this.gardens.presentLakeJewelry();
     this.gardens.addInterpretation('living-mycelium', 'Mycelium Rain Garden', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
@@ -119,12 +129,14 @@ export class Town {
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.white, this.paving, this.gold, bridge);
     createTimeTower(this.root, this.colliders, this.mobile);
     createFutureHouse(this.root, this.colliders, this.mobile);
+    await stage(54, 'Making room for science and bioart…');
     createEnhancementHill(this.root, this.colliders);
     const enhancementSign = createEnhancementPanel(this.root, this.colliders); this.researchPanels.push(...enhancementSign.panels); this.interactives.push({ id: 'materialized-enhancements', object: enhancementSign.panels[0], position: enhancementSign.position });
     const enhancementGallery = createEnhancementGallery(this.root, this.colliders); this.researchPanels.push(...enhancementGallery.panels); this.interactives.push(...enhancementGallery.interactives);
     for (const id of ['timeface', 'future-house']) this.exhibitions.push(new PlanarExhibition(id, this.root, 0, 0, this.colliders, this.interactives));
     const research = createGlucosePavilion(this.root, this.colliders, mobile, this.paving); this.researchPanels.push(...research.panels); this.interactives.push(...research.interactives);
     this.researchReady = Promise.all([research.ready, enhancementGallery.ready]).then(() => undefined);
+    await stage(62, 'Planting the woodland and mountain slopes…');
     this.createTrees(); this.createGardens();
     for (const landmark of CIVIC_LANDMARKS) {
       const color = landmark.id === 'energy' ? '#ffbf66' : landmark.id === 'science' ? '#99ded7' : '#ffe0a3';

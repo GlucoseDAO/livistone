@@ -8,7 +8,7 @@ for (const mobile of [false, true]) test(`textured railway and mountain passage 
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => { if (message.type() === 'error' && /Shader|WebGLProgram/.test(message.text())) errors.push(message.text()); });
     page.on('response', (response) => { if (response.url().includes('/textures/railway/') && response.ok()) textures.add(response.url().split('/').at(-1)!); });
-    await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.locator('#view-toggle').click();
+    await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.locator('#view-toggle').click();
     const reduced = await page.evaluate(() => (window as any).__livistone.snapshot().reducedGraphics);
     for (const name of ['ballast', 'rail']) for (const suffix of reduced ? ['color', 'roughness'] : ['color', 'normal', 'roughness']) expect(textures.has(`${name}-${suffix}.jpg`)).toBe(true);
     await page.evaluate(({ x, z }) => (window as any).__livistone.teleport(x, z, -Math.PI / 2), { x: RAILWAY.portalX - 13, z: STATION.trackZ });
@@ -19,7 +19,7 @@ for (const mobile of [false, true]) test(`textured railway and mountain passage 
     await expect(page.locator('#location')).toHaveText('Dark Nut Mountain Passage');
     const before = await page.evaluate(() => (window as any).__livistone.snapshot()); expect(before.position.y).toBeGreaterThan(.8);
     await page.screenshot({ path: `output/testing/railway/passage-${mobile ? 'mobile' : 'desktop'}.png` });
-    await page.getByRole('button', { name: 'Top view' }).click(); await page.getByRole('button', { name: 'First person' }).click();
+    await page.getByRole('button', { name: 'Map' }).click(); await page.getByRole('button', { name: 'First person' }).click();
     const after = await page.evaluate(() => (window as any).__livistone.snapshot()); expect(after.position.x).toBeCloseTo(before.position.x, 2); expect(after.position.z).toBeCloseTo(before.position.z, 2);
     expect(errors).toEqual([]);
   } finally { await context.close(); }
@@ -27,7 +27,7 @@ for (const mobile of [false, true]) test(`textured railway and mountain passage 
 
 test('missing railway maps preserve a playable passage', async ({ page }) => {
   await page.route('**/textures/railway/**', (route) => route.abort());
-  await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.click('#view-toggle');
+  await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.click('#view-toggle');
   await page.evaluate(({ x, z }) => (window as any).__livistone.teleport(x, z, Math.PI / 2), { x: -RAILWAY.portalX - 68, z: STATION.trackZ });
   await expect(page.locator('#location')).toHaveText('Dark Nut Mountain Passage');
   await page.keyboard.down('KeyW'); await expect.poll(() => page.evaluate(() => (window as any).__livistone.snapshot().position.x)).toBeLessThan(-RAILWAY.portalX - 70); await page.keyboard.up('KeyW');
@@ -36,7 +36,7 @@ test('missing railway maps preserve a playable passage', async ({ page }) => {
 for (const mobile of [false, true]) test(`boards the parked maglev and returns to the concourse (${mobile ? 'touch' : 'desktop'})`, async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, hasTouch: mobile, isMobile: mobile });
   try {
-    const page = await context.newPage(); await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.click('#view-toggle');
+    const page = await context.newPage(); await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.click('#view-toggle');
     await page.evaluate(() => (window as any).__livistone.teleport(-2, 72.7, Math.PI));
     await page.keyboard.down('KeyW');
     await expect.poll(() => page.evaluate(() => (window as any).__livistone.snapshot().position.z)).toBeGreaterThan(78.2);

@@ -1,3 +1,4 @@
+import { paintPosterText } from './poster-text';
 import * as THREE from 'three';
 import { createPlaceSign, paintPlaceSign } from './place-sign';
 import type { PlaceSign } from './place-sign';
@@ -216,19 +217,11 @@ export class LivingWaters {
     const sign = this.signs.get(id); if (sign) paintPlaceSign(sign, { eyebrow, title, body, footer: 'Click, or E / tap, for the story and sources' });
   }
   presentLakeJewelry(): void {
-    const wrap = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, width: number, line: number): number => {
-      let current = '';
-      for (const word of text.split(' ')) {
-        if (current && ctx.measureText(current + ' ' + word).width > width) { ctx.fillText(current, x, y); y += line; current = word; }
-        else current += (current ? ' ' : '') + word;
-      }
-      ctx.fillText(current, x, y); return y + line;
-    };
     const caption = (id: string, title: string, body: string): void => {
       const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 540; const ctx = canvas.getContext('2d')!;
       ctx.fillStyle = '#f4f0e5'; ctx.fillRect(0, 0, 1024, 540);
       ctx.fillStyle = '#25473b'; ctx.font = '48px Georgia'; ctx.fillText(title, 40, 70);
-      ctx.fillStyle = '#445c4b'; ctx.font = '28px sans-serif'; wrap(ctx, body, 40, 130, 940, 38);
+      ctx.fillStyle = '#445c4b'; paintPosterText(ctx, body, 40, 110, 940, 340, 44);
       ctx.fillStyle = '#25473b'; ctx.font = '26px sans-serif'; ctx.fillText('Click / E · story and livia.glucosedao.org/pieces', 40, 500);
       const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
       const panel = this.panels.find(p => p.userData.discovery === id && p.userData.kind === 'caption'); if (!panel) { map.dispose(); return; }

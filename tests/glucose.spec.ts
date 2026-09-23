@@ -9,7 +9,7 @@ for (const mobile of [false, true]) test(`Glucose Commons posters, sources, map 
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 800 }, isMobile: mobile, hasTouch: mobile });
   try {
     const page = await context.newPage(), errors: string[] = []; page.on('pageerror', (e) => errors.push(e.message));
-    await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.locator('#view-toggle').click();
+    await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.locator('#view-toggle').click();
     await teleport(page, SITE.x, SITE.z + 17); await page.waitForTimeout(700);
     if (!mobile) { await page.mouse.move(640, 400); await page.mouse.down(); await page.mouse.move(640, 300); await page.mouse.up(); await page.screenshot({ path: 'output/testing/glucose/exterior.png' }); }
     for (let i = 0; i < GLUCOSE_POSTERS.length; i++) {
@@ -33,11 +33,11 @@ for (const mobile of [false, true]) test(`Glucose Commons posters, sources, map 
       if (i === 0) { await page.waitForTimeout(550); await page.screenshot({ path: `output/testing/glucose/sources-${mobile ? 'mobile' : 'desktop'}.png` }); }
       await page.getByRole('button', { name: 'Continue exploring' }).click();
     }
-    const before = await snapshot(page); await page.getByRole('button', { name: 'Top view' }).click();
+    const before = await snapshot(page); await page.getByRole('button', { name: 'Map' }).click();
     await page.screenshot({ path: `output/testing/glucose/map-${mobile ? 'mobile' : 'desktop'}.png` });
     await page.getByRole('button', { name: 'First person' }).click(); const after = await snapshot(page);
     expect(after.position.x).toBeCloseTo(before.position.x, 2); expect(after.position.z).toBeCloseTo(before.position.z, 2); expect(after.yaw).toBe(before.yaw);
-    await page.reload(); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 });
+    await page.reload(); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
     expect((await snapshot(page)).progress.discovered).toEqual(expect.arrayContaining(RESEARCH_POSTERS.map((p) => p.id)));
     expect((await snapshot(page)).progress.visited).toContain('glucose'); expect(errors).toEqual([]);
   } finally { await context.close(); }

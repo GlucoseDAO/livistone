@@ -5,7 +5,7 @@ for(const mobile of [false,true])test(`hill participation and optional radio (${
  try{
   const page=await context.newPage(),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(()=>{const Original=window.Audio;window.Audio=class extends Original{constructor(){super();(window as any).__radio=this;}};});
-  await page.goto('/');await expect(page.locator('#view-toggle')).toBeEnabled({timeout:60000});
+  await page.goto('/');await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
   await expect(page.locator('#sound-toggle')).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('#map-origins')).toContainText('real, existing');await expect(page.locator('.landmark-item').first()).toHaveAttribute('data-action','landmark:station');await expect(page.locator('.landmark-number').last()).toHaveText('10');
   await page.locator('#map-panel').getByRole('button',{name:'Go to Materialized Enhancements',exact:true}).click();
@@ -35,7 +35,7 @@ test('posters show a hand cursor and open enhancement.bio in a new tab',async({b
   await context.route('https://enhancement.bio/**',route=>route.fulfill({contentType:'text/html',body:'<title>enhancement.bio</title>'}));
   const page=await context.newPage(),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   const cursor=()=>page.evaluate(()=>(document.querySelector('#world') as HTMLElement).style.cursor);
-  await page.goto('/');await expect(page.locator('#view-toggle')).toBeEnabled({timeout:60000});await page.locator('#view-toggle').click();
+  await page.goto('/');await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();await page.locator('#view-toggle').click();
   await page.evaluate(()=>(window as any).__livistone.teleport(88.5,-156.2,0));
   await page.mouse.move(600,380);await page.mouse.move(640,400);await expect.poll(cursor).toBe('pointer');
   // Looking around hides the hand; releasing over the poster restores it without another move.

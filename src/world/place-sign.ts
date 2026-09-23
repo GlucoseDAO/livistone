@@ -1,3 +1,4 @@
+import { paintPosterText } from './poster-text';
 import * as THREE from 'three';
 import type { ColliderSpec } from '../game/physics';
 import { nightEmission } from './night-lighting';
@@ -76,9 +77,8 @@ export function paintPlaceSign(sign: PlaceSign, text: PlaceSignText): void {
   const words = text.title.toUpperCase().split(' '), lines: string[] = []; for (const word of words) { const last = lines.at(-1); if (last && ctx.measureText(last + ' ' + word).width < 1300) lines[lines.length - 1] = last + ' ' + word; else lines.push(word); }
   lines.forEach((line, i) => ctx.fillText(line, 100, 265 + i * 100));
   let y = 265 + (lines.length - 1) * 100 + 52; const rule = ctx.createLinearGradient(100, 0, 480, 0); rule.addColorStop(0, '#d4943a'); rule.addColorStop(1, '#5ea882'); ctx.fillStyle = rule; ctx.fillRect(100, y, 380, 6);
-  ctx.fillStyle = 'rgba(245,240,232,.86)'; ctx.font = '38px sans-serif'; ctx.letterSpacing = '0px'; y += 90; let line = '';
-  for (const word of text.body.split(' ')) { if (line && ctx.measureText(line + ' ' + word).width > 1290) { ctx.fillText(line, 100, y); y += 54; line = word; } else line += (line ? ' ' : '') + word; }
-  ctx.fillText(line, 100, y);
+  ctx.fillStyle = 'rgba(245,240,232,.86)'; ctx.letterSpacing = '0px';
+  paintPosterText(ctx, text.body, 100, y + 40, 1290, 830 - (y + 40), 60);
   ctx.fillStyle = '#d4943a'; ctx.font = '600 34px sans-serif'; ctx.letterSpacing = '2px'; ctx.fillText(text.footer, 100, 900);
   const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
   const material = sign.faces[0].material as THREE.MeshBasicMaterial; material.color.set('#ffffff'); material.map = map; material.needsUpdate = true;

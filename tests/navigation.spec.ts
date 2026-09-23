@@ -8,10 +8,10 @@ for (const mobile of [false, true]) test(`navigation stays clickable across view
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1200, height: 800 }, isMobile: mobile, hasTouch: mobile, reducedMotion: 'reduce' });
   const page = await context.newPage(), errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   const activate = async (selector: string): Promise<void> => { const button = page.locator(selector); if (mobile) await button.tap(); else await button.click(); };
-  await page.goto('/'); await expect(page.getByRole('button', { name: 'First person', exact: true })).toBeEnabled({ timeout: 60000 });
+  await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
   expect((await snapshot(page)).mode).toBe('map'); await expect(page.locator('#welcome')).toBeHidden();
   await page.screenshot({ path: `output/testing/navigation-map-${mobile ? 'mobile' : 'desktop'}.png` });
-  await expect(page.getByRole('button', { name: 'Start exploring', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Resume exploring', exact: true })).toBeVisible();
   const startButton = (await page.locator('#start-exploring').boundingBox())!;
   expect(startButton.height).toBeGreaterThanOrEqual(60); expect(startButton.y + startButton.height).toBeLessThan(mobile ? 844 : 800);
   await activate('#start-exploring'); expect((await snapshot(page)).mode).toBe('walking');
@@ -45,7 +45,7 @@ for (const mobile of [false, true]) test(`navigation stays clickable across view
 });
 
 test('keyboard can activate navigation and leave a gallery without a close-first step', async ({ page }) => {
-  await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 });
+  await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
   await page.locator('#view-toggle').focus(); await page.keyboard.press('Space'); expect((await snapshot(page)).mode).toBe('walking');
   await page.keyboard.press('Tab'); await expect(page.locator('#view-toggle')).toBeFocused();
   await page.keyboard.press('Space'); expect((await snapshot(page)).mode).toBe('map');

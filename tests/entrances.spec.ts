@@ -10,7 +10,7 @@ for (const mobile of [false, true]) test(`map labels arrive outside walkable ent
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1200, height: 800 }, isMobile: mobile, hasTouch: mobile });
   try {
     const page = await context.newPage(), errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 });
+    await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
     for (const id of ['glucose', 'city-hall', 'energy', 'science', 'station', 'living-waters', 'mycelium-garden', 'city-hall']) {
       const landmark = LANDMARKS.find((place) => place.id === id)!, arrival = landmark.entrance;
       const label = page.locator(!mobile && id === 'glucose' ? '#marker-glucose' : `.landmark-item[data-action="landmark:${id}"]`);
@@ -43,7 +43,7 @@ for (const mobile of [false, true]) test(`map labels arrive outside walkable ent
 });
 
 test('garden navigation uses the already loaded town even when later asset requests are blocked', async ({ page }) => {
-  await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 });
+  await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
   await page.route('**/models/trees/*.glb', route => route.abort());
   await page.locator('.landmark-item[data-action="landmark:living-waters"]').click();
   const arrived = await snapshot(page); expect(arrived.mode).toBe('walking'); expect(arrived.zone).toBe('town');

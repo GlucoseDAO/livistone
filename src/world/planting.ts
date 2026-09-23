@@ -99,18 +99,6 @@ function batches(parent: THREE.Group, name: string, sites: Site[], geometry: THR
   }
 }
 
-export function meadowMaterial(): THREE.MeshStandardMaterial {
-  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 256;
-  const ctx = canvas.getContext('2d')!, rand = random(824);
-  ctx.fillStyle = '#acb497'; ctx.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 18000; i++) {
-    ctx.strokeStyle = i % 3 ? 'rgba(48,65,23,.16)' : 'rgba(220,217,164,.25)';
-    const x = rand() * 256, y = rand() * 256; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + rand() * 3 - 1.5, y - 1 - rand() * 5); ctx.stroke();
-  }
-  const map = new THREE.CanvasTexture(canvas); map.wrapS = map.wrapT = THREE.RepeatWrapping; map.repeat.set(75, 65); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
-  return new THREE.MeshStandardMaterial({ map, vertexColors: true, roughness: 1 });
-}
-
 export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: boolean, height: (x: number, z: number) => number, river: (x: number) => number): void {
   const rand = random(58), shrubs: Site[][] = [[], [], []], grass: Site[] = [];
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .94, side: THREE.DoubleSide });

@@ -16,7 +16,7 @@ async function facePiece(page: Page, id: string): Promise<void> {
 test('explore City Hall, preserve position through map mode, and retain discoveries', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'First person' })).toBeEnabled({ timeout: 60000 });
+  await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
   await page.getByRole('button', { name: 'First person' }).click();
   await page.waitForFunction(() => (window as unknown as { __livistone: { snapshot(): Snapshot } }).__livistone.snapshot().mode === 'walking');
   // Entering and unpressed mouse movement must never capture or turn the camera.
@@ -63,7 +63,7 @@ test('explore City Hall, preserve position through map mode, and retain discover
   const after = await snapshot(page);
   expect(after.position.x).toBeCloseTo(before.position.x, 1); expect(after.position.z).toBeCloseTo(before.position.z, 1); expect(after.yaw).toBeCloseTo(before.yaw, 4);
   await page.reload();
-  await expect(page.getByRole('button', { name: 'First person' })).toBeEnabled({ timeout: 60000 });
+  await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
   expect((await snapshot(page)).progress.discovered).toContain('nut');
   expect(errors).toEqual([]);
 });
@@ -72,7 +72,7 @@ test('mobile layout, simultaneous touch look/movement, cancellation, and aerial 
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
   const page = await context.newPage(); const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'First person' })).toBeEnabled({ timeout: 60000 });
+  await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
   await page.screenshot({ path: 'output/testing/start-map-mobile.png' });
   await page.getByRole('button', { name: 'First person' }).tap();
   await expect(page.locator('#joystick')).toBeVisible();
@@ -86,7 +86,7 @@ test('mobile layout, simultaneous touch look/movement, cancellation, and aerial 
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
   const stopped = await snapshot(page);
   expect(stopped.yaw).not.toBe(before.yaw);
-  await page.getByRole('button', { name: 'Top view' }).tap();
+  await page.getByRole('button', { name: 'Map' }).tap();
   await expect(page.getByRole('heading', { name: 'Find your wonder.' })).toBeVisible();
   await page.screenshot({ path: 'output/testing/aerial-map-mobile.png' });
   await page.getByRole('button', { name: 'First person' }).tap();
@@ -107,7 +107,7 @@ test('movement keys preserve held-mouse rotation and never enable unpressed rota
     HTMLCanvasElement.prototype.requestPointerLock = () => { throw new Error('Livistone must never request pointer lock'); };
   });
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'First person' })).toBeEnabled({ timeout: 60000 });
+  await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
   await page.getByRole('button', { name: 'First person' }).click();
   const rotations: { yaw: number; pitch: number }[] = [];
   for (const keys of [[], ['KeyW'], ['KeyA'], ['KeyS'], ['KeyD'], ['ArrowUp'], ['ArrowDown'], ['ArrowUp', 'KeyD']]) {
@@ -155,7 +155,7 @@ test('movement keys preserve held-mouse rotation and never enable unpressed rota
 test('both jewelry ministries have walkable entrances and reachable artifacts', async ({ page }) => {
   const requests: string[] = []; page.on('request', (request) => requests.push(request.url()));
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'First person' })).toBeEnabled({ timeout: 60000 });
+  await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
   await page.getByRole('button', { name: 'First person' }).click();
   for (const [x, z, location, heading] of [[-29, -9, 'Ministry of Energy', 'Mitoring'], [29, -11, 'Ministry of Science', 'The Nanot of Power']] as const) {
     await teleport(page, x, z + 16);
@@ -178,7 +178,7 @@ test('both jewelry ministries have walkable entrances and reachable artifacts', 
 });
 
 test('left/right arrows turn in place, A/D strafe, and keyboard turning preserves a held drag', async ({ page }) => {
-  await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.click('#view-toggle');
+  await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.click('#view-toggle');
   for (const [key, sign] of [['ArrowLeft', 1], ['ArrowRight', -1]] as const) {
     await teleport(page, 0, 44); const start = await snapshot(page);
     await page.keyboard.down(key); await expect.poll(async () => (await snapshot(page)).yaw * sign).toBeGreaterThan(.25); await page.keyboard.up(key);
@@ -203,7 +203,7 @@ test('left/right arrows turn in place, A/D strafe, and keyboard turning preserve
 test('curated collections keep permanent locations, full-photo controls, source facts and catalogue filters', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   const fullRequests: string[] = []; page.on('request', (request) => { if (/catalogue\/.*(?<!-thumb)\.webp/.test(request.url())) fullRequests.push(request.url()); });
-  await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.click('#view-toggle');
+  await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.click('#view-toggle');
   expect(fullRequests).toEqual([]);
   for (const [anchor, material, count, supporting] of [['nut', 'Brass, walnut, amethyst', 8, 'ammonite'], ['mitoring', 'Amber, sterling silver', 8, 'amberbow'], ['nanot', 'Sterling silver', 9, 'beanut']] as const) {
     await facePiece(page, anchor); await page.keyboard.press('KeyE');
@@ -230,7 +230,7 @@ test('curated collections keep permanent locations, full-photo controls, source 
 test('touch poster inspection preserves look gestures and fits the screen', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   try {
-    const page = await context.newPage(); await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.locator('#view-toggle').tap();
+    const page = await context.newPage(); await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.locator('#view-toggle').tap();
     await facePiece(page, 'nanot'); await page.locator('#interact').tap(); await page.locator('.photo-open').first().tap();
     await expect(page.locator('#viewer-image')).toBeVisible(); await page.getByRole('button', { name: 'Zoom photograph in' }).tap(); await expect(page.locator('#photo-zoom')).toHaveText('130%');
     await page.getByRole('button', { name: 'Next photograph' }).tap(); await expect(page.locator('#photo-count')).toHaveText('2 / 2');

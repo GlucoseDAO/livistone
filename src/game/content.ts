@@ -1,3 +1,4 @@
+import { TOWN_INTRO } from './introduction';
 import { STATION } from '../world/station-layout';
 import { GLUCOSE_PAVILION } from '../world/glucose-layout';
 import { RESEARCH_POSTERS } from './research';
@@ -47,6 +48,7 @@ export interface Discovery {
 }
 const ENHANCEMENT_STORY = 'Materialized Enhancements combines a character-building game, a gene evidence knowledgebase and printable bioart. Pick real genes from real animals, see how far each gene’s evidence reached, then grow a Voronoi crystal from your character. The hill preserves the supplied Voronoi STL, holes and angular cells included, enlarged and coloured like the project’s printed and rendered crystals. The six smaller crystals in front were grown by the project’s pipeline, one from each gene category. The posters show printed pieces, the people holding them and a character report; click any of them to open enhancement.bio. Amber arrows mark an outside climb, and a lit cave leads to an internal ramp and a human figure with a Voronoi chest.';
 export const DISCOVERIES: Discovery[] = [
+  { id: 'about-livistone', landmark: 'station', title: 'Livia & Livistone', category: 'MEET THE CREATOR', body: TOWN_INTRO.journey + '. ' + TOWN_INTRO.body + '\n\n' + TOWN_INTRO.music },
   { id: 'materialized-enhancements', landmark: 'enhancement', title: 'Materialized Enhancements', category: 'BIOART / PARTICIPATE', body: ENHANCEMENT_STORY, links: [{ label: 'Join here — create your character', url: ENHANCEMENT_URL }],
     slides: [{ title: 'A game. A knowledgebase. A bioart project.', body: ENHANCEMENT_STORY }, ...ENHANCEMENT_POSTERS.map(p => ({ title: p.title, body: `${p.body} ${p.credit}.`, image: enhancementImage(p.slug), imageAlt: p.alt }))] },
   { id: 'future-house-story', landmark: 'future-house', title: 'Camel Dalí / Future House', category: 'MATERIALS AND IMAGINATION', body: 'Camel Dalí combines native copper, a PLA printed part and leather ties, as described by Livia. The original Instagram post introduces an organic form and 3D printing. Future House enlarges those materials into a drinking camel: copper legs and neck, a printed exhibition cabin and leather bindings. The building and walkable neck are new Livistone architecture.', links: [{ label: 'Camel Dalí — original Instagram post', url: 'https://www.instagram.com/p/DdDwLqDlcm2/' }] },

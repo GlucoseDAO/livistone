@@ -1,3 +1,6 @@
+import { nearbyArchitecture, storyFor } from './game/nearby';
+import type { NearbyStory } from './game/nearby';
+import { loadingStage } from './loading';
 import './style.css';
 import * as THREE from 'three';
 import { RAILWAY, railwayCorridor } from './world/station-layout';
@@ -25,13 +28,13 @@ class Game {
   private readonly scene = new THREE.Scene();
   private skyBackground: THREE.CubeTexture;
   private readonly skies = new Map<boolean, ReturnType<typeof createSky>>();
-  private readonly nightLighting: NightLighting;
+  private nightLighting!: NightLighting;
   private timeOfDay: TimeOfDay = readTimeOfDay();
   private clockCheck = 0;
   private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, 150);
   private readonly mapCamera = new THREE.PerspectiveCamera(44, 1, 0.2, 800);
   private readonly orbit: OrbitControls;
-  private readonly town: Town;
+  private town!: Town;
   private readonly input: Input;
   private readonly ambience = new Ambience();
   private readonly sun: THREE.DirectionalLight;
@@ -54,6 +57,7 @@ class Game {
   private lastTime = performance.now();
   private elapsed = 0;
   private interaction: string | null = null;
+  private nearby: NearbyStory | null = null;
   private updateClock = 0;
   private fpsFrames = 0;
   private fpsTime = 0;
@@ -87,8 +91,6 @@ class Game {
     this.sun.position.set(this.night ? 40 : -55, this.night ? 90 : 150, this.night ? -50 : 40); this.sun.target.position.set(0, 0, -60); this.scene.add(this.sun, this.sun.target);
     const sky = createSky(this.renderer, this.reduced, this.night); this.skies.set(this.night, sky); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = sky.environment;
     this.scene.environmentIntensity = this.night ? 0.2 : 0.5;
-    this.town = new Town(this.reduced); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
-    this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced); this.nightLighting.setNight(this.night);
     // The town and sun are static; refresh shadows only when scene visibility changes.
     this.renderer.shadowMap.autoUpdate = false; this.renderer.shadowMap.needsUpdate = true;
     this.mapCamera.position.set(62, 44, 69); this.mapCamera.lookAt(0, 2, -13);
@@ -114,7 +116,7 @@ class Game {
       event.preventDefault(); this.input.active = false; this.input.clear(); cancelAnimationFrame(this.frameId);
       ui.error('The graphics connection was interrupted. Reload to return to the town. Your discoveries are saved.');
     });
-    this.resize(); this.frameId = requestAnimationFrame(this.frame);
+    this.resize();
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
         snapshot: () => ({ ready: !!this.physics, night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced }),
@@ -123,13 +125,22 @@ class Game {
     }
   }
   async load(): Promise<void> {
+    this.town = await Town.create(this.reduced, loadingStage); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
+    this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced); this.nightLighting.setNight(this.night);
+    await loadingStage(70, 'Loading gallery images and woodland…');
     const assets = this.town.loadAssets();
     const { Physics } = await import('./game/physics');
+    await loadingStage(78, 'Preparing walkable paths and interiors…');
     this.physics = await Physics.create(this.town.colliders);
     await assets;
+    await loadingStage(92, 'Preparing your first view…');
     this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true);
     this.renderer.shadowMap.needsUpdate = true;
-    this.ui.ready(); this.returnMode = 'map'; this.resetMap(); this.setMode('map');
+    this.walkCamera.position.set(SPAWN.x, SPAWN.y + .78, SPAWN.z); this.walkCamera.rotation.set(0, SPAWN.yaw, 0, 'YXZ');
+    await this.renderer.compileAsync(this.scene, this.walkCamera);
+    await loadingStage(100, 'Welcome to Livistone');
+    this.lastTime = performance.now(); this.frameId = requestAnimationFrame(this.frame);
+    this.ui.ready(); this.returnMode = 'walking'; this.setMode('walking'); this.updateWalking(0); this.findInteraction(); this.findLocation(); this.renderer.render(this.scene, this.walkCamera);
   }
   private get mapView(): boolean {
     return this.mode === 'map' || this.mode === 'welcome' || (['lore', 'journal', 'paused', 'gallery'].includes(this.mode) && this.returnMode === 'map');
@@ -190,8 +201,9 @@ class Game {
       if (this.mode === 'gallery') { this.setMode(this.galleryReturn); return; }
       if (this.mode === 'lore' && this.loreFromJournal) { this.loreFromJournal = false; this.setMode('journal'); }
       else { this.setMode(this.returnMode);  }
-    } else if (action === 'interact' && this.mode === 'walking' && this.interaction) {
-      this.discover(this.interaction);
+    } else if ((action === 'interact' || action === 'nearby-story') && this.mode === 'walking') {
+      const id = action === 'interact' ? this.interaction ?? this.nearby?.id : this.nearby?.id;
+      if (id) this.discover(id);
     } else if (action.startsWith('discovery:')) {
       this.discover(action.split(':')[1], true);
 
@@ -325,15 +337,19 @@ class Game {
   private findInteraction(): void {
     const p = this.physics!.position();
     const camera = this.walkCamera; camera.getWorldDirection(this.direction); let candidate: string | null = null, nearest = 4.8;
+    let nearbyId: string | null = null, nearbyDistance = 4.8;
     for (const item of this.town.interactives) {
-      const delta = item.position.clone().sub(camera.position); const distance = delta.length();
-      if (distance > nearest || delta.normalize().dot(this.direction) < 0.78) continue;
+      const delta = item.position.clone().sub(camera.position), distance = delta.length();
+      if (distance > 4.8) continue; delta.normalize();
       this.raycaster.set(camera.position, delta); this.raycaster.far = distance - 0.2;
       if (this.raycaster.intersectObjects(this.town.occluders, false).length > 0) continue;
-      nearest = distance; candidate = item.id;
+      if (distance < nearbyDistance) { nearbyDistance = distance; nearbyId = item.id; }
+      if (distance < nearest && delta.dot(this.direction) >= .78) { nearest = distance; candidate = item.id; }
     }
     if (candidate !== this.interaction) { this.interaction = candidate; this.ui.setInteraction(candidate); }
+    this.nearby = storyFor(candidate ?? nearbyId ?? '') ?? nearbyArchitecture(p.x, p.z); this.ui.setNearby(this.nearby);
   }
+
   private updateMarkers(): void {
     const width = window.innerWidth, height = window.innerHeight;
     const placed: { x: number; y: number; w: number; h: number }[] = [];
@@ -380,6 +396,7 @@ class Game {
 let game: Game | undefined;
 const ui = new UI((action) => { if (action === 'reload') location.reload(); else void game?.action(action); });
 try {
+  await loadingStage(12, 'Preparing the sky and light…');
   game = new Game(ui);
   game.load().catch((error: unknown) => { console.error('Town initialization failed', error); ui.error('The town could not finish loading. Check your connection and try again.'); });
 } catch (error) {

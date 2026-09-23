@@ -17,7 +17,7 @@ const views = [
   ['railway-detail', 55, 76.6, -Math.PI / 2, -.22], ['railway-inside', 200, 79, -Math.PI / 2, .07],
   ['glucose-pavilion', 38, -23, 0, .23], ['glucose-interior', 38, -40, -Math.PI / 2, .22],
   ['vittoria-lake', -18, -64, 0, .08], ['mycelium-grove', 74, -138, Math.PI, .18],
-  ['station-arrival', 0, 58, 0],
+  ['station-arrival', 0, 58, 0], ['arrival-meadow', 10, 52, -.9], ['north-meadow', 0, -42, 0],
   ['catalogue-poster', 2.51, -18.21, -2.409],
 ];
 const gpu = process.platform === 'win32' ? ['--use-angle=d3d11', '--ignore-gpu-blocklist'] : ['--use-gl=angle', '--use-angle=gl', '--ignore-gpu-blocklist'];
@@ -27,7 +27,7 @@ page.setDefaultNavigationTimeout(90000); page.setDefaultTimeout(90000);
 page.on('pageerror', (e) => console.error('page error:', e.message));
 await page.goto('http://127.0.0.1:5173');
 await page.waitForFunction(() => window.__livistone?.snapshot().ready, null, { timeout: 60000 });
-await page.click('#view-toggle'); await page.waitForTimeout(300);
+await page.waitForFunction(() => window.__livistone?.snapshot().mode === 'walking'); await page.waitForTimeout(300);
 for (const [name, x, z, yaw, pitch = 0] of views) {
   await page.evaluate(([x, z, yaw]) => window.__livistone.teleport(x, z, yaw), [x, z, yaw]);
   if (pitch) { await page.mouse.move(640, 400); await page.mouse.down(); await page.mouse.move(640, 400 - pitch / .0028, { steps: 4 }); await page.mouse.up(); }

@@ -1,3 +1,4 @@
+import type { NearbyStory } from '../game/nearby';
 import { GalleryUI } from './gallery';
 import type { Exhibit } from '../game/exhibits';
 import { DISCOVERIES, LANDMARKS } from '../game/content';
@@ -29,6 +30,7 @@ export class UI {
   private readonly live: HTMLElement;
   private toastTimer = 0;
   private hasExplored = false;
+  private nearbyId: string | null = null;
   private slide = 0;
   private openDiscovery: Discovery | null = null;
   constructor(private action: (id: string) => void) {
@@ -39,7 +41,7 @@ export class UI {
       '<header class="topbar"><div class="brand" aria-label="Livistone">' + icon('leaf') + '<span>LIVISTONE<span class="brand-sub">A LIVING WORLD</span></span></div><div class="top-center"><span class="status-dot"></span><span id="mode-label">ART, SCIENCE & NATURE</span></div><nav id="tools" aria-label="Explore Livistone"><button id="view-toggle" class="tool view-toggle" data-action="map" aria-label="First person" aria-keyshortcuts="M" disabled>' + icon('walk') + '<span>First person</span><kbd>M</kbd></button><button class="tool" data-action="journal" aria-label="Open discovery journal" aria-expanded="false" aria-controls="journal" disabled>' + icon('book') + '<span>Journal</span></button><button class="tool square" data-action="pause" aria-label="Open menu" aria-expanded="false" aria-controls="pause" disabled>' + icon('menu') + '</button></nav></header>',
       '<div id="welcome" class="loading-notice" role="status">Preparing Livistone…</div>',
       '<div id="crosshair" class="crosshair" aria-hidden="true" hidden></div>',
-      '<footer id="walk-footer" class="walk-footer" hidden><div class="place-card"><span class="eyebrow">YOU ARE EXPLORING</span><strong id="location">Riverside Gardens</strong><span id="discoveries">0 discoveries</span></div><div class="controls-hint"><span><kbd>W A S D</kbd> Walk</span><span><kbd>← →</kbd> Turn</span><span id="look-hint">Hold left mouse to look</span><span><kbd>E</kbd> Discover</span></div></footer>',
+      '<footer id="walk-footer" class="walk-footer" hidden><div class="place-card"><span id="location" class="eyebrow">Riverside Gardens</span><div id="nearby-story" hidden><span class="nearby-label">NEARBY</span><strong id="nearby-title"></strong><p id="nearby-sentence"></p><button id="nearby-read" class="nearby-read" data-action="nearby-story">Read story ' + icon('arrow') + '</button></div><span id="discoveries" class="sr-only">0 discoveries</span></div><div class="controls-hint"><span><kbd>W A S D</kbd> Walk</span><span><kbd>← →</kbd> Turn</span><span id="look-hint">Hold left mouse to look</span><button id="discover-control" data-action="interact" disabled><kbd>E</kbd> Read story</button></div></footer>',
       '<button id="interact" class="interaction" data-action="interact" hidden><span class="interaction-key">E</span><span id="interact-label">Discover</span>' + icon('arrow') + '</button>',
       '<div id="touch-controls" class="touch-controls" hidden><div id="joystick" class="joystick" role="group" aria-label="Touch movement control"><div class="stick-knob"></div></div><span class="touch-look">Drag to look around</span></div>',
       '<section id="map-panel" class="map-panel" hidden aria-labelledby="map-title"><div class="eyebrow">THE CITY AT A GLANCE</div><h2 id="map-title">Find your wonder.</h2><p id="map-origins">Every stop is based on a real, existing piece of jewelry, artwork or research project. Follow the numbers from the station into the town.</p><button id="start-exploring" class="primary full map-start" data-action="walk" aria-label="Start exploring">' + icon('walk') + '<span><strong>Start exploring</strong><small>Walk in first person</small></span>' + icon('arrow') + '</button><div class="landmark-list">' + LANDMARKS.map((l, i) => '<button class="landmark-item" data-action="landmark:' + l.id + '" aria-label="Go to ' + l.name + '"><span class="landmark-number">' + String(i + 1).padStart(2, '0') + '</span><span><strong>' + l.name + '</strong><small>' + l.artifact + '</small></span>' + icon('arrow') + '</button>').join('') + '</div><div id="map-description" class="map-description" role="status">Choose a place to arrive at its entrance.</div></section>',
@@ -55,6 +57,8 @@ export class UI {
     this.gallery = new GalleryUI(this.app);
     this.canvas = this.app.querySelector('#world')!; this.joystick = this.app.querySelector('#joystick')!;
     this.modeLabel = this.app.querySelector('#mode-label')!; this.location = this.app.querySelector('#location')!; this.prompt = this.app.querySelector('#interact')!; this.live = this.app.querySelector('#live')!;
+    const loading = document.querySelector<HTMLElement>('#boot-loading')!;
+    this.app.querySelector('#welcome')!.replaceWith(loading); loading.id = 'welcome';
     this.app.addEventListener('click', (e) => {
       const button = (e.target as Element).closest<HTMLElement>('[data-action]');
       if (button) action(button.dataset.action!);
@@ -96,7 +100,7 @@ export class UI {
     if (mode !== 'walking') this.prompt.hidden = true;
     const dialog = this.app.querySelector<HTMLElement>('.dialog:not([hidden])');
     this.canvas.inert = !!dialog;
-    const toggle = this.app.querySelector<HTMLButtonElement>('#view-toggle')!, label = mapView ? 'First person' : 'Top view';
+    const toggle = this.app.querySelector<HTMLButtonElement>('#view-toggle')!, label = mapView ? 'First person' : 'Map';
     toggle.innerHTML = icon(mapView ? 'walk' : 'map') + '<span>' + label + '</span><kbd>M</kbd>'; toggle.setAttribute('aria-label', label);
     this.app.querySelector('[data-action="journal"]')!.setAttribute('aria-expanded', String(mode === 'journal'));
     this.app.querySelector('[data-action="pause"]')!.setAttribute('aria-expanded', String(mode === 'paused'));
@@ -130,7 +134,7 @@ export class UI {
     this.app.querySelector<HTMLElement>('#lore-body')!.hidden = jewelry && !civic;
     this.app.querySelector('#lore-body')!.textContent = civic ? discovery.body : discovery.body;
     const attribution = this.app.querySelector<HTMLElement>('.lore-source')!;
-    attribution.hidden = jewelry && !civic;
+    attribution.hidden = (jewelry && !civic) || discovery.id === 'about-livistone';
     attribution.textContent = discovery.id.startsWith('glucose-') ? 'Images and text from the supplied GlucoseDAO archive · September 2026. Research claims belong to the original authors. Architecture is Livistone fiction.' : discovery.links ? 'Public project sources · reviewed September 2026. Architecture is Livistone fiction.' : 'Artist stories from Livia’s public catalogue; Livistone fiction is labelled separately.';
     const catalogue = this.app.querySelector<HTMLElement>('#exhibit-catalogue')!;
     catalogue.replaceChildren(); catalogue.hidden = !exhibit;
@@ -185,6 +189,15 @@ export class UI {
   }
 
   setLocation(name: string): void { if (this.location.textContent !== name) this.location.textContent = name; }
+  setNearby(story: NearbyStory | null): void {
+    this.app.querySelector<HTMLButtonElement>('#discover-control')!.disabled = !story;
+    if (this.nearbyId === (story?.id ?? null)) return; this.nearbyId = story?.id ?? null;
+    this.app.querySelector<HTMLElement>('#nearby-story')!.hidden = !story;
+    if (!story) return;
+    this.app.querySelector('#nearby-title')!.textContent = story.title;
+    this.app.querySelector('#nearby-sentence')!.textContent = story.sentence;
+    this.app.querySelector('#nearby-read')!.setAttribute('aria-label', 'Read story: ' + story.title);
+  }
   setLookHint(text: string): void { this.app.querySelector("#look-hint")!.textContent = text; }
   setInteraction(id: string | null): void {
     this.prompt.hidden = !id;

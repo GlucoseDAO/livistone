@@ -1,3 +1,4 @@
+import { paintPosterText } from './poster-text';
 import * as THREE from 'three';
 import { COLLECTION, EXHIBITS, photoURL, photoSize } from '../game/exhibits';
 import type { Exhibit } from '../game/exhibits';
@@ -23,7 +24,7 @@ function caption(piece: Exhibit, width: number): THREE.CanvasTexture {
   y = textLines(ctx, piece.materials, y, 25, '#445c4b');
   y = textLines(ctx, piece.dimensions, y, 24, '#445c4b');
   y = textLines(ctx, piece.collection ?? '', y + 8, 23, '#687461');
-  textLines(ctx, piece.story ?? piece.description, y + 8, 25, '#445c4b');
+  ctx.fillStyle = '#445c4b'; paintPosterText(ctx, piece.story ?? piece.description, 50, y, 860, canvas.height - 108 - y, 40);
   textLines(ctx, 'Livia Zaharia · studio archive image', canvas.height - 67, 23, '#687461');
   textLines(ctx, 'Click photo to enlarge · E / tap for the story', canvas.height - 25, 23, '#25473b');
   const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace; return map;

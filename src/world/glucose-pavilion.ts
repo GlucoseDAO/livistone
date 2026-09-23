@@ -1,3 +1,4 @@
+import { paintPosterText } from './poster-text';
 import * as THREE from 'three';
 import { addGlow, nightEmission } from './night-lighting';
 import type { ColliderSpec } from '../game/physics';
@@ -93,7 +94,7 @@ async function posterTexture(index: number): Promise<THREE.CanvasTexture> {
   const image = new Image(); image.src = poster.slides[0].image!; await image.decode();
   const scale = Math.min(880 / image.naturalWidth, 430 / image.naturalHeight);
   ctx.drawImage(image, 60 + (880 - image.naturalWidth * scale) / 2, end + 8, image.naturalWidth * scale, image.naturalHeight * scale);
-  ctx.fillStyle = '#304b44'; ctx.font = '25px sans-serif'; wrapped(ctx, poster.body, 60, end + 480, 880, 32);
+  ctx.fillStyle = '#304b44'; paintPosterText(ctx, poster.body, 60, end + 465, 880, 1040 - (end + 465), 36);
   ctx.fillStyle = '#d6cdb8'; ctx.fillRect(60, 1063, 880, 2); ctx.fillStyle = '#315a4f'; ctx.font = '28px sans-serif';
   ctx.fillText(`${poster.slides.length} slides  ·  click / tap / E`, 60, 1120);
   ctx.font = '22px sans-serif'; ctx.fillText(poster.category.startsWith('06') ? 'rcsb.org  /  1TRZ + GLC' : 'glucosedao.github.io', 60, 1164);

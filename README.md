@@ -8,10 +8,12 @@ Explore a 3D art-and-science town built around Livia Zaharia’s jewelry, artwor
 
 You only need a recent browser with WebGL 2 and hardware acceleration. No installation, IDE, account or login is required to visit the website.
 
-1. Wait for the town to load. It opens in **Top view**.
-2. Choose **Start exploring** to walk from the station, or select a named stop on the map to arrive at its entrance.
+1. The loading screen introduces Livia with her artistic homepage portrait and shows preparation progress. The town opens in **first person at the station exit, facing the Livistone entrance**.
+2. Walk towards the bridge and city gate. Choose **Map** (M) to see the town from above or select a named stop to arrive at its entrance.
 3. Approach a display and press **E**, or tap its discovery prompt, to read the story. Click a photograph to enlarge it. The pointer turns into a hand over anything you can click; the posters at Materialized Enhancements open [enhancement.bio](https://enhancement.bio/) in a new tab. Large dark signs in gold lattice frames introduce a place; cream boards show individual pieces.
 4. Open **Journal** to browse the stories and jewelry catalogue at any time.
+
+An introduction poster to the right of the bridge approach tells the story of Livia’s journey from architecture to parametric jewellery and citizen science. Click it, press E nearby, or open **Livia & Livistone** in the journal to read it. The larger **Map** button (M) opens the aerial view without moving you. A nearby-piece panel introduces what you pass in one sentence; choose **Read story**, click the **E** control, or press **E** to read more.
 
 | Action | Computer | Phone or tablet |
 | --- | --- | --- |
@@ -85,3 +87,7 @@ Browser tests require Chrome and use the dev server on port 5173. `check:hosts` 
 - [Kalimba credits and source records](public/audio/kalimba/README.md)
 
 Livistone is a playable prototype. Performance varies by device, and physical-phone and Safari verification remain ongoing work. Artwork and recording credits, third-party asset licences and concept references are preserved in the [technical guide](docs/technical-guide.md#credits-and-licensing).
+
+Ground cover combines local grass-and-soil photographs with worn path edges, earth near riverbanks and broad spring-green meadow variation. It uses the existing terrain mesh: reduced detail loads two 512 px WebP textures (about 130 KiB combined), while rich detail uses 1024 px textures. Physical-phone performance still needs measurement. Texture sources and regeneration are recorded in `public/textures/ground/ATTRIBUTION.md`.
+
+Open grass areas have broad rolling contours, reaching roughly 1–2.5 metres where space allows, with a subdued spring-green palette. `meadow-relief.ts` bakes a clearance distance field once and tapers the contours around paths, buildings and other authored clearances, including a 2.5-metre interpolation margin. The existing terrain mesh and Rapier surface share these heights; plants follow the same field. Contours add no triangles or draw calls.
