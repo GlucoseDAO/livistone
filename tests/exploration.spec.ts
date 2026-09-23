@@ -52,7 +52,7 @@ test('explore City Hall, preserve position through map mode, and retain discover
   await facePiece(page, 'nut');
   await expect(page.locator('#interact')).toBeVisible();
   await page.keyboard.press('KeyE');
-  await expect(page.getByRole('heading', { name: 'One Nut to connect them all' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The Nut of Power', exact: true })).toBeVisible();
   await page.screenshot({ path: 'output/testing/city-hall-discovery.png' });
   await page.getByRole('button', { name: 'Continue exploring' }).click();
   const before = await snapshot(page);
@@ -157,7 +157,7 @@ test('both jewelry ministries have walkable entrances and reachable artifacts', 
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'First person' })).toBeEnabled({ timeout: 60000 });
   await page.getByRole('button', { name: 'First person' }).click();
-  for (const [x, z, location, heading] of [[-29, -9, 'Ministry of Energy', 'A little powerhouse'], [29, -11, 'Ministry of Science', 'The smallest possibilities']] as const) {
+  for (const [x, z, location, heading] of [[-29, -9, 'Ministry of Energy', 'Mitoring'], [29, -11, 'Ministry of Science', 'The Nanot of Power']] as const) {
     await teleport(page, x, z + 16);
     await page.keyboard.down('ArrowUp');
     await expect.poll(async () => (await snapshot(page)).position.z, { timeout: 30000 }).toBeLessThan(z + 3);
@@ -222,7 +222,7 @@ test('curated collections keep permanent locations, full-photo controls, source 
     await page.keyboard.press('Escape'); expect((await snapshot(page)).position.z).toBeCloseTo(before.position.z, 2); expect((await snapshot(page)).yaw).toBe(before.yaw);
   }
   await page.getByRole('button', { name: 'Open discovery journal' }).click(); await page.getByRole('button', { name: 'Browse the jewelry catalogue' }).click();
-  await expect(page.locator('.piece-card')).toHaveCount(35); await page.getByRole('searchbox', { name: 'Search jewelry' }).fill('Mycelium'); await expect(page.locator('.piece-card')).toHaveCount(1); await page.getByRole('searchbox', { name: 'Search jewelry' }).fill(''); await page.getByLabel('Location', { exact: true }).selectOption('station'); await expect(page.locator('.piece-card')).toHaveCount(7);
+  await expect(page.locator('.piece-card')).toHaveCount(41); await page.getByRole('searchbox', { name: 'Search jewelry' }).fill('Mycelium'); await expect(page.locator('.piece-card')).toHaveCount(1); await page.getByRole('searchbox', { name: 'Search jewelry' }).fill(''); await page.getByLabel('Location', { exact: true }).selectOption('station'); await expect(page.locator('.piece-card')).toHaveCount(7);
   await page.getByLabel('Year', { exact: true }).selectOption('2022'); expect(await page.locator('.piece-card').count()).toBeGreaterThan(0);
   await page.screenshot({ path: 'output/testing/catalogue-filtered.png' }); expect(errors).toEqual([]);
 });

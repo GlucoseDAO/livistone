@@ -1,8 +1,8 @@
 import * as THREE from 'three';
+import { addGlow, nightEmission } from './night-lighting';
 import type { ColliderSpec } from '../game/physics';
 import type { Interactive } from './world';
 import { RESEARCH_POSTERS } from '../game/research';
-import { drawResearchFigure } from '../game/research-art';
 import { GLUCOSE_PAVILION as SITE, GLUCOSE_POSTERS } from './glucose-layout';
 import insulin from './molecules/insulin.json';
 import glucose from './molecules/glucose.json';
@@ -57,11 +57,15 @@ export function createGlucoseStructure(root: THREE.Object3D, colliders: Collider
   }
   // A separate, explicitly identified glucose graph occupies a side alcove, never the through route.
   const atomPoints = new Map(glucose.atoms.map((atom) => [atom.id, new THREE.Vector3(SITE.x + 3.8 + atom.position[0] * .42, 2.2 + atom.position[2] * .42, SITE.z + 6.2 - atom.position[1] * .42)]));
-  const oxygen = new THREE.MeshStandardMaterial({ color: '#bd765f', roughness: .4, metalness: .3 });
-  for (const atom of glucose.atoms) solid(new THREE.SphereGeometry(.16, mobile ? 8 : 12, 8), atom.element === 'O' ? oxygen : white, group, colliders, atomPoints.get(atom.id)!);
+  const oxygen = new THREE.MeshStandardMaterial({ color: '#e49d86', emissive: '#ff7955', emissiveIntensity: .55, roughness: .25, metalness: .2 });
+  const carbon = white.clone(), bonds = silver.clone(); carbon.emissive.set('#8cf4df'); carbon.emissiveIntensity = .35; bonds.emissive.set('#9effe8'); bonds.emissiveIntensity = .45;
+  nightEmission(oxygen, '#ff7955', 2); nightEmission(carbon, '#8cf4df', 1.6); nightEmission(bonds, '#9effe8', 1.2);
+  addGlow(group, new THREE.Vector3(SITE.x + 3.8, 2.3, SITE.z + 6.2), '#8fffe1', 5.5, 30, 8, .48);
+  addGlow(group, new THREE.Vector3(SITE.x, 5, SITE.z), '#a2ddd2', 16, 65, 19, .22);
+  for (const atom of glucose.atoms) solid(new THREE.SphereGeometry(.16, mobile ? 8 : 12, 8), atom.element === 'O' ? oxygen : carbon, group, colliders, atomPoints.get(atom.id)!);
   for (const [from, to] of glucose.bonds) {
     const a = atomPoints.get(from)!, b = atomPoints.get(to)!, geometry = new THREE.CylinderGeometry(.055, .055, a.distanceTo(b), 6); geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(UP, b.clone().sub(a).normalize()));
-    solid(geometry, silver, group, colliders, a.clone().lerp(b, .5));
+    solid(geometry, bonds, group, colliders, a.clone().lerp(b, .5));
   }
   solid(new THREE.CylinderGeometry(.12, .2, 1.65, 8), gold, group, colliders, new THREE.Vector3(SITE.x + 3.8, .98, SITE.z + 6.2));
   const panels = GLUCOSE_POSTERS.map((site, i) => {
@@ -80,26 +84,28 @@ function wrapped(ctx: CanvasRenderingContext2D, text: string, x: number, y: numb
   }
   ctx.fillText(current, x, y); return y + line;
 }
-function posterTexture(index: number): THREE.CanvasTexture {
+async function posterTexture(index: number): Promise<THREE.CanvasTexture> {
   const poster = RESEARCH_POSTERS[index], canvas = document.createElement('canvas'); canvas.width = 1000; canvas.height = 1200;
   const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#f2eee3'; ctx.fillRect(0, 0, 1000, 1200);
   ctx.fillStyle = '#244f46'; ctx.fillRect(0, 0, 1000, 118); ctx.fillStyle = '#f8f2df'; ctx.font = '500 32px sans-serif'; ctx.fillText('GLUCOSE COMMONS', 60, 72);
   ctx.fillStyle = '#977246'; ctx.font = '24px sans-serif'; ctx.fillText(poster.category, 60, 176);
   ctx.fillStyle = '#23473f'; ctx.font = '54px Georgia, serif'; const end = wrapped(ctx, poster.title, 60, 253, 880, 65);
-  drawResearchFigure(ctx, poster.slides[0].figure ?? 'trace', 60, end + 8, 880, 320);
-  ctx.fillStyle = '#304b44'; ctx.font = '28px sans-serif'; wrapped(ctx, poster.body, 60, end + 360, 880, 40);
+  const image = new Image(); image.src = poster.slides[0].image!; await image.decode();
+  const scale = Math.min(880 / image.naturalWidth, 430 / image.naturalHeight);
+  ctx.drawImage(image, 60 + (880 - image.naturalWidth * scale) / 2, end + 8, image.naturalWidth * scale, image.naturalHeight * scale);
+  ctx.fillStyle = '#304b44'; ctx.font = '25px sans-serif'; wrapped(ctx, poster.body, 60, end + 480, 880, 32);
   ctx.fillStyle = '#d6cdb8'; ctx.fillRect(60, 1063, 880, 2); ctx.fillStyle = '#315a4f'; ctx.font = '28px sans-serif';
   ctx.fillText(`${poster.slides.length} slides  ·  click / tap / E`, 60, 1120);
   ctx.font = '22px sans-serif'; ctx.fillText(poster.category.startsWith('06') ? 'rcsb.org  /  1TRZ + GLC' : 'glucosedao.github.io', 60, 1164);
   const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 4; return texture;
 }
-export function createGlucosePavilion(root: THREE.Object3D, colliders: ColliderSpec[], mobile: boolean, paving: THREE.Material): { panels: THREE.Mesh[]; interactives: Interactive[] } {
+export function createGlucosePavilion(root: THREE.Object3D, colliders: ColliderSpec[], mobile: boolean, paving: THREE.Material): { panels: THREE.Mesh[]; interactives: Interactive[]; ready: Promise<void> } {
   const { group, panels } = createGlucoseStructure(root, colliders, mobile, paving);
-  panels.forEach((panel, i) => { (panel.material as THREE.MeshBasicMaterial).map = posterTexture(i); (panel.material as THREE.Material).needsUpdate = true; });
+  const ready = Promise.all(panels.map(async (panel, i) => { (panel.material as THREE.MeshBasicMaterial).map = await posterTexture(i); (panel.material as THREE.Material).needsUpdate = true; })).then(() => undefined);
   const canvas = document.createElement('canvas'); canvas.width = 1600; canvas.height = 300; const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = '#23473f'; ctx.fillRect(0, 0, 1600, 300); ctx.textAlign = 'center'; ctx.fillStyle = '#f2eee3'; ctx.font = '88px Georgia, serif'; ctx.fillText('Glucose Commons', 800, 132); ctx.font = '33px sans-serif'; ctx.fillText('LIVIA ZAHARIA  /  GLUCOSEDAO  /  OPEN RESEARCH', 800, 220);
   const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
   const sign = new THREE.Mesh(new THREE.BoxGeometry(6.5, 1.22, .12), new THREE.MeshBasicMaterial({ map })); sign.position.set(SITE.x, 3.7, SITE.z + 8.5); group.add(sign);
   colliders.push({ type: 'box', position: [sign.position.x, sign.position.y, sign.position.z], size: [3.25, .61, .06] });
-  return { panels, interactives: panels.map((object, i) => ({ id: RESEARCH_POSTERS[i].id, object, position: object.position.clone() })) };
+  return { panels, ready, interactives: panels.map((object, i) => ({ id: RESEARCH_POSTERS[i].id, object, position: object.position.clone() })) };
 }

@@ -48,7 +48,7 @@ export class UI {
       '<div id="scrim" class="scrim" data-action="close" aria-hidden="true" hidden></div>',
       '<section id="lore" class="dialog lore" role="dialog" aria-labelledby="lore-title" hidden><button class="close-button" data-action="close" aria-label="Close discovery">' + icon('close') + '</button><div class="eyebrow" id="lore-category"></div><div id="lore-emblem" class="lore-emblem">✧</div><h2 id="lore-title"></h2><figure id="lore-figure" class="lore-figure" hidden><canvas id="lore-figure-canvas" width="720" height="280"></canvas></figure><div id="lore-slides" hidden><p id="lore-slide-title"></p><p id="lore-slide-body"></p><div class="slide-controls" aria-label="Chapter slides"><button data-action="slide-prev" aria-label="Previous slide">←</button><span id="lore-slide-count" aria-live="polite"></span><button data-action="slide-next" aria-label="Next slide">→</button></div><p class="viewer-help">← / → slides · Esc close</p></div><div id="exhibit-catalogue" hidden></div><p id="lore-body"></p><div class="lore-source">From Livia’s artifacts to a living town.</div><button class="text-button full" data-action="close">Continue exploring ' + icon('arrow') + '</button></section>',
       '<section id="journal" class="dialog journal" role="dialog" aria-labelledby="journal-title" hidden><button class="close-button" data-action="close" aria-label="Close journal">' + icon('close') + '</button><div class="eyebrow">YOUR FIELD NOTES</div><h2 id="journal-title">A little more wonder.</h2><p>Browse every story and photograph. Read in any order, or find them as you walk.</p><button class="primary full" data-action="catalogue">Browse the jewelry catalogue</button><div id="journal-list"></div></section>',
-      '<section id="pause" class="dialog pause" role="dialog" aria-labelledby="pause-title" hidden><button class="close-button" data-action="close" aria-label="Close menu">' + icon('close') + '</button><div class="eyebrow">MAKE YOURSELF AT HOME</div><h2 id="pause-title">A moment of quiet.</h2><button class="primary full" data-action="close">Continue exploring ' + icon('arrow') + '</button><button class="menu-item" data-action="open-map">' + icon('map') + 'Open city map</button><button class="menu-item" data-action="reset-position">' + icon('compass') + 'Return to the river entrance</button><button class="menu-item" id="sound-toggle" data-action="sound" aria-pressed="false">' + icon('sound') + 'Ambient sound: off</button><label class="quality-label">Visual detail<select id="quality"><option value="low">Gentle — lower detail</option><option value="high">Rich — higher detail</option></select></label><p class="menu-note">Move forward/back with W/S or ↑/↓. Strafe with A/D. Turn with ←/→, or hold the left mouse button and drag to look. On touch screens, use the left stick and drag to look. Your discoveries are saved on this device.</p></section>',
+      '<section id="pause" class="dialog pause" role="dialog" aria-labelledby="pause-title" hidden><button class="close-button" data-action="close" aria-label="Close menu">' + icon('close') + '</button><div class="eyebrow">MAKE YOURSELF AT HOME</div><h2 id="pause-title">A moment of quiet.</h2><button class="primary full" data-action="close">Continue exploring ' + icon('arrow') + '</button><button class="menu-item" data-action="open-map">' + icon('map') + 'Open city map</button><button class="menu-item" data-action="reset-position">' + icon('compass') + 'Return to the river entrance</button><button class="menu-item" id="sound-toggle" data-action="sound" aria-pressed="false">' + icon('sound') + 'Ambient sound: off</button><label class="quality-label">Time of day<select id="time-of-day"><option value="auto">Auto — local clock</option><option value="day">Day</option><option value="night">Night</option></select></label><label class="quality-label">Visual detail<select id="quality"><option value="low">Gentle — lower detail</option><option value="high">Rich — higher detail</option></select></label><p class="menu-note">Move forward/back with W/S or ↑/↓. Strafe with A/D. Turn with ←/→, or hold the left mouse button and drag to look. On touch screens, use the left stick and drag to look. Your discoveries are saved on this device.</p></section>',
       '<div id="toast" class="toast" role="status" hidden></div><div id="live" class="sr-only" aria-live="polite"></div>',
       '<section id="error" class="error-screen" hidden><div class="eyebrow">LIVISTONE</div><h2>Let’s try that again.</h2><p id="error-message"></p><button class="primary" data-action="reload">Reload the town</button></section>',
     ].join('');
@@ -59,6 +59,7 @@ export class UI {
       const button = (e.target as Element).closest<HTMLElement>('[data-action]');
       if (button) action(button.dataset.action!);
     });
+    this.app.querySelector('#time-of-day')!.addEventListener('change', (e) => action('time-of-day:' + (e.target as HTMLSelectElement).value));
     this.app.querySelector('#quality')!.addEventListener('change', (e) => action('quality:' + (e.target as HTMLSelectElement).value));
     document.addEventListener('keydown', (e) => {
       const loreOpen = !this.app.querySelector<HTMLElement>('#lore')!.hidden && (this.openDiscovery?.slides?.length ?? 0) > 1;
@@ -130,7 +131,7 @@ export class UI {
     this.app.querySelector('#lore-body')!.textContent = civic ? discovery.body : discovery.body;
     const attribution = this.app.querySelector<HTMLElement>('.lore-source')!;
     attribution.hidden = jewelry && !civic;
-    attribution.textContent = discovery.links ? 'Public project sources · reviewed September 2026. Glucose chapters follow the public Kyiv 2026 slides and repositories. Architecture is Livistone fiction.' : 'Artist stories from Livia’s public catalogue; Livistone fiction is labelled separately.';
+    attribution.textContent = discovery.id.startsWith('glucose-') ? 'Images and text from the supplied GlucoseDAO archive · September 2026. Research claims belong to the original authors. Architecture is Livistone fiction.' : discovery.links ? 'Public project sources · reviewed September 2026. Architecture is Livistone fiction.' : 'Artist stories from Livia’s public catalogue; Livistone fiction is labelled separately.';
     const catalogue = this.app.querySelector<HTMLElement>('#exhibit-catalogue')!;
     catalogue.replaceChildren(); catalogue.hidden = !exhibit;
     if (exhibit) {
@@ -162,6 +163,7 @@ export class UI {
   turnSlide(step: number): void {
     const slides = this.openDiscovery?.slides; if (!slides?.length) return;
     this.slide = (this.slide + step + slides.length) % slides.length; this.renderSlide();
+    this.app.querySelector<HTMLElement>('#lore')!.scrollTop = 0;
   }
   private renderSlide(): void {
     const slides = this.openDiscovery?.slides ?? [], pane = this.app.querySelector<HTMLElement>('#lore-slides')!, figure = this.app.querySelector<HTMLElement>('#lore-figure')!;
@@ -173,6 +175,10 @@ export class UI {
     this.app.querySelector('#lore-slide-count')!.textContent = `${this.slide + 1} / ${slides.length}`;
     this.app.querySelector<HTMLElement>('#lore-body')!.hidden = true;
     const canvas = this.app.querySelector<HTMLCanvasElement>('#lore-figure-canvas')!, ctx = canvas.getContext('2d')!;
+    let source = figure.querySelector<HTMLAnchorElement>('.source-image');
+    if (!source) { source = document.createElement('a'); source.className = 'source-image'; source.target = '_blank'; source.rel = 'noopener noreferrer'; source.append(document.createElement('img')); figure.prepend(source); }
+    source.hidden = !slide.image; canvas.hidden = !!slide.image;
+    if (slide.image) { source.href = slide.image; source.title = 'Open original image at full size'; const image = source.querySelector('img')!; image.src = slide.image; image.alt = slide.imageAlt ?? slide.title; figure.hidden = false; return; }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (slide.figure) drawResearchFigure(ctx, slide.figure, 0, 0, canvas.width, canvas.height);
     else { figure.hidden = true; }

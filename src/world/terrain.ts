@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { waterDistance } from './waterways';
 import { GARDENS, gardenHeight } from './living-waters-layout';
 import { RAILWAY, railwayCorridor } from './station-layout';
+import { futureClearing } from './elevated-layout';
 
 function hash(x: number, z: number): number { const n = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return n - Math.floor(n); }
 export function terrainNoise(x: number, z: number): number {
@@ -16,6 +17,7 @@ const ridges = [
 ];
 export function landscapeHeight(x: number, z: number): number {
   if (Math.hypot(x - GARDENS.x, z - GARDENS.z) < 48) return gardenHeight(x - GARDENS.x, z - GARDENS.z);
+  if (futureClearing(x, z, 5)) return 0;
   const distance = waterDistance(x, z);
   if (distance < -2.6) return -2;
   if (distance < 0) return distance / 2.6 * 2;

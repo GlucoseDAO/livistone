@@ -24,7 +24,7 @@ const atomCount = Number(lines[3].slice(0, 3)), bondCount = Number(lines[3].slic
 const atoms = lines.slice(4, 4 + atomCount).map((line, index) => ({ id: index + 1, element: line.slice(31, 34).trim(), position: [0, 10, 20].map((start) => Number(line.slice(start, start + 10))) })).filter((a) => a.element !== 'H');
 const bonds = lines.slice(4 + atomCount, 4 + atomCount + bondCount).map((line) => [Number(line.slice(0, 3)), Number(line.slice(3, 6))]).filter((bond) => bond.every((id) => atoms.some((a) => a.id === id)));
 if (atoms.length !== 12 || bonds.length !== 12) throw Error('Unexpected glucose heavy-atom graph');
-const hash = (text) => createHash('sha256').update(text).digest('hex');
+const hash = (text) => createHash('sha256').update(text.replace(/\r\n/g, '\n')).digest('hex');
 const write = (name, data) => writeFileSync(new URL(`../src/world/molecules/${name}.json`, import.meta.url), JSON.stringify(data) + '\n');
 write('insulin', { source: 'https://www.rcsb.org/structure/1TRZ', pdb: '1TRZ', sourceSha256: hash(pdb), units: 'angstrom', chains, disulfides });
 write('glucose', { source: 'https://www.rcsb.org/ligand/GLC', component: 'GLC', sourceSha256: hash(sdf), coordinates: 'ideal', units: 'angstrom', atoms, bonds });

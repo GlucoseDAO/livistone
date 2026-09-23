@@ -7,7 +7,7 @@ export function createSky(renderer: THREE.WebGLRenderer, mobile: boolean, night 
     side: THREE.BackSide, depthWrite: false,
     uniforms: {
       sun: { value: new THREE.Vector3(-35, 70, 35).normalize() },
-      moon: { value: new THREE.Vector3(40, 70, -30).normalize() },
+      moon: { value: new THREE.Vector3(25, 38, -70).normalize() },
       night: { value: night ? 1 : 0 },
     },
     vertexShader: 'varying vec3 direction; void main(){direction=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
@@ -30,17 +30,24 @@ export function createSky(renderer: THREE.WebGLRenderer, mobile: boolean, night 
         day=mix(day,clouds,cloud*.96);
         day=mix(vec3(.24,.31,.18),day,smoothstep(-.18,.025,d.y));
         vec3 dark=mix(vec3(.02,.04,.08),vec3(.05,.08,.16),pow(elevation,.55));
-        float star=step(.9964,hash(floor(d.xy*90.0)+floor(d.yz*70.0)));
-        dark+=vec3(.85,.9,1.0)*star*smoothstep(.02,.28,d.y);
+        vec2 skyUV=vec2(atan(d.z,d.x)/6.2831853+.5,acos(clamp(d.y,-1.,1.))/3.14159265);
+        vec2 grid=skyUV*vec2(360.,180.), cell=floor(grid), offset=vec2(hash(cell+7.1),hash(cell+19.7))*.64+.18;
+        float starSeed=hash(cell), star=exp(-dot(fract(grid)-offset,fract(grid)-offset)*140.)*step(.967,starSeed);
+        dark+=mix(vec3(.65,.8,1.),vec3(1.,.9,.72),hash(cell+31.))*star*(1.5+hash(cell+13.)*2.)*smoothstep(.03,.2,d.y);
         float moonLight=max(dot(d,moon),0.0);
         dark+=vec3(.42,.5,.68)*pow(moonLight,22.0)*.2;
-        dark+=vec3(.92,.94,1.0)*smoothstep(.9992,.99975,moonLight);
+        vec3 moonRight=normalize(cross(moon,vec3(0.,1.,0.))), moonUp=normalize(cross(moonRight,moon));
+        vec2 lunar=vec2(dot(d,moonRight),dot(d,moonUp))/.043;
+        float disc=1.-smoothstep(.94,1.,length(lunar));
+        float craters=.74+.16*fbm(lunar*8.)+.1*noise(lunar*27.);
+        float phase=smoothstep(-.7,-.4,lunar.x+.2*sqrt(max(0.,1.-lunar.y*lunar.y)));
+        dark=mix(dark,vec3(1.25,1.23,1.13)*craters*mix(.12,1.,phase),disc*step(0.,moonLight));
         dark=mix(vec3(.04,.06,.04),dark,smoothstep(-.12,.04,d.y));
         gl_FragColor=vec4(mix(day,dark,night),1.0);
       }`,
   });
   const geometry = new THREE.SphereGeometry(10, 24, 16); scene.add(new THREE.Mesh(geometry, material));
-  const target = new THREE.WebGLCubeRenderTarget(mobile ? 256 : 512, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+  const target = new THREE.WebGLCubeRenderTarget(night ? (mobile ? 512 : 1024) : (mobile ? 256 : 512), { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
   new THREE.CubeCamera(.1, 20, target).update(renderer, scene);
   const pmrem = new THREE.PMREMGenerator(renderer), environment = pmrem.fromCubemap(target.texture).texture;
   pmrem.dispose(); geometry.dispose(); material.dispose();

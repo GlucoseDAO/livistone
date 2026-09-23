@@ -13,7 +13,9 @@ import { Input } from './game/input';
 import { Ambience } from './game/audio';
 import { LANDMARKS, DISCOVERIES, SPAWN, readProgress, writeProgress } from './game/content';
 import { probeGraphics } from './game/graphics';
-import { isNightNow } from './game/daylight';
+import { parseTimeOfDay, readTimeOfDay, resolveNight, saveTimeOfDay } from './game/daylight';
+import type { TimeOfDay } from './game/daylight';
+import { NightLighting } from './world/night-lighting';
 import type { Physics } from './game/physics';
 
 const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 };
@@ -21,7 +23,11 @@ const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 };
 class Game {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
-  private readonly skyBackground: THREE.CubeTexture;
+  private skyBackground: THREE.CubeTexture;
+  private readonly skies = new Map<boolean, ReturnType<typeof createSky>>();
+  private readonly nightLighting: NightLighting;
+  private timeOfDay: TimeOfDay = readTimeOfDay();
+  private clockCheck = 0;
   private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, 150);
   private readonly mapCamera = new THREE.PerspectiveCamera(44, 1, 0.2, 800);
   private readonly orbit: OrbitControls;
@@ -35,7 +41,7 @@ class Game {
   private readonly point = new THREE.Vector3();
   private readonly graphics: { reduced: boolean; coarse: boolean; software: boolean };
   private readonly reduced: boolean;
-  private readonly night: boolean;
+  private night: boolean;
   private readonly hemi: THREE.HemisphereLight;
   private physics?: Physics;
   private readonly zone = 'town';
@@ -60,23 +66,24 @@ class Game {
     this.renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: !coarse, powerPreference: 'high-performance' });
     this.graphics = probeGraphics(this.renderer.getContext() as WebGL2RenderingContext);
     this.reduced = this.graphics.reduced; this.lowQuality = this.reduced;
-    this.night = isNightNow();
+    this.night = resolveNight(this.timeOfDay);
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.reduced ? 1 : 1.5));
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = this.night ? 0.58 : 0.96;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = this.night ? .72 : .96;
     const haze = this.night ? '#1a2433' : '#c3d8df';
     this.scene.fog = new THREE.Fog(haze, MAP_FOG.near, MAP_FOG.far);
-    this.hemi = new THREE.HemisphereLight(this.night ? '#8ea4c6' : '#e9f4f0', this.night ? '#121820' : '#73805c', this.night ? 0.4 : 1.2);
+    this.hemi = new THREE.HemisphereLight(this.night ? '#8ea4c6' : '#e9f4f0', this.night ? '#121820' : '#73805c', this.night ? .28 : 1.2);
     this.scene.add(this.hemi);
-    this.sun = new THREE.DirectionalLight(this.night ? '#c9d6ee' : '#fff0ce', this.night ? 0.5 : 2.4); this.sun.castShadow = true;
+    this.sun = new THREE.DirectionalLight(this.night ? '#c9d6ee' : '#fff0ce', this.night ? .32 : 2.4); this.sun.castShadow = true;
     this.sun.shadow.mapSize.setScalar(this.reduced ? 1024 : 2048);
     const shadow = this.reduced ? 90 : 160;
     this.sun.shadow.camera.left = -shadow; this.sun.shadow.camera.right = shadow; this.sun.shadow.camera.top = shadow; this.sun.shadow.camera.bottom = shadow;
     this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = 360; this.sun.shadow.normalBias = 0.035; this.sun.shadow.bias = -0.00015;
     this.sun.position.set(this.night ? 40 : -55, this.night ? 90 : 150, this.night ? -50 : 40); this.sun.target.position.set(0, 0, -60); this.scene.add(this.sun, this.sun.target);
-    const sky = createSky(this.renderer, this.reduced, this.night); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = sky.environment;
+    const sky = createSky(this.renderer, this.reduced, this.night); this.skies.set(this.night, sky); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = sky.environment;
     this.scene.environmentIntensity = this.night ? 0.2 : 0.5;
     this.town = new Town(this.reduced); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
+    this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced); this.nightLighting.setNight(this.night);
     // The town and sun are static; refresh shadows only when scene visibility changes.
     this.renderer.shadowMap.autoUpdate = false; this.renderer.shadowMap.needsUpdate = true;
     this.mapCamera.position.set(62, 44, 69); this.mapCamera.lookAt(0, 2, -13);
@@ -86,6 +93,7 @@ class Game {
     this.input = new Input(ui.canvas, ui.joystick, (action) => void this.action(action));
     ui.setLookHint('Hold left mouse to look');
     ui.progress(this.progress); ui.setMode('welcome');
+    document.querySelector<HTMLSelectElement>('#time-of-day')!.value = this.timeOfDay;
     document.querySelector<HTMLSelectElement>('#quality')!.value = this.reduced ? 'low' : 'high';
     window.addEventListener('resize', () => this.resize());
     document.addEventListener('visibilitychange', () => {
@@ -100,8 +108,8 @@ class Game {
     this.resize(); this.frameId = requestAnimationFrame(this.frame);
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: !!this.physics, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced }),
-        teleport: (x: number, z: number, yaw = 0) => { this.physics?.teleport({ x, y: 1.05, z }); this.input.yaw = yaw; this.input.pitch = 0; this.accumulator = 0; },
+        snapshot: () => ({ ready: !!this.physics, night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced }),
+        teleport: (x: number, z: number, yaw = 0, y = 1.05) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = 0; this.accumulator = 0; },
       } });
     }
   }
@@ -189,7 +197,8 @@ class Game {
       this.physics.teleport(); this.input.yaw = SPAWN.yaw; this.input.pitch = 0; this.returnMode = 'walking'; this.setMode('walking');  this.ui.toast('Back at the station exit, facing the city gate.');
     } else if (action === 'sound') {
       try { this.ui.setSound(await this.ambience.toggle()); } catch { this.ui.toast('Sound is unavailable in this browser.'); }
-    } else if (action.startsWith('quality:')) this.quality(action.split(':')[1] === 'low');
+    } else if (action.startsWith('time-of-day:')) { this.timeOfDay = parseTimeOfDay(action.split(':')[1]); saveTimeOfDay(this.timeOfDay); this.applyTimeOfDay(); }
+    else if (action.startsWith('quality:')) this.quality(action.split(':')[1] === 'low');
   }
   private visitLandmark(id: string): void {
     const landmark = LANDMARKS.find(place => place.id === id); if (!landmark || this.mode !== 'map') return;
@@ -207,7 +216,7 @@ class Game {
   private async exhibitionAction(action: string): Promise<void> {
     const [, command, hall, piece] = action.split(':'); const exhibition = this.town.exhibitions.find((e) => e.id === hall); if (!exhibition) return;
     if (command === 'info') { this.discover(exhibition.selected.discovery); }
-    else if (command === 'lore') { this.discover(hall === 'city-hall' ? 'artifactor' : hall === 'energy' ? 'shelter' : hall === 'station' ? 'embryo-station' : 'connections'); }
+    else if (command === 'lore') { this.discover(hall === 'city-hall' ? 'artifactor' : hall === 'energy' ? 'shelter' : hall === 'station' ? 'embryo-station' : hall === 'future-house' ? 'future-house-story' : hall === 'timeface' ? 'timeface' : 'connections'); }
     else if (command === 'browse') { this.galleryReturn = 'walking'; this.ui.gallery.showBrowse(hall, exhibition.selected); this.setMode('gallery'); }
     else if (command === 'photo') { this.galleryReturn = 'walking'; this.ui.gallery.showPhoto(exhibition.selected); this.setMode('gallery'); }
     else if (command === 'left' || command === 'right') exhibition.turn(command === 'left' ? -1 : 1);
@@ -221,6 +230,7 @@ class Game {
     this.raycaster.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, 1 - y / innerHeight * 2), this.walkCamera); this.raycaster.far = 9;
     const hit = this.raycaster.intersectObjects([...this.town.researchPanels, ...this.town.exhibitions.flatMap((e) => [...e.photos, ...e.textSurfaces])], false)[0]; if (!hit) return;
     const wall = this.raycaster.intersectObjects(this.town.occluders, false)[0]; if (wall && wall.distance < hit.distance) return;
+    if (hit.object.userData.href) { window.open(hit.object.userData.href as string, '_blank', 'noopener,noreferrer'); return; }
     const piece = COLLECTION.find((p) => p.discovery === hit.object.userData.piece);
     if (piece && !hit.object.userData.posterInfo && hit.object.userData.kind !== 'caption') {
       this.galleryReturn = 'walking'; this.ui.gallery.showPhoto(piece, hit.object.userData.photoIndex as number ?? 0); this.setMode('gallery'); return;
@@ -240,6 +250,18 @@ class Game {
   private resetMap(): void {
     this.mapCamera.position.set(160, 224, 192); this.orbit.target.set(0, 1, -53); this.orbit.update();
   }
+  private applyTimeOfDay(): void {
+    const night = resolveNight(this.timeOfDay); if (night === this.night) return; this.night = night;
+    let sky = this.skies.get(night); if (!sky) { sky = createSky(this.renderer, this.reduced, night); this.skies.set(night, sky); }
+    this.skyBackground = sky.background; this.scene.environment = sky.environment; this.scene.environmentIntensity = night ? .2 : .5;
+    this.renderer.toneMappingExposure = night ? .72 : .96;
+    this.hemi.color.set(night ? '#8ea4c6' : '#e9f4f0'); this.hemi.groundColor.set(night ? '#121820' : '#73805c'); this.hemi.intensity = night ? .28 : 1.2;
+    this.sun.color.set(night ? '#c9d6ee' : '#fff0ce'); this.sun.intensity = night ? .32 : 2.4;
+    this.sun.position.set(night ? 40 : -55, night ? 90 : 150, night ? -50 : 40);
+    const haze = night ? '#1a2433' : '#c3d8df', fog = this.mapView ? MAP_FOG : WALK_FOG;
+    this.scene.background = this.mapView ? new THREE.Color(haze) : this.skyBackground; this.scene.fog = new THREE.Fog(haze, fog.near, fog.far);
+    this.nightLighting.setNight(night); this.renderer.shadowMap.needsUpdate = true;
+  }
   private quality(low: boolean): void {
     this.lowQuality = low; this.renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1 : 1.5));
     this.sun.shadow.mapSize.setScalar(low ? 1024 : 2048); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; this.renderer.shadowMap.needsUpdate = true;
@@ -249,11 +271,12 @@ class Game {
       for (const material of materials) if (material instanceof THREE.MeshPhysicalMaterial) {
         if (material.userData.myceliumOpal) { material.iridescence = low ? .35 : 1; material.needsUpdate = true; continue; }
         if (material.userData.gatewayGem) { setGatewayQuality(material, low); continue; }
+        if (material.userData.pavilionGem) { material.transmission = low ? 0 : .42; material.opacity = low ? .45 : .7; material.needsUpdate = true; continue; }
         material.transmission = low ? 0 : material.userData.stationAmber ? .8 : .45;
         material.opacity = material.userData.stationAmber ? 1 : material.userData.clearGallery ? (low ? .18 : .26) : (low ? .32 : .65); if (material.userData.stationAmber) material.emissiveIntensity = low ? .23 : .2; material.needsUpdate = true;
       }
     });
-    this.resize(); this.ui.toast(low ? 'Gentle visual detail enabled.' : 'Rich visual detail enabled.');
+    this.nightLighting.setNight(this.night); this.resize(); this.ui.toast(low ? 'Gentle visual detail enabled.' : 'Rich visual detail enabled.');
   }
   private updateWalking(dt: number): void {
     if (!this.physics) return;
@@ -328,7 +351,8 @@ class Game {
     const camera = this.mapView ? this.mapCamera : this.walkCamera;
     this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : WALK_FOG.far, this.mapView);
     this.updateExhibitionControls();
-    this.renderer.render(this.scene, camera);
+    this.clockCheck += rawDt; if (this.clockCheck > 30) { this.clockCheck = 0; if (this.timeOfDay === 'auto') this.applyTimeOfDay(); }
+    this.nightLighting.update(camera); this.renderer.render(this.scene, camera);
     this.fpsFrames++; this.fpsTime += rawDt;
     if (this.fpsTime >= 1) { this.fps = Math.round(this.fpsFrames / this.fpsTime); this.fpsFrames = 0; this.fpsTime = 0; }
   };

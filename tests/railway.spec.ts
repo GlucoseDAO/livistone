@@ -9,7 +9,8 @@ for (const mobile of [false, true]) test(`textured railway and mountain passage 
     page.on('console', (message) => { if (message.type() === 'error' && /Shader|WebGLProgram/.test(message.text())) errors.push(message.text()); });
     page.on('response', (response) => { if (response.url().includes('/textures/railway/') && response.ok()) textures.add(response.url().split('/').at(-1)!); });
     await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.locator('#view-toggle').click();
-    for (const name of ['ballast', 'rail']) for (const suffix of mobile ? ['color', 'roughness'] : ['color', 'normal', 'roughness']) expect(textures.has(`${name}-${suffix}.jpg`)).toBe(true);
+    const reduced = await page.evaluate(() => (window as any).__livistone.snapshot().reducedGraphics);
+    for (const name of ['ballast', 'rail']) for (const suffix of reduced ? ['color', 'roughness'] : ['color', 'normal', 'roughness']) expect(textures.has(`${name}-${suffix}.jpg`)).toBe(true);
     await page.evaluate(({ x, z }) => (window as any).__livistone.teleport(x, z, -Math.PI / 2), { x: RAILWAY.portalX - 13, z: STATION.trackZ });
     await page.waitForTimeout(400); await page.screenshot({ path: `output/testing/railway/approach-${mobile ? 'mobile' : 'desktop'}.png` });
     await page.keyboard.down('ShiftLeft'); await page.keyboard.down('KeyW');

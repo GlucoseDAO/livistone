@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addGlow, nightEmission } from './night-lighting';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
@@ -87,7 +88,10 @@ export function createGateway(parent: THREE.Group, colliders: ColliderSpec[], mo
   for (const g of letters) g.translate(-offset, 0, 0);
   for (const x of centers) tube([[x - offset, 6.65, 0], [x - offset, 6.83, 0]], .021);
   add(merge(silver), materials.silver, 'Paired open silver shanks, fan ribs and gemstone bezel');
-  add(merge(letters), materials.silver, 'LIVISTONE raised silver lettering');
+  const neon = materials.silver.clone(); nightEmission(neon, '#b8fff0', 2.4);
+  add(merge(letters), neon, 'LIVISTONE raised silver lettering');
+  nightEmission(materials.silver, '#8cdec7', .55); nightEmission(materials.gem, '#b4ef72', .85);
+  for (const x of [-2.8, 0, 2.8]) addGlow(group, new THREE.Vector3(x, 6.6, GATEWAY.z + .4), '#baffbb', 5, 35, 11, .45);
   const gem = add(gatewayGemGeometry(), materials.gem, 'Long faceted green tourmaline'); gem.castShadow = false;
   if (paving) {
     const positions: number[] = [], uv: number[] = [], indices: number[] = [];

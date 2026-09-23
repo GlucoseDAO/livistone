@@ -1,6 +1,6 @@
 # Curated jewelry exhibition
 
-`selection.json` records reviewed facts, source titles, exhibition assignments and original photograph paths from the adjacent `livia/content/pieces.md`. The first exhibition has **32 physical works**: 8 in City Hall, 8 in Energy, 9 in Science, and 7 in Embryo Station. Eyelense, Timeface and Deep Sea Pearl remain journal-only. Every work has exactly one physical location or none; there is no duplicate physical poster.
+`selection.json` records reviewed facts, source titles, exhibition assignments and original photograph paths from the adjacent `livia/content/pieces.md`. The first exhibition has **32 physical works**: 8 in City Hall, 8 in Energy, 9 in Science, and 7 in Embryo Station. The later extension assigns Timeface to its tower, and Eyelense and Deep Sea Pearl to Future House. Five older works and Camel Dalí are added in `src/game/archive-catalogue.json`, with provenance under `public/images/jewelry/archive/ATTRIBUTION.md`. The combined catalogue now has 41 physical works. Every work has exactly one physical location or none; there is no duplicate physical poster.
 
 Photographs: © Livia Zaharia, studio archive. Supplied for the Livistone/Livia project; no blanket third-party reuse license is implied. Source URLs are `https://livia.glucosedao.org` followed by each `sourcePhotos` path. The public site is a build-time fallback when the adjacent archive contains a Git LFS pointer. It is never a runtime dependency.
 

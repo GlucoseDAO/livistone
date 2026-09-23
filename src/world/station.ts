@@ -178,7 +178,7 @@ export function createStation(root: THREE.Group, colliders: ColliderSpec[], mobi
     ctx.fillStyle = '#f5e9c9'; ctx.textAlign = 'center'; ctx.font = '500 88px Georgia'; ctx.fillText(title, 512, canvas.height * .5);
     ctx.font = '30px sans-serif'; ctx.fillText(subtitle, 512, canvas.height * .77);
     const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
-    return add(station, new THREE.PlaneGeometry(width, height), new THREE.MeshStandardMaterial({ map, roughness: .8, side: THREE.DoubleSide, emissive: '#d4c69a', emissiveMap: map, emissiveIntensity: .25 }), title);
+    return add(station, new THREE.PlaneGeometry(width, height), new THREE.MeshStandardMaterial({ map, roughness: .8, side: THREE.FrontSide, emissive: '#d4c69a', emissiveMap: map, emissiveIntensity: .25 }), title);
   };
   const entrance = sign(5.4, 1.3, 'EMBRYO', 'LIVISTONE  /  RAILWAY STATION'); entrance.position.set(-16, 4.25, -61.85);
   const platform = sign(5.2, 1.3, '01  /  NEW HORIZONS', 'MAGLEV  ·  BOARD AT THE OPEN GATES'); platform.position.set(6, 3.8, -73.4);
@@ -192,6 +192,11 @@ export function createStation(root: THREE.Group, colliders: ColliderSpec[], mobi
   const story = sign(2.8, 1.3, 'NEW BEGINNINGS', 'The story of the Embryo Ring'); story.position.set(-8.5, 1.75, -66.3);
   const storyBack = box(-8.5, 1.75, -66.4, 3, 1.5, .16); add(station, storyBack, white, 'Station story panel'); solid(colliders, storyBack);
   for (const x of [-9.65, -7.35]) { const leg = box(x, .72, -66.4, .08, 1.1, .08); add(station, leg, silver, 'Story panel support'); solid(colliders, leg); }
+  // Independent front faces keep reverse lettering readable instead of mirrored.
+  for (const board of [entrance, platform, boarding, story]) {
+    const back = board.clone(); back.rotation.y = Math.PI; back.position.z -= board === story ? .19 : .035; back.name = board.name + ' · reverse'; station.add(back);
+    if (board === story) back.userData.discovery = 'embryo-station';
+  }
   const posters = createTrainCabinGraphics(station.getObjectByName('Panoramic maglev') as THREE.Group);
   return { object: story, position: story.position.clone(), posters };
 }

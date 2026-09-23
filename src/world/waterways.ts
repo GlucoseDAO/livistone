@@ -12,4 +12,4 @@ export function waterDistance(x: number, z: number): number {
   return distance;
 }
 export const GARDEN_BRIDGES = [{ x: -57, z: -12, yaw: Math.PI / 2, scale: .65 }, { x: 57, z: -12, yaw: Math.PI / 2, scale: .65 }];
-export const TIME_TOWER = { x: 17, z: -39, radius: 4.8 };
+export const TIME_TOWER = { x: 17, z: -39, radius: 9.6 };

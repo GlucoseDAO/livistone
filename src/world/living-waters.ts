@@ -7,6 +7,8 @@ import type { Point } from './living-waters-layout';
 import { MYCELIUM_RADIUS, myceliumCrown, myceliumStem, myceliumOpal } from './mycelium';
 import { COLLECTION, photoSize, photoURL } from '../game/exhibits';
 import { drawDewdropRing } from '../game/jewelry-art';
+import { addGlow, nightEmission } from './night-lighting';
+import { createLakePlants } from './lake-plants';
 
 function shape(points: Point[]): THREE.Shape { return new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, -z))); }
 function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
@@ -15,7 +17,7 @@ export class LivingWaters {
   readonly colliders: ColliderSpec[] = [];
   readonly interactives: Interactive[] = [];
   readonly panels: THREE.Mesh[] = [];
-  private readonly water = new THREE.MeshStandardMaterial({ color: '#7bafaa', vertexColors: true, metalness: .34, roughness: .25, envMapIntensity: 1.2 });
+  private readonly water = new THREE.MeshStandardMaterial({ color: '#507c78', vertexColors: true, metalness: .28, roughness: .32, envMapIntensity: .65 });
   private readonly waterTime = { value: 0 };
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#d9e0d6', metalness: .63, roughness: .32 });
   private readonly stone = new THREE.MeshStandardMaterial({ color: '#d4cfbc', roughness: .91 });
@@ -43,7 +45,7 @@ export class LivingWaters {
     });
     for (const path of GARDEN_PATHS) this.path(path, 2.2);
     this.pavilion();
-    this.mushrooms(); this.wetlandPlanting();
+    this.mushrooms(); this.wetlandPlanting(); createLakePlants(this.root, mobile);
     for (const [name, [x, z]] of Object.entries(GARDEN_PANELS)) {
       const id = 'living-' + name, jewelry = name === 'vittoria' || name === 'dewdrop';
       for (const dx of [-1, 1]) this.mesh(new THREE.CylinderGeometry(.045, .065, jewelry ? 1.7 : 1.35, 6), this.silver, true, x + dx, jewelry ? .85 : .675, z);
@@ -116,16 +118,28 @@ export class LivingWaters {
   private pavilion(): void {
     const x = GARDENS.pavilionX, z = GARDENS.pavilionZ;
     this.mesh(new THREE.CylinderGeometry(6, 6.15, .18, 10), this.stone, true, x, .09, z);
-    const blue = new THREE.MeshStandardMaterial({ color: '#8bc6d0', roughness: this.mobile ? .26 : .16, metalness: .35, transparent: !this.mobile, opacity: this.mobile ? 1 : .47, side: THREE.DoubleSide });
-    const points = [new THREE.Vector2(5.7, .18), new THREE.Vector2(6, 3.8), new THREE.Vector2(4.6, 6.8), new THREE.Vector2(1.2, 9.7), new THREE.Vector2(0, 10.1)];
-    for (let i = 0; i < 10; i++) {
-      const angle = i * Math.PI / 5;
-      const doorway = i === 4 || i === 5 || i === 1 || i === 2;
-      const profile = doorway ? [new THREE.Vector2(5.95, 3.2), ...points.slice(1)] : points;
-      this.mesh(new THREE.LatheGeometry(profile, 1, angle, Math.PI / 5), blue, true, x, 0, z);
+    const blue = new THREE.MeshPhysicalMaterial({ color: '#79cde9', roughness: .13, metalness: .12, transmission: this.mobile ? 0 : .42, thickness: .6, ior: 1.61, clearcoat: 1, transparent: true, opacity: this.mobile ? .45 : .7, side: THREE.DoubleSide, depthWrite: false, flatShading: true });
+    blue.userData.pavilionGem = true; nightEmission(blue, '#74cbe5', .24);
+    // Staggered triangular facets follow the pear profile; the two existing entry sectors stay open.
+    const profile = [[4.5, .18], [5.8, 1.5], [6, 3.2], [5.4, 4.9], [4, 6.7], [2.4, 8.7], [1.05, 10.5], [.03, 12.4]], segments = 20, vertices: number[] = [];
+    const point = (ring: number, sector: number): THREE.Vector3 => { const a = (sector + (ring % 2 ? .5 : 0)) / segments * Math.PI * 2; return new THREE.Vector3(Math.sin(a) * profile[ring][0], profile[ring][1], Math.cos(a) * profile[ring][0]); };
+    for (let ring = 0; ring < profile.length - 1; ring++) for (let i = 0; i < segments; i++) {
+      const angle = (i + .5) / segments * 360;
+      if (ring < 2 && ((angle >= 36 && angle <= 108) || (angle >= 144 && angle <= 216))) continue;
+      const a = point(ring, i), b = point(ring, i + 1), c = point(ring + 1, i), d = point(ring + 1, i + 1);
+      for (const p of [a, c, b, b, c, d]) vertices.push(p.x, p.y, p.z);
     }
-    const embrace = Array.from({ length: 40 }, (_, i) => { const a = -.5 + i / 39 * Math.PI * 1.65; return new THREE.Vector3(x + Math.sin(a) * 6.3, 2.8 + i / 39 * 3.7, z + Math.cos(a) * 6.3); });
-    this.mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(embrace), this.mobile ? 60 : 120, .27, 8, false), this.silver, true);
+    const gem = new THREE.BufferGeometry(); gem.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); gem.computeVertexNormals();
+    this.mesh(gem, blue, true, x, 0, z).name = 'Dewdrop pavilion · faceted briolette';
+    const metal = this.silver.clone(); metal.metalness = .9; metal.roughness = .2;
+    nightEmission(metal, '#87bac4', .15);
+    // The adjustable ring's two free silver ends sweep around the lower stone and curl upward.
+    for (const side of [-1, 1]) {
+      const embrace = [[.8, 3.35, 6.2], [4.8, 3.6, 4.5], [6.1, 4, 0], [5, 6, -1.8], [3.1, 8.8, -.8], [.55, 11.7, .15]].map(([px, py, pz]) => new THREE.Vector3(x + side * px, py, z + pz));
+      this.mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(embrace), this.mobile ? 64 : 110, .2, 8, false), metal, true).name = 'Dewdrop · open silver embrace';
+    }
+    addGlow(this.root, new THREE.Vector3(x, 4, z), '#8cdeef', 14, 75, 16, .32);
+    addGlow(this.root, new THREE.Vector3(x, 7.2, z), '#b2eeff', 8, 0, 8, .28);
   }
   private mushrooms(): void {
     const sites: { x: number; z: number; scale: number; height: number }[] = [], rand = random(8142);
@@ -135,8 +149,10 @@ export class LivingWaters {
       sites.push({ x, z, scale, height });
     }
     const silver = new THREE.MeshStandardMaterial({ color: '#c7c3b7', roughness: .27, metalness: .9 });
+    nightEmission(silver, '#739589', .11);
     const opal = new THREE.MeshPhysicalMaterial({ color: '#ffffff', vertexColors: true, metalness: .15, roughness: .18, iridescence: this.mobile ? .35 : 1, iridescenceIOR: 1.38, iridescenceThicknessRange: [180, 420], clearcoat: .9 });
     opal.userData.myceliumOpal = true;
+    nightEmission(opal, '#a8ead2', .7);
     const crowns = new THREE.InstancedMesh(myceliumCrown(this.mobile), silver, sites.length), stems = new THREE.InstancedMesh(myceliumStem(this.mobile), silver, sites.length);
     const stones = new THREE.InstancedMesh(myceliumOpal(this.mobile), opal, sites.length), matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion();
     crowns.name = 'Mycelium · curled open silver gills'; stones.name = 'Mycelium · opal hearts'; stems.name = 'Mycelium · branching stems';
@@ -145,6 +161,7 @@ export class LivingWaters {
       matrix.compose(new THREE.Vector3(site.x, site.height, site.z), rotation, new THREE.Vector3(site.scale, site.scale, site.scale)); crowns.setMatrixAt(i, matrix);
       matrix.compose(new THREE.Vector3(site.x, 0, site.z), rotation, new THREE.Vector3(site.scale, site.height - .4 * site.scale, site.scale)); stems.setMatrixAt(i, matrix);
       matrix.compose(new THREE.Vector3(site.x, site.height + .5 * site.scale, site.z), rotation, new THREE.Vector3(site.scale, site.scale * .72, site.scale)); stones.setMatrixAt(i, matrix);
+      addGlow(this.root, new THREE.Vector3(site.x, site.height + .5 * site.scale, site.z), '#adf5d8', 5 * site.scale, 12, 7, .52).userData.surfaceOffset = 1.02 * site.scale;
       this.colliders.push({ type: 'box', position: [GARDENS.x + site.x, site.height / 2, GARDENS.z + site.z], size: [.38 * site.scale, site.height / 2, .38 * site.scale] });
       this.colliders.push({ type: 'box', position: [GARDENS.x + site.x, site.height + .15 * site.scale, GARDENS.z + site.z], size: [site.scale * MYCELIUM_RADIUS, .75 * site.scale, site.scale * MYCELIUM_RADIUS] });
       if (i % 2 === 0) this.drainage.push(new THREE.CatmullRomCurve3([
@@ -168,6 +185,7 @@ export class LivingWaters {
         matrix.compose(new THREE.Vector3(site.x, site.height, site.z), rotation, new THREE.Vector3(site.scale, site.scale, site.scale)); lowCrowns.setMatrixAt(i, matrix);
         matrix.compose(new THREE.Vector3(site.x, 0, site.z), rotation, new THREE.Vector3(site.scale, site.height - .12 * site.scale, site.scale)); lowStems.setMatrixAt(i, matrix);
         matrix.compose(new THREE.Vector3(site.x, site.height + .12 * site.scale, site.z), rotation, new THREE.Vector3(site.scale, site.scale * .7, site.scale)); lowStones.setMatrixAt(i, matrix);
+        addGlow(this.root, new THREE.Vector3(site.x, site.height + .12 * site.scale, site.z), '#b8e7dc', 4 * site.scale, 0, 4, .42).userData.surfaceOffset = 1.02 * site.scale;
         this.colliders.push({ type: 'box', position: [GARDENS.x + site.x, site.height / 2, GARDENS.z + site.z], size: [.28 * site.scale, site.height / 2, .28 * site.scale] });
         this.colliders.push({ type: 'box', position: [GARDENS.x + site.x, site.height + .08 * site.scale, GARDENS.z + site.z], size: [site.scale * MYCELIUM_RADIUS, .42 * site.scale, site.scale * MYCELIUM_RADIUS] });
       });

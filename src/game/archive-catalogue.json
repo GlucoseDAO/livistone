@@ -1,0 +1,134 @@
+[
+  {
+    "discovery": "first-ring",
+    "title": "First Ring",
+    "type": "Ring",
+    "materials": "Silver; bronze exhibition variant",
+    "dimensions": "Not recorded",
+    "year": "2018–2022 (archive estimate)",
+    "location": "timeface",
+    "collection": "Earlier explorations",
+    "description": "The artist’s first cast piece uses polygons of different heights and an open front for adjustment. The archive records silver and a bronze version made for exhibition.",
+    "story": "The artist’s first cast piece uses polygons of different heights and an open front for adjustment. The archive records silver and a bronze version made for exhibition.",
+    "source": "https://livia.glucosedao.org/pieces/",
+    "photos": [
+      {
+        "file": "archive/first-ring.webp",
+        "thumb": "archive/first-ring-thumb.webp",
+        "alt": "First Ring — Livia Zaharia, studio archive",
+        "sourcePath": "/pieces/First%20ring/2130268170623444.jpg",
+        "sourceSha256": "7d9e6d5a0f7572ec9fc68a1f7e74c0711e927ae345166409378d215a28b6a6a8"
+      }
+    ]
+  },
+  {
+    "discovery": "moldavian-vault",
+    "title": "Moldavian Vault Ring",
+    "type": "Ring",
+    "materials": "Not specified in the archive",
+    "dimensions": "Not recorded",
+    "year": "2018 (archive estimate)",
+    "location": "timeface",
+    "collection": "Earlier explorations",
+    "description": "An early ring from the studio archive. Its name refers to a Moldavian vault; the available catalogue records photographs and an estimated year, without a longer artist statement.",
+    "story": "An early ring from the studio archive. Its name refers to a Moldavian vault; the available catalogue records photographs and an estimated year, without a longer artist statement.",
+    "source": "https://livia.glucosedao.org/pieces/",
+    "photos": [
+      {
+        "file": "archive/moldavian-vault.webp",
+        "thumb": "archive/moldavian-vault-thumb.webp",
+        "alt": "Moldavian Vault Ring — Livia Zaharia, studio archive",
+        "sourcePath": "/pieces/Moldavian%20vault%20ring/2130322920617969.jpg",
+        "sourceSha256": "28a17ae045193adec0569d10ae2f6d5aeb1bea9e0a8e6bf67846d6b48834e09d"
+      }
+    ]
+  },
+  {
+    "discovery": "art-nouveau",
+    "title": "Art Nouveau Ring",
+    "type": "Ring",
+    "materials": "Silver, amethyst cabochon",
+    "dimensions": "Not recorded",
+    "year": "2020 (archive estimate)",
+    "location": "timeface",
+    "collection": "Earlier explorations",
+    "description": "An oval amethyst inspired a light Art Nouveau setting. Livia describes this as her first complete flush setting, designed to pair with the Pretzel earrings.",
+    "story": "An oval amethyst inspired a light Art Nouveau setting. Livia describes this as her first complete flush setting, designed to pair with the Pretzel earrings.",
+    "source": "https://livia.glucosedao.org/pieces/",
+    "photos": [
+      {
+        "file": "archive/art-nouveau.webp",
+        "thumb": "archive/art-nouveau-thumb.webp",
+        "alt": "Art Nouveau Ring — Livia Zaharia, studio archive",
+        "sourcePath": "/pieces/Art-Nouveau%20ring/2386236335026625.jpg",
+        "sourceSha256": "e285b074811a2d21996cd5f793a6b60fd38f4912d5e6965630092d12dca85410"
+      }
+    ]
+  },
+  {
+    "discovery": "peas-in-pod",
+    "title": "Peas in Pod Ring",
+    "type": "Ring",
+    "materials": "Silver, jade beads",
+    "dimensions": "Not recorded",
+    "year": "2020 (archive estimate)",
+    "location": "timeface",
+    "collection": "Earlier explorations",
+    "description": "Moving jade beads sit inside a silver ring inspired by gears. The artist wanted the beads to move while keeping a smooth shape that would not catch on clothing.",
+    "story": "Moving jade beads sit inside a silver ring inspired by gears. The artist wanted the beads to move while keeping a smooth shape that would not catch on clothing.",
+    "source": "https://livia.glucosedao.org/pieces/",
+    "photos": [
+      {
+        "file": "archive/peas-in-pod.webp",
+        "thumb": "archive/peas-in-pod-thumb.webp",
+        "alt": "Peas in Pod Ring — Livia Zaharia, studio archive",
+        "sourcePath": "/pieces/Peas-in-pod%20ring/2532581933725397.jpg",
+        "sourceSha256": "caa88a8105d41e94ebaa3e99d531aa03c743a41b16318594fafc69195d8d1e6e"
+      }
+    ]
+  },
+  {
+    "discovery": "wormy",
+    "title": "Wormy Ring",
+    "type": "Ring",
+    "materials": "Silver, purple cultured pearl",
+    "dimensions": "Not recorded",
+    "year": "Undated in the archive",
+    "location": "timeface",
+    "collection": "Earlier explorations",
+    "description": "The woven silver setting was developed around an unusually shaped purple cultured pearl. Livia found that the woven pattern also strengthened the open ring.",
+    "story": "The woven silver setting was developed around an unusually shaped purple cultured pearl. Livia found that the woven pattern also strengthened the open ring.",
+    "source": "https://livia.glucosedao.org/pieces/",
+    "photos": [
+      {
+        "file": "archive/wormy.webp",
+        "thumb": "archive/wormy-thumb.webp",
+        "alt": "Wormy Ring — Livia Zaharia, studio archive",
+        "sourcePath": "/pieces/Wormy%20ring/2485169258466665.jpg",
+        "sourceSha256": "3f9747e9070e9bf6d7d965289e5a61d2595c0bb91c49526c2a5939880b948ba5"
+      }
+    ]
+  },
+  {
+    "discovery": "camel-dali",
+    "title": "Camel Dalí",
+    "type": "Mixed-material object",
+    "materials": "Native copper, PLA print, leather",
+    "dimensions": "Not recorded",
+    "year": "2026",
+    "location": "future-house",
+    "collection": "Organic forms and 3D printing",
+    "description": "Native copper hangs beneath a dark PLA printed part, held together with leather ties. Livia describes the form as a camel; her original Instagram post introduces an organic form and 3D printing. These materials inspire Future House.",
+    "story": "Native copper hangs beneath a dark PLA printed part, held together with leather ties. The drinking camel, walkable neck and exhibition cabin are new architecture imagined for Livistone.",
+    "source": "https://www.instagram.com/p/DdDwLqDlcm2/",
+    "photos": [
+      {
+        "file": "archive/camel-dali.webp",
+        "thumb": "archive/camel-dali-thumb.webp",
+        "alt": "Camel Dalí — original photograph supplied by Livia through Instagram",
+        "sourcePath": "https://www.instagram.com/p/DdDwLqDlcm2/",
+        "sourceSha256": "57b10a577b0454e1a2d015a0d5bbbf47ad47e7dd80444a1c4e17c577287c126b"
+      }
+    ]
+  }
+]

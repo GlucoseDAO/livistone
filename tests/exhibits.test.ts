@@ -18,9 +18,9 @@ describe('photographs retain their proportions on planar displays and in the vie
 describe('curated catalogue', () => {
   it('assigns each physical work exactly once and ships local thumbnails/full images', async () => {
     const { COLLECTION } = await import('../src/game/exhibits'); const { existsSync } = await import('node:fs');
-    expect(COLLECTION).toHaveLength(35); expect(new Set(COLLECTION.map((p) => p.discovery)).size).toBe(35);
-    for (const [location, count] of [['city-hall', 8], ['energy', 8], ['science', 9], ['station', 7]] as const) expect(COLLECTION.filter((p) => p.location === location)).toHaveLength(count);
-    for (const piece of COLLECTION) { expect(piece.materials.length).toBeGreaterThan(0); expect(piece.year).toMatch(/^20\d\d$/); expect(PIECE_STORIES[piece.discovery]?.length).toBeGreaterThan(40); expect((piece.story ?? piece.description).length).toBeGreaterThan(40); for (const photo of piece.photos) { expect(existsSync('public/images/jewelry/' + photo.file)).toBe(true); expect(existsSync('public/images/jewelry/' + photo.thumb)).toBe(true); } }
+    expect(COLLECTION).toHaveLength(41); expect(new Set(COLLECTION.map((p) => p.discovery)).size).toBe(41);
+    for (const [location, count] of [['city-hall', 8], ['energy', 8], ['science', 9], ['station', 7], ['timeface', 6], ['future-house', 3]] as const) expect(COLLECTION.filter((p) => p.location === location)).toHaveLength(count);
+    for (const piece of COLLECTION) { expect(piece.materials.length).toBeGreaterThan(0); expect(piece.year).toMatch(/^(20\d\d|Undated)/); expect((piece.story ?? PIECE_STORIES[piece.discovery] ?? piece.description).length).toBeGreaterThan(40); for (const photo of piece.photos) { expect(existsSync('public/images/jewelry/' + photo.file)).toBe(true); expect(existsSync('public/images/jewelry/' + photo.thumb)).toBe(true); } }
   });
   it('lands at the station looking toward the city gate', () => {
     expect(SPAWN.yaw).toBe(0);

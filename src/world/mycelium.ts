@@ -4,12 +4,24 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 export const MYCELIUM_RADIUS = 2.7;
 /** The ring's curled, pierced silver folds wrap an opal; no fabric panels or umbrella spokes. */
 export function myceliumCrown(mobile: boolean): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [], folds = mobile ? 18 : 26;
+  const parts: THREE.BufferGeometry[] = [], folds = mobile ? 22 : 28;
   for (let i = 0; i < folds; i++) {
     const angle = i / folds * Math.PI * 2, reach = 1 + Math.sin(i * 2.399) * .07;
-    const profile = [[.42, -.6, -.06], [1.2, -.5, -.14], [2.12, -.22, -.18], [2.4, .2, 0], [2.09, .61, .16], [1.2, .85, .14], [.49, .48, .06]];
+    const profile = [[.7, -.43, -.045], [1.46, -.53, -.07], [2.23, -.23, -.065], [2.39, .18, 0], [2.12, .67, .07], [1.4, .86, .085], [.81, .51, .04]];
     const points = profile.map(([r, y, side]) => new THREE.Vector3(Math.cos(angle) * r * reach - Math.sin(angle) * side, y, Math.sin(angle) * r * reach + Math.cos(angle) * side));
-    parts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points, true), mobile ? 24 : 40, .105, mobile ? 5 : 8, true));
+    // The photograph shows flattened folded straps, with wide faces and narrow open slots.
+    const curve = new THREE.CatmullRomCurve3(points, true), steps = mobile ? 32 : 52, vertices: number[] = [], indices: number[] = [];
+    const tangent = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle));
+    for (let j = 0; j <= steps; j++) {
+      const p = curve.getPoint(j / steps), radial = curve.getTangent(j / steps).cross(tangent).normalize();
+      const width = .12 + .055 * Math.sin(Math.PI * j / steps) ** 2;
+      for (let k = 0; k < 8; k++) {
+        const a = k / 8 * Math.PI * 2, v = p.clone().addScaledVector(tangent, Math.cos(a) * width).addScaledVector(radial, Math.sin(a) * .065);
+        vertices.push(v.x, v.y, v.z);
+        if (j < steps) { const n = j * 8 + k, next = j * 8 + (k + 1) % 8; indices.push(n, next, n + 8, next, next + 8, n + 8); }
+      }
+    }
+    const fold = new THREE.BufferGeometry(); fold.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); fold.setIndex(indices); fold.computeVertexNormals(); parts.push(fold);
   }
   const geometry = mergeGeometries(parts)!; parts.forEach(p => p.dispose()); return geometry;
 }

@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { nightFromDate } from '../src/game/daylight';
+import { nightFromDate, parseTimeOfDay, resolveNight } from '../src/game/daylight';
 import { DISCOVERIES } from '../src/game/content';
 import { RESEARCH_POSTERS } from '../src/game/research';
 
 describe('local night and exhibition sources', () => {
+  it('overrides an incorrect clock and rejects unknown saved settings', () => {
+    expect(resolveNight('day', new Date(2026, 8, 23, 0))).toBe(false);
+    expect(resolveNight('night', new Date(2026, 8, 23, 12))).toBe(true);
+    expect(resolveNight('auto', new Date(2026, 8, 23, 12))).toBe(false);
+    expect(parseTimeOfDay('broken')).toBe('auto'); expect(parseTimeOfDay(null)).toBe('auto');
+  });
   it('treats midsummer noon as day and winter midnight as night', () => {
     expect(nightFromDate(new Date(2026, 5, 21, 12, 0, 0))).toBe(false);
     expect(nightFromDate(new Date(2026, 0, 15, 0, 30, 0))).toBe(true);

@@ -34,13 +34,13 @@ describe('train cabin announcements', () => {
     for (const board of TRAIN_ANNOUNCEMENTS) {
       expect(board.yaw).toBe(0);
       expect(board.y).toBeGreaterThan(1.4);
-      expect(board.z).toBeGreaterThan(STATION.trackZ - .4);
-      expect(board.z).toBeLessThan(STATION.trackZ);
+      expect(board.z).toBeGreaterThan(STATION.trackZ - 1.38);
+      expect(board.z).toBeLessThan(STATION.trackZ - 1.2);
     }
     const science = TRAIN_ANNOUNCEMENTS.filter((board) => board.id === 'train-science');
     const art = TRAIN_ANNOUNCEMENTS.filter((board) => board.id === 'train-art');
     expect(science.every((board) => art.some((other) => other.x > board.x && Math.abs(other.z - board.z) < .01))).toBe(true);
     const world = stationPoint(science[0].x, science[0].z);
-    expect(world.z).toBeCloseTo(79.32, 1);
+    expect(world.z).toBeCloseTo(80.27, 2);
   });
 });

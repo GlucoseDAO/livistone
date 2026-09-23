@@ -1,3 +1,4 @@
+import { paintTransitAd } from './transit-art';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -5,11 +6,11 @@ import type { ColliderSpec } from '../game/physics';
 import { STATION_LOCAL as STATION } from './station-layout';
 
 const DOORS = [-12, 12], WINDOWS = [-18.2, -15.2, -8.6, -5.7, -2.8, .1, 3, 5.9, 8.6, 15.2, 18.2];
-/** Eye-level boards in front of the seats, facing the boarding bays. Local −X is science after the station half-turn. */
-export const TRAIN_ANNOUNCEMENTS = DOORS.flatMap((door) => [
-  { id: 'train-science' as const, x: STATION.x + door - 1.22, y: 1.58, z: STATION.trackZ - .32, yaw: 0 },
-  { id: 'train-future' as const, x: STATION.x + door, y: 1.58, z: STATION.trackZ - .32, yaw: 0 },
-  { id: 'train-art' as const, x: STATION.x + door + 1.22, y: 1.58, z: STATION.trackZ - .32, yaw: 0 },
+/** Eye-level boards above the seats, facing the boarding bays. Local −X is science after the station half-turn. */
+export const TRAIN_ANNOUNCEMENTS: { id: 'train-science' | 'train-art' | 'train-future'; x: number; y: number; z: number; yaw: number }[] = DOORS.flatMap((door) => [
+  { id: 'train-science' as const, x: STATION.x + door - 1.22, y: 2.18, z: STATION.trackZ - 1.27, yaw: 0 },
+  { id: 'train-future' as const, x: STATION.x + door, y: 2.18, z: STATION.trackZ - 1.27, yaw: 0 },
+  { id: 'train-art' as const, x: STATION.x + door + 1.22, y: 2.18, z: STATION.trackZ - 1.27, yaw: 0 },
 ]);
 const LOW = 2.02 - 1.52 * Math.pow(Math.SQRT1_2, .78), HIGH = 4.04 - LOW;
 function sideZ(y: number): number { return 1.38 * Math.pow(Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs((y - 2.02) / 1.52), 2 / .78))), .68); }
@@ -141,52 +142,32 @@ function cabinPoster(width: number, height: number, paint: (ctx: CanvasRendering
   const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = Math.max(128, Math.round(1024 * height / width));
   const ctx = canvas.getContext('2d')!; paint(ctx, canvas.width, canvas.height);
   const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
-  return new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ map, toneMapped: false, side: THREE.DoubleSide }));
+  return new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ map, toneMapped: false, side: THREE.FrontSide }));
 }
 
 /** Cabin boards face the boarding bays or sit on bulkheads. They add no colliders and never cover window holes. */
 export function createTrainCabinGraphics(train: THREE.Group): THREE.Mesh[] {
   const posters: THREE.Mesh[] = [];
   const mount = (mesh: THREE.Mesh, id: string, x: number, y: number, z: number, yaw: number): void => {
-    mesh.userData.discovery = id; mesh.name = id; mesh.position.set(x, y, z); mesh.rotation.y = yaw; train.add(mesh); posters.push(mesh);
+    mesh.userData.discovery = id; mesh.userData.href = id === 'train-science' ? 'https://livia.glucosedao.org/science-tech/glucosedao/' : 'https://livia.glucosedao.org/pieces/'; mesh.name = id; mesh.position.set(x, y, z); mesh.rotation.y = yaw; train.add(mesh); posters.push(mesh);
+    mesh.geometry.computeBoundingBox(); const size = mesh.geometry.boundingBox!.getSize(new THREE.Vector3());
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(size.x + .045, size.y + .045, .018), new THREE.MeshStandardMaterial({ color: '#bbc3bf', metalness: .8, roughness: .3 }));
+    frame.position.copy(mesh.position).add(new THREE.Vector3(0, 0, -.013).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw)); frame.rotation.y = yaw; frame.name = 'Flush advertisement frame'; train.add(frame);
   };
-  const scienceWall = cabinPoster(2, 1.35, (ctx, w, h) => {
-    ctx.fillStyle = '#14262c'; ctx.fillRect(0, 0, w, h); ctx.strokeStyle = '#c4a45a'; ctx.lineWidth = 8; ctx.strokeRect(18, 18, w - 36, h - 36);
-    ctx.fillStyle = '#f3e6c4'; ctx.textAlign = 'center'; ctx.font = '600 54px Georgia'; ctx.fillText('STEP INTO THE FUTURE', w / 2, 120);
-    ctx.font = '700 92px Georgia'; ctx.fillText('SCIENCE', w / 2, 280);
-    ctx.fillStyle = '#8fd0c4'; chevrons(ctx, w * 0.22, 390, -1, 1.15); chevrons(ctx, w * 0.78, 390, 1, 1.15);
-    ctx.fillStyle = '#d7c7a0'; ctx.font = '32px sans-serif'; ctx.fillText('livia.glucosedao.org/pieces', w / 2, h - 70);
-  });
-  const artWall = cabinPoster(2, 1.35, (ctx, w, h) => {
-    ctx.fillStyle = '#241c18'; ctx.fillRect(0, 0, w, h); ctx.strokeStyle = '#c4a45a'; ctx.lineWidth = 8; ctx.strokeRect(18, 18, w - 36, h - 36);
-    ctx.fillStyle = '#f3e6c4'; ctx.textAlign = 'center'; ctx.font = '600 54px Georgia'; ctx.fillText('STEP INTO THE FUTURE', w / 2, 120);
-    ctx.font = '700 78px Georgia'; ctx.fillText('ART  ·  GEOMETRY', w / 2, 280);
-    ctx.fillStyle = '#e0b56a'; chevrons(ctx, w * 0.22, 390, -1, 1.15); chevrons(ctx, w * 0.78, 390, 1, 1.15);
-    ctx.fillStyle = '#d7c7a0'; ctx.font = '32px sans-serif'; ctx.fillText('livia.glucosedao.org/pieces', w / 2, h - 70);
-  });
+  const scienceWall = cabinPoster(2, 1.35, (ctx, w, h) => paintTransitAd(ctx, w, h, 'science'));
+  const artWall = cabinPoster(2, 1.35, (ctx, w, h) => paintTransitAd(ctx, w, h, 'art'));
   // Local −X is world east after the station half-turn: Science and Glucose Commons.
-  mount(scienceWall, 'train-science', STATION.x - 20.48, 2.05, STATION.trackZ, -Math.PI / 2);
-  mount(artWall, 'train-art', STATION.x + 20.48, 2.05, STATION.trackZ, Math.PI / 2);
-  const arrival = (kind: 'science' | 'art' | 'future'): THREE.Mesh => cabinPoster(kind === 'future' ? 1.55 : .88, .92, (ctx, w, h) => {
-    const science = kind === 'science';
-    ctx.fillStyle = kind === 'future' ? '#1b2a24' : science ? '#12333a' : '#2a1f16'; ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = '#c4a45a'; ctx.lineWidth = 6; ctx.strokeRect(10, 10, w - 20, h - 20);
-    ctx.fillStyle = '#f3e6c4'; ctx.textAlign = 'center';
-    if (kind === 'future') {
-      ctx.font = '700 52px Georgia'; ctx.fillText('STEP INTO', w / 2, h * .42); ctx.fillText('THE FUTURE', w / 2, h * .68);
-    } else {
-      ctx.fillStyle = science ? '#8fd0c4' : '#e0b56a'; chevrons(ctx, science ? 70 : w - 70, h * .32, science ? -1 : 1, .85);
-      ctx.fillStyle = '#f3e6c4'; ctx.font = '700 48px Georgia'; ctx.fillText(science ? 'SCIENCE' : 'ART', w / 2, h * .68);
-    }
-  });
-  // Face the boarding bays (local +Z). Sit in front of the seats, not in the aisle or window holes.
+  mount(scienceWall, 'train-science', STATION.x - 20.48, 2.05, STATION.trackZ, Math.PI / 2);
+  mount(artWall, 'train-art', STATION.x + 20.48, 2.05, STATION.trackZ, -Math.PI / 2);
+  const arrival = (kind: 'science' | 'art' | 'future'): THREE.Mesh => cabinPoster(kind === 'future' ? 1.55 : .88, .92, (ctx, w, h) => paintTransitAd(ctx, w, h, kind));
+  // Face the boarding bays (local +Z), mounted above the seats on the opposite wall.
   for (const board of TRAIN_ANNOUNCEMENTS) mount(arrival(board.id === 'train-science' ? 'science' : board.id === 'train-art' ? 'art' : 'future'), board.id, board.x, board.y, board.z, board.yaw);
   const banner = (title: string, science: boolean): THREE.Mesh => cabinPoster(1.55, .38, (ctx, w, h) => {
     ctx.fillStyle = science ? '#12333a' : '#2a1f16'; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = science ? '#8fd0c4' : '#e0b56a'; chevrons(ctx, 64, h / 2, -1, .65); chevrons(ctx, w - 64, h / 2, 1, .65);
     ctx.fillStyle = '#f3e6c4'; ctx.textAlign = 'center'; ctx.font = '700 56px Georgia'; ctx.fillText(title, w / 2, h * .7);
   });
-  for (const x of [-17, -6]) mount(banner('SCIENCE', true), 'train-science', STATION.x + x, 2.52, STATION.trackZ + .15, -Math.PI / 2);
-  for (const x of [6, 17]) mount(banner('ART · GEOMETRY', false), 'train-art', STATION.x + x, 2.52, STATION.trackZ + .15, Math.PI / 2);
+  for (const x of [-17, -6]) mount(banner('SCIENCE', true), 'train-science', STATION.x + x, 3.12, STATION.trackZ - .88, 0);
+  for (const x of [6, 17]) mount(banner('ART · GEOMETRY', false), 'train-art', STATION.x + x, 3.12, STATION.trackZ - .88, 0);
   return posters;
 }

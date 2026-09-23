@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addGlow, nightEmission } from './night-lighting';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
 import { mitoringCage, nanotCage, ENERGY_HALL } from './jewelry';
@@ -12,6 +13,7 @@ import { Mountains } from './mountains';
 import { PlanarExhibition } from './planar-exhibition';
 import { GARDEN_BRIDGES, riverCenter, tributaryCenter, waterDistance } from './waterways';
 import { createTimeTower } from './time-tower';
+import { createFutureHouse } from './future-house';
 import { riverMaterial } from './river';
 import { pavingMaterial, rockGeometry, rockMaterial } from './stone';
 import { walnutMaterial, walnutRadius } from './walnut';
@@ -77,6 +79,7 @@ export class Town {
   readonly researchPanels: THREE.Mesh[] = [];
   private readonly mountains: Mountains;
   private readonly railway: THREE.Group;
+  private readonly researchReady: Promise<void>;
   private readonly white = new THREE.MeshStandardMaterial({ color: '#f4f0df', roughness: 0.57, metalness: 0.07 });
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#e2e7dd', roughness: 0.26, metalness: 0.65 });
   private readonly gold = new THREE.MeshStandardMaterial({ color: '#b99a55', roughness: 0.3, metalness: 0.7 });
@@ -112,8 +115,17 @@ export class Town {
     this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.white, this.paving, this.gold, bridge);
     createTimeTower(this.root, this.colliders, this.mobile);
+    createFutureHouse(this.root, this.colliders, this.mobile);
+    for (const id of ['timeface', 'future-house']) this.exhibitions.push(new PlanarExhibition(id, this.root, 0, 0, this.colliders, this.interactives));
     const research = createGlucosePavilion(this.root, this.colliders, mobile, this.paving); this.researchPanels.push(...research.panels); this.interactives.push(...research.interactives);
+    this.researchReady = research.ready;
     this.createTrees(); this.createGardens();
+    for (const landmark of CIVIC_LANDMARKS) {
+      const color = landmark.id === 'energy' ? '#ffbf66' : landmark.id === 'science' ? '#99ded7' : '#ffe0a3';
+      addGlow(this.root, new THREE.Vector3(landmark.x, 6, landmark.z), color, 25, 90, 24, .3);
+      for (const side of [-1, 1]) addGlow(this.root, new THREE.Vector3(landmark.x + side * 5, 2.5, landmark.z + 7), color, 8, 65, 15, .24);
+    }
+    for (const x of [-20, 0, 20]) addGlow(arrival, new THREE.Vector3(x, 4.3, -68), '#ffd28a', 12, 70, 17, .3);
     this.mountains = new Mountains(mobile); this.root.add(this.mountains);
   }
   private createTerrain(): void {
@@ -216,7 +228,8 @@ export class Town {
     this.createInterior(id, inside, x, z, floorR);
   }
   private glass(color: string, emissive = '#000000'): THREE.MeshPhysicalMaterial {
-    return new THREE.MeshPhysicalMaterial({ color, emissive, emissiveIntensity: 0.35, metalness: 0.05, roughness: 0.16, transmission: this.mobile ? 0 : 0.45, thickness: 0.25, transparent: true, opacity: this.mobile ? 0.32 : 0.65, side: THREE.DoubleSide, depthWrite: false });
+    const material = new THREE.MeshPhysicalMaterial({ color, emissive, emissiveIntensity: 0.35, metalness: 0.05, roughness: 0.16, transmission: this.mobile ? 0 : 0.45, thickness: 0.25, transparent: true, opacity: this.mobile ? 0.32 : 0.65, side: THREE.DoubleSide, depthWrite: false });
+    nightEmission(material, color, .5); return material;
   }
   /** Invisible wall segments (colliders + occluders) around an elliptical floor, leaving a gap of ±gap radians at the south door. */
   private wallRing(exterior: THREE.Group, x: number, z: number, a: number, b: number, gap: number): void {
@@ -307,7 +320,7 @@ export class Town {
     return true;
   }
   readonly forest = new Forest();
-  async loadAssets(): Promise<void> { await Promise.all([this.forest.load(this.mobile), this.mountains.ready, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
+  async loadAssets(): Promise<void> { await Promise.all([this.forest.load(this.mobile), this.mountains.ready, this.researchReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
     const rand = seeded(3974); const sites: THREE.Vector3[] = [];
     for (let i = 0; i < (this.mobile ? 2600 : 5400); i++) {
@@ -338,6 +351,8 @@ export class Town {
     for (const x of [-6.5, 6.5]) for (const z of [5, 13, 39]) {
       const pole = mesh(new THREE.CylinderGeometry(0.045, 0.065, 2.8, 8), this.gold, this.root, x, 1.4, z);
       const globe = mesh(this.sphere, new THREE.MeshStandardMaterial({ color: '#f3e8c9', emissive: '#e4c881', emissiveIntensity: 0.35, roughness: 0.6 }), this.root, x, 2.8, z); globe.scale.setScalar(0.23); pole.castShadow = false;
+      nightEmission(globe.material as THREE.MeshStandardMaterial, '#ffcf79', 3);
+      addGlow(this.root, new THREE.Vector3(x, 2.8, z), '#ffcf79', 4.5, 36, 10, .7);
     }
   }
   update(time: number, camera?: THREE.Camera, fogFar = 220, mapView = false): void {

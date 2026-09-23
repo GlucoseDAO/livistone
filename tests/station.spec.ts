@@ -48,6 +48,17 @@ test('train cabin announcements point to science, art and the pieces site', asyn
   expect(errors).toEqual([]);
 });
 
+test('clicking the two wall advertisements opens the science and art sites', async ({ page, context }) => {
+  await context.route('https://livia.glucosedao.org/**', route => route.fulfill({ contentType: 'text/html', body: '<title>Artist website</title>' }));
+  await page.goto('/'); await expect(page.locator('#view-toggle')).toBeEnabled({ timeout: 60000 }); await page.locator('#start-exploring').click();
+  for (const [x, yaw, path] of [[3, -Math.PI / 2, 'science-tech/glucosedao/'], [-31, Math.PI / 2, 'pieces/']] as const) {
+    await page.evaluate(({ x, yaw }) => (window as unknown as { __livistone: { teleport(x: number, z: number, yaw: number): void } }).__livistone.teleport(x, 79, yaw), { x, yaw });
+    await expect(page.locator('#interact')).toContainText(path === 'pieces/' ? 'Art and geometry' : 'Science this way');
+    const popup = page.waitForEvent('popup'); await page.mouse.click(600, 400); const opened = await popup;
+    await expect(opened).toHaveURL('https://livia.glucosedao.org/' + path); await opened.close();
+  }
+});
+
 test('station map and discovery are usable on a touch viewport', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
   try {

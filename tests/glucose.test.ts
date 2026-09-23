@@ -14,7 +14,8 @@ import glucose from '../src/world/molecules/glucose.json';
 
 describe('Glucose Commons', () => {
   it('preserves the selected molecular records and separates research from jewelry galleries', () => {
-    for (const [name, source] of [['1TRZ.pdb', insulin], ['GLC_ideal.sdf', glucose]] as const) expect(source.sourceSha256).toBe(createHash('sha256').update(readFileSync(`data/molecules/${name}`)).digest('hex'));
+    // Git can check these text records out as CRLF on Windows; provenance hashes use canonical LF.
+    for (const [name, source] of [['1TRZ.pdb', insulin], ['GLC_ideal.sdf', glucose]] as const) expect(source.sourceSha256).toBe(createHash('sha256').update(readFileSync(`data/molecules/${name}`, 'utf8').replace(/\r\n/g, '\n')).digest('hex'));
     expect(insulin.chains.map((c) => c.residues.length)).toEqual([21, 30]); expect(insulin.disulfides).toHaveLength(3);
     expect(glucose.atoms.filter((a) => a.element === 'C')).toHaveLength(6); expect(glucose.atoms.filter((a) => a.element === 'O')).toHaveLength(6);
     for (const chain of insulin.chains) for (let i = 1; i < chain.residues.length; i++) {

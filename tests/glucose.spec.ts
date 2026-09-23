@@ -21,6 +21,8 @@ for (const mobile of [false, true]) test(`Glucose Commons posters, sources, map 
       await expect(page.locator('#lore-slides')).toBeVisible();
       await expect(page.locator('#lore-slide-count')).toHaveText(`1 / ${RESEARCH_POSTERS[i].slides.length}`);
       await expect(page.locator('#lore-slide-title')).toHaveText(RESEARCH_POSTERS[i].slides[0].title);
+      await expect(page.locator('.source-image img')).toHaveAttribute('src', RESEARCH_POSTERS[i].slides[0].image!);
+      await expect.poll(() => page.locator('.source-image img').evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
       if (RESEARCH_POSTERS[i].slides.length > 1) {
         await page.getByRole('button', { name: 'Next slide' }).click();
         await expect(page.locator('#lore-slide-count')).toHaveText(`2 / ${RESEARCH_POSTERS[i].slides.length}`);

@@ -5,6 +5,7 @@ import { stationClearing } from './station-layout';
 import { gatewayClearing } from './gateway-layout';
 import { glucoseClearing } from './glucose-layout';
 import { gardenClearing } from './living-waters-layout';
+import { futureClearing } from './elevated-layout';
 
 
 // Reserved for future authored homes; the white dome placeholders have been removed.
@@ -34,6 +35,7 @@ const pathSamples = PATH_CURVES.map((curve) => curve.getPoints(160));
 
 /** Reserve the whole plant footprint, not just its stem, along the rendered routes. */
 export function plantingAllowed(x: number, z: number, radius: number): boolean {
+  if (futureClearing(x, z, radius)) return false;
   if (waterDistance(x, z) < radius + .35) return false;
   if (Math.hypot(x - TIME_TOWER.x, z - TIME_TOWER.z) < TIME_TOWER.radius + radius) return false;
   if (GARDEN_BRIDGES.some((b) => Math.abs(z - b.z) < 2 + radius && Math.abs(x - b.x) < 10 + radius)) return false;

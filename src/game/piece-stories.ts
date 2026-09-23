@@ -39,6 +39,6 @@ export const PIECE_STORIES: Record<string, string> = {
   'eye-of-winter': 'Shown in A world for everyone at Romanian Jewelry Week 2026. Sterling silver, faceted topaz and quartz; wearable as a double ring or pendant. The public site tab has no longer studio paragraph.',
   hollywood: 'Shown in A world for everyone at Romanian Jewelry Week 2026. Sterling silver and fossilized wood. The public site tab lists the exhibition facts; no longer studio paragraph was published there.',
   'rotary-magnetic': 'Shown in A world for everyone at Romanian Jewelry Week 2026. The structured exhibition caption and selected photographs identify sterling silver and amber. An older studio note describes a tourmaline experiment; this display does not combine those two versions.',
-  timeface: 'Shown in A world for everyone at Romanian Jewelry Week 2026. Sterling silver. Journal-only in Livistone; the public tab lists exhibition facts without a longer studio paragraph.',
-  'deep-sea-pearl': 'Shown in A world for everyone at Romanian Jewelry Week 2026 as Deep Sea Pearl (Karmazina). Sterling silver and amber. Journal-only; the public tab lists exhibition facts without a longer studio paragraph.',
+  timeface: 'Shown in A world for everyone at Romanian Jewelry Week 2026. Sterling silver. Its photograph introduces the tower’s spiral exhibition of earlier works; the public tab lists exhibition facts without a longer studio paragraph.',
+  'deep-sea-pearl': 'Shown in A world for everyone at Romanian Jewelry Week 2026 as Deep Sea Pearl (Karmazina). Sterling silver and amber. On display in Future House. The public tab lists exhibition facts without a longer studio paragraph.',
 };

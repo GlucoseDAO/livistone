@@ -1,4 +1,5 @@
 import catalogue from './jewelry-catalogue.json' with { type: 'json' };
+import archive from './archive-catalogue.json' with { type: 'json' };
 import type { LandmarkId } from './content';
 import { PIECE_STORIES } from './piece-stories';
 
@@ -19,7 +20,7 @@ export const EXHIBITS: Exhibit[] = [
     photos: [{ file: 'IMG_3433.jpg', alt: 'Nanot pendant: an open silver lattice with angular folds and dark inclusions' }, { file: 'IMG_3434.jpg', alt: 'A second studio photograph of the Nanot pendant and its folded metal structure' }] },
 ];
 /** Curated manifest: every physical piece belongs to exactly one place. Full photographs are viewer-only. */
-export const COLLECTION: Exhibit[] = catalogue.map((piece) => ({ ...piece, location: piece.location as LandmarkId | null, landmark: EXHIBITS.find((anchor) => anchor.discovery === piece.discovery)?.landmark, story: PIECE_STORIES[piece.discovery] }));
+export const COLLECTION: Exhibit[] = [...catalogue, ...archive].map((piece) => ({ ...piece, location: (piece.discovery === 'timeface' ? 'timeface' : ['eyelense', 'deep-sea-pearl'].includes(piece.discovery) ? 'future-house' : piece.location) as LandmarkId | null, landmark: EXHIBITS.find((anchor) => anchor.discovery === piece.discovery)?.landmark, story: PIECE_STORIES[piece.discovery] ?? ('story' in piece ? piece.story : undefined) }));
 /** Contain the entire photograph within the available panel or viewer area. */
 export function photoSize(width: number, height: number, maxWidth = 2.8, maxHeight = 2.3): { width: number; height: number } {
   const ratio = width > 0 && height > 0 ? width / height : 1;

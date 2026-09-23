@@ -4,8 +4,9 @@ import { RESEARCH_POSTERS } from './research';
 import { COLLECTION } from './exhibits';
 import { GARDENS } from '../world/living-waters-layout';
 import type { ResearchFigure } from './research-art';
+import { TIME_TOWER } from '../world/waterways';
 
-export type LandmarkId = 'city-hall' | 'energy' | 'science' | 'station' | 'glucose' | 'living-waters' | 'mycelium-garden';
+export type LandmarkId = 'city-hall' | 'energy' | 'science' | 'station' | 'glucose' | 'living-waters' | 'mycelium-garden' | 'timeface' | 'future-house';
 export interface Landmark {
   id: LandmarkId;
   zone?: 'town' | 'gardens';
@@ -21,16 +22,18 @@ export interface Landmark {
   stretch: { x: number; z: number };
 }
 export const LANDMARKS: Landmark[] = [
+  { id: 'timeface', entrance: { x: TIME_TOWER.x + 6.55, y: 1.25, z: TIME_TOWER.z + 2, yaw: 0 }, name: 'Timeface Tower', artifact: 'Earlier explorations · spiral gallery', x: TIME_TOWER.x, z: TIME_TOWER.z, color: '#b3c6cb', stretch: { x: 1.35, z: 1.35 }, description: 'A round plaza opens onto a continuous spiral walk around the silver hourglass. Follow older works from the studio archive to a viewing terrace above the town.' },
+  { id: 'future-house', entrance: { x: -35, y: 1.2, z: -105, yaw: Math.PI / 2 }, name: 'Future House', artifact: 'Camel Dalí · a lakeside exhibition', x: -64, z: -110, color: '#c98c65', stretch: { x: 1.8, z: 2 }, description: 'A camel bends toward Vittoria Lake. Climb its copper neck into a dark printed cabin held by leather bands, with an exhibition of recent works and views over the water.' },
   { id: 'city-hall', entrance: { x: 0, y: 1.05, z: -11, yaw: 0 }, name: 'City Hall', artifact: 'The Nut of Power', x: 0, z: -21, color: '#b89a5d', stretch: { x: 1, z: 1 }, description: 'Walnut, crystal, and brass come together at the heart of Livistone. Step into the atrium and discover the artifact that connects them all.' },
   { id: 'energy', entrance: { x: -29, y: 1.05, z: 3, yaw: 0 }, name: 'Ministry of Energy', artifact: 'The Mitoring', x: -29, z: -9, color: '#c88a38', stretch: { x: 14 / 7.1, z: 6.6 / 7.1 }, description: 'A long amber hall wrapped in folded silver cristae, entered through the ring itself. Explore a garden of energy, inspired by the tiny structures that power living cells.' },
   { id: 'science', entrance: { x: 29, y: 1.05, z: -1, yaw: 0 }, name: 'Ministry of Science', artifact: 'The Nanot of Power', x: 29, z: -11, color: '#819e96', stretch: { x: 1, z: 1 }, description: 'An intricate silver lattice of struts and folded strands shelters a place of curiosity. Inside, small structures reveal extraordinary possibilities.' },
   { id: 'station', entrance: { x: STATION.entranceX, y: 1.05, z: STATION.entranceZ - 4, yaw: 0 }, name: 'Embryo Station', artifact: 'The Embryo Ring', x: STATION.x, z: STATION.z, color: '#d5a044', stretch: { x: 4.1, z: 1.4 }, description: 'A silver ring opens into an amber-roofed railway station. Arrive at the southern station looking toward the city gate and the Livistone bridge. The train and both railway lines belong to this arrival station.' },
-  { id: 'glucose', entrance: { x: GLUCOSE_PAVILION.x, y: 1.05, z: GLUCOSE_PAVILION.z + GLUCOSE_PAVILION.radius + 5.4, yaw: 0 }, name: 'Glucose Commons', artifact: 'Human insulin · GlucoseDAO', x: GLUCOSE_PAVILION.x, z: GLUCOSE_PAVILION.z, color: '#78a99b', stretch: { x: 1.35, z: 1.35 }, description: 'Follow the eastern station garden path to an open pavilion beneath two ribbons traced from a human insulin structure. Six chapter posters open into sourced slides from the public Kyiv 2026 talk and the GlucoseDAO repositories: why glucose matters, how it is measured, GlucoseDAO, Sugar-Sugar, forecasting tools and the insulin sculpture.' },
+  { id: 'glucose', entrance: { x: GLUCOSE_PAVILION.x, y: 1.05, z: GLUCOSE_PAVILION.z + GLUCOSE_PAVILION.radius + 5.4, yaw: 0 }, name: 'Glucose Commons', artifact: 'Human insulin · GlucoseDAO', x: GLUCOSE_PAVILION.x, z: GLUCOSE_PAVILION.z, color: '#78a99b', stretch: { x: 1.35, z: 1.35 }, description: 'Follow the eastern station garden path to an open pavilion beneath two ribbons traced from a human insulin structure. Six chapter posters open into original images and text from Livia’s supplied research folder: why glucose matters, how it is measured, GlucoseDAO, Sugar-Sugar, forecasting tools and the insulin sculpture.' },
   { id: 'living-waters', entrance: { x: GARDENS.x + GARDENS.pavilionX, y: 1.05, z: GARDENS.z + GARDENS.pavilionZ - 9, yaw: Math.PI }, name: 'Vittoria Lake', artifact: 'Living Waters · town gardens', x: GARDENS.x - 10, z: GARDENS.z, color: '#81bcc0', stretch: { x: 6, z: 6 }, description: 'Walk north from City Hall into Living Waters, part of the same town gardens. Walk a branching silver network between shallow water eyes and enter an aquamarine pavilion inspired by Vittoria Amazonica and Dewdrop.' },
   { id: 'mycelium-garden', entrance: { x: GARDENS.x + 74, y: 1.05, z: GARDENS.z - 25, yaw: -2 }, name: 'Mycelium Rain Garden', artifact: 'Silver mushroom grove', x: GARDENS.x + 75, z: GARDENS.z, color: '#81a791', stretch: { x: 3, z: 4 }, description: 'At Living Waters, follow the eastern path into tall mushroom sculptures and lower ring-scale silver shrubs with curled gills and opal hearts, both following the Mycelium ring. Folded crowns collect rain above a dry loop; a visible silver rill links the opalescent basin to Vittoria Lake.' },
 ];
 export const CIVIC_LANDMARKS = LANDMARKS.filter((landmark) => ['city-hall', 'energy', 'science'].includes(landmark.id));
-export interface DiscoverySlide { title: string; body: string; figure?: ResearchFigure }
+export interface DiscoverySlide { title: string; body: string; figure?: ResearchFigure; image?: string; imageAlt?: string }
 export interface Discovery {
   id: string;
   landmark: LandmarkId;
@@ -41,6 +44,7 @@ export interface Discovery {
   slides?: DiscoverySlide[];
 }
 export const DISCOVERIES: Discovery[] = [
+  { id: 'future-house-story', landmark: 'future-house', title: 'Camel Dalí / Future House', category: 'MATERIALS AND IMAGINATION', body: 'Camel Dalí combines native copper, a PLA printed part and leather ties, as described by Livia. The original Instagram post introduces an organic form and 3D printing. Future House enlarges those materials into a drinking camel: copper legs and neck, a printed exhibition cabin and leather bindings. The building and walkable neck are new Livistone architecture.', links: [{ label: 'Camel Dalí — original Instagram post', url: 'https://www.instagram.com/p/DdDwLqDlcm2/' }] },
   ...RESEARCH_POSTERS,
   { id: 'living-vittoria', landmark: 'living-waters', title: 'Vittoria Amazonica at the lake', category: 'VITTORIA LAKE / TWO WORKS',
     body: 'Livia’s Vittoria Amazonica pendant is silver and aquamarine, made in 2022 and shown in Survival at Romanian Jewelry Week 2023. The lake enlarges its lily-pad form into water eyes and walkable silver nerves; that landscape is new Livistone fiction. The neighbouring stand presents the separate Dewdrop ring.',
@@ -66,10 +70,10 @@ export const DISCOVERIES: Discovery[] = [
   { id: 'connections', landmark: 'science', title: 'A world of connections', category: 'THE BIOLOGY COLLECTION', body: 'The artifacts belong to a wider exploration of cells, living forms, and natural materials. The shapes of the nucleus, mitochondrion, and microscopic structures become jewelry. In Livistone, those same connections become a walk between buildings.' },
   { id: 'embryo-station', landmark: 'station', title: 'A departure, a beginning', category: 'THE EMBRYO STATION', body: 'Livia’s Embryo Ring holds raw amber in an organic embrace of sterling-silver prongs. In Livia Lore, it blesses new projects and beginnings. Livistone gives that idea a place in the town: a railway station for journeys yet to come. The pierced ring becomes the entrance, amber becomes a shelter over the platform, and the silver prongs hold it above the garden. The station and its ultra-fast train are new Livistone fiction. Leave its ring entrance looking toward the city gate and the Livistone bridge, then follow the civic footpaths to the northern Living Waters gardens.' },
   { id: 'train-future', landmark: 'station', title: 'Step into the future', category: 'EMBRYO TRAIN / ANNOUNCEMENT',
-    body: 'Inside the parked maglev, the cabin boards say step into the future. They are Livistone announcements, not a scheduled service. Click or press E to open Livia Zaharia’s public catalogue of works and objects.',
+    body: 'Inside the parked maglev, the cabin boards say step into the future. They are Livistone announcements, not a scheduled service. Click to open Livia Zaharia’s public catalogue of works and objects, or press E for the story and links.',
     links: [{ label: 'Livia’s works and objects', url: 'https://livia.glucosedao.org/pieces/' }] },
   { id: 'train-science', landmark: 'station', title: 'Science this way', category: 'EMBRYO TRAIN / SCIENCE ≫',
-    body: 'Double triangle arrowheads mark the science direction along the cabin: toward the eastern Ministry of Science and Glucose Commons after you leave the train. The announcement opens the same public catalogue of pieces.',
+    body: 'Double triangle arrowheads mark the science direction along the cabin: toward the eastern Ministry of Science and Glucose Commons after you leave the train. Click the advertisement to open Livia’s GlucoseDAO science page. Press E for its story and source links.',
     links: [{ label: 'Livia’s works and objects', url: 'https://livia.glucosedao.org/pieces/' }, { label: 'GlucoseDAO science & tech', url: 'https://livia.glucosedao.org/science-tech/glucosedao/' }] },
   { id: 'train-art', landmark: 'station', title: 'Art and geometry this way', category: 'EMBRYO TRAIN / ART ≫',
     body: 'The opposite cabin direction is marked for art and geometry: toward the civic jewelry halls after you leave the train. The announcement opens Livia’s public catalogue of works and objects.',
