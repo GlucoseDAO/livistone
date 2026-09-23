@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { createPlaceSign, paintPlaceSign } from './place-sign';
+import type { PlaceSign } from './place-sign';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
 import type { Interactive } from './world';
@@ -18,6 +20,7 @@ export class LivingWaters {
   readonly colliders: ColliderSpec[] = [];
   readonly interactives: Interactive[] = [];
   readonly panels: THREE.Mesh[] = [];
+  private readonly signs = new Map<string, PlaceSign>();
   private readonly water = new THREE.MeshStandardMaterial({ color: '#507c78', vertexColors: true, metalness: .28, roughness: .32, envMapIntensity: .65 });
   private readonly waterTime = { value: 0 };
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#d9e0d6', metalness: .63, roughness: .32 });
@@ -59,12 +62,13 @@ export class LivingWaters {
     this.mushrooms(); this.wetlandPlanting(); createLakePlants(this.root, mobile);
     for (const [name, [x, z]] of Object.entries(GARDEN_PANELS)) {
       const id = 'living-' + name, jewelry = name === 'vittoria' || name === 'dewdrop';
-      for (const dx of [-1, 1]) this.mesh(new THREE.CylinderGeometry(.045, .065, jewelry ? 1.7 : 1.35, 6), this.silver, true, x + dx, jewelry ? .85 : .675, z);
       if (!jewelry) {
-        const panel = this.mesh(new THREE.BoxGeometry(2.6, 1.65, .1), new THREE.MeshBasicMaterial({ color: '#f4f0e5', toneMapped: false }), true, x, 1.8, z);
-        panel.userData.discovery = id; this.panels.push(panel); this.interactives.push({ id, object: panel, position: new THREE.Vector3(x + GARDENS.x, 1.8, z + GARDENS.z) });
+        const sign = createPlaceSign(this.root, this.colliders, { x, z, yaw: 0 }, 'Garden story · ' + name, new THREE.Vector3(GARDENS.x, 0, GARDENS.z));
+        for (const face of sign.faces) face.userData.discovery = id;
+        this.signs.set(id, sign); this.panels.push(...sign.faces); this.interactives.push({ id, object: sign.faces[0], position: sign.position });
         continue;
       }
+      for (const dx of [-1, 1]) this.mesh(new THREE.CylinderGeometry(.045, .065, 1.7, 6), this.silver, true, x + dx, .85, z);
       this.mesh(new THREE.BoxGeometry(2.72, 2.9, .1), new THREE.MeshBasicMaterial({ color: '#f4f0e5', toneMapped: false }), true, x, 1.82, z);
       const photo = new THREE.Mesh(new THREE.PlaneGeometry(2.52, 1.32), new THREE.MeshBasicMaterial({ color: '#f4f0e5', toneMapped: false }));
       photo.position.set(x, 2.4, z + .06); photo.userData.discovery = id; photo.userData.kind = 'photo'; if (name === 'vittoria') photo.userData.piece = 'vittoria-amazonica';
@@ -208,13 +212,8 @@ export class LivingWaters {
       for (const object of [lowCrowns, lowStems, lowStones]) { object.castShadow = object.receiveShadow = true; object.computeBoundingSphere(); this.root.add(object); }
     }
   }
-  addInterpretation(id: string, title: string, body: string): void {
-    const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 640; const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#f4f0e5'; ctx.fillRect(0, 0, 1024, 640); ctx.fillStyle = '#2a5044'; ctx.font = '56px Georgia'; ctx.fillText(title, 45, 90); ctx.font = '31px sans-serif';
-    let y = 170, line = ''; for (const word of body.split(' ')) { if (ctx.measureText(line + word).width > 910) { ctx.fillText(line, 45, y); y += 45; line = ''; } line += word + ' '; } ctx.fillText(line, 45, y); ctx.font = '28px sans-serif'; ctx.fillText('E / tap to read the story and sources', 45, 585);
-    const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
-    const panel = this.panels.find(p => p.userData.discovery === id && p.userData.kind !== 'photo'); if (!panel) { map.dispose(); return; }
-    const material = panel.material as THREE.MeshBasicMaterial; material.color.set('#ffffff'); material.map = map; material.needsUpdate = true;
+  addInterpretation(id: string, eyebrow: string, title: string, body: string): void {
+    const sign = this.signs.get(id); if (sign) paintPlaceSign(sign, { eyebrow, title, body, footer: 'Click, or E / tap, for the story and sources' });
   }
   presentLakeJewelry(): void {
     const wrap = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, width: number, line: number): number => {

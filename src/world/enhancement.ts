@@ -1,19 +1,33 @@
 import { cutShaft } from './shaft';
 import { enhancementFigure } from './enhancement-figure';
 import * as THREE from 'three';
-import { ENHANCEMENT as H, ENHANCEMENT_SUMMIT, enhancementGeometry, SHAFT, enhancementRamp, CAVE_APPROACH } from './enhancement-layout';
+import { ENHANCEMENT as H, ENHANCEMENT_SUMMIT, enhancementGeometry, SHAFT, enhancementRamp, CAVE_APPROACH, ENHANCEMENT_SIGN } from './enhancement-layout';
+import { createPlaceSign, paintPlaceSign } from './place-sign';
+import { ENHANCEMENT_URL } from '../game/enhancement';
 import { solidMesh, walkwayGeometry, guardRail } from './walkway';
 import { addGlow, nightEmission } from './night-lighting';
 import type { ColliderSpec } from '../game/physics';
 
+/** Satin violet after the project's rendered and printed crystals; coplanar triangles share a tone so each Voronoi facet reads. */
+function facetColors(geometry: THREE.BufferGeometry): void {
+  const p=geometry.getAttribute('position'),colors=new Float32Array(p.count*3),a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),n=new THREE.Vector3(),color=new THREE.Color();
+  const tones=['#6c58d6','#7d6ae6','#5d4cc6','#8f80ef','#7262dd','#a497f3'].map(t=>new THREE.Color(t)),top=new THREE.Color('#d8d0ff'),base=new THREE.Color('#3d3190');
+  for(let i=0;i<p.count;i+=3){
+    a.fromBufferAttribute(p,i);b.fromBufferAttribute(p,i+1);c.fromBufferAttribute(p,i+2);n.subVectors(b,a).cross(c.clone().sub(a)).normalize();
+    const key=Math.round(n.x*12)*7+Math.round(n.y*12)*13+Math.round(n.z*12)*29,h=(a.y+b.y+c.y)/60;
+    color.copy(tones[(key%6+6)%6]).lerp(h>.5?top:base,Math.abs(h-.5)*.55);
+    for(let j=0;j<3;j++)colors.set([color.r,color.g,color.b],(i+j)*3);
+  }
+  geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
+}
 /** The supplied Voronoi shell: original cells retained outside the single approved internal exit shaft. */
 export function createEnhancementHill(parent: THREE.Group, colliders: ColliderSpec[]): void {
-  const crystal = new THREE.MeshStandardMaterial({color:'#a6472c',metalness:.02,roughness:.96,flatShading:true,side:THREE.DoubleSide});
-  nightEmission(crystal,'#a93b18',.09);
-  const original=enhancementGeometry(),cut=cutShaft(original,new THREE.Vector3(SHAFT.x-SHAFT.half,-1,SHAFT.z-SHAFT.half),new THREE.Vector3(SHAFT.x+SHAFT.half,30,SHAFT.z+SHAFT.half));original.dispose();
+  const crystal = new THREE.MeshStandardMaterial({vertexColors:true,metalness:.28,roughness:.36,flatShading:true,side:THREE.DoubleSide});
+  nightEmission(crystal,'#5a42c8',.11);
+  const original=enhancementGeometry(),cut=cutShaft(original,new THREE.Vector3(SHAFT.x-SHAFT.half,-1,SHAFT.z-SHAFT.half),new THREE.Vector3(SHAFT.x+SHAFT.half,30,SHAFT.z+SHAFT.half));original.dispose();facetColors(cut);
   solidMesh(parent,colliders,cut,crystal,'Materialized Enhancements · original Voronoi shell');
   const surface=colliders[colliders.length-1];if(surface.type==='mesh')surface.climbable=true;
-  const pathMaterial=new THREE.MeshStandardMaterial({color:'#bda58c',roughness:.9,side:THREE.DoubleSide}),rail=new THREE.MeshStandardMaterial({color:'#7b5140',metalness:.45,roughness:.5});
+  const pathMaterial=new THREE.MeshStandardMaterial({color:'#d6d0e2',roughness:.85,side:THREE.DoubleSide}),rail=new THREE.MeshStandardMaterial({color:'#9c9ab4',metalness:.6,roughness:.35});
   const ramp=enhancementRamp();solidMesh(parent,colliders,walkwayGeometry(ramp,1.6),pathMaterial,'Enhancement · internal spiral');
   solidMesh(parent,colliders,walkwayGeometry(CAVE_APPROACH.getPoints(70),2.2),pathMaterial,'Enhancement · existing cave entry');
   for(const side of [-1,1]){
@@ -48,15 +62,10 @@ export function createEnhancementHill(parent: THREE.Group, colliders: ColliderSp
     }
   }
 }
-export function createEnhancementPanel(parent: THREE.Group): THREE.Mesh {
-  const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=900;const ctx=canvas.getContext('2d')!;
-  ctx.fillStyle='#f0ebd8';ctx.fillRect(0,0,1200,900);ctx.fillStyle='#264e42';ctx.textAlign='center';
-  const line=(text:string,y:number,size:number)=>{ctx.font=`${size>50?'700':'400'} ${size}px sans-serif`;ctx.fillText(text,600,y,1100);};
-  line('MATERIALIZED',110,82);line('ENHANCEMENTS',205,82);line('A game. A knowledgebase. A bioart project.',315,36);
-  line('Choose traits. Explore the evidence.',400,42);line('Turn your character into a printable crystal.',465,39);
-  line('CLIMB: follow the amber markers',565,42);line('WALK: enter the cave to your right',635,42);line('JOIN HERE / enhancement.bio',745,53);line('Click to create your character',825,32);
-  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-  const panel=new THREE.Mesh(new THREE.PlaneGeometry(2.25,1.69),new THREE.MeshBasicMaterial({map:texture,toneMapped:false,side:THREE.DoubleSide}));panel.position.set(98.8,1.7,-157);panel.name='Enhancement · join here';panel.userData.href='https://enhancement.bio/';panel.userData.discovery='materialized-enhancements';parent.add(panel);
-  const postMaterial=new THREE.MeshStandardMaterial({color:'#87604c',metalness:.4,roughness:.5});for(const side of [-1,1]){const post=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,1,6),postMaterial);post.position.set(panel.position.x+side*.8,.5,panel.position.z);parent.add(post);}
-  return panel;
+/** The participation sign stands beside the start of the marked climb, turned toward arrivals. */
+export function createEnhancementPanel(parent: THREE.Group, colliders: ColliderSpec[]): { panels: THREE.Mesh[]; position: THREE.Vector3 } {
+  const sign=createPlaceSign(parent,colliders,ENHANCEMENT_SIGN,'Enhancement · join here');
+  paintPlaceSign(sign,{eyebrow:'Bioart · participate',title:'Materialized Enhancements',body:'A game, a gene knowledgebase and a bioart project. Choose real genes from real animals, see how far their evidence reached, and grow a printable crystal. Climb the amber markers to the summit, or follow the road round to the lit cave.',footer:'Click to create your character at enhancement.bio ↗'});
+  for(const face of sign.faces){face.userData.href=ENHANCEMENT_URL;face.userData.discovery='materialized-enhancements';}
+  return {panels:sign.faces,position:sign.position};
 }

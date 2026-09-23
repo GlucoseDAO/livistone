@@ -1,0 +1,67 @@
+{
+ "name": "Livistone",
+ "sourceCommit": "3271faf",
+ "doltHash": "uupl5q35e6av1rcqv96717396ftq90ac",
+ "crystals": [
+  {
+   "category": "Regeneration",
+   "file": "regeneration.stl",
+   "sha256": "a1d6519bf6fccf0d8d56cce2abc0e3865eba35e4199d9f692d3560e01f2a8c40",
+   "seed": 6155,
+   "finalSeed": 6155,
+   "genes": 11,
+   "faces": 3020,
+   "watertight": true
+  },
+  {
+   "category": "Environmental Adaptation",
+   "file": "environmental-adaptation.stl",
+   "sha256": "4b05a2bc120d0ec99fb7eb92b359940f611d88866ace3b68d2d36cfbda73153d",
+   "seed": 6152,
+   "finalSeed": 6152,
+   "genes": 18,
+   "faces": 4152,
+   "watertight": true
+  },
+  {
+   "category": "Expression",
+   "file": "expression.stl",
+   "sha256": "fab02221c01fb3e81e043e5286afb8e4b5fca0b3faf451345dbd0ae12ba19ca2",
+   "seed": 6158,
+   "finalSeed": 6158,
+   "genes": 11,
+   "faces": 11204,
+   "watertight": true
+  },
+  {
+   "category": "Longevity & Genome",
+   "file": "longevity-genome.stl",
+   "sha256": "40c4f6a5cba7140569412e30b66195b052c183e0cb947c27fd61df8dbe28a778",
+   "seed": 6146,
+   "finalSeed": 6146,
+   "genes": 39,
+   "faces": 12740,
+   "watertight": true
+  },
+  {
+   "category": "Stress Resistance",
+   "file": "stress-resistance.stl",
+   "sha256": "14e06d96b51e16fdf3a18549d6be3dce558f301db416f35e063e3055d7bf4fef",
+   "seed": 6138,
+   "finalSeed": 6138,
+   "genes": 17,
+   "faces": 7144,
+   "watertight": true
+  },
+  {
+   "category": "Perception",
+   "file": "perception.stl",
+   "sha256": "0919d963f8cf64fb875e2dae74f580322d98842e06fbb5b538da0d3bc8cc8a78",
+   "seed": 6122,
+   "finalSeed": 6122,
+   "genes": 10,
+   "faces": 2160,
+   "watertight": true
+  }
+ ]
+}

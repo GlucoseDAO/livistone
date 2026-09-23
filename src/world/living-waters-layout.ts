@@ -44,6 +44,6 @@ export function rainPlantAllowed(x: number, z: number, radius: number): boolean 
 /** Living Waters is a district in the town, with shared ground and full-footprint planting reservations. */
 export function gardenClearing(x: number, z: number, radius: number): boolean {
   x -= GARDENS.x; z -= GARDENS.z;
-  return Object.values(GARDEN_PANELS).some(([px, pz]) => Math.hypot(px - x, pz - z) < 2 + radius) || Math.hypot(x, z) < 47 + radius || (x > 51 - radius && x < 104 + radius && z > -35 - radius && z < 32 + radius)
+  return Object.values(GARDEN_PANELS).some(([px, pz]) => Math.hypot(px - x, pz - z) < 2.4 + radius) || Math.hypot(x, z) < 47 + radius || (x > 51 - radius && x < 104 + radius && z > -35 - radius && z < 32 + radius)
     || pathSamples.some(points => points.some(p => Math.hypot(p.x - x, p.z - z) < PATH_WIDTH / 2 + .4 + radius));
 }

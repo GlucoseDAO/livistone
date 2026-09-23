@@ -17,4 +17,11 @@ export function enhancementRamp():THREE.Vector3[] {
  const points=Array.from({length:401},(_,i)=>{const t=i/400,a=t*Math.PI*8;return new THREE.Vector3(SHAFT.x+Math.sin(a)*1.5,.12+t*19.98,SHAFT.z+Math.cos(a)*1.5);});
  const last=points[points.length-1];for(let i=1;i<=20;i++)points.push(last.clone().lerp(new THREE.Vector3(SHAFT.x,20.1,-176.8),i/20));return points;
 }
+/** Beside the start of the marked climb, not on it; faces the map arrival point. */
+export const ENHANCEMENT_SIGN = { x: 93.4, z: -157.5, yaw: 1 };
+/** One row between the approach and the hill's south face: category stands alternate with posters from the arrival end westward. Gaps stay walkable and the ascent line stays clear. */
+export const GALLERY = { z: -160, east: 91.1, step: 2.6, posterWidth: 2.1, standWidth: 1.4 };
+export const galleryX = (i: number): number => GALLERY.east - i * GALLERY.step;
+export const STAND_SITES = Array.from({ length: 6 }, (_, i) => new THREE.Vector3(galleryX(i * 2), 0, GALLERY.z));
+export const POSTER_SITES = Array.from({ length: 6 }, (_, i) => new THREE.Vector3(galleryX(i * 2 + 1), 0, GALLERY.z));
 export const CAVE_APPROACH = new THREE.CatmullRomCurve3([new THREE.Vector3(111,.12,-178),new THREE.Vector3(99,.12,-178),new THREE.Vector3(91,.12,-177),new THREE.Vector3(87,.12,-176),new THREE.Vector3(82,.12,-177.5),new THREE.Vector3(83,.12,-179.1),enhancementRamp()[0]]);

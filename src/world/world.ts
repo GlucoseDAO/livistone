@@ -1,4 +1,5 @@
 import { createEnhancementHill, createEnhancementPanel } from './enhancement';
+import { createEnhancementGallery } from './enhancement-gallery';
 import * as THREE from 'three';
 import { addGlow, nightEmission } from './night-lighting';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -113,16 +114,17 @@ export class Town {
     this.railway = createRailwayStructure(this.root, this.colliders, mobile);
     this.gardens = new LivingWaters(mobile, this.paving); this.root.add(this.gardens.root);
     this.gardens.presentLakeJewelry();
-    this.gardens.addInterpretation('living-mycelium', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
+    this.gardens.addInterpretation('living-mycelium', 'Mycelium Rain Garden', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
     this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.white, this.paving, this.gold, bridge);
     createTimeTower(this.root, this.colliders, this.mobile);
     createFutureHouse(this.root, this.colliders, this.mobile);
     createEnhancementHill(this.root, this.colliders);
-    const enhancementPanel = createEnhancementPanel(this.root); this.researchPanels.push(enhancementPanel); this.interactives.push({ id: 'materialized-enhancements', object: enhancementPanel, position: enhancementPanel.position.clone() });
+    const enhancementSign = createEnhancementPanel(this.root, this.colliders); this.researchPanels.push(...enhancementSign.panels); this.interactives.push({ id: 'materialized-enhancements', object: enhancementSign.panels[0], position: enhancementSign.position });
+    const enhancementGallery = createEnhancementGallery(this.root, this.colliders); this.researchPanels.push(...enhancementGallery.panels); this.interactives.push(...enhancementGallery.interactives);
     for (const id of ['timeface', 'future-house']) this.exhibitions.push(new PlanarExhibition(id, this.root, 0, 0, this.colliders, this.interactives));
     const research = createGlucosePavilion(this.root, this.colliders, mobile, this.paving); this.researchPanels.push(...research.panels); this.interactives.push(...research.interactives);
-    this.researchReady = research.ready;
+    this.researchReady = Promise.all([research.ready, enhancementGallery.ready]).then(() => undefined);
     this.createTrees(); this.createGardens();
     for (const landmark of CIVIC_LANDMARKS) {
       const color = landmark.id === 'energy' ? '#ffbf66' : landmark.id === 'science' ? '#99ded7' : '#ffe0a3';

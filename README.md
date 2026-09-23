@@ -10,7 +10,7 @@ You only need a recent browser with WebGL 2 and hardware acceleration. No instal
 
 1. Wait for the town to load. It opens in **Top view**.
 2. Choose **Start exploring** to walk from the station, or select a named stop on the map to arrive at its entrance.
-3. Approach a display and press **E**, or tap its discovery prompt, to read the story. Click a photograph to enlarge it.
+3. Approach a display and press **E**, or tap its discovery prompt, to read the story. Click a photograph to enlarge it. The pointer turns into a hand over anything you can click; the posters at Materialized Enhancements open [enhancement.bio](https://enhancement.bio/) in a new tab. Large dark signs in gold lattice frames introduce a place; cream boards show individual pieces.
 4. Open **Journal** to browse the stories and jewelry catalogue at any time.
 
 | Action | Computer | Phone or tablet |

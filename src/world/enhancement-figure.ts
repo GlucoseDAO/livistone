@@ -21,11 +21,11 @@ export function enhancementFigure(parent: THREE.Group): THREE.Group {
   figure.add(body);
   const form = enhancementGeometry();
   form.translate(-82, 0, 178).rotateX(Math.PI / 2).scale(.026, .026, .026).translate(0, 5.85, .43);
-  const heart = new THREE.MeshStandardMaterial({ color: '#d66d42', metalness: .3, roughness: .48, side: THREE.DoubleSide });
-  nightEmission(heart, '#ff8644', 1.8);
+  const heart = new THREE.MeshStandardMaterial({ color: '#a89bff', metalness: .3, roughness: .35, flatShading: true, side: THREE.DoubleSide });
+  nightEmission(heart, '#8c74ff', 1.8);
   const chest = new THREE.Mesh(form, heart);
   chest.name = 'Human · Voronoi chest';
   figure.add(chest);
-  addGlow(figure, new THREE.Vector3(0, 5.85, .65), '#ffb37e', 2.2, 10, 5, .18);
+  addGlow(figure, new THREE.Vector3(0, 5.85, .65), '#b9a8ff', 2.2, 10, 5, .18);
   return figure;
 }

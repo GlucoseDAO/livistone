@@ -61,6 +61,8 @@ class Game {
   private frameId = 0;
   private lowQuality = false;
   private selection: string | null = null;
+  private hoverPointer: { x: number; y: number; buttons: number } | null = null;
+  private cursorDirty = false;
   constructor(private ui: UI) {
     this.ambience.onStateChange = enabled => this.ui.setSound(enabled);
     this.ui.setSound(this.ambience.enabled);
@@ -94,6 +96,10 @@ class Game {
     this.orbit.enableDamping = true; this.orbit.dampingFactor = 0.08; this.orbit.minDistance = 30; this.orbit.maxDistance = 410;
     this.orbit.minPolarAngle = 0.16; this.orbit.maxPolarAngle = Math.PI * 0.44;
     this.input = new Input(ui.canvas, ui.joystick, (action) => void this.action(action));
+    // Mouse hover only: a hand over anything that responds to a click. Evaluated once per frame.
+    ui.canvas.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') { this.hoverPointer = { x: e.clientX, y: e.clientY, buttons: e.buttons }; this.cursorDirty = true; } });
+    ui.canvas.addEventListener('pointerleave', () => { this.hoverPointer = null; this.cursorDirty = true; });
+    document.addEventListener('pointerup', (e) => { if (this.hoverPointer && e.pointerType === 'mouse') { this.hoverPointer.buttons = e.buttons; this.cursorDirty = true; } });
     ui.setLookHint('Hold left mouse to look');
     ui.progress(this.progress); ui.setMode('welcome');
     document.querySelector<HTMLSelectElement>('#time-of-day')!.value = this.timeOfDay;
@@ -147,6 +153,7 @@ class Game {
     const fog = this.mapView ? MAP_FOG : WALK_FOG;
     this.scene.fog = new THREE.Fog(haze, fog.near, fog.far);
     this.ui.setMode(mode, this.mapView); this.town.setMapMode(this.mapView); this.renderer.shadowMap.needsUpdate = true; this.resize();
+    this.cursorDirty = true;
     if (mode === 'walking') this.ui.canvas.focus({ preventScroll: true });
   }
   async action(action: string): Promise<void> {
@@ -229,10 +236,19 @@ class Game {
     }
   }
 
-  private clickPhoto(x: number, y: number): void {
+  /** The poster, photo or caption a click at this screen point would act on; hover uses the same test for its cursor. */
+  private clickTarget(x: number, y: number): THREE.Intersection | undefined {
     this.raycaster.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, 1 - y / innerHeight * 2), this.walkCamera); this.raycaster.far = 9;
     const hit = this.raycaster.intersectObjects([...this.town.researchPanels, ...this.town.exhibitions.flatMap((e) => [...e.photos, ...e.textSurfaces])], false)[0]; if (!hit) return;
     const wall = this.raycaster.intersectObjects(this.town.occluders, false)[0]; if (wall && wall.distance < hit.distance) return;
+    const data = hit.object.userData; return data.href || data.discovery || COLLECTION.some((p) => p.discovery === data.piece) ? hit : undefined;
+  }
+  private updateCursor(): void {
+    const pointer = this.hoverPointer, target = !!pointer && this.mode === 'walking' && !(pointer.buttons & 1) && !!this.physics && !!this.clickTarget(pointer.x, pointer.y);
+    this.ui.canvas.style.cursor = target ? 'pointer' : '';
+  }
+  private clickPhoto(x: number, y: number): void {
+    const hit = this.clickTarget(x, y); if (!hit) return;
     if (hit.object.userData.href) { window.open(hit.object.userData.href as string, '_blank', 'noopener,noreferrer'); return; }
     const piece = COLLECTION.find((p) => p.discovery === hit.object.userData.piece);
     if (piece && !hit.object.userData.posterInfo && hit.object.userData.kind !== 'caption') {
@@ -295,7 +311,7 @@ class Game {
 
     const current = this.physics.position(); this.walkCamera.position.set(current.x, current.y + 0.78, current.z); this.walkCamera.rotation.set(this.input.pitch, this.input.yaw, 0, 'YXZ');
     this.updateClock += dt;
-    if (this.updateClock > 0.12) { this.updateClock = 0; this.findInteraction(); this.findLocation(); }
+    if (this.updateClock > 0.12) { this.updateClock = 0; this.findInteraction(); this.findLocation(); this.cursorDirty = true; }
   }
   private findLocation(): void {
     const p = this.physics!.position();
@@ -356,6 +372,7 @@ class Game {
     this.updateExhibitionControls();
     this.clockCheck += rawDt; if (this.clockCheck > 30) { this.clockCheck = 0; if (this.timeOfDay === 'auto') this.applyTimeOfDay(); }
     this.nightLighting.update(camera); this.renderer.render(this.scene, camera);
+    if (this.cursorDirty) { this.cursorDirty = false; this.updateCursor(); }
     this.fpsFrames++; this.fpsTime += rawDt;
     if (this.fpsTime >= 1) { this.fps = Math.round(this.fpsFrames / this.fpsTime); this.fpsFrames = 0; this.fpsTime = 0; }
   };

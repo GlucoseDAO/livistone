@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createPlaceSign, paintPlaceSign } from './place-sign';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
 import { createMaglevTrain, createTrainCabinGraphics } from './train';
@@ -169,7 +170,7 @@ export function createStationStructure(root: THREE.Group, colliders: ColliderSpe
 
 export function createStation(root: THREE.Group, colliders: ColliderSpec[], mobile: boolean, paving: THREE.Material): { object: THREE.Object3D; position: THREE.Vector3; posters: THREE.Mesh[] } {
   const station = createStationStructure(root, colliders, mobile, paving);
-  const white = new THREE.MeshStandardMaterial({ color: '#ede9dc', roughness: .43 }), silver = new THREE.MeshStandardMaterial({ color: '#e1e8e8', metalness: .86, roughness: .21 });
+  const silver = new THREE.MeshStandardMaterial({ color: '#e1e8e8', metalness: .86, roughness: .21 });
   // Signs are world-space surfaces; the ordinary discovery input remains the only interaction.
   const sign = (width: number, height: number, title: string, subtitle: string): THREE.Mesh => {
     const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = Math.round(1024 * height / width);
@@ -189,14 +190,13 @@ export function createStation(root: THREE.Group, colliders: ColliderSpec[], mobi
     hangers.push(box(x, (top + bottom) / 2, z, .035, top - bottom, .035));
   }
   add(station, merge(hangers), silver, 'Suspended station signs');
-  const story = sign(2.8, 1.3, 'NEW BEGINNINGS', 'The story of the Embryo Ring'); story.position.set(-8.5, 1.75, -66.3);
-  const storyBack = box(-8.5, 1.75, -66.4, 3, 1.5, .16); add(station, storyBack, white, 'Station story panel'); solid(colliders, storyBack);
-  for (const x of [-9.65, -7.35]) { const leg = box(x, .72, -66.4, .08, 1.1, .08); add(station, leg, silver, 'Story panel support'); solid(colliders, leg); }
+  const story = createPlaceSign(station, colliders, { x: -8.5, z: -66.35, yaw: 0 }, 'Station story panel');
+  paintPlaceSign(story, { eyebrow: 'The Embryo Station', title: 'New beginnings', body: 'Livia’s Embryo Ring holds raw amber in an organic embrace of sterling-silver prongs. In Livia Lore it blesses new projects and beginnings; Livistone makes it a station for journeys yet to come.', footer: 'Click, or E / tap, for the story of the Embryo Ring' });
+  for (const face of story.faces) face.userData.discovery = 'embryo-station';
   // Independent front faces keep reverse lettering readable instead of mirrored.
-  for (const board of [entrance, platform, boarding, story]) {
-    const back = board.clone(); back.rotation.y = Math.PI; back.position.z -= board === story ? .19 : .035; back.name = board.name + ' · reverse'; station.add(back);
-    if (board === story) back.userData.discovery = 'embryo-station';
+  for (const board of [entrance, platform, boarding]) {
+    const back = board.clone(); back.rotation.y = Math.PI; back.position.z -= .035; back.name = board.name + ' · reverse'; station.add(back);
   }
-  const posters = createTrainCabinGraphics(station.getObjectByName('Panoramic maglev') as THREE.Group);
-  return { object: story, position: story.position.clone(), posters };
+  const posters = [...createTrainCabinGraphics(station.getObjectByName('Panoramic maglev') as THREE.Group), ...story.faces];
+  return { object: story.faces[0], position: story.position.clone(), posters };
 }

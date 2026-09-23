@@ -71,6 +71,7 @@ For a phone on the same Wi-Fi, use the **Network** URL that Vite prints, such as
 | Discover | Face a nearby display, then E | Tap the discovery prompt |
 | Poster facts / collection | E facing a poster; 1 / 2 inside a hall | Tap a poster or its discovery prompt |
 | Open a photograph | 3, click a poster photo, or Open photograph | Tap a photo or Open photograph |
+| Spot something clickable | The pointer becomes a hand over any poster, photo or caption that responds to a click | — |
 | Explore the parked train | Walk through either boarding bay | Board with the thumbstick |
 | Inspect a photograph | Scroll or +/− to zoom; drag to pan; ←/→ photos; 0 fit; Esc close | Pinch or +/− to zoom; drag to pan; photo arrows; Fit image; Close |
 | Switch aerial / first-person view | M or First person / Top view | Labeled First person / Top view button |
@@ -104,6 +105,7 @@ src/
     content.ts       Landmarks, discoveries, spawn point, saved progress
     exhibits.ts      Curated local jewelry catalogue and photograph metadata
     research.ts      Source-linked GlucoseDAO research posters
+    enhancement.ts   Materialized Enhancements poster captions and gene-category facts
     physics.ts       Rapier world and kinematic character controller
     input.ts         Keyboard, held-button drag-to-look mouse, and touch thumbstick input
     audio.ts         Approved phone-recorded kalimba playlist
@@ -130,6 +132,9 @@ src/
     planar-exhibition.ts Permanent photo posters and aspect-matched factual captions
     poster-layout.ts Building-specific gallery placement
     glucose-pavilion.ts Insulin ribbons, glucose sculpture and research posters
+    enhancement.ts   Voronoi hill, cave ramp, markers and base panel
+    enhancement-gallery.ts Enhancement photo posters, category emblems and generated crystals
+    place-sign.ts    Building/place signs with a pierced gold lattice frame
     living-waters.ts Town lake, pavilion and silver mushroom grove
     living-waters-layout.ts Shared water cells, paths and planting clearance
     terrain.ts       Continuous town ground and matching collision mesh
@@ -275,8 +280,10 @@ Jewelry photographs and catalogue facts come from [Livia Zaharia’s Pieces cata
 
 ### Materialized Enhancements and town route
 
-Every stop is based on an existing piece of jewelry, artwork or research project. Map numbering starts at Embryo Station and continues through the civic buildings to the northern gardens. Behind the mycelium grove, Materialized Enhancements preserves Livia's original Voronoi STL as a reddish faceted hill with open cells and a direct climb. Amber markers indicate the direct ascent; an optional concealed cave spiral exits beside an anatomical human monument. A small base panel links to https://enhancement.bio/ . Five smaller mycelium trees form a sparse roadside transition.
+Every stop is based on an existing piece of jewelry, artwork or research project. Map numbering starts at Embryo Station and continues through the civic buildings to the northern gardens. Behind the mycelium grove, Materialized Enhancements preserves the supplied Voronoi STL as a violet faceted hill with open cells and a direct climb. Its satin violet follows the project's rendered and printed crystals; coplanar triangles share one tone so each Voronoi facet reads. Amber markers indicate the direct ascent; an optional concealed cave spiral exits beside an anatomical human monument. A small base panel links to https://enhancement.bio/ . Five smaller mycelium trees form a sparse roadside transition.
+
+In front of the hill's south face, one row alternates six photo posters with six gene-category stands. The posters show a character report screenshot, the 3D printer with fresh prints, Livia Zaharia wearing a crystal, visitors holding theirs, a crystal glowing under blue light and four project memes about genes ([image provenance](../public/images/enhancement/ATTRIBUTION.md)). Each stand carries the category's emblem and colour from the project source, three example genes, and a crystal that the project's own sculpture pipeline grew from all of that category's game genes. The six STLs are in `data/enhancement/crystals/` with their seeds and hashes; `scripts/generate-enhancement-crystals.py` regrows them inside a materialized-enhancements checkout and `python3 scripts/build-enhancement.py` rebuilds the WebP images and compact meshes. Clicking any poster, label or emblem opens https://enhancement.bio/ in a new tab; E opens the story, whose slides repeat the poster images.
 
 Future House has complete, raised FUTURE HOUSE lettering visible by day and emissive at night. Timeface's gallery panels sit toward the core, outside the walking lane. Livistone Radio plays six owner-approved, informal phone recordings of Livia Zaharia playing kalimba. These are personal recordings, not professional studio recordings. Music defaults on, starting at the first gesture if autoplay is blocked, with a menu mute switch and hidden-tab pause. Only one local AAC file plays at a time; the six clips total approximately 4.2 MB and are tracked with Git LFS. Clip 7 is excluded. Deployment checkouts must run `git lfs pull` before building.
 
-Exhibition and garden display boards use continuous cream paper around photographs and captions, consistent in day and night mode.
+Exhibition boards and jewel stands use continuous cream paper around photographs and captions, consistent in day and night mode. Building and place signs (Embryo Station story, Mycelium grove, Materialized Enhancements) are deliberately different: larger boards with a dark face in the style of Livia's website (warm near-black, letter-spaced serif capitals, an amber-to-green rule) inside a pierced cast-gold lattice frame, lettered on both sides and clickable for their stories.

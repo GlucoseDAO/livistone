@@ -18,7 +18,7 @@ A TypeScript + Vite single-page app. Three.js renders the town on WebGL 2; Rapie
 (WebAssembly) provides a kinematic capsule character controller. There is no backend, no
 API key, no database, and no account system — the entire game is static files plus
 `localStorage`. Every building, tree placement, path, and piece of jewelry geometry in the
-current build is generated in code at load time; binary assets are two tree GLBs, local derivatives of 70 real jewelry photographs, two CC0 rock maps, and nine CC0 railway maps.
+current build is generated in code at load time; binary assets are two tree GLBs, local derivatives of 70 real jewelry photographs, six Materialized Enhancements poster images, two CC0 rock maps, and nine CC0 railway maps.
 
 ## Commands
 
@@ -34,6 +34,7 @@ current build is generated in code at load time; binary assets are two tree GLBs
 | Install git hooks | `bun run hooks:install` | Sets `core.hooksPath` to `.githooks` |
 | Regenerate tree GLBs | `bun scripts/generate-trees.mjs` | Needs the dev server running |
 | Landmark screenshots | `node scripts/screenshot-landmarks.mjs [outDir]` | Needs the dev server; headless Chrome with GPU WebGL flags |
+| Enhancement assets | `python3 scripts/build-enhancement.py [photoDir]` | Pillow; WebP posters + compact crystal meshes. Regrow crystals with `scripts/generate-enhancement-crystals.py` inside a materialized-enhancements checkout |
 
 `bun run test` uses Vitest; `bun test` would invoke Bun's own runner and fail. Playwright
 reuses an already-running dev server, so leave one up while iterating.
@@ -60,6 +61,7 @@ src/
     research-art.ts  Drawn figures for non-research garden stories; research uses source images
     jewelry-art.ts   Drawn Dewdrop stand-in when no local studio photograph exists
     piece-stories.ts Artist and exhibition stories overlaid on the jewellery catalogue
+    enhancement.ts   Materialized Enhancements poster captions and gene-category facts
     jewelry-catalogue.json Generated source-hashed catalogue and image manifest
   world/
     world.ts         Town: terrain, river, paths, bridges, landmarks, interiors, tower,
@@ -96,9 +98,11 @@ src/
     time-tower.ts    Silver hourglass, round plaza, guarded spiral gallery and summit terrace
     elevated-layout.ts Shared tower, camel neck and Future House clearances
     walkway.ts       Shared rendered/physical ribbons and guard rails
+    place-sign.ts    Livia-style building/place signs: pierced gold lattice frame, dark lettered faces, colliders
     future-house.ts  Liquid copper camel, curved printed hull, leather ties and neon name
     lake-plants.ts   Untold elliptical strip leaves and Spotlight folded bracts
     transit-art.ts   Original bold transit campaign for cabin advertisements
+    enhancement*.ts  Voronoi hill (enhancement.ts), shared layout, poster row with category crystals (enhancement-gallery.ts)
   ui/gallery.ts      Floating exhibit controls, piece browser, flat photo zoom/pan viewer
   ui/ui.ts           DOM overlay: HUD, map panel, lore panel, journal, pause menu
 tests/               *.test.ts → Vitest, *.spec.ts → Playwright
@@ -194,6 +198,8 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   synthesized touch click cannot hit a newly focused dialog button. Track its pointer independently from the joystick; cancelled gestures,
   long holds, and look drags must not open photos. Gallery arrows operate on photos,
   while walking arrows still turn. Keep visible buttons for zoom, fit, next/previous, and close.
+  `clickTarget` in `main.ts` is the one test for what a click acts on (href, discovery or catalogue piece, not behind an occluder);
+  mouse hover reuses it once per frame to show a hand cursor. Anything new that opens on click belongs in `researchPanels` or an exhibition so it gets the cue.
 - **River gardens share one channel field.** `waterways.ts` owns the main river, both tributaries, garden bridge placements, and the silver hourglass tower site. `waterDistance` drives terrain, clipped water, and full-footprint planting clearance. `createGardenBridge` transforms both render meshes and every collider together. Keep the tower’s ground-level north–south passage open and its approach free of trees. Placeholder dome homes are removed; `HOME_SITES` is empty.
 - **Water and its banks share their outline.** `terrainHeight` and the water/shore meshes use
   the same river centre and width variation. Match terrain colliders to the rendered bank;
@@ -326,8 +332,10 @@ directory, so the hook travels with the repository.
 - Timeface poster corners and feet remain entirely inside the inner guard rail, toward the core, clear of the walking lane.
 - Radio defaults on at the owner’s request; browser autoplay restrictions defer playback to the first gesture. Use one HTMLAudioElement for the six owner-approved phone kalimba clips, pause when muted/hidden, and load one local Git LFS asset at a time. Never include rejected clip 7. Keep the informal phone-recording credit visible in the menu.
 
+- The hill is satin violet, one tone per coplanar facet, after the project's rendered and printed crystals; do not return to terracotta, which read as rust. A single row (`GALLERY`, z = -160) alternates six photo posters with six gene-category stands; keep its gaps walkable and it clear of paths, the climb line and overhangs (`tests/enhancement.test.ts`). Posters, labels and emblems carry `href` to enhancement.bio. The join sign (`ENHANCEMENT_SIGN`) stands beside the start of the marked climb, never on it. Stand crystals are real pipeline outputs from `data/enhancement/crystals/` (every triangle kept, flat side down, 10× STL mm) and load as their own chunk; never substitute procedural shapes. Photo originals stay outside the repo; keep `public/images/enhancement/ATTRIBUTION.md` and `sources.json` current, label memes as AI-assisted and do not name visitors.
 - Enhancement retains the source Voronoi shell outside one approved internal shaft. Keep the cave spiral connected and the base panel small. The summit human uses the CC0 MakeHuman body surface in `enhancement-human.json`; preserve continuous anatomy and chest-scale copper geometry. Five smaller roadside mycelium trees taper toward the hill without obstructing its entrances.
 
-- Photo exhibition boards and garden interpretation panels share cream paper (`#f4f0e5`) across backing, margins, and captions. Use unlit, non-tone-mapped paper so it stays consistent at night; white studio photo backgrounds are tinted to that paper color.
+- Photo exhibition boards and jewel stands share cream paper (`#f4f0e5`) across backing, margins, and captions. Use unlit, non-tone-mapped paper so it stays consistent at night; white studio photo backgrounds are tinted to that paper color.
+- Building and place story signs (Embryo Station story, Mycelium grove, Enhancement join sign) use `place-sign.ts` so they are never mistaken for piece posters: a larger 3.5 × 2.5 m board, dark face in Livia's site style (warm near-black, letter-spaced serif capitals, amber-to-green rule) inside a pierced cast-gold lattice frame, lettered on both faces and clickable. Geometry and colliders are DOM-independent; `paintPlaceSign` draws the face. New place signs use the same component.
 
 - Town and garden roads share the 2.6 m path width, 0.13 m surface elevation and world-aligned paving. Round joints cover ribbon endpoint wedges. Keep the Glucose rear connection direct (38,-49 to 38,-52), with no redundant north spur.
