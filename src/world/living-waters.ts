@@ -9,6 +9,7 @@ import { COLLECTION, photoSize, photoURL } from '../game/exhibits';
 import { drawDewdropRing } from '../game/jewelry-art';
 import { addGlow, nightEmission } from './night-lighting';
 import { createLakePlants } from './lake-plants';
+import { PATH_WIDTH, pathJoin } from './path-surface';
 
 function shape(points: Point[]): THREE.Shape { return new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, -z))); }
 function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
@@ -24,7 +25,7 @@ export class LivingWaters {
   private readonly rain: THREE.Points;
   private readonly drips: THREE.Points;
   private readonly drainage: THREE.Curve<THREE.Vector3>[] = [];
-  constructor(private mobile: boolean) {
+  constructor(private mobile: boolean, private readonly pathMaterial: THREE.Material = new THREE.MeshStandardMaterial({ color: '#d4cfbc', roughness: .91 })) {
     this.root.name = 'Living Waters · town gardens'; this.root.position.set(GARDENS.x, 0, GARDENS.z);
     this.water.onBeforeCompile = (shader) => {
       shader.uniforms.waterTime = this.waterTime;
@@ -43,21 +44,31 @@ export class LivingWaters {
       const outline = cell.map(([x, z]) => new THREE.Vector3(x, .14, z)); outline.push(outline[0].clone());
       this.mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(outline, false, 'catmullrom', 0), cell.length * 3, .085, 5, false), this.stone, false);
     });
-    for (const path of GARDEN_PATHS) this.path(path, 2.2);
+    const roadEdge = new THREE.MeshStandardMaterial({ color: '#bbb39e', roughness: .92, side: THREE.DoubleSide });
+    for (const path of GARDEN_PATHS) {
+      this.path(path, PATH_WIDTH + .32, roadEdge, -.012);
+      this.path(path, PATH_WIDTH, this.pathMaterial);
+    }
+    const roadNodes = new Map<string, THREE.Vector3>();
+    for (const path of GARDEN_PATHS) for (const p of path.points) roadNodes.set(`${p.x},${p.z}`, p);
+    for (const p of roadNodes.values()) {
+      this.mesh(pathJoin(p.x, p.z, (PATH_WIDTH + .32) / 2, p.y - .011, GARDENS.x, GARDENS.z), roadEdge, false);
+      this.mesh(pathJoin(p.x, p.z, PATH_WIDTH / 2, p.y + .001, GARDENS.x, GARDENS.z), this.pathMaterial, false);
+    }
     this.pavilion();
     this.mushrooms(); this.wetlandPlanting(); createLakePlants(this.root, mobile);
     for (const [name, [x, z]] of Object.entries(GARDEN_PANELS)) {
       const id = 'living-' + name, jewelry = name === 'vittoria' || name === 'dewdrop';
       for (const dx of [-1, 1]) this.mesh(new THREE.CylinderGeometry(.045, .065, jewelry ? 1.7 : 1.35, 6), this.silver, true, x + dx, jewelry ? .85 : .675, z);
       if (!jewelry) {
-        const panel = this.mesh(new THREE.BoxGeometry(2.6, 1.65, .1), new THREE.MeshBasicMaterial({ color: '#f0ecdf' }), true, x, 1.8, z);
+        const panel = this.mesh(new THREE.BoxGeometry(2.6, 1.65, .1), new THREE.MeshBasicMaterial({ color: '#f4f0e5', toneMapped: false }), true, x, 1.8, z);
         panel.userData.discovery = id; this.panels.push(panel); this.interactives.push({ id, object: panel, position: new THREE.Vector3(x + GARDENS.x, 1.8, z + GARDENS.z) });
         continue;
       }
-      this.mesh(new THREE.BoxGeometry(2.72, 2.9, .1), new THREE.MeshStandardMaterial({ color: '#3a4d44', roughness: .8 }), true, x, 1.82, z);
-      const photo = new THREE.Mesh(new THREE.PlaneGeometry(2.52, 1.32), new THREE.MeshBasicMaterial({ color: '#c4cebd', toneMapped: false }));
+      this.mesh(new THREE.BoxGeometry(2.72, 2.9, .1), new THREE.MeshBasicMaterial({ color: '#f4f0e5', toneMapped: false }), true, x, 1.82, z);
+      const photo = new THREE.Mesh(new THREE.PlaneGeometry(2.52, 1.32), new THREE.MeshBasicMaterial({ color: '#f4f0e5', toneMapped: false }));
       photo.position.set(x, 2.4, z + .06); photo.userData.discovery = id; photo.userData.kind = 'photo'; if (name === 'vittoria') photo.userData.piece = 'vittoria-amazonica';
-      const caption = new THREE.Mesh(new THREE.PlaneGeometry(2.52, 1.32), new THREE.MeshBasicMaterial({ color: '#f0ecdf', toneMapped: false }));
+      const caption = new THREE.Mesh(new THREE.PlaneGeometry(2.52, 1.32), new THREE.MeshBasicMaterial({ color: '#f4f0e5', toneMapped: false }));
       caption.position.set(x, 1.18, z + .06); caption.userData.discovery = id; caption.userData.kind = 'caption';
       this.root.add(photo, caption); this.panels.push(photo, caption); this.interactives.push({ id, object: caption, position: new THREE.Vector3(x + GARDENS.x, 1.8, z + GARDENS.z) });
     }
@@ -107,13 +118,13 @@ export class LivingWaters {
     if (solid) { mesh.updateWorldMatrix(true, false); const world = geometry.clone().applyMatrix4(mesh.matrixWorld); this.colliders.push({ type: 'mesh', vertices: new Float32Array(world.getAttribute('position').array), indices: world.index ? new Uint32Array(world.index.array) : Uint32Array.from({ length: world.getAttribute('position').count }, (_, i) => i) }); world.dispose(); }
     return mesh;
   }
-  private path(curve: THREE.Curve<THREE.Vector3>, width: number): void {
-    const vertices: number[] = [], indices: number[] = [], steps = 100;
+  private path(curve: THREE.Curve<THREE.Vector3>, width: number, material: THREE.Material, lift = 0): void {
+    const vertices: number[] = [], indices: number[] = [], uv: number[] = [], steps = 100;
     for (let i = 0; i <= steps; i++) { const p = curve.getPoint(i / steps), tangent = curve.getTangent(i / steps), side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize().multiplyScalar(width / 2);
-      for (const sign of [-1, 1]) vertices.push(p.x + side.x * sign, p.y, p.z + side.z * sign);
+      for (const sign of [-1, 1]) { const x = p.x + side.x * sign, z = p.z + side.z * sign; vertices.push(x, p.y + lift, z); uv.push((x + GARDENS.x) / 4, (z + GARDENS.z) / 4); }
       if (i < steps) { const n = i * 2; indices.push(n, n + 1, n + 2, n + 1, n + 3, n + 2); }
     }
-    const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geometry.setIndex(indices); geometry.computeVertexNormals(); this.mesh(geometry, this.stone, true);
+    const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geometry.setIndex(indices); geometry.computeVertexNormals(); this.mesh(geometry, material, lift === 0);
   }
   private pavilion(): void {
     const x = GARDENS.pavilionX, z = GARDENS.pavilionZ;
@@ -146,6 +157,11 @@ export class LivingWaters {
     for (let i = 0; i < 900 && sites.length < (this.mobile ? 26 : 44); i++) {
       const x = 55 + rand() * 45, z = -30 + rand() * 58, scale = .8 + rand() * .55, height = 3.6 + rand() * 2.8;
       if (!rainPlantAllowed(x, z, scale * MYCELIUM_RADIUS) || sites.some(p => Math.hypot(x - p.x, z - p.z) < (p.scale + scale) * MYCELIUM_RADIUS + .4)) continue;
+      sites.push({ x, z, scale, height });
+    }
+    // Sparse young trees follow the outside of the hill approach, with full crown clearance.
+    // Coordinates are local to the garden (world z = local z - 110).
+    for (const [x, z, scale, height] of [[80,-26,.62,2.6],[86,-25,.54,2.3],[94,-30,.48,2.1],[101,-35,.42,1.9],[106,-40,.35,1.65]]) {
       sites.push({ x, z, scale, height });
     }
     const silver = new THREE.MeshStandardMaterial({ color: '#c7c3b7', roughness: .27, metalness: .9 });
@@ -194,7 +210,7 @@ export class LivingWaters {
   }
   addInterpretation(id: string, title: string, body: string): void {
     const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 640; const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#f0ecdf'; ctx.fillRect(0, 0, 1024, 640); ctx.fillStyle = '#2a5044'; ctx.font = '56px Georgia'; ctx.fillText(title, 45, 90); ctx.font = '31px sans-serif';
+    ctx.fillStyle = '#f4f0e5'; ctx.fillRect(0, 0, 1024, 640); ctx.fillStyle = '#2a5044'; ctx.font = '56px Georgia'; ctx.fillText(title, 45, 90); ctx.font = '31px sans-serif';
     let y = 170, line = ''; for (const word of body.split(' ')) { if (ctx.measureText(line + word).width > 910) { ctx.fillText(line, 45, y); y += 45; line = ''; } line += word + ' '; } ctx.fillText(line, 45, y); ctx.font = '28px sans-serif'; ctx.fillText('E / tap to read the story and sources', 45, 585);
     const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
     const panel = this.panels.find(p => p.userData.discovery === id && p.userData.kind !== 'photo'); if (!panel) { map.dispose(); return; }
@@ -225,7 +241,7 @@ export class LivingWaters {
     if (dewdrop) {
       const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 540; const ctx = canvas.getContext('2d')!;
       drawDewdropRing(ctx, 0, 0, 1024, 540);
-      ctx.fillStyle = '#e8f2ef'; ctx.textAlign = 'center'; ctx.font = '36px Georgia'; ctx.fillText('Dewdrop · Swiss blue topaz', 512, 500);
+      ctx.fillStyle = '#25473b'; ctx.textAlign = 'center'; ctx.font = '36px Georgia'; ctx.fillText('Dewdrop · Swiss blue topaz', 512, 500);
       const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
       const material = dewdrop.material as THREE.MeshBasicMaterial; material.color.set('#ffffff'); material.map = map; material.needsUpdate = true;
     }
@@ -235,7 +251,7 @@ export class LivingWaters {
         map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
         const image = map.image as HTMLImageElement, size = photoSize(image.naturalWidth, image.naturalHeight, 2.52, 1.32);
         photo.geometry.dispose(); photo.geometry = new THREE.PlaneGeometry(size.width, size.height);
-        const material = photo.material as THREE.MeshBasicMaterial; material.color.set('#ffffff'); material.map = map; material.needsUpdate = true;
+        const material = photo.material as THREE.MeshBasicMaterial; material.color.set('#f4f0e5'); material.map = map; material.needsUpdate = true;
       });
     }
   }

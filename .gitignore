@@ -9,3 +9,7 @@ test-results/
 playwright-report/
 .playwright-cli/
 output/testing/
+
+output/audio-tools/
+output/audio-review/
+output/audio-models/

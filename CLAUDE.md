@@ -53,7 +53,7 @@ src/
     exhibits.ts      Source-linked factual jewelry catalogue and photograph metadata
     physics.ts       Rapier world, collider specs, kinematic character controller
     input.ts         Keyboard, held-button drag-to-look mouse, and touch thumbstick input
-    audio.ts         Procedural filtered-noise ambience via WebAudio
+    audio.ts         Owner-approved phone kalimba playlist, default on
     graphics.ts      Coarse-pointer / software-GL / laptop-iGPU probe that selects reduced town meshes
     daylight.ts      Persistent Auto / Day / Night selection, without GPS
     research.ts      GlucoseDAO chapters with original Drive poster images and source links
@@ -316,3 +316,18 @@ directory, so the hook travels with the repository.
 - Concept images, the design brief, and the interview decisions recorded in
   `docs/3d-game-plan.md` are the approved direction — check them before redesigning the
   town's look, its civic identities, or its landmark roles.
+
+## Enhancement hill and route numbering
+
+- `enhancement-layout.ts` owns the faceted hill surface and sampling; `enhancement.ts` uses that exact mesh for display and collision. Preserve direct slope access; do not add a compulsory ramp. The indexed STL source is kept unchanged; never fill holes or smooth its Voronoi cells to make navigation easier. Climbing assistance applies only while moving toward an actual tagged hill face. Original provenance is in `docs/enhancement-reference.md`.
+- The summit sign links to enhancement.bio and has a journal story with the same source. Keep research/bioart descriptions distinct from clinical claims. Future supplied stone STLs can replace the small procedural foot lights without changing access.
+- `LANDMARKS` order is the visitor route from southern Embryo Station toward the northern hill, never insertion recency. The map tells visitors every stop comes from an existing work or project.
+- The monument font must contain every glyph in both LIVISTONE and FUTURE HOUSE, including a real space. Future House letters sit above the leather straps and face the lake approach.
+- Timeface poster corners and feet remain entirely inside the inner guard rail, toward the core, clear of the walking lane.
+- Radio defaults on at the owner’s request; browser autoplay restrictions defer playback to the first gesture. Use one HTMLAudioElement for the six owner-approved phone kalimba clips, pause when muted/hidden, and load one local Git LFS asset at a time. Never include rejected clip 7. Keep the informal phone-recording credit visible in the menu.
+
+- Enhancement retains the source Voronoi shell outside one approved internal shaft. Keep the cave spiral connected and the base panel small. The summit human uses the CC0 MakeHuman body surface in `enhancement-human.json`; preserve continuous anatomy and chest-scale copper geometry. Five smaller roadside mycelium trees taper toward the hill without obstructing its entrances.
+
+- Photo exhibition boards and garden interpretation panels share cream paper (`#f4f0e5`) across backing, margins, and captions. Use unlit, non-tone-mapped paper so it stays consistent at night; white studio photo backgrounds are tinted to that paper color.
+
+- Town and garden roads share the 2.6 m path width, 0.13 m surface elevation and world-aligned paving. Round joints cover ribbon endpoint wedges. Keep the Glucose rear connection direct (38,-49 to 38,-52), with no redundant north spur.

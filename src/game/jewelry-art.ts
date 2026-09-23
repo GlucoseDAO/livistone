@@ -1,9 +1,9 @@
 /** Drawn stand-in for Dewdrop: the public catalogue has no local studio photograph. */
 export function drawDewdropRing(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number): void {
   ctx.save(); ctx.beginPath(); ctx.rect(x, y, width, height); ctx.clip();
-  ctx.fillStyle = '#1c2e36'; ctx.fillRect(x, y, width, height);
+  ctx.fillStyle = '#f4f0e5'; ctx.fillRect(x, y, width, height);
   const cx = x + width * 0.5, cy = y + height * 0.46, drop = Math.min(width, height) * 0.18;
-  ctx.strokeStyle = '#cfd6cc'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.strokeStyle = '#87988e'; ctx.lineWidth = 7; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(cx - drop * 1.7, cy + drop * 0.2);
   ctx.bezierCurveTo(cx - drop * 1.9, cy - drop * 1.4, cx - drop * 0.2, cy - drop * 2.1, cx, cy - drop * 0.35);
   ctx.stroke();

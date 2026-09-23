@@ -1,3 +1,5 @@
+import { PATH_WIDTH } from './path-surface';
+import { enhancementClearing } from './enhancement-layout';
 import * as THREE from 'three';
 export const GARDENS = { x: 0, z: -110, radius: 44, pavilionX: -10, pavilionZ: 0 };
 export const GARDEN_PANELS = { vittoria: [-16, -52], dewdrop: [-13, -1.5], mycelium: [70, -23] } as const;
@@ -34,13 +36,14 @@ export const GARDEN_PATHS = [
 ].map((points) => new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(x, .13, z))));
 const pathSamples = GARDEN_PATHS.map((path) => path.getPoints(120));
 export function rainPlantAllowed(x: number, z: number, radius: number): boolean {
+  if (enhancementClearing(x + GARDENS.x, z + GARDENS.z, radius)) return false;
   if (Math.hypot(x - 75, z) < 5 + radius) return false;
-  return pathSamples.every((points) => points.every((point) => Math.hypot(point.x - x, point.z - z) > 1.4 + radius));
+  return pathSamples.every((points) => points.every((point) => Math.hypot(point.x - x, point.z - z) > PATH_WIDTH / 2 + .4 + radius));
 }
 
 /** Living Waters is a district in the town, with shared ground and full-footprint planting reservations. */
 export function gardenClearing(x: number, z: number, radius: number): boolean {
   x -= GARDENS.x; z -= GARDENS.z;
   return Object.values(GARDEN_PANELS).some(([px, pz]) => Math.hypot(px - x, pz - z) < 2 + radius) || Math.hypot(x, z) < 47 + radius || (x > 51 - radius && x < 104 + radius && z > -35 - radius && z < 32 + radius)
-    || pathSamples.some(points => points.some(p => Math.hypot(p.x - x, p.z - z) < 1.5 + radius));
+    || pathSamples.some(points => points.some(p => Math.hypot(p.x - x, p.z - z) < PATH_WIDTH / 2 + .4 + radius));
 }

@@ -1,0 +1,56 @@
+[
+  {
+    "file": "kalimba-01.m4a",
+    "source": "WhatsApp Audio 2026-09-23 at 12.53.57.mp4",
+    "source_sha256": "5a63c69634777b147f34162c8ecde2f9c96bb202b5ffc4331397b3b02bef0147",
+    "start_seconds": 136.672,
+    "duration_seconds": 58,
+    "sha256": "721341964c75f04b189e52c4a93b84a2145e253e0f14a523063b5263a5d9986d",
+    "review": "Confirmed free of human voices by Livia in this task, 23 September 2026."
+  },
+  {
+    "file": "kalimba-02.m4a",
+    "source": "WhatsApp Audio 2026-09-23 at 12.53.59 (1).mp4",
+    "source_sha256": "2f6781bbc0d21a72e01bc6c469515fd1678d31329f83a8d33480fba215a42b33",
+    "start_seconds": 225.92,
+    "duration_seconds": 58,
+    "sha256": "a67a1c0847845d9ebfed69805a2f107296387f8edb51c22adfa06907c557e7da",
+    "review": "Confirmed free of human voices by Livia in this task, 23 September 2026."
+  },
+  {
+    "file": "kalimba-03.m4a",
+    "source": "WhatsApp Audio 2026-09-23 at 12.53.59 (2).mp4",
+    "source_sha256": "a9baa9af269c0a8832d563d34940230d25c95a8865342983eed71d76f458cfd2",
+    "start_seconds": 140.101,
+    "duration_seconds": 58,
+    "sha256": "0c0099be5cbe360b2598cb4527ba19055178d15f1a72d125e168f1b541810291",
+    "review": "Confirmed free of human voices by Livia in this task, 23 September 2026."
+  },
+  {
+    "file": "kalimba-04.m4a",
+    "source": "WhatsApp Audio 2026-09-23 at 12.53.59 (3).mp4",
+    "source_sha256": "2612f6906b6824696aafdaa8b0919fd68fa0ebe6b98de63d8facdac1197630dc",
+    "start_seconds": 128.064,
+    "duration_seconds": 58,
+    "sha256": "1b4a3b4b0c9812ee49c8f956f34c6e7343dea718a94fb157aaea956d53ad1265",
+    "review": "Confirmed free of human voices by Livia in this task, 23 September 2026."
+  },
+  {
+    "file": "kalimba-05.m4a",
+    "source": "WhatsApp Audio 2026-09-23 at 12.53.59 (4).mp4",
+    "source_sha256": "e58b28fdc913149f3445c658b295b1ef402e233fa6a299c22f73fed24f9410db",
+    "start_seconds": 151.685,
+    "duration_seconds": 58,
+    "sha256": "6acff77f2fa6466c7fbb18109e31b09310da4d4eabd9990af353e3cf525d8f13",
+    "review": "Confirmed free of human voices by Livia in this task, 23 September 2026."
+  },
+  {
+    "file": "kalimba-06.m4a",
+    "source": "WhatsApp Audio 2026-09-23 at 12.53.59.mp4",
+    "source_sha256": "6e39bf032adb36a94b2bc3963983f35030dd54bf1c4b49c0b668ccad56da7c5d",
+    "start_seconds": 246.299,
+    "duration_seconds": 58,
+    "sha256": "c1aee55091ca236c16079ef5570789f1bbb6b7265fb91d8256a266681aa2df58",
+    "review": "Confirmed free of human voices by Livia in this task, 23 September 2026."
+  }
+]

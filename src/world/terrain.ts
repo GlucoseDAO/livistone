@@ -1,3 +1,4 @@
+import { enhancementClearing, ENHANCEMENT } from './enhancement-layout';
 import * as THREE from 'three';
 import { waterDistance } from './waterways';
 import { GARDENS, gardenHeight } from './living-waters-layout';
@@ -17,7 +18,7 @@ const ridges = [
 ];
 export function landscapeHeight(x: number, z: number): number {
   if (Math.hypot(x - GARDENS.x, z - GARDENS.z) < 48) return gardenHeight(x - GARDENS.x, z - GARDENS.z);
-  if (futureClearing(x, z, 5)) return 0;
+  if (futureClearing(x, z, 5) || enhancementClearing(x, z, 2)) return 0;
   const distance = waterDistance(x, z);
   if (distance < -2.6) return -2;
   if (distance < 0) return distance / 2.6 * 2;
@@ -38,7 +39,8 @@ export function landscapeHeight(x: number, z: number): number {
   const railShoulder = 1 - THREE.MathUtils.smoothstep(Math.abs(z - RAILWAY.centerZ), 9, 30);
   const approach = 1 - THREE.MathUtils.smoothstep(Math.abs(x), RAILWAY.portalX - 9, RAILWAY.portalX + 6);
   const exit = THREE.MathUtils.smoothstep(Math.abs(x), RAILWAY.exitX - 36, RAILWAY.exitX - 3);
-  return relief * foothills * riverValley * (1 - railShoulder * Math.max(approach, exit));
+  const hillMargin = THREE.MathUtils.smoothstep(Math.max(Math.abs(x - ENHANCEMENT.x) / 50, Math.abs(z - ENHANCEMENT.z) / 46), 1, 1.3);
+  return hillMargin * relief * foothills * riverValley * (1 - railShoulder * Math.max(approach, exit));
 }
 export function terrainHeight(x: number, z: number): number {
   // The walkable floor follows the rail foundation under the visually open mountain bore.

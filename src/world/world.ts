@@ -1,3 +1,4 @@
+import { createEnhancementHill, createEnhancementPanel } from './enhancement';
 import * as THREE from 'three';
 import { addGlow, nightEmission } from './night-lighting';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -9,6 +10,7 @@ import { createGateway } from './gateway';
 import { gatewayClearing } from './gateway-layout';
 import { createPlanting, updatePlanting } from './planting';
 import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from './landscape';
+import { pathJoin } from './path-surface';
 import { Mountains } from './mountains';
 import { PlanarExhibition } from './planar-exhibition';
 import { GARDEN_BRIDGES, riverCenter, tributaryCenter, waterDistance } from './waterways';
@@ -109,13 +111,15 @@ export class Town {
     this.interactives.push(...stationInteractions.map(item => ({ ...item, position: item.position.applyMatrix4(arrival.matrix) })));
     this.train = arrival.getObjectByName('Panoramic maglev')!;
     this.railway = createRailwayStructure(this.root, this.colliders, mobile);
-    this.gardens = new LivingWaters(mobile); this.root.add(this.gardens.root);
+    this.gardens = new LivingWaters(mobile, this.paving); this.root.add(this.gardens.root);
     this.gardens.presentLakeJewelry();
     this.gardens.addInterpretation('living-mycelium', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
     this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.white, this.paving, this.gold, bridge);
     createTimeTower(this.root, this.colliders, this.mobile);
     createFutureHouse(this.root, this.colliders, this.mobile);
+    createEnhancementHill(this.root, this.colliders);
+    const enhancementPanel = createEnhancementPanel(this.root); this.researchPanels.push(enhancementPanel); this.interactives.push({ id: 'materialized-enhancements', object: enhancementPanel, position: enhancementPanel.position.clone() });
     for (const id of ['timeface', 'future-house']) this.exhibitions.push(new PlanarExhibition(id, this.root, 0, 0, this.colliders, this.interactives));
     const research = createGlucosePavilion(this.root, this.colliders, mobile, this.paving); this.researchPanels.push(...research.panels); this.interactives.push(...research.interactives);
     this.researchReady = research.ready;
@@ -158,6 +162,14 @@ export class Town {
     for (const curve of PATH_CURVES) {
       mesh(ribbon(curve, PATH_WIDTH + .32, 100), edging, this.root, 0, -.012).castShadow = false;
       mesh(ribbon(curve, PATH_WIDTH, 100), this.paving, this.root).castShadow = false;
+    }
+    // Continuous round joints at shared nodes and road ends; no exposed triangular gaps.
+    const nodes = new Map<string, THREE.Vector3>();
+    for (const curve of PATH_CURVES) for (const point of curve.points) nodes.set(`${point.x},${point.z}`, point);
+    for (const point of nodes.values()) {
+      const y = point.y + terrainHeight(point.x, point.z);
+      mesh(pathJoin(point.x, point.z, (PATH_WIDTH + .32) / 2, y - .011), edging, this.root).castShadow = false;
+      mesh(pathJoin(point.x, point.z, PATH_WIDTH / 2, y + .001), this.paving, this.root).castShadow = false;
     }
     for (const l of CIVIC_LANDMARKS) {
       const ring = mesh(new THREE.RingGeometry(8.4, 10.6, 64), this.paving, this.root, l.x, 0.06, l.z); ring.rotation.x = -Math.PI / 2; ring.castShadow = false; const sp = spread(l, .85); ring.scale.set(sp.x, sp.z, 1);

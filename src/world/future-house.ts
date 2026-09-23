@@ -94,11 +94,11 @@ export function createFutureHouse(parent: THREE.Group, colliders: ColliderSpec[]
     const eye = new THREE.Mesh(new THREE.SphereGeometry(.16, 10, 8), new THREE.MeshStandardMaterial({ color: '#112628', emissive: '#79dec5', emissiveIntensity: .5 })); eye.position.set(-36.4, 2.65, -105 + side * 1.95); parent.add(eye);
   }
   parent.add(new THREE.Mesh(mergeGeometries(pieces)!, copper)); pieces.forEach(g => g.dispose());
-  const font = new FontLoader().parse(serif), letters = new TextGeometry('FUTURE HOUSE', { font, size: 1.1, depth: .035, curveSegments: 4 }); letters.computeBoundingBox(); letters.translate(-(letters.boundingBox!.max.x + letters.boundingBox!.min.x) / 2, 0, 0);
+  const font = new FontLoader().parse(serif), letters = new TextGeometry('FUTURE HOUSE', { font, size: 1.45, depth: .1, curveSegments: 4 }); letters.computeBoundingBox(); letters.translate(-(letters.boundingBox!.max.x + letters.boundingBox!.min.x) / 2, 0, 0);
   const neon = new THREE.MeshStandardMaterial({ color: '#d3ffe5', emissive: '#9fffd8', emissiveIntensity: .2, metalness: .15, roughness: .4 }); nightEmission(neon, '#9fffd8', 4);
-  const sign = new THREE.Mesh(letters, neon); sign.position.set(H.x, 19.15, H.z); sign.name = 'FUTURE HOUSE · neon sign'; parent.add(sign);
-  for (const x of [-68, -60]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(.055, .055, 2.8, 6), leather); post.position.set(x, 18.45, H.z); parent.add(post); }
-  addGlow(parent, new THREE.Vector3(H.x, 19.5, H.z + 1.3), '#8cf5c8', 15, 25, 14, .3);
+  const sign = new THREE.Mesh(letters, neon); sign.position.set(H.x, 20.3, H.z + 3); sign.rotation.y = Math.PI / 4; sign.name = 'FUTURE HOUSE · neon sign'; parent.add(sign);
+  for (const x of [-68, -60]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(.055, .055, 4.2, 6), leather); post.position.set(x, 18.5, H.z + 3 - (x - H.x)); parent.add(post); }
+  addGlow(parent, new THREE.Vector3(H.x, 20.9, H.z + 3.5), '#8cf5c8', 15, 25, 14, .3);
   addGlow(parent, new THREE.Vector3(H.x, 14.6, H.z), '#ffdfb2', 12, 95, 18, .2);
   for (const t of [.15, .5, .85]) addGlow(parent, FUTURE_NECK.getPoint(t).add(new THREE.Vector3(0, .6, 0)), '#ffd097', 4, 16, 8, .3);
 }

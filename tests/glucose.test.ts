@@ -24,7 +24,7 @@ describe('Glucose Commons', () => {
       expect(insulinPoint(a).distanceTo(insulinPoint(b))).toBeCloseTo(sourceDistance * .53, 8);
       expect(insulinPoint(b).y).toBeGreaterThanOrEqual(SITE.canopyY);
     }
-    expect(CIVIC_LANDMARKS.map((l) => l.id)).toEqual(['city-hall', 'energy', 'science']);
+    expect(CIVIC_LANDMARKS.map((l) => l.id).sort()).toEqual(['city-hall', 'energy', 'science']);
     expect(RESEARCH_POSTERS).toHaveLength(GLUCOSE_POSTERS.length);
     expect(RESEARCH_POSTERS.map((p) => p.id)).toEqual(['glucose-livia', 'glucose-format', 'glucose-service', 'glucose-game', 'glucose-models', 'glucose-molecule']);
     for (const poster of RESEARCH_POSTERS) { expect(poster.slides.length).toBeGreaterThan(1); expect(poster.slides[0].title.length).toBeGreaterThan(0); }

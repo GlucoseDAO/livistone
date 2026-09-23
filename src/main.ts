@@ -62,6 +62,9 @@ class Game {
   private lowQuality = false;
   private selection: string | null = null;
   constructor(private ui: UI) {
+    this.ambience.onStateChange = enabled => this.ui.setSound(enabled);
+    this.ui.setSound(this.ambience.enabled);
+    this.ambience.start();
     const coarse = matchMedia('(pointer: coarse)').matches;
     this.renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: !coarse, powerPreference: 'high-performance' });
     this.graphics = probeGraphics(this.renderer.getContext() as WebGL2RenderingContext);

@@ -1,3 +1,5 @@
+import { GARDEN_PATHS, GARDENS } from '../src/world/living-waters-layout';
+import { waterDistance } from '../src/world/waterways';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { createBridge, bridgeHeight } from '../src/world/bridge';
@@ -7,6 +9,17 @@ import { Physics } from '../src/game/physics';
 import type { ColliderSpec } from '../src/game/physics';
 
 describe('garden circulation', () => {
+  it('connects the Glucose rear entrance directly without the redundant north spur', () => {
+    const path = PATH_CURVES.find(c => c.points[0].x === 38 && c.points[0].z === -49)!;
+    expect(path.points.map(p => [p.x,p.z])).toEqual([[38,-49],[38,-52]]);
+  });
+  it('connects both outer branches into the garden network without crossing water', () => {
+    for (const startX of [-66.1,66.1]) {
+      const curve=PATH_CURVES.find(c=>c.points[0].x===startX)!;
+      const end=curve.getPoint(1);expect(GARDEN_PATHS.some(g=>g.points.some(p=>Math.hypot(p.x+GARDENS.x-end.x,p.z+GARDENS.z-end.z)<.001))).toBe(true);
+      for(const p of curve.getPoints(200))expect(waterDistance(p.x,p.z)).toBeGreaterThan(1.3);
+    }
+  });
   it('keeps the full width of curved paths and south-facing entrances clear of foliage', () => {
     for (const curve of PATH_CURVES) for (let i = 0; i <= 200; i++) {
       const p = curve.getPoint(i / 200), tangent = curve.getTangent(i / 200), normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
