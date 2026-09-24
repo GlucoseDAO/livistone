@@ -18,6 +18,20 @@ async function follow(physics: Physics, points: THREE.Vector3[]): Promise<void> 
   }
 }
 describe('elevated exhibition routes', () => {
+  it('lets players jump out over the Timeface gallery rail', async () => {
+    const colliders: ColliderSpec[] = [{ type:'box', position:[17,-.2,-39],size:[30,.2,30] }];
+    createTimeTower(new THREE.Group(), colliders, true);
+    const physics = await Physics.create(colliders), start = towerPoint(.8), outward = towerPoint(.8, 7.55).sub(start).normalize();
+    try {
+      physics.teleport({ x: start.x, y: start.y + .9, z: start.z });
+      for (let i=0;i<30;i++) physics.step(0,0);
+      physics.step(0,0,1/60,true);
+      for (let i=0;i<200;i++) physics.step(i<100?outward.x*4.2:0,i<100?outward.z*4.2:0);
+      expect(physics.position().y).toBeLessThan(1);
+      expect(Math.hypot(physics.position().x-start.x,physics.position().z-start.z)).toBeGreaterThan(5);
+    } finally { physics.dispose(); }
+  });
+
   it('keeps the roof above all Future House poster corners', () => {
     const root=new THREE.Group();createFutureHouse(root,[],true);root.updateMatrixWorld(true);
     const roof=root.getObjectByName('Future House · PLA printed exhibition cabin')!, ray=new THREE.Raycaster();

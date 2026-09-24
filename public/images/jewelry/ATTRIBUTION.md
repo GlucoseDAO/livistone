@@ -35,3 +35,12 @@ are used. The same project-owner reuse and rights notice above applies.
 Online originals use the same filenames beneath `https://livia.glucosedao.org/RJW2023/`,
 `/RJW2024/`, and `/RJW2021/`, respectively. The in-game collection links to the full
 [Pieces catalogue](https://livia.glucosedao.org/pieces/).
+
+## Dewdrop garden stand
+
+`dewdrop-ring-full.jpg` is Livia Zaharia’s original photograph
+`../livia/assets/pieces/Dewdrop ring/2386297345020524.jpg`, included in the
+[Dewdrop Ring gallery](https://livia.glucosedao.org/pieces/). `dewdrop-ring-stand.webp`
+is an uncropped 1024 × 683 WebP derivative for the 3D stand. The full JPEG opens in
+the Dewdrop story. The stone is treated Swiss blue topaz, as described in the
+site’s `content/pieces.md`. The same project-owner reuse notice above applies.

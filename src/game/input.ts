@@ -5,6 +5,7 @@ export class Input {
   yaw = 0;
   pitch = 0;
   active = false;
+  private jumpPending = false;
   private lookPointer: number | null = null;
   private joystickPointer: number | null = null;
   private last = { x: 0, y: 0 };
@@ -20,6 +21,7 @@ export class Input {
       if (e.target instanceof Element && e.target.closest('button, a, [contenteditable="true"]') && !['KeyM', 'Escape'].includes(e.code)) return;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code) && this.active) e.preventDefault();
       if (this.active) this.keys.add(e.code);
+      if (!e.repeat && e.code === 'Space' && this.active) this.requestJump();
       if (!e.repeat && e.code === 'KeyM') this.onAction('map');
       const exhibitKey = ({ Digit1: 'info', Digit2: 'browse', Digit3: 'photo', Digit4: 'lore', BracketLeft: 'left', BracketRight: 'right' } as Record<string, string>)[e.code];
       if (!e.repeat && this.active && exhibitKey) this.onAction('exhibit-key:' + exhibitKey);
@@ -93,6 +95,8 @@ export class Input {
     this.yaw -= dx * 0.0028;
     this.pitch = Math.max(-1.3, Math.min(1.3, this.pitch - dy * 0.0028));
   }
+  requestJump(): void { if (this.active) this.jumpPending = true; }
+  consumeJump(): boolean { const jump = this.jumpPending; this.jumpPending = false; return jump; }
   turn(dt: number): void {
     if (this.active) this.yaw += (Number(this.keys.has('ArrowLeft')) - Number(this.keys.has('ArrowRight'))) * 1.65 * dt;
   }
@@ -103,7 +107,7 @@ export class Input {
     return { x: x * Math.cos(this.yaw) - z * Math.sin(this.yaw), z: -x * Math.sin(this.yaw) - z * Math.cos(this.yaw), speed: this.keys.has('ShiftLeft') ? 6.5 : 4.2 };
   }
   clear(): void {
-    this.pendingTap = null; this.keys.clear(); this.moveX = 0; this.moveZ = 0; this.releaseLook();
+    this.jumpPending = false; this.pendingTap = null; this.keys.clear(); this.moveX = 0; this.moveZ = 0; this.releaseLook();
     const pointer = this.joystickPointer; this.joystickPointer = null; this.knob.style.transform = '';
     if (pointer !== null && this.joystick.hasPointerCapture(pointer)) this.joystick.releasePointerCapture(pointer);
   }

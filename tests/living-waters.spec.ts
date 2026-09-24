@@ -14,7 +14,14 @@ for (const mobile of [false, true]) test(`integrated garden stories, walking and
     await page.locator('#view-toggle').click();
     for (const [id, x, z, title] of [['living-vittoria', -16, -49, 'Vittoria Amazonica at the lake'], ['living-dewdrop', -13, 1.5, 'Dewdrop at the pavilion'], ['living-mycelium', 70, -20, 'A crown that lets water go']] as const) {
       await teleport(page, GARDENS.x + x, GARDENS.z + z); await expect(page.locator('#interact')).toContainText(title); await page.locator('#interact').click(); await expect(page.locator('#lore-title')).toHaveText(title);
-      if (id === 'living-dewdrop') await expect(page.locator('#lore-slide-body')).toContainText('Swiss blue topaz'); await page.getByRole('button', { name: 'Continue exploring' }).click();
+      if (id === 'living-dewdrop') {
+        await expect(page.locator('#lore-slide-body')).toContainText('Swiss blue topaz');
+        const image = page.locator('#lore-figure .source-image img');
+        await expect(image).toHaveAttribute('src', /dewdrop-ring-full\.jpg$/);
+        await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+        const stand = await page.request.get('/images/jewelry/dewdrop-ring-stand.webp'); expect(stand.ok()).toBe(true);
+      }
+      await page.getByRole('button', { name: 'Continue exploring' }).click();
     }
     await teleport(page, GARDENS.x + 74, GARDENS.z - 28, Math.PI); await page.waitForTimeout(400); await page.screenshot({ path: `output/testing/gardens/mycelium-${mobile ? 'mobile' : 'desktop'}.png` });
     await page.locator('#view-toggle').click(); await page.screenshot({ path: `output/testing/gardens/unified-map-${mobile ? 'mobile' : 'desktop'}.png` }); await page.locator('#view-toggle').click();

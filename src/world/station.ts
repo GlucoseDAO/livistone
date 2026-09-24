@@ -183,9 +183,10 @@ export function createStation(root: THREE.Group, colliders: ColliderSpec[], mobi
   };
   const entrance = sign(5.4, 1.3, 'EMBRYO', 'LIVISTONE  /  RAILWAY STATION'); entrance.position.set(-16, 4.25, -61.85);
   const platform = sign(5.2, 1.3, '01  /  NEW HORIZONS', 'MAGLEV  ·  BOARD AT THE OPEN GATES'); platform.position.set(6, 3.8, -73.4);
+  const arrival = sign(4.3, 1.05, 'LIVISTONE STATION', 'CITY CENTRE  ↑'); arrival.position.set(-14, 3.6, -66); arrival.rotation.y = Math.PI;
   const boarding = sign(3.6, .8, 'BOARD HERE', 'LIVISTONE  ·  ARRIVALS'); boarding.position.set(-14, 3.6, -76.1);
   const hangers: THREE.BufferGeometry[] = [];
-  for (const board of [entrance, platform]) for (const dx of [-2, 2]) {
+  for (const board of [entrance, platform, arrival]) for (const dx of [-2, 2]) {
     const x = board.position.x + dx, z = board.position.z, bottom = board.position.y + .65, top = stationAmberSoffit(x, z).y;
     hangers.push(box(x, (top + bottom) / 2, z, .035, top - bottom, .035));
   }

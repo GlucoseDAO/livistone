@@ -9,7 +9,6 @@ import { GARDENS, GARDEN_PANELS, GARDEN_PATHS, LAKE_OUTLINE, WATER_EYES, gardenH
 import type { Point } from './living-waters-layout';
 import { MYCELIUM_RADIUS, myceliumCrown, myceliumStem, myceliumOpal } from './mycelium';
 import { COLLECTION, photoSize, photoURL } from '../game/exhibits';
-import { drawDewdropRing } from '../game/jewelry-art';
 import { addGlow, nightEmission } from './night-lighting';
 import { createLakePlants } from './lake-plants';
 import { PATH_WIDTH, pathJoin } from './path-surface';
@@ -230,13 +229,12 @@ export class LivingWaters {
     caption('living-vittoria', 'Vittoria Amazonica', 'Silver and aquamarine, 2022. Survival, Romanian Jewelry Week 2023. The lake reads its lily-pad form. Dewdrop, a separate topaz ring, stands by the pavilion.');
     caption('living-dewdrop', 'Dewdrop Ring', 'Adjustable silver around treated Swiss blue topaz. A faceted droplet in an open embrace. Vittoria Amazonica, the aquamarine pendant, has its own stand on the lake.');
     const dewdrop = this.panels.find(p => p.userData.discovery === 'living-dewdrop' && p.userData.kind === 'photo');
-    if (dewdrop) {
-      const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 540; const ctx = canvas.getContext('2d')!;
-      drawDewdropRing(ctx, 0, 0, 1024, 540);
-      ctx.fillStyle = '#25473b'; ctx.textAlign = 'center'; ctx.font = '36px Georgia'; ctx.fillText('Dewdrop · Swiss blue topaz', 512, 500);
-      const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
+    if (dewdrop) new THREE.TextureLoader().load(photoURL('dewdrop-ring-stand.webp'), (map) => {
+      map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
+      const image = map.image as HTMLImageElement, size = photoSize(image.naturalWidth, image.naturalHeight, 2.52, 1.32);
+      dewdrop.geometry.dispose(); dewdrop.geometry = new THREE.PlaneGeometry(size.width, size.height);
       const material = dewdrop.material as THREE.MeshBasicMaterial; material.color.set('#ffffff'); material.map = map; material.needsUpdate = true;
-    }
+    });
     const vittoria = COLLECTION.find(p => p.discovery === 'vittoria-amazonica'), photo = this.panels.find(p => p.userData.discovery === 'living-vittoria' && p.userData.kind === 'photo');
     if (vittoria && photo) {
       new THREE.TextureLoader().load(photoURL(vittoria.photos[0].thumb ?? vittoria.photos[0].file), (map) => {

@@ -10,6 +10,7 @@ export class Physics {
   readonly collider: RAPIER.Collider;
   private readonly controller: RAPIER.KinematicCharacterController;
   private verticalVelocity = 0;
+  private grounded = false;
   private readonly climbable = new Set<number>();
   static async create(specs: ColliderSpec[]): Promise<Physics> {
     await RAPIER.init();
@@ -33,15 +34,16 @@ export class Physics {
     this.controller.setMaxSlopeClimbAngle(Math.PI / 4);
     this.controller.setMinSlopeSlideAngle(Math.PI / 3);
   }
-  step(x: number, z: number, dt = 1 / 60): void {
+  step(x: number, z: number, dt = 1 / 60, jump = false): void {
     const current = this.body.translation(), onEnhancement = enhancementClearing(current.x, current.z, 0);
     this.controller.setMaxSlopeClimbAngle(onEnhancement ? Math.PI * .47 : Math.PI / 4);
     this.controller.setMinSlopeSlideAngle(onEnhancement ? Math.PI * .49 : Math.PI / 3);
+    if (jump && this.grounded) this.verticalVelocity = 8.5;
     this.verticalVelocity = Math.max(-18, this.verticalVelocity - 18 * dt);
     let vertical = this.verticalVelocity;
     const speed = Math.hypot(x, z);
     // Climb only when pressing toward an actual nearby STL face. Openings stay open.
-    if (onEnhancement && speed > .01) {
+    if (onEnhancement && speed > .01 && this.verticalVelocity <= 0) {
       const ray = new RAPIER.Ray({ x: current.x, y: current.y - .35, z: current.z }, { x: x / speed, y: 0, z: z / speed });
       const hit = this.world.castRayAndGetNormal(ray, .65, true, undefined, undefined, this.collider, this.body, c => this.climbable.has(c.handle));
       if (hit && hit.normal.y < .75) { vertical = Math.min(3, speed); this.verticalVelocity = 0; }
@@ -51,14 +53,15 @@ export class Physics {
     const pos = this.body.translation();
     this.body.setNextKinematicTranslation({ x: pos.x + move.x, y: pos.y + move.y, z: pos.z + move.z });
     this.world.step();
-    if (this.controller.computedGrounded()) this.verticalVelocity = -0.3;
+    this.grounded = this.controller.computedGrounded();
+    if (this.grounded || (vertical > 0 && move.y < vertical * dt - .001)) this.verticalVelocity = -0.3;
   }
   position(): { x: number; y: number; z: number } { return this.body.translation(); }
   teleport(position: { x: number; y: number; z: number } = SPAWN): void {
     const next = { x: position.x, y: position.y, z: position.z };
     this.body.setTranslation(next, true);
     this.body.setNextKinematicTranslation(next);
-    this.verticalVelocity = 0;
+    this.verticalVelocity = 0; this.grounded = false;
   }
   dispose(): void { this.world.free(); }
 }

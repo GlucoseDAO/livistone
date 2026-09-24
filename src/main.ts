@@ -217,6 +217,8 @@ class Game {
       if (this.mode === 'lore') this.ui.turnSlide(action === 'slide-next' ? 1 : -1);
     } else if (action === 'reset-position') {
       this.physics.teleport(); this.input.yaw = SPAWN.yaw; this.input.pitch = 0; this.returnMode = 'walking'; this.setMode('walking');  this.ui.toast('Back at the station exit, facing the city gate.');
+    } else if (action === 'jump') {
+      this.input.requestJump();
     } else if (action === 'sound') {
       try { this.ui.setSound(await this.ambience.toggle()); } catch { this.ui.toast('Sound is unavailable in this browser.'); }
     } else if (action.startsWith('time-of-day:')) { this.timeOfDay = parseTimeOfDay(action.split(':')[1]); saveTimeOfDay(this.timeOfDay); this.applyTimeOfDay(); }
@@ -314,7 +316,7 @@ class Game {
     this.accumulator = Math.min(this.accumulator + dt, 0.1);
     while (this.accumulator >= 1 / 60) {
       this.input.turn(1 / 60); const movement = this.input.direction();
-      this.physics.step(movement.x * movement.speed, movement.z * movement.speed); this.accumulator -= 1 / 60;
+      this.physics.step(movement.x * movement.speed, movement.z * movement.speed, 1 / 60, this.input.consumeJump()); this.accumulator -= 1 / 60;
     }
     const pos = this.physics.position();
     const b = TOWN_BOUNDS;
@@ -379,7 +381,8 @@ class Game {
     this.frameId = requestAnimationFrame(this.frame);
     if (document.hidden) { this.lastTime = now; return; }
     if (this.lowQuality && now - this.lastTime < 30) return;
-    const rawDt = (now - this.lastTime) / 1000; const dt = Math.min(rawDt, 0.1); this.lastTime = now; this.elapsed += dt;
+    // A queued animation frame can predate the startup or visibility timestamp.
+    const rawDt = Math.max(0, (now - this.lastTime) / 1000); const dt = Math.min(rawDt, 0.1); this.lastTime = now; this.elapsed += dt;
     if (this.mode === 'walking') this.updateWalking(dt);
     this.town.gardens.update(this.elapsed, this.mode === 'walking' ? dt : 0, matchMedia('(prefers-reduced-motion: reduce)').matches);
     if (this.mode === 'map') { this.orbit.update(); this.updateMarkers(); }

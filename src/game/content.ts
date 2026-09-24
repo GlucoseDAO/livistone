@@ -3,7 +3,7 @@ import { STATION } from '../world/station-layout';
 import { GLUCOSE_PAVILION } from '../world/glucose-layout';
 import { RESEARCH_POSTERS } from './research';
 import { ENHANCEMENT_POSTERS, ENHANCEMENT_URL, enhancementImage } from './enhancement';
-import { COLLECTION } from './exhibits';
+import { COLLECTION, photoURL } from './exhibits';
 import { GARDENS } from '../world/living-waters-layout';
 import type { ResearchFigure } from './research-art';
 import { TIME_TOWER } from '../world/waterways';
@@ -64,7 +64,7 @@ export const DISCOVERIES: Discovery[] = [
     body: 'The Dewdrop ring is an adjustable silver setting around a treated Swiss blue topaz. A faceted droplet sits in an open silver embrace. The pavilion borrows that silhouette; its civic stone colour follows Vittoria’s aquamarine. Dewdrop’s real stone is topaz. The two open entries and the view across the lake are architectural inventions for Livistone.',
     links: [{ label: 'Dewdrop and Vittoria on Livia’s site', url: 'https://livia.glucosedao.org/pieces/' }],
     slides: [
-      { title: 'Dewdrop Ring', body: 'Adjustable silver around treated Swiss blue topaz. The public catalogue describes a faceted droplet in an open silver embrace. Livistone has no local studio photograph of Dewdrop, so the stand draws that silhouette and links to the source page.' },
+      { title: 'Dewdrop Ring', body: 'Adjustable silver around treated Swiss blue topaz. This photograph from Livia’s archive shows the faceted stone in its open silver setting; the nearby pavilion borrows that silhouette.', image: photoURL('dewdrop-ring-full.jpg'), imageAlt: 'Livia Zaharia’s Dewdrop silver ring with faceted blue topaz photographed on stone' },
       { title: 'Vittoria Amazonica, the other lake work', body: 'Vittoria is silver and aquamarine, 2022, shown in Survival at Romanian Jewelry Week 2023. Its lily-pad form becomes the water eyes on the lake stand to the south. The two jewels stay named separately: aquamarine pendant, topaz ring.' },
     ] },
   { id: 'living-mycelium', landmark: 'mycelium-garden', title: 'A crown that lets water go', category: 'MYCELIUM / MATERIAL STORY', body: 'Livia describes designing Mycelium’s folded silver setting so water could drain away from its porous opal. Mushrooms and fungi informed the solution. Livistone enlarges that idea into open silver mushroom crowns around opal hearts and visible drainage rills. The garden is an imagined landscape, not a claim about ecological or medical performance. Follow the dry loop toward the lake and the civic gardens.', links: [{ label: 'Mycelium in the artist’s catalogue', url: 'https://livia.glucosedao.org/pieces/' }] },
@@ -86,7 +86,7 @@ export const DISCOVERIES: Discovery[] = [
     body: 'The opposite cabin direction is marked for art and geometry: toward the civic jewelry halls after you leave the train. The announcement opens Livia’s public catalogue of works and objects.',
     links: [{ label: 'Livia’s works and objects', url: 'https://livia.glucosedao.org/pieces/' }] },
 ];
-export const SPAWN = { x: 0, y: 1.05, z: 58, yaw: 0 };
+export const SPAWN = { x: -2, y: 1.05, z: 75.2, yaw: 0 };
 export const STORAGE_KEY = 'livistone-progress-v1';
 export interface Progress { version: 1; discovered: string[]; visited: LandmarkId[]; }
 export function parseProgress(value: string | null): Progress {

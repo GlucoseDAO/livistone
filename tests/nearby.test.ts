@@ -4,7 +4,7 @@ import { DISCOVERIES, LANDMARKS, SPAWN } from '../src/game/content';
 
 describe('nearby stories along the visitor route', () => {
   it('introduces the ring gateway on arrival and the Nut as you cross into town', () => {
-    expect(nearbyArchitecture(SPAWN.x, SPAWN.z)?.id).toBe('kings-chapel');
+    expect(nearbyArchitecture(SPAWN.x, SPAWN.z)?.id).toBe('embryo-station');
     expect(nearbyArchitecture(0, 39)?.id).toBe('kings-chapel');
     expect(nearbyArchitecture(0, 10)?.id).toBe('nut');
     expect(nearbyArchitecture(-29, 4)?.id).toBe('mitoring');

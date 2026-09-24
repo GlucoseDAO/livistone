@@ -25,9 +25,9 @@ current build is generated in code at load time; binary assets are two tree GLBs
 | Task | Command | Notes |
 | --- | --- | --- |
 | Install | `bun install --frozen-lockfile` | Bun is the package manager and dev server |
-| Dev server | `bun run dev` | http://localhost:5173, `strictPort` is on |
+| Dev server | `bun run dev` | Binds `0.0.0.0:5173`; open `http://localhost:5173` locally or the computer's LAN IP on Wi-Fi. `strictPort` is on |
 | Type check + build | `bun run build` | `tsc --noEmit` then `vite build` into `dist/` |
-| Preview the build | `bun run preview` | http://localhost:4173 |
+| Preview the build | `bun run preview` | Binds `0.0.0.0:4173`; open `http://localhost:4173` locally |
 | Unit tests | `bun run test` | Vitest, `tests/**/*.test.ts` — **not** `bun test` |
 | Browser tests | `bun run test:browser` | Playwright, `tests/**/*.spec.ts`, real Chrome |
 | Sync agent docs | `bun run docs:sync` | What the pre-commit hook runs |
@@ -59,7 +59,6 @@ src/
     daylight.ts      Persistent Auto / Day / Night selection, without GPS
     research.ts      GlucoseDAO chapters with original Drive poster images and source links
     research-art.ts  Drawn figures for non-research garden stories; research uses source images
-    jewelry-art.ts   Drawn Dewdrop stand-in when no local studio photograph exists
     piece-stories.ts Artist and exhibition stories overlaid on the jewellery catalogue
     enhancement.ts   Materialized Enhancements poster captions and gene-category facts
     jewelry-catalogue.json Generated source-hashed catalogue and image manifest
@@ -133,7 +132,10 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   trees also reserve their full canopy near the arch. `createGateway` is DOM-independent
   and derives colliders from its meshes. Keep the gem's quality settings separate from hall
   glazing and station amber; low detail uses an opaque reflective fallback. The serif glyph
-  outlines are bundled, with their licence under `public/fonts/`. Spawn is at `(0, 58)` with yaw `0`, looking from Embryo Station toward the city gate.
+  outlines are bundled, with their licence under `public/fonts/`. The source-photo poster
+  stands left of the southern bridge approach, outside the walking span; keep its photo,
+  factual caption, interaction and planting clearance aligned. Spawn is at `(-2, 75.2)`
+  with yaw `0`, looking from the town-facing train exit toward the city gate.
 - **The station keeps its transport role.** Its seven-poster collection stays in the concourse. `CIVIC_LANDMARKS`
   selects only the three ministries/City Hall for circular gardens and civic construction. Guard exhibition
   lookups when iterating all `LANDMARKS`. `station-layout.ts` owns the station and railway
@@ -160,6 +162,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   supplied photo, distinct from City Hall. Mobile omits railway normal maps and reduces
   shell/rib detail. Preserve railway clearance and full-passage physics tests.
 - **Glucose Commons uses scientific source coordinates.** `glucose-pavilion.ts` lifts the A/B backbone of human insulin PDB 1TRZ above an open, walkable court. Preserve the uniformly scaled fold, three disulfides and separate GLC glucose identity. `data/molecules/` keeps attributed originals; `bun scripts/extract-molecules.mjs` rebuilds hashed compact data. `glucose-layout.ts` shares poster/planting clearance; architecture creation stays DOM-independent for Rapier tests. Research facts, chapter slides and source links belong in `game/research.ts`, separate from jewelry lore. The supplied Drive folder is the current glucose image/text source; direct extracts from Livia’s Romanian AI Days 2026 poster live under `public/images/research/` with provenance. Preserve source plots and offer full-size viewing; do not treat its unpublished benchmark claims as verified results. Each of the six posters opens a multi-slide dialog (←/→ or on-screen buttons). Only verified public tools and research workflows count as achievements. Keep the pavilion out of `CIVIC_LANDMARKS`, preserve old save IDs (`glucose-livia`, `glucose-format`, `glucose-service`, `glucose-game`, `glucose-models`, `glucose-molecule`), and keep source dialogs keyboard/touch accessible. Do not invent clinical outcomes.
+- Space and the touch Jump button request one grounded jump in the fixed physics loop. Jumping clears gallery rails; falling has no damage. Keep the main navigation sound toggle labeled and visible on touch screens.
 - **Physics is a kinematic capsule, not a rigid body.** `Physics.step(x, z, dt)` applies
   horizontal intent plus its own gravity accumulation, then Rapier's character controller
   resolves the movement. Autostep, snap-to-ground, and slope limits are configured once in
@@ -174,6 +177,12 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   keys must not be consumed as movement. Map markers sit below map panels and navigation.
   All journal stories are readable from the start; reading records progress without
   requiring a landmark visit. Preserve existing save IDs.
+  On touch and narrow screens, the nearby-story card starts folded and has an accessible
+  toggle; desktop can fold it too. Keep the nearby title visible when folded and the story
+  link reachable when expanded. The desktop controls strip also folds, while touch movement
+  and Jump remain available. The top sound control is a compact labeled speaker button.
+  The loading progress bar spans the viewport; larger introduction text and portrait must
+  remain fully reachable by scrolling on short screens.
 - **Mouse rotation requires a held left mouse button; Left/Right arrows also turn.** Never request pointer lock or turn on
   entering/resuming. A drag starts on the canvas, uses client-coordinate deltas on document
   pointer events, and checks `buttons & 1`. A/D strafe, W/S or Up/Down move forward/backward, and Left/Right turn
@@ -192,7 +201,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **Jewelry collections have permanent homes.** `data/catalogue/selection.json` contains reviewed source facts; `scripts/build-catalogue.mjs` generates `game/jewelry-catalogue.json` and local WebP derivatives using offline Sharp tooling. City Hall/Energy/Science/station keep 8/8/9/7 physical works. Timeface has six and Future House has three; the catalogue has 41. The additional attributed archive manifest is `game/archive-catalogue.json`. Keep one physical assignment per work. `piece-stories.ts` overlays artist texts from https://livia.glucosedao.org/pieces and official Romanian Jewelry Week collection pages; do not invent a studio story when the public tab has none. Rotary Magnetic keeps the 2026 amber caption and does not mix the older tourmaline note. `planar-exhibition.ts` uses uncropped thumbnails, aspect-matched caption canvases and simple stand colliders; full images load only for inspection. `poster-layout.ts` keeps the central axes and entrances clear. Do not restore rotating cylinders, pedestal tables or lore lecterns. Source facts and artist descriptions stay separate from Livistone fiction. Native in-hall controls remain hidden until keyboard focus; 1–4 give facts, collection, photo and place story. Failed photographs leave facts available.
 - **All rail facilities belong to southern Embryo Station.** Keep one parked train and its platform at the placed station, with both main guideways at z = 79/85. There is no northern platform, duplicate train or garden rail loop. Preserve snapshot diagnostics (`zone: 'town'`, `journey: null`) and the save version. Garden access is by continuous walking paths.
 - **Terrain is continuous, not a flat town inside a mountain ring.** `terrain.ts` owns the shared river banks, lake depression, woodland foothills and asymmetrical elongated ridges. `mountains.ts` renders the whole ground with meadow/rock blending and actual tunnel apertures. Ground cover uses local meadow/soil WebP maps (512 px reduced, 1024 px rich), with path wear and bank soil baked by `ground-cover.ts` into existing vertices. Preserve soil attributes when clipping tunnels. No extra terrain draw call or per-frame CPU work is needed; reduced detail skips the mountain normal map. Regenerate derivatives with `python3 scripts/build-ground-textures.py`; provenance is under `public/textures/ground/`. The two-metre near grid agrees with the terrain collider. Grade railway approaches and far exits; reserve full tree canopies and taper planting naturally up slopes.
-- **Living Waters belongs to the town.** `living-waters-layout.ts` defines the lake at `(0, -110)`, asymmetrical water cells, 2.2 m nerve network and paths into the civic gardens. Use the shared `terrain.ts` ground and town Rapier world; never restore remote scene switching or a second terrain. Keep both pavilion entries, shallow-water escape and the dry Mycelium loop traversable in both quality tiers. Place mushrooms, reeds, lily pads and rain with seeded scatter and path clearance, not a modular lattice. The mushroom crowns use the actual Mycelium photographs: curled open silver folds around opal hearts, with branching stems, never fabric umbrellas. Also instance a lower shrub-scale ring population. Reserve every crown’s full radius from paths. Vittoria and Dewdrop garden stands present both jewels (studio photo for Vittoria; drawn figure for Dewdrop, which has no local catalogue photograph). The pavilion borrows Dewdrop’s silhouette, whose original stone is topaz, not aquamarine. Rain/drainage respects reduced motion; audio remains opt-in. Physical-device performance remains release work.
+- **Living Waters belongs to the town.** `living-waters-layout.ts` defines the lake at `(0, -110)`, asymmetrical water cells, 2.2 m nerve network and paths into the civic gardens. Use the shared `terrain.ts` ground and town Rapier world; never restore remote scene switching or a second terrain. Keep both pavilion entries, shallow-water escape and the dry Mycelium loop traversable in both quality tiers. Place mushrooms, reeds, lily pads and rain with seeded scatter and path clearance, not a modular lattice. The mushroom crowns use the actual Mycelium photographs: curled open silver folds around opal hearts, with branching stems, never fabric umbrellas. Also instance a lower shrub-scale ring population. Reserve every crown’s full radius from paths. Vittoria and Dewdrop garden stands present both jewels with local photographs from Livia’s archive. The pavilion borrows Dewdrop’s silhouette, whose original stone is topaz, not aquamarine. Rain/drainage respects reduced motion; audio remains opt-in. Physical-device performance remains release work.
 - **Photo clicking must not break looking.** A short scene press with no drag can raycast
   a planar photograph or caption. Activate on the native click after pointerup, so a
   synthesized touch click cannot hit a newly focused dialog button. Track its pointer independently from the joystick; cancelled gestures,

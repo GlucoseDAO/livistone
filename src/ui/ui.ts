@@ -16,6 +16,9 @@ const icons: Record<string, string> = {
   compass: '<circle cx="12" cy="12" r="9"/><path d="m16 8-2 6-6 2 2-6 6-2Z"/>',
   leaf: '<path d="M20 3C7 2 2 8 5 16c7 5 15 0 15-13ZM5 20 16 8"/>',
   sound: '<path d="M4 9v6h4l5 4V5L8 9H4ZM17 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
+  'sound-off': '<path d="M4 9v6h4l5 4V5L8 9H4ZM17 9l5 6m0-6-5 6"/>',
+  minimize: '<path d="M5 18h14"/>',
+  restore: '<rect x="5" y="5" width="14" height="14" rx="1"/>',
 };
 export function icon(name: string): string { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + icons[name] + '</svg>'; }
 export class UI {
@@ -38,19 +41,19 @@ export class UI {
     this.app.innerHTML = [
       '<canvas id="world" aria-label="Livistone interactive 3D town" tabindex="0"></canvas>',
       '<div class="vignette" aria-hidden="true"></div>',
-      '<header class="topbar"><div class="brand" aria-label="Livistone">' + icon('leaf') + '<span>LIVISTONE<span class="brand-sub">A LIVING WORLD</span></span></div><div class="top-center"><span class="status-dot"></span><span id="mode-label">ART, SCIENCE & NATURE</span></div><nav id="tools" aria-label="Explore Livistone"><button id="view-toggle" class="tool view-toggle" data-action="map" aria-label="First person" aria-keyshortcuts="M" disabled>' + icon('walk') + '<span>First person</span><kbd>M</kbd></button><button class="tool" data-action="journal" aria-label="Open discovery journal" aria-expanded="false" aria-controls="journal" disabled>' + icon('book') + '<span>Journal</span></button><button class="tool square" data-action="pause" aria-label="Open menu" aria-expanded="false" aria-controls="pause" disabled>' + icon('menu') + '</button></nav></header>',
+      '<header class="topbar"><div class="brand" aria-label="Livistone">' + icon('leaf') + '<span>LIVISTONE<span class="brand-sub">A LIVING WORLD</span></span></div><div class="top-center"><span class="status-dot"></span><span id="mode-label">ART, SCIENCE & NATURE</span></div><nav id="tools" aria-label="Explore Livistone"><button id="view-toggle" class="tool view-toggle" data-action="map" aria-label="First person" aria-keyshortcuts="M" disabled>' + icon('walk') + '<span>First person</span><kbd>M</kbd></button><button class="tool" data-action="journal" aria-label="Open discovery journal" aria-expanded="false" aria-controls="journal" disabled>' + icon('book') + '<span>Journal</span></button><button id="hud-sound" class="tool sound-control" data-action="sound" aria-label="Enable sound" aria-pressed="false" disabled>' + icon('sound-off') + '</button><button class="tool square" data-action="pause" aria-label="Open menu" aria-expanded="false" aria-controls="pause" disabled>' + icon('menu') + '</button></nav></header>',
       '<div id="welcome" class="loading-notice" role="status">Preparing Livistone…</div>',
       '<div id="crosshair" class="crosshair" aria-hidden="true" hidden></div>',
-      '<footer id="walk-footer" class="walk-footer" hidden><div class="place-card"><span id="location" class="eyebrow">Riverside Gardens</span><div id="nearby-story" hidden><span class="nearby-label">NEARBY</span><strong id="nearby-title"></strong><p id="nearby-sentence"></p><button id="nearby-read" class="nearby-read" data-action="nearby-story">Read story ' + icon('arrow') + '</button></div><span id="discoveries" class="sr-only">0 discoveries</span></div><div class="controls-hint"><span><kbd>W A S D</kbd> Walk</span><span><kbd>← →</kbd> Turn</span><span id="look-hint">Hold left mouse to look</span><button id="discover-control" data-action="interact" disabled><kbd>E</kbd> Read story</button></div></footer>',
+      '<footer id="walk-footer" class="walk-footer" hidden><div class="place-card"><div class="place-head"><span id="location" class="eyebrow">Riverside Gardens</span><button id="place-toggle" class="place-toggle" data-action="toggle-nearby" aria-controls="nearby-story" aria-expanded="true" aria-label="Minimize nearby panel" title="Minimize nearby panel" hidden>' + icon('minimize') + '</button></div><strong id="nearby-preview" class="nearby-preview" hidden></strong><div id="nearby-story" hidden><span class="nearby-label">NEARBY</span><strong id="nearby-title"></strong><p id="nearby-sentence"></p><button id="nearby-read" class="nearby-read" data-action="nearby-story">Read story ' + icon('arrow') + '</button></div><span id="discoveries" class="sr-only">0 discoveries</span></div><div class="controls-hint"><div id="controls-details" class="controls-details"><span><kbd>W A S D</kbd> Walk</span><span><kbd>← →</kbd> Turn</span><button data-action="jump"><kbd>Space</kbd> Jump</button><span id="look-hint">Hold left mouse to look</span><button id="discover-control" data-action="interact" disabled><kbd>E</kbd> Read story</button></div><button id="controls-toggle" data-action="toggle-controls" aria-controls="controls-details" aria-expanded="true" aria-label="Minimize controls panel" title="Minimize controls panel">' + icon('minimize') + '</button></div></footer>',
       '<button id="interact" class="interaction" data-action="interact" hidden><span class="interaction-key">E</span><span id="interact-label">Discover</span>' + icon('arrow') + '</button>',
-      '<div id="touch-controls" class="touch-controls" hidden><div id="joystick" class="joystick" role="group" aria-label="Touch movement control"><div class="stick-knob"></div></div><span class="touch-look">Drag to look around</span></div>',
+      '<div id="touch-controls" class="touch-controls" hidden><div id="joystick" class="joystick" role="group" aria-label="Touch movement control"><div class="stick-knob"></div></div><button class="touch-jump" data-action="jump" aria-label="Jump">↑ Jump</button><span class="touch-look">Drag to look around</span></div>',
       '<section id="map-panel" class="map-panel" hidden aria-labelledby="map-title"><div class="eyebrow">THE CITY AT A GLANCE</div><h2 id="map-title">Find your wonder.</h2><p id="map-origins">Every stop is based on a real, existing piece of jewelry, artwork or research project. Follow the numbers from the station into the town.</p><button id="start-exploring" class="primary full map-start" data-action="walk" aria-label="Start exploring">' + icon('walk') + '<span><strong>Start exploring</strong><small>Walk in first person</small></span>' + icon('arrow') + '</button><div class="landmark-list">' + LANDMARKS.map((l, i) => '<button class="landmark-item" data-action="landmark:' + l.id + '" aria-label="Go to ' + l.name + '"><span class="landmark-number">' + String(i + 1).padStart(2, '0') + '</span><span><strong>' + l.name + '</strong><small>' + l.artifact + '</small></span>' + icon('arrow') + '</button>').join('') + '</div><div id="map-description" class="map-description" role="status">Choose a place to arrive at its entrance.</div></section>',
       '<div id="map-controls" class="map-controls" hidden><button class="tool square" data-action="zoom-in" aria-label="Zoom map in">+</button><button class="tool square" data-action="zoom-out" aria-label="Zoom map out">−</button><button class="tool square" data-action="reset-map" aria-label="Reset map view">' + icon('compass') + '</button><span>Drag to orbit · Pinch or scroll to zoom</span></div>',
       '<div id="map-markers" hidden>' + LANDMARKS.map((l, i) => '<button class="map-marker" id="marker-' + l.id + '" data-action="landmark:' + l.id + '" aria-label="Go to ' + l.name + '"><span>' + String(i + 1).padStart(2, '0') + '</span><b>' + l.name + '</b></button>').join('') + '<div id="player-marker" class="player-marker"><span></span>You are here</div></div>',
       '<div id="scrim" class="scrim" data-action="close" aria-hidden="true" hidden></div>',
       '<section id="lore" class="dialog lore" role="dialog" aria-labelledby="lore-title" hidden><button class="close-button" data-action="close" aria-label="Close discovery">' + icon('close') + '</button><div class="eyebrow" id="lore-category"></div><div id="lore-emblem" class="lore-emblem">✧</div><h2 id="lore-title"></h2><figure id="lore-figure" class="lore-figure" hidden><canvas id="lore-figure-canvas" width="720" height="280"></canvas></figure><div id="lore-slides" hidden><p id="lore-slide-title"></p><p id="lore-slide-body"></p><div class="slide-controls" aria-label="Chapter slides"><button data-action="slide-prev" aria-label="Previous slide">←</button><span id="lore-slide-count" aria-live="polite"></span><button data-action="slide-next" aria-label="Next slide">→</button></div><p class="viewer-help">← / → slides · Esc close</p></div><div id="exhibit-catalogue" hidden></div><p id="lore-body"></p><div class="lore-source">From Livia’s artifacts to a living town.</div><button class="text-button full" data-action="close">Continue exploring ' + icon('arrow') + '</button></section>',
       '<section id="journal" class="dialog journal" role="dialog" aria-labelledby="journal-title" hidden><button class="close-button" data-action="close" aria-label="Close journal">' + icon('close') + '</button><div class="eyebrow">YOUR FIELD NOTES</div><h2 id="journal-title">A little more wonder.</h2><p>Browse every story and photograph. Read in any order, or find them as you walk.</p><button class="primary full" data-action="catalogue">Browse the jewelry catalogue</button><div id="journal-list"></div></section>',
-      '<section id="pause" class="dialog pause" role="dialog" aria-labelledby="pause-title" hidden><button class="close-button" data-action="close" aria-label="Close menu">' + icon('close') + '</button><div class="eyebrow">MAKE YOURSELF AT HOME</div><h2 id="pause-title">A moment of quiet.</h2><button class="primary full" data-action="close">Continue exploring ' + icon('arrow') + '</button><button class="menu-item" data-action="open-map">' + icon('map') + 'Open city map</button><button class="menu-item" data-action="reset-position">' + icon('compass') + 'Return to the river entrance</button><button class="menu-item" id="sound-toggle" data-action="sound" aria-pressed="false">' + icon('sound') + 'Livistone Radio: off</button><label class="quality-label">Time of day<select id="time-of-day"><option value="auto">Auto — local clock</option><option value="day">Day</option><option value="night">Night</option></select></label><label class="quality-label">Visual detail<select id="quality"><option value="low">Gentle — lower detail</option><option value="high">Rich — higher detail</option></select></label><p class="menu-note">Move forward/back with W/S or ↑/↓. Strafe with A/D. Turn with ←/→, or hold the left mouse button and drag to look. On touch screens, use the left stick and drag to look. Music: Livia Zaharia playing kalimba, recorded on her phone — informal personal recordings, not professional studio recordings. Your discoveries are saved on this device.</p></section>',
+      '<section id="pause" class="dialog pause" role="dialog" aria-labelledby="pause-title" hidden><button class="close-button" data-action="close" aria-label="Close menu">' + icon('close') + '</button><div class="eyebrow">MAKE YOURSELF AT HOME</div><h2 id="pause-title">A moment of quiet.</h2><button class="primary full" data-action="close">Continue exploring ' + icon('arrow') + '</button><button class="menu-item" data-action="open-map">' + icon('map') + 'Open city map</button><button class="menu-item" data-action="reset-position">' + icon('compass') + 'Return to the train exit</button><button class="menu-item" id="sound-toggle" data-action="sound" aria-pressed="false">' + icon('sound') + 'Livistone Radio: off</button><label class="quality-label">Time of day<select id="time-of-day"><option value="auto">Auto — local clock</option><option value="day">Day</option><option value="night">Night</option></select></label><label class="quality-label">Visual detail<select id="quality"><option value="low">Gentle — lower detail</option><option value="high">Rich — higher detail</option></select></label><p class="menu-note">Move forward/back with W/S or ↑/↓. Strafe with A/D. Jump with Space or the Jump button; jump over gallery rails to leave towers. Turn with ←/→, or hold the left mouse button and drag to look. On touch screens, use the left stick and drag to look. Music: Livia Zaharia playing kalimba, recorded on her phone — informal personal recordings, not professional studio recordings. Your discoveries are saved on this device.</p></section>',
       '<div id="toast" class="toast" role="status" hidden></div><div id="live" class="sr-only" aria-live="polite"></div>',
       '<section id="error" class="error-screen" hidden><div class="eyebrow">LIVISTONE</div><h2>Let’s try that again.</h2><p id="error-message"></p><button class="primary" data-action="reload">Reload the town</button></section>',
     ].join('');
@@ -59,8 +62,11 @@ export class UI {
     this.modeLabel = this.app.querySelector('#mode-label')!; this.location = this.app.querySelector('#location')!; this.prompt = this.app.querySelector('#interact')!; this.live = this.app.querySelector('#live')!;
     const loading = document.querySelector<HTMLElement>('#boot-loading')!;
     this.app.querySelector('#welcome')!.replaceWith(loading); loading.id = 'welcome';
+    if (matchMedia('(pointer:coarse), (max-width:650px)').matches) this.setNearbyExpanded(false);
     this.app.addEventListener('click', (e) => {
       const button = (e.target as Element).closest<HTMLElement>('[data-action]');
+      if (button?.dataset.action === 'toggle-nearby') { this.toggleNearby(); return; }
+      if (button?.dataset.action === 'toggle-controls') { this.toggleControls(); return; }
       if (button) action(button.dataset.action!);
     });
     this.app.querySelector('#time-of-day')!.addEventListener('change', (e) => action('time-of-day:' + (e.target as HTMLSelectElement).value));
@@ -96,7 +102,7 @@ export class UI {
     start.querySelector('strong')!.textContent = startLabel; start.setAttribute('aria-label', startLabel);
     if (mode === 'map') this.mapStatus('Choose a place to arrive at its entrance.');
     this.app.querySelector<HTMLElement>('#toast')!.hidden = true;
-    this.modeLabel.textContent = mode === 'welcome' ? 'ART, SCIENCE & NATURE' : mode === 'map' ? 'A DIFFERENT PERSPECTIVE' : 'EXPLORE AT YOUR OWN PACE';
+    this.modeLabel.textContent = mode === 'welcome' ? 'ART, SCIENCE & NATURE' : mode === 'map' ? 'A DIFFERENT PERSPECTIVE' : '';
     if (mode !== 'walking') this.prompt.hidden = true;
     const dialog = this.app.querySelector<HTMLElement>('.dialog:not([hidden])');
     this.canvas.inert = !!dialog;
@@ -189,12 +195,32 @@ export class UI {
   }
 
   setLocation(name: string): void { if (this.location.textContent !== name) this.location.textContent = name; }
+  private setNearbyExpanded(expanded: boolean): void {
+    this.app.querySelector('.place-card')!.classList.toggle('is-collapsed', !expanded);
+    const toggle = this.app.querySelector<HTMLButtonElement>('#place-toggle')!;
+    const label = expanded ? 'Minimize nearby panel' : 'Expand nearby panel';
+    toggle.setAttribute('aria-expanded', String(expanded)); toggle.setAttribute('aria-label', label); toggle.title = label;
+    toggle.innerHTML = icon(expanded ? 'minimize' : 'restore');
+  }
+  private toggleNearby(): void {
+    this.setNearbyExpanded(this.app.querySelector('.place-card')!.classList.contains('is-collapsed'));
+  }
+  private toggleControls(): void {
+    const panel = this.app.querySelector<HTMLElement>('.controls-hint')!, expanded = panel.classList.toggle('is-collapsed') === false;
+    const toggle = this.app.querySelector<HTMLButtonElement>('#controls-toggle')!;
+    const label = expanded ? 'Minimize controls panel' : 'Expand controls panel';
+    toggle.setAttribute('aria-expanded', String(expanded)); toggle.setAttribute('aria-label', label); toggle.title = label;
+    toggle.innerHTML = icon(expanded ? 'minimize' : 'restore');
+  }
   setNearby(story: NearbyStory | null): void {
     this.app.querySelector<HTMLButtonElement>('#discover-control')!.disabled = !story;
     if (this.nearbyId === (story?.id ?? null)) return; this.nearbyId = story?.id ?? null;
     this.app.querySelector<HTMLElement>('#nearby-story')!.hidden = !story;
+    this.app.querySelector<HTMLButtonElement>('#place-toggle')!.hidden = !story;
+    this.app.querySelector<HTMLElement>('#nearby-preview')!.hidden = !story;
     if (!story) return;
     this.app.querySelector('#nearby-title')!.textContent = story.title;
+    this.app.querySelector('#nearby-preview')!.textContent = story.title;
     this.app.querySelector('#nearby-sentence')!.textContent = story.sentence;
     this.app.querySelector('#nearby-read')!.setAttribute('aria-label', 'Read story: ' + story.title);
   }
@@ -213,7 +239,9 @@ export class UI {
     this.app.querySelector('#error-message')!.textContent = message;
   }
   setSound(enabled: boolean): void {
-    const button = this.app.querySelector<HTMLButtonElement>('#sound-toggle')!;
-    button.innerHTML = icon('sound') + 'Livistone Radio: ' + (enabled ? 'on' : 'off'); button.setAttribute('aria-pressed', String(enabled));
+    const hud = this.app.querySelector<HTMLButtonElement>('#hud-sound')!, label = enabled ? 'Mute sound' : 'Enable sound';
+    hud.innerHTML = icon(enabled ? 'sound' : 'sound-off'); hud.setAttribute('aria-label', label); hud.title = label; hud.setAttribute('aria-pressed', String(enabled));
+    const menu = this.app.querySelector<HTMLButtonElement>('#sound-toggle')!;
+    menu.innerHTML = icon(enabled ? 'sound' : 'sound-off') + 'Livistone Radio: ' + (enabled ? 'on' : 'off'); menu.setAttribute('aria-pressed', String(enabled));
   }
 }

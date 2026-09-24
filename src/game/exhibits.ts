@@ -26,4 +26,4 @@ export function photoSize(width: number, height: number, maxWidth = 2.8, maxHeig
   const ratio = width > 0 && height > 0 ? width / height : 1;
   return ratio > maxWidth / maxHeight ? { width: maxWidth, height: maxWidth / ratio } : { width: maxHeight * ratio, height: maxHeight };
 }
-export function photoURL(file: string): string { return import.meta.env.BASE_URL + 'images/jewelry/' + file; }
+export function photoURL(file: string): string { return (import.meta.env?.BASE_URL ?? '/') + 'images/jewelry/' + file; }

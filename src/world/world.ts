@@ -9,6 +9,7 @@ import { mitoringCage, nanotCage, ENERGY_HALL } from './jewelry';
 import { Forest } from './forest';
 import { createBridge, createGardenBridge } from './bridge';
 import { createGateway } from './gateway';
+import { createGatewayPoster } from './gateway-poster';
 import { gatewayClearing } from './gateway-layout';
 import { createPlanting, updatePlanting } from './planting';
 import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from './landscape';
@@ -102,6 +103,7 @@ export class Town {
     this.root.name = 'Livistone'; this.root.add(this.interiors, this.details);
     this.createTerrain(); this.createPaths(); createBridge(this.root, this.colliders, this.white, this.paving, this.gold);
     createGateway(this.root, this.colliders, mobile, this.paving);
+    const gatewayPoster = createGatewayPoster(this.root, this.colliders); this.researchPanels.push(...gatewayPoster.panels); this.interactives.push({ id: 'kings-chapel', object: gatewayPoster.panels[0], position: gatewayPoster.position });
     const introduction = createIntroduction(this.root, this.colliders); this.researchPanels.push(...introduction.panels); this.interactives.push({ id: 'about-livistone', object: introduction.panels[0], position: introduction.position });
     await stage(28, 'Turning jewellery into civic buildings…');
     for (const landmark of CIVIC_LANDMARKS) landmark.id === 'energy' ? this.createEnergyHall(landmark.x, landmark.z) : this.createLandmark(landmark.id, landmark.x, landmark.z);
@@ -135,7 +137,7 @@ export class Town {
     const enhancementGallery = createEnhancementGallery(this.root, this.colliders); this.researchPanels.push(...enhancementGallery.panels); this.interactives.push(...enhancementGallery.interactives);
     for (const id of ['timeface', 'future-house']) this.exhibitions.push(new PlanarExhibition(id, this.root, 0, 0, this.colliders, this.interactives));
     const research = createGlucosePavilion(this.root, this.colliders, mobile, this.paving); this.researchPanels.push(...research.panels); this.interactives.push(...research.interactives);
-    this.researchReady = Promise.all([research.ready, enhancementGallery.ready]).then(() => undefined);
+    this.researchReady = Promise.all([research.ready, enhancementGallery.ready, gatewayPoster.ready]).then(() => undefined);
     await stage(62, 'Planting the woodland and mountain slopes…');
     this.createTrees(); this.createGardens();
     for (const landmark of CIVIC_LANDMARKS) {
