@@ -29,7 +29,7 @@ current build is generated in code at load time; binary assets are two tree GLBs
 | Type check + build | `bun run build` | `tsc --noEmit` then `vite build` into `dist/` |
 | Preview the build | `bun run preview` | Binds `0.0.0.0:4173`; open `http://localhost:4173` locally |
 | Unit tests | `bun run test` | Vitest, `tests/**/*.test.ts` — **not** `bun test` |
-| Browser tests | `bun run test:browser` | Playwright, `tests/**/*.spec.ts`, real Chrome |
+| Browser tests | `bun run test:browser` | Playwright, `tests/**/*.spec.ts`, real Chrome. `LIVISTONE_BASE_URL=http://127.0.0.1:<port>` targets another worktree's dev server |
 | Sync agent docs | `bun run docs:sync` | What the pre-commit hook runs |
 | Install git hooks | `bun run hooks:install` | Sets `core.hooksPath` to `.githooks` |
 | Regenerate tree GLBs | `bun scripts/generate-trees.mjs` | Needs the dev server running |
