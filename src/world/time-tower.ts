@@ -24,7 +24,7 @@ export function createTimeTower(parent: THREE.Group, colliders: ColliderSpec[], 
     }
     strand([point(a + .18, 2.8, 5), point(a + .45, .8, 12), point(a + .5, 2, 21)], .08, inner);
   }
-  const silver = new THREE.MeshStandardMaterial({ color: '#dce5e8', metalness: .9, roughness: .22, envMapIntensity: 1.4 });
+  const silver = new THREE.MeshStandardMaterial({ color: '#dce5e8', metalness: .9, roughness: .22, envMapIntensity: 1, userData: { heroEnv: true } });
   const shadowSilver = new THREE.MeshStandardMaterial({ color: '#727e83', metalness: .82, roughness: .3 });
   nightEmission(silver, '#99c4d4', .17);
   for (const [geometries, material] of [[parts, silver], [inner, shadowSilver]] as const) {

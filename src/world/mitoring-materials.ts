@@ -6,7 +6,7 @@ export function mitoringAmberMaterial(mobile: boolean): THREE.MeshPhysicalMateri
     ior: 1.54, thickness: 1.8, attenuationColor: '#e9a044', attenuationDistance: 6,
     envMapIntensity: 1.25, clearcoatRoughness: .12, side: THREE.DoubleSide,
     emissive: '#b34c06', emissiveIntensity: .045 });
-  material.name = 'Mitoring cloudy amber'; material.userData.mitoringAmber = true;
+  material.name = 'Mitoring cloudy amber'; material.userData.mitoringAmber = material.userData.heroEnv = true;
   nightEmission(material, '#e8a235', .24); setMitoringAmberQuality(material, mobile); return material;
 }
 
@@ -30,8 +30,8 @@ export async function loadMitoringAmberTextures(material: THREE.MeshPhysicalMate
 }
 
 export function mitoringSilverMaterial(): THREE.MeshStandardMaterial {
-  const material = new THREE.MeshStandardMaterial({ color: '#f1eee8', metalness: 1, roughness: .34, envMapIntensity: 1.7 });
-  material.name = 'Mitoring polished cast silver'; return material;
+  const material = new THREE.MeshStandardMaterial({ color: '#f1eee8', metalness: 1, roughness: .34, envMapIntensity: 1.05 });
+  material.name = 'Mitoring polished cast silver'; material.userData.heroEnv = true; return material;
 }
 
 export async function loadMitoringSilverTexture(material: THREE.MeshStandardMaterial, mobile: boolean): Promise<void> {

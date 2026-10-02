@@ -16,8 +16,8 @@ export function gatewayMaterials(mobile: boolean): { silver: THREE.MeshStandardM
     relief[k] = relief[k + 1] = relief[k + 2] = 163 + (grain - .5) * 26 - pore * 2; relief[k + 3] = 255;
     polish[k] = polish[k + 1] = polish[k + 2] = 205 + rand() * 32; polish[k + 3] = 255;
   }
-  const silver = new THREE.MeshStandardMaterial({ color: '#f1f3f4', metalness: 1, roughness: .21, roughnessMap: texture(polish, n, n, mobile), envMapIntensity: 1.65 });
-  silver.name = 'Polished cast silver';
+  const silver = new THREE.MeshStandardMaterial({ color: '#f1f3f4', metalness: 1, roughness: .21, roughnessMap: texture(polish, n, n, mobile), envMapIntensity: 1 });
+  silver.name = 'Polished cast silver'; silver.userData.heroEnv = true;
   const limestone = new THREE.MeshStandardMaterial({ map: texture(stone, n, n, mobile, true), bumpMap: texture(relief, n, n, mobile), bumpScale: .016, roughness: .88, metalness: 0 });
   limestone.name = 'Honed porous limestone';
   const width = 512, height = 64, color = new Uint8Array(width * height * 4);
@@ -33,7 +33,7 @@ export function gatewayMaterials(mobile: boolean): { silver: THREE.MeshStandardM
   const gem = new THREE.MeshPhysicalMaterial({ color: '#ffffff', map, metalness: 0, roughness: .065, transmission: .82, ior: 1.62,
     thickness: .8, attenuationColor: '#bde99a', attenuationDistance: 3.5, dispersion: mobile ? 0 : .025,
     envMapIntensity: 1.45, clearcoat: .5, clearcoatRoughness: .06, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: .035 });
-  gem.name = 'Green colour-zoned tourmaline'; gem.userData.gatewayGem = true; setGatewayQuality(gem, mobile);
+  gem.name = 'Green colour-zoned tourmaline'; gem.userData.gatewayGem = gem.userData.heroEnv = true; setGatewayQuality(gem, mobile);
   return { silver, limestone, gem };
 }
 

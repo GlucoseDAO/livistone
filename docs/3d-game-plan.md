@@ -3,6 +3,9 @@
 ## River water shading — 3 October 2026
 
 Realism sub-plan 04 replaces the opaque green river with transparent water: the river sheet bakes downstream flow, channel distance, depth and rock proximity per vertex from the shared channel field. GPU and mobile water use flow-map ripples that follow every bend and turn smoothly into the river at both confluences, depth absorption over the visible bank, a soft shoreline, Fresnel sky reflection, sun glints and waterline foam; mobile samples one ripple scale. CPU water stays opaque with depth colour baked into vertex colours. Draw calls are unchanged; the CPU sheet keeps about 2,600 more triangles than before. Two dev-only looks (clear stream, deeper garden river) await the owner's choice, see [concepts/14-realism/04-river.md](../concepts/14-realism/04-river.md). Physical-device cost is unmeasured.
+## Light and sky coherence (realism 02, WIP) — 3 October 2026
+
+The directional light now comes from the painted sun and moon (`SUN_DIR` / `MOON_DIR` in `sky.ts`). Fog and the map background use `HORIZON_HAZE`, the sky's horizon after tone mapping, instead of hard-coded colours. Look b, the default, raises environment light to 0.9 by day and lowers the hemisphere light to 0.55. It also gives `userData.heroEnv` materials their own reflection strength and darkens the reflected ground, so polished metal reads. The CPU tier keeps the old fill. The dev-only `?look=a` keeps only the coherence fixes. The owner has not yet chosen a look; see `concepts/14-realism/02-light-sky.md`.
 
 ## City Hall material pilot — 3 October 2026
 

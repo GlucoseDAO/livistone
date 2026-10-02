@@ -73,7 +73,7 @@ function cage(parent: THREE.Group, strands: number[][], transform: (x: number, y
     flush();
   }
   if (!geometries.length) return;
-  const silver = material ?? new THREE.MeshStandardMaterial({ color: '#e1e5df', metalness: .78, roughness: .29, side: THREE.DoubleSide });
+  const silver = material ?? new THREE.MeshStandardMaterial({ color: '#e1e5df', metalness: .78, roughness: .29, side: THREE.DoubleSide, userData: { heroEnv: true } });
   const sculpture = new THREE.Mesh(mergeGeometries(geometries, false)!, silver); sculpture.name = 'Jewelry silver';
   sculpture.castShadow = true; sculpture.receiveShadow = true; parent.add(sculpture);
   for (const geometry of geometries) geometry.dispose();
@@ -98,7 +98,7 @@ export function mitoringCage(parent: THREE.Group, mobile: boolean): THREE.MeshSt
 export function nanotCage(parent: THREE.Group, radius: number, centerY: number, mobile: boolean): THREE.BufferGeometry {
   const scale = (radius + .5) / 20, angle = .45, center = new THREE.Vector3(0, centerY, 0), frameRadius = radius + .85;
   const baseY = .22, baseRadius = Math.sqrt(frameRadius ** 2 - (centerY - baseY) ** 2), frame: THREE.BufferGeometry[] = [];
-  const silver = new THREE.MeshStandardMaterial({ color: '#d9dfda', metalness: .72, roughness: .3 });
+  const silver = new THREE.MeshStandardMaterial({ color: '#d9dfda', metalness: .72, roughness: .3, userData: { heroEnv: true } });
   const point = (phi: number, theta: number): THREE.Vector3 => new THREE.Vector3(Math.sin(phi) * Math.sin(theta) * frameRadius, centerY + Math.cos(theta) * frameRadius, Math.cos(phi) * Math.sin(theta) * frameRadius);
   const baseTheta = Math.acos((baseY - centerY) / frameRadius);
   // Continuous ribs carry the folded facade to the foundation; the south bay is the entrance.

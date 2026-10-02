@@ -83,5 +83,5 @@ export function stationAmberMaterial(mobile: boolean): THREE.MeshPhysicalMateria
     transmission: mobile ? 0 : .8, thickness: 5.5, attenuationColor: '#ffe063', attenuationDistance: 14, ior: 1.54,
     clearcoat: 1, clearcoatRoughness: .055, envMapIntensity: 1.2, bumpScale: .32, side: THREE.FrontSide,
     emissive: '#ffc108', emissiveIntensity: mobile ? .23 : .2 });
-  material.userData.stationAmber = true; return material;
+  material.userData.stationAmber = material.userData.heroEnv = true; return material;
 }

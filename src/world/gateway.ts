@@ -88,7 +88,8 @@ export function createGateway(parent: THREE.Group, colliders: ColliderSpec[], mo
   for (const g of letters) g.translate(-offset, 0, 0);
   for (const x of centers) tube([[x - offset, 6.65, 0], [x - offset, 6.83, 0]], .021);
   add(merge(silver), materials.silver, 'Paired open silver shanks, fan ribs and gemstone bezel');
-  const neon = materials.silver.clone(); nightEmission(neon, '#b8fff0', 2.4);
+  // Mirror-bright letters vanish against the sky they reflect; a dimmer reflection keeps the name legible by day.
+  const neon = materials.silver.clone(); neon.envMapIntensity = .45; nightEmission(neon, '#b8fff0', 2.4);
   add(merge(letters), neon, 'LIVISTONE raised silver lettering');
   nightEmission(materials.silver, '#8cdec7', .55); nightEmission(materials.gem, '#b4ef72', .85);
   for (const x of [-2.8, 0, 2.8]) addGlow(group, new THREE.Vector3(x, 6.6, GATEWAY.z + .4), '#baffbb', 5, 35, 11, .45);

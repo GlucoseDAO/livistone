@@ -13,7 +13,7 @@ function point(phi: number, theta: number, radius: number): THREE.Vector3 {
 export function cityHallCrystalMaterial(low: boolean): THREE.MeshPhysicalMaterial {
   const material = new THREE.MeshPhysicalMaterial({ color: '#e1dce5', roughness: .075, metalness: 0, ior: 1.54, thickness: .9,
     attenuationColor: '#c9c3d0', attenuationDistance: 12, envMapIntensity: 1.5, side: THREE.DoubleSide });
-  material.name = 'Nut of Power smoky crystal'; material.userData.cityHallCrystal = true;
+  material.name = 'Nut of Power smoky crystal'; material.userData.cityHallCrystal = material.userData.heroEnv = true;
   nightEmission(material, '#c4bad6', .16); setCityHallCrystalQuality(material, low); return material;
 }
 
@@ -56,8 +56,8 @@ function clasp(phi: number, theta: number, halfSpan: number, low: boolean): THRE
 /** Facade only: the established floor, doorway, interior and wall colliders remain in Town. */
 export function createCityHallFacade(parent: THREE.Group, low: boolean): { colliders: ColliderSpec[]; walnut: THREE.MeshStandardMaterial; crystal: THREE.MeshPhysicalMaterial } {
   const wood = walnutMaterial(), crystal = cityHallCrystalMaterial(low);
-  const brass = new THREE.MeshStandardMaterial({ color: '#d8bb7c', roughness: .28, metalness: 1, envMapIntensity: 1.6 });
-  const silver = new THREE.MeshStandardMaterial({ color: '#eeeae5', roughness: .25, metalness: 1, envMapIntensity: 1.5 });
+  const brass = new THREE.MeshStandardMaterial({ color: '#d8bb7c', roughness: .28, metalness: 1, envMapIntensity: 1.2, userData: { heroEnv: true } });
+  const silver = new THREE.MeshStandardMaterial({ color: '#eeeae5', roughness: .25, metalness: 1, envMapIntensity: 1, userData: { heroEnv: true } });
   const dark = new THREE.MeshStandardMaterial({ color: '#4d2d23', roughness: .9 });
   const end = Math.acos(-CITY_HALL.centerY / CITY_HALL.radius), doorway = Math.acos((CITY_HALL.doorwayY - CITY_HALL.centerY) / CITY_HALL.radius);
   const add = (geometry: THREE.BufferGeometry, material: THREE.Material, name: string): void => { const object = new THREE.Mesh(geometry, material); object.name = name; object.castShadow = object.receiveShadow = true; parent.add(object); };

@@ -22,7 +22,7 @@ export class LivingWaters {
   readonly interactives: Interactive[] = [];
   readonly panels: THREE.Mesh[] = [];
   private readonly signs = new Map<string, PlaceSign>();
-  private readonly water = new THREE.MeshStandardMaterial({ color: '#507c78', vertexColors: true, metalness: .28, roughness: .32, envMapIntensity: .65 });
+  private readonly water = new THREE.MeshStandardMaterial({ color: '#507c78', vertexColors: true, metalness: .28, roughness: .32, envMapIntensity: .65, userData: { heroEnv: true } });
   private readonly waterTime = { value: 0 };
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#d9e0d6', metalness: .63, roughness: .32 });
   private readonly stone = new THREE.MeshStandardMaterial({ color: '#d4cfbc', roughness: .91 });
@@ -142,7 +142,7 @@ export class LivingWaters {
     const x = GARDENS.pavilionX, z = GARDENS.pavilionZ;
     this.mesh(new THREE.CylinderGeometry(6, 6.15, .18, 10), this.stone, true, x, .09, z);
     const blue = new THREE.MeshPhysicalMaterial({ color: '#79cde9', roughness: .13, metalness: .12, transmission: this.mobile ? 0 : .42, thickness: .6, ior: 1.61, clearcoat: 1, transparent: true, opacity: this.mobile ? .45 : .7, side: THREE.DoubleSide, depthWrite: false, flatShading: true });
-    blue.userData.pavilionGem = true; nightEmission(blue, '#74cbe5', .24);
+    blue.userData.pavilionGem = blue.userData.heroEnv = true; nightEmission(blue, '#74cbe5', .24);
     // Staggered triangular facets follow the pear profile; the two existing entry sectors stay open.
     const profile = [[4.5, .18], [5.8, 1.5], [6, 3.2], [5.4, 4.9], [4, 6.7], [2.4, 8.7], [1.05, 10.5], [.03, 12.4]], segments = 20, vertices: number[] = [];
     const point = (ring: number, sector: number): THREE.Vector3 => { const a = (sector + (ring % 2 ? .5 : 0)) / segments * Math.PI * 2; return new THREE.Vector3(Math.sin(a) * profile[ring][0], profile[ring][1], Math.cos(a) * profile[ring][0]); };
@@ -176,10 +176,10 @@ export class LivingWaters {
     for (const [x, z, scale, height] of [[80,-26,.62,2.6],[86,-25,.54,2.3],[94,-30,.48,2.1],[101,-35,.42,1.9],[106,-40,.35,1.65]]) {
       sites.push({ x, z, scale, height });
     }
-    const silver = new THREE.MeshStandardMaterial({ color: '#c7c3b7', roughness: .27, metalness: .9 });
+    const silver = new THREE.MeshStandardMaterial({ color: '#c7c3b7', roughness: .27, metalness: .9, userData: { heroEnv: true } });
     nightEmission(silver, '#739589', .11);
     const opal = new THREE.MeshPhysicalMaterial({ color: '#ffffff', vertexColors: true, metalness: .15, roughness: .18, iridescence: this.mobile ? .35 : 1, iridescenceIOR: 1.38, iridescenceThicknessRange: [180, 420], clearcoat: .9 });
-    opal.userData.myceliumOpal = true;
+    opal.userData.myceliumOpal = opal.userData.heroEnv = true;
     nightEmission(opal, '#a8ead2', .7);
     const crowns = new THREE.InstancedMesh(myceliumCrown(this.mobile), silver, sites.length), stems = new THREE.InstancedMesh(myceliumStem(this.mobile), silver, sites.length);
     const stones = new THREE.InstancedMesh(myceliumOpal(this.mobile), opal, sites.length), matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion();

@@ -86,7 +86,7 @@ function createFoyer(station: THREE.Group, colliders: ColliderSpec[], mobile: bo
 
 export function createStationStructure(root: THREE.Group, colliders: ColliderSpec[], mobile: boolean, paving: THREE.Material): THREE.Group {
   const station = new THREE.Group(); station.name = 'Embryo Station'; root.add(station);
-  const silver = new THREE.MeshStandardMaterial({ color: '#eee7db', metalness: .82, roughness: .23, envMapIntensity: 1.6 });
+  const silver = new THREE.MeshStandardMaterial({ color: '#eee7db', metalness: .82, roughness: .23, envMapIntensity: 1.05, userData: { heroEnv: true } });
   const white = new THREE.MeshStandardMaterial({ color: '#ede9dc', metalness: .18, roughness: .43, side: THREE.DoubleSide });
   const brass = new THREE.MeshStandardMaterial({ color: '#b28d42', metalness: .65, roughness: .3 });
   const amber = stationAmberMaterial(mobile), roof = stationAmberGeometry(mobile);
