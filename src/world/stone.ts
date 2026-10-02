@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { plantingAllowed } from './landscape';
+import { terrainHeight } from './terrain';
+import { riverCenter, tributaryCenter } from './waterways';
+import type { RockSite } from './water-surface';
 
 /** One four-metre tile, with separate colour and relief so mortar stays recessed. */
 export function pavingMaterial(mobile = false): THREE.MeshStandardMaterial {
@@ -82,4 +86,18 @@ export function rockMaterial(mobile: boolean): THREE.MeshStandardMaterial {
     map.wrapS = map.wrapT = THREE.RepeatWrapping; material.normalMap = map; material.normalScale.set(.65, .65); material.needsUpdate = true;
   }, undefined, () => { /* The silhouette remains modelled if relief cannot load. */ });
   return material;
+}
+
+/** Seeded bank boulders along the river and both tributaries; the instanced rocks, their colliders and the water's rock foam share this list. */
+export function riverRockSites(mobile: boolean): RockSite[] {
+  let seed = 58; const rand = (): number => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const count = mobile ? 230 : 420, sites: RockSite[] = [];
+  for (let i = 0; i < count * 3 && sites.length < count; i++) {
+    let x = (rand() - 0.5) * 170, z = riverCenter(x) + (i % 2 ? 1 : -1) * (7.4 + rand() * 2);
+    if (i % 3) { z = -49 + rand() * 70; x = tributaryCenter(z, i % 2 ? 1 : -1) + (i % 4 < 2 ? 1 : -1) * (4.1 + rand() * 1.6); }
+    const s = i % 5 ? .16 + rand() * .35 : .65 + rand() * .6;
+    if (!plantingAllowed(x, z, s * 1.45)) continue;
+    sites.push({ x, y: Math.max(terrainHeight(x, z) + s * .26, -.62 - s * .2), z, s, yaw: rand() * Math.PI * 2 });
+  }
+  return sites;
 }

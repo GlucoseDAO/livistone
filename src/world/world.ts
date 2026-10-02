@@ -21,11 +21,13 @@ import { TIME_TOWER } from './waterways';
 import { pathJoin } from './path-surface';
 import { Mountains } from './mountains';
 import { PlanarExhibition } from './planar-exhibition';
-import { GARDEN_BRIDGES, riverCenter, tributaryCenter, waterDistance } from './waterways';
+import { GARDEN_BRIDGES, riverCenter } from './waterways';
 import { createTimeTower } from './time-tower';
 import { createFutureHouse } from './future-house';
-import { riverMaterial } from './river';
-import { pavingMaterial, rockGeometry, rockMaterial } from './stone';
+import { cpuWaterColour, waterMaterial } from './water-material';
+import { waterSurfaceGeometry } from './water-surface';
+import type { RockSite } from './water-surface';
+import { pavingMaterial, riverRockSites, rockGeometry, rockMaterial } from './stone';
 import { createCityHallFacade, loadCityHallTextures } from './city-hall';
 import { mitoringAmberMaterial, loadMitoringAmberTextures, loadMitoringSilverTexture } from './mitoring-materials';
 import { CIVIC_LANDMARKS } from '../game/content';
@@ -83,7 +85,7 @@ export class Town {
   readonly colliders: ColliderSpec[] = [];
   readonly interactives: Interactive[] = [];
   readonly occluders: THREE.Object3D[] = [];
-  readonly water: THREE.MeshStandardMaterial;
+  readonly water: THREE.Material;
   readonly exhibitions: PlanarExhibition[] = [];
   train!: THREE.Object3D;
   gardens!: LivingWaters;
@@ -100,7 +102,8 @@ export class Town {
   private plantBatches: THREE.InstancedMesh[] = [];
   private readonly dark = new THREE.MeshStandardMaterial({ color: '#3e5550', roughness: 0.25, metalness: 0.35 });
   private readonly sphere = new THREE.SphereGeometry(1, 16, 12);
-  private constructor(private mobile: boolean, private tier: GraphicsTier) { this.water = riverMaterial(); this.paving = pavingMaterial(mobile); }
+  private rocks: RockSite[] = [];
+  private constructor(private mobile: boolean, private tier: GraphicsTier) { this.water = waterMaterial(tier); this.paving = pavingMaterial(mobile); }
   static async create(mobile: boolean, stage: (value: number, label: string) => Promise<void>, tier: GraphicsTier = mobile ? 'mobile' : 'gpu'): Promise<Town> {
     const town = new Town(mobile, tier); await town.build(stage); return town;
   }
@@ -158,26 +161,11 @@ export class Town {
   private createTerrain(): void {
     const geo = townTerrainGeometry();
     this.colliders.push({ type: 'mesh', vertices: new Float32Array(geo.getAttribute('position').array), indices: new Uint32Array(geo.index!.array) }); geo.dispose();
-    // Clip a single surface against the shared bank field: junctions have no overlapping water sheets.
-    const vertices: number[] = [], uv: number[] = [];
-    const level = -.546;
-    const emit = (corners: THREE.Vector2[]): void => {
-      const polygon: THREE.Vector2[] = [];
-      for (let i = 0; i < corners.length; i++) {
-        const a = corners[i], b = corners[(i + 1) % corners.length], da = waterDistance(a.x, a.y) - level, db = waterDistance(b.x, b.y) - level;
-        if (da <= 0) polygon.push(a);
-        if ((da <= 0) !== (db <= 0)) polygon.push(a.clone().lerp(b, da / (da - db)));
-      }
-      for (let i = 1; i < polygon.length - 1; i++) for (const p of [polygon[0], polygon[i], polygon[i + 1]]) {
-        vertices.push(p.x, -.42, p.y); uv.push(p.x / 23, .5 + .5 * Math.max(0, 1 + waterDistance(p.x, p.y) / 4));
-      }
-    };
-    for (let x = -600; x < 600; x++) for (let z = -60; z < 45; z++) {
-      const a = new THREE.Vector2(x, z), b = new THREE.Vector2(x + 1, z), c = new THREE.Vector2(x, z + 1), d = new THREE.Vector2(x + 1, z + 1);
-      emit([a, c, b]); emit([b, c, d]);
-    }
-    const surface = new THREE.BufferGeometry(); surface.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); surface.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); surface.computeVertexNormals();
-    mesh(surface, this.water, this.root).castShadow = false;
+    // One clipped sheet carries flow, depth and rock proximity; CPU bakes its absorption colour instead of blending.
+    this.rocks = riverRockSites(this.mobile);
+    const cpu = this.tier === 'cpu', water = mesh(waterSurfaceGeometry(this.rocks, cpu ? cpuWaterColour() : undefined, cpu ? 2 : 1), this.water, this.root);
+    // Nothing transparent sits under the surface, so the river blends first and later glass or glows stay on top.
+    water.name = 'River water'; water.castShadow = false; water.renderOrder = -1;
   }
 
   private createPaths(): void {
@@ -367,17 +355,12 @@ export class Town {
   }
   private createGardens(): void {
     this.plantBatches = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter);
-    const rand = seeded(58), matrix = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const matrix = new THREE.Matrix4(), q = new THREE.Quaternion();
     const stone = rockMaterial(this.mobile);
-    const count = this.mobile ? 230 : 420, rocks = new THREE.InstancedMesh(rockGeometry(), stone, count);
+    const rocks = new THREE.InstancedMesh(rockGeometry(), stone, this.rocks.length);
     let placed = 0;
-    for (let i = 0; i < count * 3 && placed < count; i++) {
-      let x = (rand() - 0.5) * 170, z = riverCenter(x) + (i % 2 ? 1 : -1) * (7.4 + rand() * 2);
-      if (i % 3) { z = -49 + rand() * 70; x = tributaryCenter(z, i % 2 ? 1 : -1) + (i % 4 < 2 ? 1 : -1) * (4.1 + rand() * 1.6); }
-      const s = i % 5 ? .16 + rand() * .35 : .65 + rand() * .6;
-      if (!plantingAllowed(x, z, s * 1.45)) continue;
-      const y = Math.max(terrainHeight(x, z) + s * .26, -.62 - s * .2);
-      matrix.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(UP, rand() * TAU), new THREE.Vector3(s * 1.4, s * .8, s)); rocks.setMatrixAt(placed++, matrix);
+    for (const { x, y, z, s, yaw } of this.rocks) {
+      matrix.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(UP, yaw), new THREE.Vector3(s * 1.4, s * .8, s)); rocks.setMatrixAt(placed++, matrix);
       this.colliders.push({ type: 'box', position: [x, y, z], size: [s * 1.1, s * .65, s * .85] });
     }
     rocks.count = placed; rocks.castShadow = true; rocks.receiveShadow = true; rocks.computeBoundingSphere(); this.root.add(rocks);

@@ -1,0 +1,16 @@
+[
+  {
+    "file": "ripples-512.webp",
+    "generator": "scripts/build-water-textures.py",
+    "seed": 4410,
+    "license": "project-original",
+    "sha256": "554e32fa9d99b0c36c467c8286347aa89a8dec64a2bf942d702bb8c65c33e381"
+  },
+  {
+    "file": "ripples-256.webp",
+    "generator": "scripts/build-water-textures.py",
+    "seed": 4410,
+    "license": "project-original",
+    "sha256": "e56b46f4c6f1c08f66968202d2c12a586de2afc76cdd129054fa89c14030533f"
+  }
+]
