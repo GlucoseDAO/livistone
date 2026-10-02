@@ -1,0 +1,32 @@
+{
+  "generator": "scripts/build-city-hall-textures.py",
+  "seed": 3493,
+  "source": "https://livia.glucosedao.org/pieces/",
+  "originalPhotos": [
+    "https://livia.glucosedao.org/RJW2025/IMG_3493.jpg",
+    "https://livia.glucosedao.org/RJW2025/IMG_3496.jpg"
+  ],
+  "references": [
+    {
+      "file": "public/images/jewelry/catalogue/nut-1.webp",
+      "sha256": "f4c033f078dbc56eb23380136da3022da913ddc6f6bce62ae50698100c04d8d7"
+    },
+    {
+      "file": "public/images/jewelry/catalogue/nut-2.webp",
+      "sha256": "98e855200312af5a9c4986658e83234d82e0750ce68fafa6c68b604094c6aef7"
+    }
+  ],
+  "walnutPalette": {
+    "dark": [
+      126.0,
+      73.0,
+      27.0
+    ],
+    "light": [
+      194.0,
+      130.0,
+      61.0
+    ]
+  },
+  "method": "Original periodic warped fold fields, branch furrows, normal/occlusion/roughness bake, and smoky cloud fields. No photographed highlights projected onto the building."
+}

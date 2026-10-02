@@ -21,7 +21,7 @@ import { createTimeTower } from './time-tower';
 import { createFutureHouse } from './future-house';
 import { riverMaterial } from './river';
 import { pavingMaterial, rockGeometry, rockMaterial } from './stone';
-import { walnutMaterial, walnutRadius } from './walnut';
+import { createCityHallFacade, loadCityHallTextures } from './city-hall';
 import { mitoringAmberMaterial, loadMitoringAmberTextures, loadMitoringSilverTexture } from './mitoring-materials';
 import { CIVIC_LANDMARKS } from '../game/content';
 import { createStation } from './station';
@@ -91,7 +91,6 @@ export class Town {
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#e2e7dd', roughness: 0.26, metalness: 0.65 });
   private readonly gold = new THREE.MeshStandardMaterial({ color: '#b99a55', roughness: 0.3, metalness: 0.7 });
   private readonly wood = new THREE.MeshStandardMaterial({ color: '#d1a37d', roughness: 0.8, map: texture('walnut') });
-  private readonly walnut = walnutMaterial();
   private readonly paving = pavingMaterial();
   private readonly dark = new THREE.MeshStandardMaterial({ color: '#3e5550', roughness: 0.25, metalness: 0.35 });
   private readonly sphere = new THREE.SphereGeometry(1, 16, 12);
@@ -199,11 +198,10 @@ export class Town {
     return new THREE.Vector3(Math.sin(phi) * Math.sin(theta) * radius * sx, Math.cos(theta) * radius + height, Math.cos(phi) * Math.sin(theta) * radius * sz);
   }
   private surface(phiStart: number, phiLength: number, thetaStart: number, thetaLength: number, radius: number, height: number, material: THREE.Material, parent: THREE.Group, sx = 1, sz = 1): THREE.Mesh {
-    const isWalnut = material === this.walnut;
-    const vertices: number[] = [], uv: number[] = [], indices: number[] = []; const nx = isWalnut ? (this.mobile ? 48 : 80) : 28, ny = isWalnut ? (this.mobile ? 36 : 64) : 20;
+    const vertices: number[] = [], uv: number[] = [], indices: number[] = []; const nx = 28, ny = 20;
     for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) {
       const phi = phiStart + i / nx * phiLength, theta = thetaStart + j / ny * thetaLength;
-      const p = this.shellPoint(phi, theta, isWalnut ? walnutRadius(phi, theta, radius) : radius, height, sx, sz);
+      const p = this.shellPoint(phi, theta, radius, height, sx, sz);
       vertices.push(p.x, p.y, p.z); uv.push(phi / Math.PI, theta / Math.PI);
       if (i < nx && j < ny) { const n = j * (nx + 1) + i; indices.push(n, n + nx + 1, n + 1, n + 1, n + nx + 1, n + nx + 2); }
     }
@@ -217,38 +215,20 @@ export class Town {
     const sx = 1, sz = 1;
     const floorR = Math.sqrt(radius * radius - centerY * centerY);
     const maxTheta = Math.acos(-centerY / radius); const doorwayTheta = Math.acos((3.1 - centerY) / radius);
-    const glass = this.glass(id === 'city-hall' ? '#bbbabd' : '#b4bdb8');
-    if (id === 'science') { glass.opacity = this.mobile ? .18 : .26; glass.userData.clearGallery = true; }
-    const wood = this.walnut;
-    const halves = id === 'city-hall' ? [{ start: 0, length: Math.PI, mat: wood }, { start: Math.PI, length: Math.PI, mat: glass }] : [{ start: 0, length: TAU, mat: glass }];
-    for (const half of halves) {
-      this.surface(half.start, half.length, 0.01, doorwayTheta - 0.01, radius, centerY, half.mat, exterior, sx, sz);
-      const start = Math.max(0.29 / sx, half.start); const end = Math.min(TAU - 0.29 / sx, half.start + half.length);
-      if (end > start) this.surface(start, end - start, doorwayTheta, maxTheta - doorwayTheta, radius, centerY, half.mat, exterior, sx, sz);
+    if (id === 'city-hall') {
+      const facade = createCityHallFacade(exterior, this.mobile); this.jewelryReady.push(loadCityHallTextures(facade.walnut, facade.crystal, this.mobile));
+      this.colliders.push(...transformColliders(facade.colliders, new THREE.Matrix4().makeTranslation(x, .16, z)));
+    } else {
+      const glass = this.glass('#b4bdb8'); glass.opacity = this.mobile ? .18 : .26; glass.userData.clearGallery = true;
+      this.surface(0, TAU, .01, doorwayTheta - .01, radius, centerY, glass, exterior, sx, sz);
+      this.surface(.29, TAU - .58, doorwayTheta, maxTheta - doorwayTheta, radius, centerY, glass, exterior, sx, sz);
     }
     const floor = mesh(new THREE.CylinderGeometry(floorR, floorR + 0.3, 0.3, 64), this.paving, exterior, 0, -0.03); floor.scale.set(sx, 1, sz);
     const rim = mesh(new THREE.TorusGeometry(floorR + 0.15, 0.2, 8, 72), this.white, exterior, 0, 0.08); rim.rotation.x = Math.PI / 2; rim.scale.set(sx, sz, 1);
     this.colliders.push({ type: 'box', position: [x, 0.08, z], size: [floorR * sx * 0.75, 0.08, floorR * sz * 0.75] });
     this.wallRing(exterior, x, z, floorR * sx, floorR * sz, 0.32);
     this.entranceArch(exterior, floorR * sz, id === 'city-hall' ? this.gold : this.white);
-    // Shell bands retain the three different jewelry identities.
-    if (id === 'city-hall') {
-      const seam = new THREE.MeshStandardMaterial({ color: '#4d3325', roughness: .93 });
-      for (const phi of [0, Math.PI]) {
-        const end = phi === 0 ? doorwayTheta : maxTheta;
-        lineTube(Array.from({ length: 48 }, (_, j) => this.shellPoint(phi, .01 + j / 47 * (end - .01), radius + .06, centerY)), .16, seam, exterior);
-        // Wide clasps bridge the walnut/crystal seam, with hexagonal fasteners on the shell side.
-        for (const theta of [.47, 1.48, ...(phi ? [2.05] : [])]) {
-          this.surface(phi - .32, .64, theta - .055, .11, radius + .23, centerY, this.gold, exterior);
-          const boltPhi = phi === 0 ? .25 : phi - .25;
-          const p = this.shellPoint(boltPhi, theta, radius + .30, centerY), normal = p.clone().sub(new THREE.Vector3(0, centerY, 0)).normalize();
-          const bolt = mesh(new THREE.CylinderGeometry(.23, .23, .13, 6), this.gold, exterior, p.x, p.y, p.z); bolt.quaternion.setFromUnitVectors(UP, normal);
-          p.addScaledVector(normal, .09);
-          const pin = mesh(new THREE.CylinderGeometry(.11, .11, .04, 12), this.silver, exterior, p.x, p.y, p.z); pin.quaternion.copy(bolt.quaternion);
-        }
-      }
-      const loop = mesh(new THREE.TorusGeometry(.85, .18, 8, 40), seam, exterior, 0, 16.6, 0); loop.scale.set(.5, 1.25, .6);
-    } else {
+    if (id === 'science') {
       const frame = nanotCage(exterior, radius, centerY, this.mobile).clone().translate(x, .16, z);
       this.colliders.push({ type: 'mesh', vertices: new Float32Array(frame.getAttribute('position').array), indices: new Uint32Array(frame.index!.array) }); frame.dispose();
       const base = new THREE.RingGeometry(floorR - .1, 7.7, 80); base.rotateX(-Math.PI / 2); base.translate(x, .25, z);

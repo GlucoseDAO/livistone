@@ -1,5 +1,9 @@
 # Livistone: browser game implementation plan
 
+## City Hall material pilot — 3 October 2026
+
+The Nut of Power facade uses source-referenced walnut relief, curved brass clasps, hexagonal fasteners and smoky crystal. Original procedural maps are generated offline by `scripts/build-city-hall-textures.py`, using the two attributed catalogue photos as palette and form references. The approved revision halves the fold scale and depth. Facade meshes fall from 22 to 5; triangles fall from 35,080 to 20,260 in rich detail and from 21,512 to 9,508 in reduced detail. These are geometry counts, not measured frame-rate improvements. Reduced detail omits normal maps and refraction. Original floor and doorway clearances remain, and reachable ornaments have matching mesh colliders. Build and all 77 unit tests pass; matching actual daytime screenshots were inspected. FPS benchmarking and physical-device validation remain deferred.
+
 ## Mitoring material pilot — 2 October 2026
 
 The Ministry of Energy now uses offline-baked honey-amber clouding and roughness maps, rather than a uniformly pale transparent shell. Rich detail adds absorption, refraction and clearcoat; reduced detail uses single-pass partial alpha transparency without those extra effects. The STL-derived silver retains the original source strands, with rounded cross-sections, softened clipped tips, outward surface normals and a gradual transition from the bezel wall onto the roof. Every sampled span reserves the full ribbon width outside the amber, so the folds do not disappear into the shell. One cast-silver material also covers the entrance ring, arch and foundation rim. The hall footprint, floor, doorway and collision layout are preserved.

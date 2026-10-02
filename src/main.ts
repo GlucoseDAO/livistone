@@ -1,3 +1,4 @@
+import { setCityHallCrystalQuality } from './world/city-hall';
 import { nearbyArchitecture, storyFor } from './game/nearby';
 import type { NearbyStory } from './game/nearby';
 import { loadingStage } from './loading';
@@ -305,6 +306,7 @@ class Game {
       for (const material of materials) if (material instanceof THREE.MeshPhysicalMaterial) {
         if (material.userData.myceliumOpal) { material.iridescence = low ? .35 : 1; material.needsUpdate = true; continue; }
         if (material.userData.gatewayGem) { setGatewayQuality(material, low); continue; }
+        if (material.userData.cityHallCrystal) { setCityHallCrystalQuality(material, low); continue; }
         if (material.userData.mitoringAmber) { setMitoringAmberQuality(material, low); continue; }
         if (material.userData.pavilionGem) { material.transmission = low ? 0 : .42; material.opacity = low ? .45 : .7; material.needsUpdate = true; continue; }
         material.transmission = low ? 0 : material.userData.stationAmber ? .8 : .45;

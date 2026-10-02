@@ -364,3 +364,7 @@ directory, so the hook travels with the repository.
 - `game/nearby.ts` maps architecture to source-backed one-sentence stories. The ring gateway takes precedence at the arrival approach; close displays take precedence over buildings. Both the nearby card and desktop E control are real buttons, and keyboard E falls back to the nearby story without requiring precise aim. Keep lore explicitly labelled.
 
 Open grass areas have broad rolling contours, reaching roughly 1–2.5 metres where space allows, with a subdued spring-green palette. `meadow-relief.ts` bakes a clearance distance field once and tapers the contours around paths, buildings and other authored clearances, including a 2.5-metre interpolation margin. The existing terrain mesh and Rapier surface share these heights; plants follow the same field. Contours add no triangles or draw calls.
+
+## City Hall facade
+
+`world/city-hall.ts` owns the DOM-independent Nut of Power facade and ornamental colliders. Preserve the doorway, source photo attribution and separate `cityHallCrystal` quality tag. `world/walnut.ts` loads offline maps; reduced detail omits normals. Regenerate maps with `python3 scripts/build-city-hall-textures.py`. `scripts/screenshot-city-hall.mjs [outDir] [desktop|touch|software]` accepts `LIVISTONE_BENCHMARK_URL` for an isolated preview; touch emulation is not a physical-device benchmark.

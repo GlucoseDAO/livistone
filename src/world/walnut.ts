@@ -1,34 +1,28 @@
 import * as THREE from 'three';
 
-// The shell has irregular raised cells and branching furrows, rather than timber grain.
 export function walnutMaterial(): THREE.MeshStandardMaterial {
-  const size = 256, color = document.createElement('canvas'), relief = document.createElement('canvas');
-  color.width = relief.width = size; color.height = relief.height = size;
-  const ctx = color.getContext('2d')!, bump = relief.getContext('2d')!;
-  const pixels = ctx.createImageData(size, size), heights = bump.createImageData(size, size);
-  const seeds = Array.from({ length: 80 }, (_, i) => ({ x: (i % 8 + .5 + Math.sin(i * 17.3) * .46) / 8, y: (Math.floor(i / 8) + .5 + Math.cos(i * 12.7) * .46) / 10 }));
-  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    const u = x / size + Math.sin(y * .048) * .055 + Math.sin(y * .13) * .016, v = y / size + Math.sin(x * .041) * .03;
-    let first = Infinity, second = Infinity;
-    for (const seed of seeds) {
-      const dx = Math.min(Math.abs(u - seed.x), 1 - Math.abs(u - seed.x)), dy = Math.min(Math.abs(v - seed.y), 1 - Math.abs(v - seed.y));
-      const d = dx * dx + dy * dy * .65;
-      if (d < first) { second = first; first = d; } else if (d < second) second = d;
-    }
-    const raised = THREE.MathUtils.smoothstep(Math.sqrt(second) - Math.sqrt(first), .0002, .009);
-    const grain = Math.sin(x * 3.17 + y * 7.23) * 3, i = (y * size + x) * 4;
-    pixels.data.set([140 + raised * 34 + grain, 95 + raised * 34 + grain, 54 + raised * 30 + grain, 255], i);
-    heights.data.set([raised * 220, raised * 220, raised * 220, 255], i);
-  }
-  ctx.putImageData(pixels, 0, 0); bump.putImageData(heights, 0, 0);
-  const map = new THREE.CanvasTexture(color), bumpMap = new THREE.CanvasTexture(relief);
-  map.colorSpace = THREE.SRGBColorSpace;
-  for (const texture of [map, bumpMap]) { texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(1.7, 1.5); }
-  return new THREE.MeshStandardMaterial({ color: '#ead3ab', map, bumpMap, bumpScale: .45, roughness: .72, side: THREE.DoubleSide });
+  const material = new THREE.MeshStandardMaterial({ color: '#b77b36', roughness: .64, side: THREE.DoubleSide });
+  material.name = 'Nut of Power walnut'; return material;
+}
+
+export async function loadWalnutTextures(material: THREE.MeshStandardMaterial, mobile: boolean): Promise<void> {
+  const loader = new THREE.TextureLoader();
+  await Promise.all((mobile ? ['colour', 'ao-roughness'] : ['colour', 'ao-roughness', 'normal']).map(async kind => {
+    try {
+      const size = kind === 'colour' ? (mobile ? 512 : 1024) : kind === 'normal' ? 512 : (mobile ? 256 : 512);
+      const texture = await loader.loadAsync(`${import.meta.env.BASE_URL}textures/city-hall/walnut-${kind}-${size}.webp`);
+      texture.colorSpace = kind === 'colour' ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.anisotropy = mobile ? 2 : 4; texture.repeat.set(3.2, 3.2);
+      if (kind === 'colour') { material.map = texture; material.color.set('#ffffff'); }
+      else if (kind === 'normal') { material.normalMap = texture; material.normalScale.set(.22, .22); }
+      else { material.roughnessMap = material.aoMap = texture; material.roughness = 1; material.aoMapIntensity = .45; }
+      material.needsUpdate = true;
+    } catch { /* The golden shell remains usable without its optional baked surface maps. */ }
+  }));
 }
 
 export function walnutRadius(phi: number, theta: number, radius: number): number {
-  const lobes = .25 * Math.cos(phi * 7 + Math.sin(theta * 4) * .8);
-  const wrinkles = .13 * Math.sin(phi * 23 + Math.sin(theta * 11) * 1.4) + .08 * Math.cos(theta * 27 + phi * 9);
-  return radius + (lobes + wrinkles) * Math.max(0, Math.sin(theta)) ** .6 * Math.max(0, Math.sin(phi)) ** .4;
+  // Broad asymmetrical folds carry the outline; finer branching relief belongs in the baked map.
+  const folds = .10 * Math.cos(phi * 12 + Math.sin(theta * 6) * .55) + .08 * Math.sin(theta * 20 + phi * 8 + Math.sin(phi * 22) * .4) + .04 * Math.cos(theta * 34 - phi * 12);
+  return radius + folds * Math.max(0, Math.sin(theta)) ** .7 * Math.max(0, Math.sin(phi)) ** .7;
 }
