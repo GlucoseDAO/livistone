@@ -46,6 +46,9 @@ class Game {
   private readonly point = new THREE.Vector3();
   private readonly graphics: ReturnType<typeof probeGraphics>;
   private renderScale: number;
+  // Dev-only ?capture=1: frozen animation time and render scale so before/after screenshots match.
+  private readonly capture = import.meta.env.DEV && new URLSearchParams(location.search).has('capture');
+  private frames = 0;
   private cpuGeometry = { before: 0, after: 0 };
   private readonly reduced: boolean;
   private night: boolean;
@@ -128,8 +131,8 @@ class Game {
     this.resize();
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry }),
-        teleport: (x: number, z: number, yaw = 0, y = 1.05) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = 0; this.accumulator = 0; },
+        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames }),
+        teleport: (x: number, z: number, yaw = 0, y = 1.05, pitch = 0) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = pitch; this.accumulator = 0; },
       } });
     }
   }
@@ -338,7 +341,8 @@ class Game {
   }
   private updateWalking(dt: number): void {
     if (!this.physics) return;
-    this.accumulator = Math.min(this.accumulator + dt, 0.1);
+    // Capture mode takes exactly one step per frame: wall-clock jitter would otherwise change how far a teleported capsule settles.
+    this.accumulator = this.capture ? 1 / 60 : Math.min(this.accumulator + dt, 0.1);
     while (this.accumulator >= 1 / 60) {
       this.input.turn(1 / 60); const movement = this.input.direction();
       this.physics.step(movement.x * movement.speed, movement.z * movement.speed, 1 / 60, this.input.consumeJump()); this.accumulator -= 1 / 60;
@@ -407,9 +411,9 @@ class Game {
     if (document.hidden) { this.lastTime = now; return; }
     if (this.lowQuality && now - this.lastTime < 30) return;
     // A queued animation frame can predate the startup or visibility timestamp.
-    const rawDt = Math.max(0, (now - this.lastTime) / 1000); const dt = Math.min(rawDt, 0.1); this.lastTime = now; this.elapsed += dt;
+    const rawDt = Math.max(0, (now - this.lastTime) / 1000); const dt = Math.min(rawDt, 0.1); this.lastTime = now; this.elapsed = this.capture ? 12 : this.elapsed + dt;
     if (this.mode === 'walking') this.updateWalking(dt);
-    if (this.graphics.tier !== 'cpu') this.town.gardens.update(this.elapsed, this.mode === 'walking' ? dt : 0, matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (this.graphics.tier !== 'cpu') this.town.gardens.update(this.elapsed, this.mode === 'walking' && !this.capture ? dt : 0, matchMedia('(prefers-reduced-motion: reduce)').matches);
     if (this.mode === 'map') { this.orbit.update(); this.updateMarkers(); }
     const camera = this.mapView ? this.mapCamera : this.walkCamera;
     this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : WALK_FOG.far, this.mapView);
@@ -417,9 +421,9 @@ class Game {
     this.clockCheck += rawDt; if (this.clockCheck > 30) { this.clockCheck = 0; if (this.timeOfDay === 'auto') this.applyTimeOfDay(); }
     this.nightLighting.update(camera); this.renderer.render(this.scene, camera);
     if (this.cursorDirty) { this.cursorDirty = false; this.updateCursor(); }
-    this.fpsFrames++; this.fpsTime += rawDt;
+    this.frames++; this.fpsFrames++; this.fpsTime += rawDt;
     if (this.fpsTime >= 1) { this.fps = Math.round(this.fpsFrames / this.fpsTime);
-      if (this.graphics.tier === 'cpu' && this.fps < 18 && this.renderScale > .3) { this.renderScale = Math.max(.3, this.renderScale - .05); this.renderer.setPixelRatio(this.pixelRatio()); }
+      if (this.graphics.tier === 'cpu' && !this.capture && this.fps < 18 && this.renderScale > .3) { this.renderScale = Math.max(.3, this.renderScale - .05); this.renderer.setPixelRatio(this.pixelRatio()); }
       this.fpsFrames = 0; this.fpsTime = 0; }
   };
 }

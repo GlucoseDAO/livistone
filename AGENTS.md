@@ -34,6 +34,8 @@ current build is generated in code at load time; binary assets are two tree GLBs
 | Install git hooks | `bun run hooks:install` | Sets `core.hooksPath` to `.githooks` |
 | Regenerate tree GLBs | `bun scripts/generate-trees.mjs` | Needs the dev server running |
 | Landmark screenshots | `node scripts/screenshot-landmarks.mjs [outDir]` | Needs the dev server; headless Chrome with GPU WebGL flags |
+| Realism captures | `bun scripts/screenshot-realism.ts <outDir> <desktop\|touch\|software> [quick\|exteriors\|ground\|water\|galleries\|all] [day\|golden\|night]` | Dev server only (`LIVISTONE_BENCHMARK_URL`, default port 5173); loads `?capture=1`, which freezes animation time, CPU render scale and physics stepping so runs are pixel-close. See `docs/realism/` |
+| Realism review page | `bun scripts/build-realism-comparison.ts <dir> [--base before] [--title text]` | Writes `<dir>/index.html`: before/after sliders, variants, draw-call/triangle deltas. Serve the folder over HTTP to view it |
 | Mitoring comparisons | `node scripts/screenshot-mitoring.mjs [outDir] [desktop\|touch\|software]` | Fixed daylight/cameras; real SwiftShader is separate from touch emulation |
 | Enhancement assets | `python3 scripts/build-enhancement.py [photoDir]` | Pillow; WebP posters + compact crystal meshes. Regrow crystals with `scripts/generate-enhancement-crystals.py` inside a materialized-enhancements checkout |
 
@@ -282,6 +284,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   budget on a loaded machine. Neither mode says anything about real GPU performance.
 - After changing anything in `src/`, run `bun run build` and `bun run test`. Run
   `bun run test:browser` for changes to input, modes, interaction, world layout, or the UI.
+- Realism work follows `docs/realism/README.md`: one sub-plan per `realism/NN-slug` branch, with before/after captures for desktop, touch and software. New scripts are TypeScript run with `bun scripts/<name>.ts`; `tsconfig.json` type-checks `scripts/**/*.ts`.
 - `node scripts/screenshot-landmarks.mjs` is the quickest visual check after touching
   `world.ts` or `jewelry.ts`; it renders on the GPU when one is available. Look at the images.
 - Screenshots land in `output/testing/`; failure traces in `test-results/`. Both are
