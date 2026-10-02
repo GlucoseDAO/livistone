@@ -7,6 +7,19 @@
     <meta name="description" content="Walk into Livistone, a green town of art, science, and extraordinary architecture inspired by Livia's jewelry." />
     <title>Livistone — A living world</title>
     <link rel="stylesheet" href="/src/loading.css" />
+    <script>
+      if (window.location.hostname === 'livistone.liviazaharia.com') {
+        for (const file of ['script.js', 'recorder.js']) {
+          const script = document.createElement('script');
+          script.src = `https://umami.glucosedao.org/${file}`;
+          script.defer = true;
+          script.async = false;
+          script.dataset.websiteId = '3f5ab4c1-0276-4d87-a56d-5d958ea89002';
+          script.dataset.domains = 'livistone.liviazaharia.com';
+          document.head.appendChild(script);
+        }
+      }
+    </script>
   </head>
   <body>
     <section id="boot-loading" class="loading-screen" aria-labelledby="loading-title">

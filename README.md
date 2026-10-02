@@ -36,6 +36,9 @@ An introduction poster to the right of the bridge approach tells the story of Li
 - **Progress:** visits and stories read are saved in this browser. They do not sync between devices; clearing site data resets them.
 - **Lost?** Choose a destination on the map, or use the menu’s return-to-entrance action.
 
+
+Production visits use Umami analytics and session replays, loaded only on `livistone.liviazaharia.com`. Localhost, LAN and preview hosts stay untracked; see [deployment details](docs/deployment.md#verify-a-release).
+
 ## Run it locally
 
 This section is for running your own copy. Visitors to the published website can skip it. An IDE is optional; a terminal is enough.

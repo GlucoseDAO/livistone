@@ -90,6 +90,8 @@ References: [Caddy static files](https://caddyserver.com/docs/quick-starts/stati
 
 ## Verify a release
 
+The HTML loads Umami analytics and the session-replay recorder from `umami.glucosedao.org` only on `livistone.liviazaharia.com`. Localhost, LAN addresses and other preview hosts do not load either script. Both scripts use website ID `3f5ab4c1-0276-4d87-a56d-5d958ea89002`; enable replays in that website's Umami settings to collect recordings. Analytics loads independently of the game, so blocked or unavailable scripts do not prevent exploration. Rebuild and redeploy after changing the hostname or website ID in `index.html`.
+
 1. Open `https://livistone.liviazaharia.com/` in a fresh browser tab. Confirm the map finishes loading without a blocked-host error.
 2. Enter the town, select a destination, and open a poster photograph.
 3. Click or tap once if autoplay was blocked. Confirm kalimba playback, mute and unmute. The music credit appears in the menu.
