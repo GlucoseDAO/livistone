@@ -29,6 +29,8 @@ An introduction poster to the right of the bridge approach tells the story of Li
 | Move / zoom the map | Drag / scroll | Drag / pinch |
 | Menu | Escape or ☰ | ☰ |
 
+Paths use natural-looking limestone paving and raised bevelled stone kerbs with matching collision surfaces; meadow patches, scattered grass islands and grove colours soften the landscape. A raised path connects the western lake loop to the Future House neck, and the Glucose Commons approach passes through its map arrival point. All road ends join another route or a paved destination; the station, bridge and building approaches share one walking network. Three automatic graphics profiles cover GPU, mobile/typical integrated graphics, and software-rendered CPU WebGL. Profiles scale architecture, foliage, sky resolution, lighting and rendering resolution; the menu shows the active profile. CPU detail loads a small mesh simplifier, keeps the original collision world and uses simpler lighting without shadows. Actual SwiftShader remains only 2–4 FPS in local arrival measurements, so CPU-only playability is still unfinished. Touch emulation does not establish physical-phone performance.
+
 ### Make yourself comfortable
 
 - **Day or night:** choose Auto, Day or Night in the menu. Day and Night work independently of the current time.

@@ -40,7 +40,7 @@ export function mountainGeometry(mobile: boolean): THREE.BufferGeometry {
       const values: number[] = []; for (let value = start; value <= end; value += value >= nearStart && value < nearEnd ? 2 : Math.abs(value) > 520 ? 32 : mobile ? 8 : 4) values.push(value); return values;
     };
     const xs = axis(-1400, 1400, -240, 240), zs = axis(-1280, 1280, -270, 150);
-    const positions: number[] = [], colors: number[] = [], soils: number[] = [], indices: number[] = [], color = new THREE.Color(), grass = new THREE.Color('#c1cbbc'), fresh = new THREE.Color('#aabda4'), stone = new THREE.Color('#a6a294');
+    const positions: number[] = [], colors: number[] = [], soils: number[] = [], indices: number[] = [], color = new THREE.Color(), grass = new THREE.Color('#c5c5a4'), fresh = new THREE.Color('#a1b894'), stone = new THREE.Color('#a6a294');
     for (let j = 0; j < zs.length; j++) for (let i = 0; i < xs.length; i++) {
       const x = xs[i], z = zs[j], y = landscapeHeight(x, z);
       positions.push(x, y, z);

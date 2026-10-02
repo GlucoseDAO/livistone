@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { modestRenderer, reducedGraphics, softwareRenderer } from '../src/game/graphics';
+import { graphicsProfile, graphicsTier, modestRenderer, reducedGraphics, softwareRenderer } from '../src/game/graphics';
 
 describe('software renderer names', () => {
   it('flags SwiftShader, WARP and the generic software drivers', () => {
@@ -42,5 +42,24 @@ describe('reduced graphics policy', () => {
     expect(reducedGraphics({ coarse: false, renderer: 'AMD Radeon Graphics' })).toBe(true);
     expect(reducedGraphics({ coarse: false, renderer: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0)' })).toBe(false);
     expect(reducedGraphics({ coarse: false })).toBe(false);
+  });
+});
+
+describe('three world graphics profiles', () => {
+  it('distinguishes software WebGL from phones and hardware GPUs', () => {
+    expect(graphicsTier({ coarse: false, renderer: 'Google SwiftShader' })).toBe('cpu');
+    expect(graphicsTier({ coarse: true, renderer: 'Google SwiftShader' })).toBe('cpu');
+    expect(graphicsTier({ coarse: true, renderer: 'Apple A17' })).toBe('mobile');
+    expect(graphicsTier({ coarse: false, renderer: 'Intel(R) UHD Graphics' })).toBe('mobile');
+    expect(graphicsTier({ coarse: false, renderer: 'NVIDIA RTX 3060' })).toBe('gpu');
+    expect(graphicsTier({ coarse: false, caveatFailed: true })).toBe('cpu');
+  });
+  it('budgets sky, resolution, vegetation and lighting progressively', () => {
+    const cpu = graphicsProfile('cpu'), mobile = graphicsProfile('mobile'), gpu = graphicsProfile('gpu');
+    expect(cpu.shadows).toBe(false); expect(mobile.shadows && gpu.shadows).toBe(true);
+    for (const key of ['pixelRatio', 'skyDay', 'skyNight', 'plants', 'forest', 'lights'] as const) {
+      expect(cpu[key]).toBeLessThan(mobile[key]); expect(mobile[key]).toBeLessThan(gpu[key]);
+    }
+    expect(cpu.reduced && mobile.reduced).toBe(true); expect(gpu.reduced).toBe(false);
   });
 });

@@ -55,7 +55,9 @@ export class Forest extends THREE.Group {
             quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), index * 2.399);
             matrix.compose(p, quaternion, new THREE.Vector3(scale, scale * (1 + (index % 3) * .035), scale));
             batch.setMatrixAt(i, matrix);
-            color.setHSL(.21 + (index % 5) * .009, source.name === 'foliage' ? .14 : .03, .65 + (index % 4) * .06);
+            // Spatial colour families read as woodland groves rather than alternating identical trees.
+            const grove = .5 + .5 * Math.sin(p.x * .038 + Math.sin(p.z * .047) * 2);
+            color.setHSL(.19 + grove * .055, source.name === 'foliage' ? .18 + grove * .12 : .04, .67 + grove * .13 + (index % 3) * .025);
             batch.setColorAt(i, color);
           });
           batch.castShadow = source.name !== 'foliage'; batch.receiveShadow = true; batch.computeBoundingSphere(); batch.name = source.name; this.add(batch);

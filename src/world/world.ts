@@ -1,3 +1,5 @@
+import { graphicsProfile } from '../game/graphics';
+import type { GraphicsTier } from '../game/graphics';
 import { createIntroduction } from './introduction';
 import { createEnhancementHill, createEnhancementPanel } from './enhancement';
 import { createEnhancementGallery } from './enhancement-gallery';
@@ -10,9 +12,12 @@ import { Forest } from './forest';
 import { createBridge, createGardenBridge } from './bridge';
 import { createGateway } from './gateway';
 import { createGatewayPoster } from './gateway-poster';
-import { gatewayClearing } from './gateway-layout';
+import { gatewayApproachWidth, gatewayClearing } from './gateway-layout';
 import { createPlanting, updatePlanting } from './planting';
 import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from './landscape';
+import { pathKerbs } from './path-kerbs';
+import { GLUCOSE_PAVILION } from './glucose-layout';
+import { TIME_TOWER } from './waterways';
 import { pathJoin } from './path-surface';
 import { Mountains } from './mountains';
 import { PlanarExhibition } from './planar-exhibition';
@@ -44,11 +49,11 @@ export { terrainHeight } from './terrain';
 function mesh(geometry: THREE.BufferGeometry, material: THREE.Material, parent: THREE.Object3D, x = 0, y = 0, z = 0): THREE.Mesh {
   const m = new THREE.Mesh(geometry, material); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
 }
-function ribbon(curve: THREE.Curve<THREE.Vector3>, width: number, steps = 80): THREE.BufferGeometry {
+function ribbon(curve: THREE.Curve<THREE.Vector3>, width: number | ((p: THREE.Vector3) => number), steps = 80): THREE.BufferGeometry {
   const vertices: number[] = [], indices: number[] = [], uv: number[] = [];
   for (let i = 0; i <= steps; i++) {
     const t = i / steps, p = curve.getPoint(t), tangent = curve.getTangent(t);
-    const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize().multiplyScalar(width / 2);
+    const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize().multiplyScalar((typeof width === 'number' ? width : width(p)) / 2);
     for (const side of [-1, 1]) { const x = p.x + normal.x * side, z = p.z + normal.z * side; vertices.push(x, p.y + terrainHeight(x, z), z); uv.push(x / 4, z / 4); }
     if (i < steps) { const n = i * 2; indices.push(n, n + 1, n + 2, n + 1, n + 3, n + 2); }
   }
@@ -91,12 +96,13 @@ export class Town {
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#e2e7dd', roughness: 0.26, metalness: 0.65 });
   private readonly gold = new THREE.MeshStandardMaterial({ color: '#b99a55', roughness: 0.3, metalness: 0.7 });
   private readonly wood = new THREE.MeshStandardMaterial({ color: '#d1a37d', roughness: 0.8, map: texture('walnut') });
-  private readonly paving = pavingMaterial();
+  private readonly paving: THREE.MeshStandardMaterial;
+  private plantBatches: THREE.InstancedMesh[] = [];
   private readonly dark = new THREE.MeshStandardMaterial({ color: '#3e5550', roughness: 0.25, metalness: 0.35 });
   private readonly sphere = new THREE.SphereGeometry(1, 16, 12);
-  private constructor(private mobile: boolean) { this.water = riverMaterial(); }
-  static async create(mobile: boolean, stage: (value: number, label: string) => Promise<void>): Promise<Town> {
-    const town = new Town(mobile); await town.build(stage); return town;
+  private constructor(private mobile: boolean, private tier: GraphicsTier) { this.water = riverMaterial(); this.paving = pavingMaterial(mobile); }
+  static async create(mobile: boolean, stage: (value: number, label: string) => Promise<void>, tier: GraphicsTier = mobile ? 'mobile' : 'gpu'): Promise<Town> {
+    const town = new Town(mobile, tier); await town.build(stage); return town;
   }
   private async build(stage: (value: number, label: string) => Promise<void>): Promise<void> {
     const mobile = this.mobile;
@@ -175,19 +181,36 @@ export class Town {
   }
 
   private createPaths(): void {
-    const edging = new THREE.MeshStandardMaterial({ color: '#bbb39e', roughness: .92, side: THREE.DoubleSide });
-    for (const curve of PATH_CURVES) {
-      mesh(ribbon(curve, PATH_WIDTH + .32, 100), edging, this.root, 0, -.012).castShadow = false;
-      mesh(ribbon(curve, PATH_WIDTH, 100), this.paving, this.root).castShadow = false;
+    const edging = new THREE.MeshStandardMaterial({ color: '#a79e86', roughness: 1, side: THREE.DoubleSide });
+    const paving: THREE.BufferGeometry[] = [], borders: THREE.BufferGeometry[] = [];
+    const roadWidth = (p: THREE.Vector3, road: number): number => PATH_CURVES[road].points.every(point => point.x === 0 && point.z >= 40) ? gatewayApproachWidth(p.z) : PATH_WIDTH;
+    for (const [road, curve] of PATH_CURVES.entries()) {
+      borders.push(ribbon(curve, p => roadWidth(p, road) + .32, 100).translate(0, -.012, 0));
+      paving.push(ribbon(curve, p => roadWidth(p, road), 100));
     }
     // Continuous round joints at shared nodes and road ends; no exposed triangular gaps.
-    const nodes = new Map<string, THREE.Vector3>();
-    for (const curve of PATH_CURVES) for (const point of curve.points) nodes.set(`${point.x},${point.z}`, point);
-    for (const point of nodes.values()) {
-      const y = point.y + terrainHeight(point.x, point.z);
-      mesh(pathJoin(point.x, point.z, (PATH_WIDTH + .32) / 2, y - .011), edging, this.root).castShadow = false;
-      mesh(pathJoin(point.x, point.z, PATH_WIDTH / 2, y + .001), this.paving, this.root).castShadow = false;
+    const nodes = new Map<string, { point: THREE.Vector3; width: number }>();
+    for (const [road, curve] of PATH_CURVES.entries()) for (const point of curve.points) {
+      const key = `${point.x},${point.z}`; nodes.set(key, { point, width: Math.max(nodes.get(key)?.width ?? 0, roadWidth(point, road)) });
     }
+    for (const { point, width } of nodes.values()) {
+      const y = point.y + terrainHeight(point.x, point.z);
+      borders.push(pathJoin(point.x, point.z, (width + .32) / 2, y - .011));
+      paving.push(pathJoin(point.x, point.z, width / 2, y + .001));
+    }
+    // Shared world UVs let connected ribbons and joints share two draws without changing their footprint.
+    for (const [parts, material, name] of [[paving, this.paving, 'Limestone walking network'], [borders, edging, 'Weathered path borders']] as const) {
+      const surface = mesh(mergeGeometries(parts)!, material, this.root); surface.name = name; surface.castShadow = false; parts.forEach(g => g.dispose());
+    }
+    const open = (x: number, z: number): boolean => z >= STATION.front - 1
+      || Math.hypot(x - TIME_TOWER.x, z - TIME_TOWER.z) < TIME_TOWER.radius + .5
+      || Math.hypot(x - GLUCOSE_PAVILION.x, z - GLUCOSE_PAVILION.z) < GLUCOSE_PAVILION.radius + .5
+      || CIVIC_LANDMARKS.some(l => Math.hypot((x - l.x) / spread(l, .85).x, (z - l.z) / spread(l, .85).z) < 10.9);
+    const kerbs = pathKerbs(PATH_CURVES, roadWidth, terrainHeight, open, this.mobile);
+    const kerbMaterial = new THREE.MeshStandardMaterial({ color: '#e4decf', map: this.paving.map, vertexColors: true, roughness: .97 });
+    this.paving.userData.ready.then(() => { kerbMaterial.map = this.paving.map; kerbMaterial.needsUpdate = true; });
+    const border = mesh(kerbs, kerbMaterial, this.root); border.name = 'Bevelled limestone kerbs'; border.castShadow = false;
+    this.colliders.push({ type: 'mesh', vertices: new Float32Array(kerbs.getAttribute('position').array), indices: Uint32Array.from({ length: kerbs.getAttribute('position').count }, (_, i) => i) });
     for (const l of CIVIC_LANDMARKS) {
       const ring = mesh(new THREE.RingGeometry(8.4, 10.6, 64), this.paving, this.root, l.x, 0.06, l.z); ring.rotation.x = -Math.PI / 2; ring.castShadow = false; const sp = spread(l, .85); ring.scale.set(sp.x, sp.z, 1);
       const p = ring.geometry.getAttribute('position'), uv = ring.geometry.getAttribute('uv');
@@ -330,7 +353,7 @@ export class Town {
     return true;
   }
   readonly forest = new Forest();
-  async loadAssets(): Promise<void> { await Promise.all([this.forest.load(this.mobile), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
+  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.forest.load(this.mobile), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
     const rand = seeded(3974); const sites: THREE.Vector3[] = [];
     for (let i = 0; i < (this.mobile ? 2600 : 5400); i++) {
@@ -343,7 +366,7 @@ export class Town {
     this.forest.sites = sites; this.root.add(this.forest);
   }
   private createGardens(): void {
-    createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter);
+    this.plantBatches = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter);
     const rand = seeded(58), matrix = new THREE.Matrix4(), q = new THREE.Quaternion();
     const stone = rockMaterial(this.mobile);
     const count = this.mobile ? 230 : 420, rocks = new THREE.InstancedMesh(rockGeometry(), stone, count);
@@ -368,8 +391,10 @@ export class Town {
   update(time: number, camera?: THREE.Camera, fogFar = 220, mapView = false): void {
     this.water.userData.time.value = time;
     if (!camera) return;
-    this.forest.update(camera, fogFar, mapView);
-    updatePlanting([this.root, this.details], camera, mapView ? 200 : 38);
+    const profile = graphicsProfile(this.tier);
+    this.forest.update(camera, mapView ? fogFar : Math.min(fogFar, profile.forest), mapView);
+    updatePlanting(this.plantBatches, camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
+    if (this.tier === 'cpu') this.details.visible = false;
   }
   setMapMode(active: boolean): void { this.interiors.visible = !active; this.details.visible = !active; }
 }

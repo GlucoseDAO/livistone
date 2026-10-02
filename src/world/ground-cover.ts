@@ -29,6 +29,6 @@ export function groundCover(x: number, z: number): { soil: number; shade: number
   const broad = terrainNoise(x * .035 + 19, z * .035 - 7), patches = terrainNoise(x * .18, z * .18 + 41);
   const edge = groundPathDistance(x, z), bank = Math.max(0, 1 - Math.abs(waterDistance(x, z)) / 3.5);
   const wear = Math.max(0, 1 - Math.max(0, edge - PATH_WIDTH / 2) / (1 + patches * 1.6));
-  const freshness = broad;
-  return { soil: Math.min(.48, .015 + wear * (.08 + patches * .12) + bank * .3), shade: .88 + broad * .16 + patches * .07, freshness };
+  const freshness = Math.min(1, broad * .75 + bank * .25);
+  return { soil: Math.min(.55, .025 + wear * (.16 + patches * .17) + bank * .27 + Math.max(0, .4 - broad) * .3), shade: .82 + broad * .22 + patches * .09, freshness };
 }

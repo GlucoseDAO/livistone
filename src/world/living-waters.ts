@@ -11,6 +11,7 @@ import { MYCELIUM_RADIUS, myceliumCrown, myceliumStem, myceliumOpal } from './my
 import { COLLECTION, photoSize, photoURL } from '../game/exhibits';
 import { addGlow, nightEmission } from './night-lighting';
 import { createLakePlants } from './lake-plants';
+import { pathKerbs } from './path-kerbs';
 import { PATH_WIDTH, pathJoin } from './path-surface';
 
 function shape(points: Point[]): THREE.Shape { return new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, -z))); }
@@ -58,6 +59,13 @@ export class LivingWaters {
       this.mesh(pathJoin(p.x, p.z, (PATH_WIDTH + .32) / 2, p.y - .011, GARDENS.x, GARDENS.z), roadEdge, false);
       this.mesh(pathJoin(p.x, p.z, PATH_WIDTH / 2, p.y + .001, GARDENS.x, GARDENS.z), this.pathMaterial, false);
     }
+    const kerbs = pathKerbs(GARDEN_PATHS, PATH_WIDTH, () => 0, (x, z) => Math.hypot(x - GARDENS.pavilionX, z - GARDENS.pavilionZ) < 7, mobile);
+    const kerbMaterial = new THREE.MeshStandardMaterial({ color: '#e4decf', vertexColors: true, roughness: .97 });
+    if (this.pathMaterial instanceof THREE.MeshStandardMaterial) {
+      const paving = this.pathMaterial; kerbMaterial.map = paving.map;
+      paving.userData.ready?.then(() => { kerbMaterial.map = paving.map; kerbMaterial.needsUpdate = true; });
+    }
+    this.mesh(kerbs, kerbMaterial, true).name = 'Lake path stone kerbs';
     this.pavilion();
     this.mushrooms(); this.wetlandPlanting(); createLakePlants(this.root, mobile);
     for (const [name, [x, z]] of Object.entries(GARDEN_PANELS)) {

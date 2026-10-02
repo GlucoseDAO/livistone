@@ -1,19 +1,34 @@
 import * as THREE from 'three';
 
 /** One four-metre tile, with separate colour and relief so mortar stays recessed. */
-export function pavingMaterial(): THREE.MeshStandardMaterial {
+export function pavingMaterial(mobile = false): THREE.MeshStandardMaterial {
   const canvas = document.createElement('canvas'), relief = document.createElement('canvas');
   canvas.width = canvas.height = relief.width = relief.height = 512;
   const ctx = canvas.getContext('2d')!, bump = relief.getContext('2d')!;
   let seed = 725; const rand = (): number => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-  ctx.fillStyle = '#9b9582'; ctx.fillRect(0, 0, 512, 512); bump.fillStyle = '#555555'; bump.fillRect(0, 0, 512, 512);
-  for (let row = 0; row < 8; row++) for (let col = -1; col < 4; col++) {
-    const x = col * 128 + (row % 2) * 64, y = row * 64, light = 72 + rand() * 12;
-    const points = [[x + 3, y + 3], [x + 123, y + 2], [x + 126, y + 59], [x + 4, y + 62]];
-    for (const c of [ctx, bump]) {
-      c.beginPath(); points.forEach(([px, py], i) => i ? c.lineTo(px, py) : c.moveTo(px, py)); c.closePath();
-      c.fillStyle = c === ctx ? `hsl(42, ${14 + rand() * 9}%, ${light}%)` : '#d9d9d9'; c.fill();
-      c.strokeStyle = c === ctx ? 'rgba(255,250,228,.45)' : '#aaaaaa'; c.lineWidth = 2; c.stroke();
+  ctx.fillStyle = '#aaa38f'; ctx.fillRect(0, 0, 512, 512); bump.fillStyle = '#666666'; bump.fillRect(0, 0, 512, 512);
+  // Staggered limestone courses wrap at the tile boundary; wide slabs and fine seams read at walking scale.
+  for (let row = 0; row < 8; row++) {
+    const y = row * 64, offset = row % 2 ? -64 : 0;
+    const course = row % 3 === 0 ? [128, 192, 192] : row % 3 === 1 ? [192, 128, 192] : [192, 192, 128];
+    for (let col = -1; col < 6; col++) {
+      const slot = (col + 3) % 3, width = course[slot], x = Math.floor(col / 3) * 512 + course.slice(0, slot).reduce((sum, value) => sum + value, 0) + offset, light = 70 + rand() * 13;
+      const points = [[x + 2, y + 2], [x + width - 3, y + 2 + rand() * 2], [x + width - 2, y + 61], [x + 2 + rand() * 2, y + 62]];
+      for (const c of [ctx, bump]) {
+        c.beginPath(); points.forEach(([px, py], i) => i ? c.lineTo(px, py) : c.moveTo(px, py)); c.closePath();
+        c.fillStyle = c === ctx ? `hsl(40, ${10 + rand() * 8}%, ${light}%)` : '#c7c7c7'; c.fill();
+        c.save(); c.clip();
+        const wash = c.createLinearGradient(x, y, x + width, y + 64);
+        wash.addColorStop(0, c === ctx ? 'rgba(255,250,228,.2)' : '#dedede'); wash.addColorStop(1, c === ctx ? 'rgba(103,92,70,.13)' : '#aaaaaa');
+        c.fillStyle = wash; c.fillRect(x, y, width, 64);
+        for (let vein = 0; vein < 3; vein++) {
+          c.beginPath(); const vy = y + rand() * 64;
+          c.moveTo(x, vy); c.bezierCurveTo(x + 45, vy - 12, x + 85, vy + 15, x + width, vy + 8);
+          c.strokeStyle = c === ctx ? 'rgba(117,107,88,.13)' : 'rgba(80,80,80,.12)'; c.lineWidth = .5 + rand(); c.stroke();
+        }
+        c.restore();
+        c.strokeStyle = c === ctx ? 'rgba(255,250,233,.35)' : '#b4b4b4'; c.lineWidth = 1; c.stroke();
+      }
     }
   }
   for (let i = 0; i < 38000; i++) {
@@ -22,9 +37,15 @@ export function pavingMaterial(): THREE.MeshStandardMaterial {
     bump.fillStyle = 'rgba(65,65,65,.12)'; bump.fillRect(x, y, size, size);
   }
   const map = new THREE.CanvasTexture(canvas), bumpMap = new THREE.CanvasTexture(relief);
-  for (const t of [map, bumpMap]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; }
+  for (const t of [map, bumpMap]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = mobile ? 2 : 8; }
   map.colorSpace = THREE.SRGBColorSpace;
-  return new THREE.MeshStandardMaterial({ map, bumpMap, bumpScale: .035, roughness: .94, side: THREE.DoubleSide });
+  const material = new THREE.MeshStandardMaterial({ map, bumpMap: mobile ? null : bumpMap, bumpScale: .012, roughness: .96, side: THREE.DoubleSide });
+  material.userData.ready = new THREE.TextureLoader().loadAsync(import.meta.env.BASE_URL + `textures/paving/limestone-${mobile ? 512 : 1024}.webp`).then(stone => {
+    stone.colorSpace = THREE.SRGBColorSpace; stone.wrapS = stone.wrapT = THREE.RepeatWrapping; stone.anisotropy = mobile ? 2 : 8;
+    // Dark joints give restrained relief; colour variation is not used as physical displacement.
+    material.map = stone; material.bumpMap = mobile ? null : stone; material.needsUpdate = true; map.dispose(); bumpMap.dispose();
+  }).catch(() => { /* The procedural fallback keeps all paths visible if the local texture fails. */ });
+  return material;
 }
 
 export function rockGeometry(): THREE.BufferGeometry {

@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { graphicsProfile } from '../game/graphics';
+import type { GraphicsTier } from '../game/graphics';
 
 let halo: THREE.DataTexture | undefined;
 function haloTexture(): THREE.DataTexture {
@@ -25,13 +27,13 @@ export function nightEmission(material: THREE.MeshStandardMaterial, color: strin
 
 export class NightLighting {
   private readonly halos: THREE.Sprite[] = [];
-  private readonly materials = new Set<THREE.MeshStandardMaterial>();
+  private readonly materials = new Set<THREE.MeshStandardMaterial | THREE.MeshLambertMaterial>();
   private readonly sources: { position: THREE.Vector3; color: string; intensity: number; distance: number }[] = [];
   private readonly surfaceHalos: { sprite: THREE.Sprite; center: THREE.Vector3; offset: number }[] = [];
   private readonly direction = new THREE.Vector3();
   private readonly lights: THREE.PointLight[];
   private night = false;
-  constructor(root: THREE.Object3D, scene: THREE.Scene, reduced: boolean) {
+  constructor(root: THREE.Object3D, scene: THREE.Scene, reduced: boolean, private tier: GraphicsTier = reduced ? 'mobile' : 'gpu') {
     root.updateWorldMatrix(true, true);
     root.traverse(object => {
       if (object instanceof THREE.Sprite && object.userData.nightGlow) {
@@ -40,13 +42,13 @@ export class NightLighting {
         if (object.userData.lightSource.intensity) this.sources.push({ ...object.userData.lightSource, position: object.getWorldPosition(new THREE.Vector3()) });
       }
       if (object instanceof THREE.Mesh) for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
-        if (material instanceof THREE.MeshStandardMaterial && material.userData.nightEmission) this.materials.add(material);
+        if ((material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshLambertMaterial) && material.userData.nightEmission) this.materials.add(material);
       }
     });
-    this.lights = Array.from({ length: reduced ? 6 : 10 }, () => { const light = new THREE.PointLight('#ffffff', 0, 15, 2); scene.add(light); return light; });
+    this.lights = Array.from({ length: graphicsProfile(tier).lights }, () => { const light = new THREE.PointLight('#ffffff', 0, 15, 2); scene.add(light); return light; });
   }
   setNight(night: boolean): void {
-    this.night = night; this.halos.forEach(halo => { halo.visible = night; });
+    this.night = night; this.halos.forEach(halo => { halo.visible = night && this.tier !== 'cpu'; });
     this.materials.forEach(material => { const value = material.userData[night ? 'nightEmission' : 'dayEmission']; material.emissive.set(value.color); material.emissiveIntensity = value.intensity; });
     if (!night) this.lights.forEach(light => { light.intensity = 0; });
   }

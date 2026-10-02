@@ -33,6 +33,8 @@ export const GARDEN_PATHS = [
   [[74, -25], [89, -19], [94, -2], [87, 19], [70, 22], [59, 9], [60, -9], [64, -23], [74, -25]],
   [[-10, 0], [-1, 0], [-1, 18], [-13, 34], [-18, 45], [-23, 56]],
   [[74, -25], [61, -34], [56, -21], [56, 5], [60, 27], [48, 46], [38, 58]],
+  // Continue the west lake loop to the foot of the camel neck, with a dry raised walking surface.
+  [[-44, 16], [-39, 13], [-31, 10], [-31, 5], [-35, 5]],
 ].map((points) => new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(x, .13, z))));
 const pathSamples = GARDEN_PATHS.map((path) => path.getPoints(120));
 export function rainPlantAllowed(x: number, z: number, radius: number): boolean {

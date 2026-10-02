@@ -17,7 +17,7 @@ import type { Mode } from './ui/ui';
 import { Input } from './game/input';
 import { Ambience } from './game/audio';
 import { LANDMARKS, DISCOVERIES, SPAWN, readProgress, writeProgress } from './game/content';
-import { probeGraphics } from './game/graphics';
+import { graphicsProfile, probeGraphics } from './game/graphics';
 import { parseTimeOfDay, readTimeOfDay, resolveNight, saveTimeOfDay } from './game/daylight';
 import type { TimeOfDay } from './game/daylight';
 import { NightLighting } from './world/night-lighting';
@@ -44,7 +44,9 @@ class Game {
   private readonly raycaster = new THREE.Raycaster();
   private readonly direction = new THREE.Vector3();
   private readonly point = new THREE.Vector3();
-  private readonly graphics: { reduced: boolean; coarse: boolean; software: boolean };
+  private readonly graphics: ReturnType<typeof probeGraphics>;
+  private renderScale: number;
+  private cpuGeometry = { before: 0, after: 0 };
   private readonly reduced: boolean;
   private night: boolean;
   private readonly hemi: THREE.HemisphereLight;
@@ -76,10 +78,15 @@ class Game {
     const coarse = matchMedia('(pointer: coarse)').matches;
     this.renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: !coarse, powerPreference: 'high-performance' });
     this.graphics = probeGraphics(this.renderer.getContext() as WebGL2RenderingContext);
+    if (import.meta.env.DEV) {
+      const override = new URLSearchParams(location.search).get('graphics');
+      if (override === 'cpu' || override === 'mobile' || override === 'gpu') Object.assign(this.graphics, graphicsProfile(override));
+    }
+    this.renderScale = this.graphics.pixelRatio;
     this.reduced = this.graphics.reduced; this.lowQuality = this.reduced;
     this.night = resolveNight(this.timeOfDay);
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.reduced ? 1 : 1.5));
-    this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.setPixelRatio(this.pixelRatio());
+    this.renderer.shadowMap.enabled = this.graphics.shadows; this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = this.night ? .72 : .96;
     const haze = this.night ? '#1a2433' : '#c3d8df';
     this.scene.fog = new THREE.Fog(haze, MAP_FOG.near, MAP_FOG.far);
@@ -91,7 +98,7 @@ class Game {
     this.sun.shadow.camera.left = -shadow; this.sun.shadow.camera.right = shadow; this.sun.shadow.camera.top = shadow; this.sun.shadow.camera.bottom = shadow;
     this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = 360; this.sun.shadow.normalBias = 0.035; this.sun.shadow.bias = -0.00015;
     this.sun.position.set(this.night ? 40 : -55, this.night ? 90 : 150, this.night ? -50 : 40); this.sun.target.position.set(0, 0, -60); this.scene.add(this.sun, this.sun.target);
-    const sky = createSky(this.renderer, this.reduced, this.night); this.skies.set(this.night, sky); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = sky.environment;
+    const sky = createSky(this.renderer, this.reduced, this.night, this.graphics.tier); this.skies.set(this.night, sky); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = this.graphics.tier === 'cpu' ? null : sky.environment;
     this.scene.environmentIntensity = this.night ? 0.2 : 0.5;
     // The town and sun are static; refresh shadows only when scene visibility changes.
     this.renderer.shadowMap.autoUpdate = false; this.renderer.shadowMap.needsUpdate = true;
@@ -121,20 +128,25 @@ class Game {
     this.resize();
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: !!this.physics, night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced }),
+        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry }),
         teleport: (x: number, z: number, yaw = 0, y = 1.05) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = 0; this.accumulator = 0; },
       } });
     }
   }
   async load(): Promise<void> {
-    this.town = await Town.create(this.reduced, loadingStage); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
-    this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced); this.nightLighting.setNight(this.night);
+    this.town = await Town.create(this.reduced, loadingStage, this.graphics.tier); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
     await loadingStage(70, 'Loading gallery images and woodland…');
     const assets = this.town.loadAssets();
     const { Physics } = await import('./game/physics');
     await loadingStage(78, 'Preparing walkable paths and interiors…');
     this.physics = await Physics.create(this.town.colliders);
     await assets;
+    if (this.graphics.tier === 'cpu') {
+      await loadingStage(86, 'Preparing the CPU graphics profile…');
+      const { prepareCpuDetail } = await import('./world/cpu-detail'); this.cpuGeometry = await prepareCpuDetail(this.town.root, this.skyBackground);
+    }
+    this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced, this.graphics.tier); this.nightLighting.setNight(this.night);
+    document.querySelector<HTMLElement>('#graphics-profile')!.textContent = 'Device profile: ' + ({ gpu: 'GPU', mobile: 'Mobile / integrated GPU', cpu: 'CPU software renderer' }[this.graphics.tier]);
     await loadingStage(92, 'Preparing your first view…');
     this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true);
     this.renderer.shadowMap.needsUpdate = true;
@@ -147,7 +159,12 @@ class Game {
   private get mapView(): boolean {
     return this.mode === 'map' || this.mode === 'welcome' || (['lore', 'journal', 'paused', 'gallery'].includes(this.mode) && this.returnMode === 'map');
   }
+  private pixelRatio(): number {
+    const cap = this.graphics.tier === 'cpu' ? Math.sqrt(180000 / (window.innerWidth * window.innerHeight)) : Infinity;
+    return Math.min(devicePixelRatio, this.renderScale, cap);
+  }
   private resize(): void {
+    this.renderer.setPixelRatio(this.pixelRatio());
     const width = window.innerWidth, height = window.innerHeight;
     this.renderer.setSize(width, height); this.walkCamera.aspect = width / height; this.walkCamera.updateProjectionMatrix();
     this.mapCamera.aspect = width / height; this.mapCamera.fov = width < 650 ? 72 : 44;
@@ -287,8 +304,12 @@ class Game {
   }
   private applyTimeOfDay(): void {
     const night = resolveNight(this.timeOfDay); if (night === this.night) return; this.night = night;
-    let sky = this.skies.get(night); if (!sky) { sky = createSky(this.renderer, this.reduced, night); this.skies.set(night, sky); }
-    this.skyBackground = sky.background; this.scene.environment = sky.environment; this.scene.environmentIntensity = night ? .2 : .5;
+    let sky = this.skies.get(night); if (!sky) { sky = createSky(this.renderer, this.reduced, night, this.graphics.tier); this.skies.set(night, sky); }
+    this.skyBackground = sky.background; this.scene.environment = this.graphics.tier === 'cpu' ? null : sky.environment;
+    if (this.graphics.tier === 'cpu') this.scene.traverse(object => {
+      if (!(object instanceof THREE.Mesh)) return;
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) if (material instanceof THREE.MeshLambertMaterial && material.envMap) material.envMap = sky.background;
+    }); this.scene.environmentIntensity = night ? .2 : .5;
     this.renderer.toneMappingExposure = night ? .72 : .96;
     this.hemi.color.set(night ? '#8ea4c6' : '#e9f4f0'); this.hemi.groundColor.set(night ? '#121820' : '#73805c'); this.hemi.intensity = night ? .28 : 1.2;
     this.sun.color.set(night ? '#c9d6ee' : '#fff0ce'); this.sun.intensity = night ? .32 : 2.4;
@@ -298,7 +319,7 @@ class Game {
     this.nightLighting.setNight(night); this.renderer.shadowMap.needsUpdate = true;
   }
   private quality(low: boolean): void {
-    this.lowQuality = low; this.renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1 : 1.5));
+    this.lowQuality = low || this.graphics.tier === 'cpu'; this.renderScale = Math.min(low ? 1 : 1.5, this.graphics.pixelRatio); this.renderer.setPixelRatio(this.pixelRatio());
     this.sun.shadow.mapSize.setScalar(low ? 1024 : 2048); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; this.renderer.shadowMap.needsUpdate = true;
     this.scene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
@@ -388,7 +409,7 @@ class Game {
     // A queued animation frame can predate the startup or visibility timestamp.
     const rawDt = Math.max(0, (now - this.lastTime) / 1000); const dt = Math.min(rawDt, 0.1); this.lastTime = now; this.elapsed += dt;
     if (this.mode === 'walking') this.updateWalking(dt);
-    this.town.gardens.update(this.elapsed, this.mode === 'walking' ? dt : 0, matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (this.graphics.tier !== 'cpu') this.town.gardens.update(this.elapsed, this.mode === 'walking' ? dt : 0, matchMedia('(prefers-reduced-motion: reduce)').matches);
     if (this.mode === 'map') { this.orbit.update(); this.updateMarkers(); }
     const camera = this.mapView ? this.mapCamera : this.walkCamera;
     this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : WALK_FOG.far, this.mapView);
@@ -397,7 +418,9 @@ class Game {
     this.nightLighting.update(camera); this.renderer.render(this.scene, camera);
     if (this.cursorDirty) { this.cursorDirty = false; this.updateCursor(); }
     this.fpsFrames++; this.fpsTime += rawDt;
-    if (this.fpsTime >= 1) { this.fps = Math.round(this.fpsFrames / this.fpsTime); this.fpsFrames = 0; this.fpsTime = 0; }
+    if (this.fpsTime >= 1) { this.fps = Math.round(this.fpsFrames / this.fpsTime);
+      if (this.graphics.tier === 'cpu' && this.fps < 18 && this.renderScale > .3) { this.renderScale = Math.max(.3, this.renderScale - .05); this.renderer.setPixelRatio(this.pixelRatio()); }
+      this.fpsFrames = 0; this.fpsTime = 0; }
   };
 }
 let game: Game | undefined;

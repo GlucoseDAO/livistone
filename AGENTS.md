@@ -18,7 +18,7 @@ A TypeScript + Vite single-page app. Three.js renders the town on WebGL 2; Rapie
 (WebAssembly) provides a kinematic capsule character controller. There is no backend, no
 API key, no database, and no account system — the entire game is static files plus
 `localStorage`. Every building, tree placement, path, and piece of jewelry geometry in the
-current build is generated in code at load time; binary assets are two tree GLBs, local derivatives of 70 real jewelry photographs, six Materialized Enhancements poster images, two CC0 rock maps, four CC0 ground-map derivatives, and nine CC0 railway maps.
+current build is generated in code at load time; binary assets are two tree GLBs, local derivatives of 70 real jewelry photographs, six Materialized Enhancements poster images, two CC0 rock maps, four CC0 ground-map derivatives, nine CC0 railway maps, and two generated limestone paving derivatives.
 
 ## Commands
 
@@ -71,6 +71,8 @@ src/
     strands/         mitoring.json, nanot.json: preserved wire centerlines from the STLs
     forest.ts        Batched GLB tree instancing, mobile foliage cut, and distance LOD
     landscape.ts     Shared path curves and planting clearance
+    path-kerbs.ts    Batched bevelled borders, junction gaps and shared collision geometry
+    cpu-detail.ts    CPU-only visual simplification, vertex lighting and static batching
     station.ts       Embryo station ring, glazed foyer, signs, train, and matching colliders
     train.ts         Maglev shell with true glazed apertures, lounge cabin, cabin announcements and matching colliders
     station-amber.ts Closed resin body, procedural textures, refraction, and inner core geometry
@@ -122,6 +124,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   `interactives` (raycast targets for the E key), `occluders` (invisible boxes used to hide
   interiors until you are inside). If you add geometry that the player can walk into, you must push a matching
   `ColliderSpec` — the renderer and the physics world share no geometry automatically.
+- **Path connectivity is a regression gate.** `tests/path-network.test.ts` checks that roads connect to the station through bridges and civic aprons, terminate on another route or a paved destination, and reach all map entrances. Keep the raised west-lake connector aligned with the foot of `FUTURE_NECK` and give garden paths matching mesh collision. Town ribbons and round joins share mesh batches with world-space UVs. `path-kerbs.ts` creates raised bevelled borders with matching mesh collision; reserve openings at junctions and entrances. The wider gateway apron and its kerbs share `gatewayApproachWidth`; do not place narrow-path kerbs inside the apron. Paving loads attributed generated limestone derivatives with a procedural fallback; planting visibility uses the batches returned by `createPlanting`, without per-frame scene traversal. Reduced paving omits bump sampling.
 - **Paths and planting share one layout.** `landscape.ts` owns the path curves and
   `plantingAllowed(x, z, radius)`. Every plant placement must reserve its full canopy or
   tuft radius, including flowers; keep civic doorway approaches and the bridge clear.
@@ -249,10 +252,10 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **Comments explain why, not what.** Existing comments flag non-obvious intent (a wall ring
   leaving an opening, a mobile foliage reduction, a fallback that keeps exploration
   available). Do not narrate the obvious.
-- **No new runtime dependencies without a reason.** Runtime deps are Three.js and Rapier
-  only; EZ-Tree is a dev-time asset generator. Prefer generating geometry over adding a
+- **No new runtime dependencies without a reason.** Runtime deps are Three.js, Rapier and the CPU-only lazy meshoptimizer simplifier; EZ-Tree is a dev-time asset generator. Prefer generating geometry over adding a
   library.
 - **Time of day is selectable.** `daylight.ts` resolves persistent Auto / Day / Night; Auto follows the local clock without requesting GPS. Cache each `createSky` result on first use and switch fog, reflections, emissions and light sources without rebuilding town meshes or moving the player. `night-lighting.ts` keeps depth-tested additive halos and a fixed pool of six/ten nearby point lights. Lake lighting concentrates on the central briolette; keep the outer lake subdued. Quality changes must preserve night emissions.
+- **Graphics has three device profiles.** `graphics.ts` selects GPU, mobile/typical integrated graphics, or CPU software WebGL. Profiles cover raster and sky resolution, foliage range, lighting and architecture. CPU uses `cpu-detail.ts` to reduce visual geometry with locked boundaries and batch static opaque architecture, preserving collision geometry and parent visibility. CPU disables shadows and rain, retaining night emission and a bounded light pool. Test profile overrides do not prove actual device performance.
 - **Mobile is a first-class target, not a later port.** `Town` takes a `mobile` flag
   (coarse pointer, software GL, or a typical laptop iGPU — not a discrete card) and
   materials/foliage are already reduced for it. Walking hides far vegetation and thins

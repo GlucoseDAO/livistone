@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { terrainNoise } from './terrain';
 import { CIVIC_LANDMARKS } from '../game/content';
 import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from './landscape';
 
@@ -81,7 +82,8 @@ function flowerGeometry(seed: number, mobile: boolean): THREE.BufferGeometry {
   }
   const merged = mergeGeometries(parts)!; parts.forEach((g) => g.dispose()); leaf.dispose(); petal.dispose(); center.dispose(); return merged;
 }
-function batches(parent: THREE.Group, name: string, sites: Site[], geometry: THREE.BufferGeometry, material: THREE.Material, shadow: boolean): void {
+function batches(parent: THREE.Group, name: string, sites: Site[], geometry: THREE.BufferGeometry, material: THREE.Material, shadow: boolean): THREE.InstancedMesh[] {
+  const result: THREE.InstancedMesh[] = [];
   const cells = new Map<string, Site[]>();
   for (const site of sites) { const key = Math.floor(site.x / 24) + ':' + Math.floor(site.z / 24), cell = cells.get(key) ?? []; cell.push(site); cells.set(key, cell); }
   const matrix = new THREE.Matrix4(), q = new THREE.Quaternion(), color = new THREE.Color();
@@ -95,11 +97,13 @@ function batches(parent: THREE.Group, name: string, sites: Site[], geometry: THR
     batch.userData.plantLod = true;
     batch.userData.lodX = cell.reduce((sum, s) => sum + s.x, 0) / cell.length;
     batch.userData.lodZ = cell.reduce((sum, s) => sum + s.z, 0) / cell.length;
-    parent.add(batch);
+    parent.add(batch); result.push(batch);
   }
+  return result;
 }
 
-export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: boolean, height: (x: number, z: number) => number, river: (x: number) => number): void {
+export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: boolean, height: (x: number, z: number) => number, river: (x: number) => number): THREE.InstancedMesh[] {
+  const result: THREE.InstancedMesh[] = [];
   const rand = random(58), shrubs: Site[][] = [[], [], []], grass: Site[] = [];
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .94, side: THREE.DoubleSide });
   for (let i = 0; i < 2600; i++) {
@@ -111,7 +115,7 @@ export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: 
     shrubs[i % 3].push({ x, y: height(x, z), z, scale, angle });
     if (shrubs.flat().length >= (mobile ? 200 : 320)) break;
   }
-  shrubs.forEach((sites, i) => batches(root, 'Leafy shrubs', sites, shrubGeometry(191 + i, mobile, i > 0), material, true));
+  shrubs.forEach((sites, i) => result.push(...batches(root, 'Leafy shrubs', sites, shrubGeometry(191 + i, mobile, i > 0), material, true)));
   // Short, separated patches leave grass between flowers and keep the routes visually quiet.
   const flowers: Site[][] = [[], [], [], []];
   const plant = (x: number, z: number, palette: number): void => {
@@ -134,19 +138,22 @@ export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: 
     const x = (rand() - .5) * 125, z = river(x) + (i % 2 ? 1 : -1) * (8.1 + rand() * 3.7);
     plant(x, z, Math.floor((x + 65) / 7));
   }
-  flowers.forEach((sites, i) => batches(root, 'Flower borders', sites, flowerGeometry(400 + i, mobile), material, false));
+  flowers.forEach((sites, i) => result.push(...batches(root, 'Flower borders', sites, flowerGeometry(400 + i, mobile), material, false)));
   for (let i = 0; i < (mobile ? 18000 : 52000); i++) {
     const x = (rand() - .5) * 155, z = (rand() - .5) * 132, scale = .55 + rand() * .75;
+    // Open lawns alternate with denser meadow islands; keep the original maximum tuft footprint.
+    if (terrainNoise(x * .085 + 23, z * .085 - 9) < .32) continue;
     if (!plantingAllowed(x, z, .55 * scale) || Math.abs(z - river(x)) < 7.4) continue;
     grass.push({ x, y: height(x, z) + .012, z, scale, angle: rand() * TAU });
   }
-  batches(details, 'Meadow grass', grass, grassGeometry(mobile), material, false);
+  result.push(...batches(details, 'Meadow grass', grass, grassGeometry(mobile), material, false));
+  return result;
 }
 
-export function updatePlanting(groups: THREE.Object3D[], camera: THREE.Camera, range: number): void {
-  const origin = camera.position;
-  for (const group of groups) group.traverse((object) => {
-    if (!(object instanceof THREE.InstancedMesh) || !object.userData.plantLod) return;
-    object.visible = Math.hypot(origin.x - object.userData.lodX, origin.z - object.userData.lodZ) < range;
-  });
+export function updatePlanting(batches: THREE.InstancedMesh[], camera: THREE.Camera, range: number): void {
+  const origin = camera.position, range2 = range * range;
+  for (const batch of batches) {
+    const dx = origin.x - batch.userData.lodX, dz = origin.z - batch.userData.lodZ;
+    batch.visible = dx * dx + dz * dz < range2;
+  }
 }

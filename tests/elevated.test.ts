@@ -4,6 +4,9 @@ import { Physics } from '../src/game/physics';
 import type { ColliderSpec } from '../src/game/physics';
 import { createTimeTower } from '../src/world/time-tower';
 import { createFutureHouse } from '../src/world/future-house';
+import { LivingWaters } from '../src/world/living-waters';
+import { GARDEN_PATHS, GARDENS } from '../src/world/living-waters-layout';
+import { townTerrainGeometry } from '../src/world/terrain';
 import { FUTURE_NECK, towerPoint } from '../src/world/elevated-layout';
 import { posterLayout } from '../src/world/poster-layout';
 
@@ -18,6 +21,18 @@ async function follow(physics: Physics, points: THREE.Vector3[]): Promise<void> 
   }
 }
 describe('elevated exhibition routes', () => {
+  for (const mobile of [false, true]) it(`walks from the west lake loop onto the Future House neck (${mobile ? 'reduced' : 'rich'})`, async () => {
+    const gardens = new LivingWaters(mobile), ground = townTerrainGeometry(), colliders: ColliderSpec[] = [...gardens.colliders, { type: 'mesh', vertices: new Float32Array(ground.getAttribute('position').array), indices: new Uint32Array(ground.index!.array) }];
+    createFutureHouse(new THREE.Group(), colliders, mobile); ground.dispose();
+    const route = GARDEN_PATHS[GARDEN_PATHS.length - 1], points = route.getSpacedPoints(60).map(p => p.clone().add(new THREE.Vector3(GARDENS.x, 0, GARDENS.z)));
+    points.push(...FUTURE_NECK.getSpacedPoints(70));
+    const physics = await Physics.create(colliders);
+    try {
+      physics.teleport({ x: points[0].x, y: points[0].y + .9, z: points[0].z });
+      await follow(physics, points); await follow(physics, [...points].reverse());
+    } finally { physics.dispose(); gardens.dispose(); }
+  }, 20000);
+
   it('lets players jump out over the Timeface gallery rail', async () => {
     const colliders: ColliderSpec[] = [{ type:'box', position:[17,-.2,-39],size:[30,.2,30] }];
     createTimeTower(new THREE.Group(), colliders, true);
