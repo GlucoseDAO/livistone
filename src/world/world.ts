@@ -22,6 +22,7 @@ import { createFutureHouse } from './future-house';
 import { riverMaterial } from './river';
 import { pavingMaterial, rockGeometry, rockMaterial } from './stone';
 import { walnutMaterial, walnutRadius } from './walnut';
+import { mitoringAmberMaterial, loadMitoringAmberTextures, loadMitoringSilverTexture } from './mitoring-materials';
 import { CIVIC_LANDMARKS } from '../game/content';
 import { createStation } from './station';
 import { STATION } from './station-layout';
@@ -85,6 +86,7 @@ export class Town {
   private mountains!: Mountains;
   private railway!: THREE.Group;
   private researchReady!: Promise<void>;
+  private readonly jewelryReady: Promise<void>[] = [];
   private readonly white = new THREE.MeshStandardMaterial({ color: '#f4f0df', roughness: 0.57, metalness: 0.07 });
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#e2e7dd', roughness: 0.26, metalness: 0.65 });
   private readonly gold = new THREE.MeshStandardMaterial({ color: '#b99a55', roughness: 0.3, metalness: 0.7 });
@@ -283,27 +285,27 @@ export class Town {
     // A cabochon: the wall flares slightly up to the rim, then the dome closes over the hall.
     const profile: [number, number][] = [[0, 0.98], [3.7, 1], [wall, 1]];
     for (let k = 1; k <= 8; k++) profile.push([wall + dome * Math.sin(k / 8 * Math.PI / 2), Math.cos(k / 8 * Math.PI / 2)]);
-    const nx = 72, vertices: number[] = [], indices: number[] = [];
+    const nx = 72, vertices: number[] = [], indices: number[] = [], uv: number[] = [];
     for (const [j, [y, f]] of profile.entries()) for (let i = 0; i <= nx; i++) {
-      const phi = i / nx * TAU; vertices.push(Math.sin(phi) * a * f, y, Math.cos(phi) * b * f);
+      const phi = i / nx * TAU; vertices.push(Math.sin(phi) * a * f, y, Math.cos(phi) * b * f); uv.push(i / nx, y / (wall + dome));
       if (i === nx || j === profile.length - 1) continue;
       // The doorway is the only cut in the amber; the arch and wall gap below match it.
       const angle = Math.atan2(Math.sin((i + 0.5) / nx * TAU), Math.cos((i + 0.5) / nx * TAU));
       if (Math.abs(angle) < doorPhi && y < 3.7) continue;
       const n = j * (nx + 1) + i; indices.push(n, n + 1, n + nx + 1, n + 1, n + nx + 2, n + nx + 1);
     }
-    const shell = new THREE.BufferGeometry(); shell.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); shell.setIndex(indices); shell.computeVertexNormals();
-    const amberShell = this.glass('#dba347', '#422005'); amberShell.opacity = this.mobile ? .24 : .38;
-    mesh(shell, amberShell, exterior);
+    const shell = new THREE.BufferGeometry(); shell.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); shell.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); shell.setIndex(indices); shell.computeVertexNormals();
+    const amberShell = mitoringAmberMaterial(this.mobile); this.jewelryReady.push(loadMitoringAmberTextures(amberShell, this.mobile));
+    mesh(shell, amberShell, exterior).name = 'Mitoring amber cup';
+    const silver = mitoringCage(exterior, this.mobile); this.jewelryReady.push(loadMitoringSilverTexture(silver, this.mobile));
     const floor = mesh(new THREE.CylinderGeometry(a, a + 0.3, 0.3, 72), this.paving, exterior, 0, -0.03); floor.scale.z = b / a;
-    const rim = mesh(new THREE.TorusGeometry(a + 0.15, 0.2, 8, 96), this.white, exterior, 0, 0.08); rim.rotation.x = Math.PI / 2; rim.scale.y = b / a;
+    const rim = mesh(new THREE.TorusGeometry(a + 0.15, 0.2, 8, 96), silver, exterior, 0, 0.08); rim.rotation.x = Math.PI / 2; rim.scale.y = b / a;
     this.colliders.push({ type: 'box', position: [x, 0.08, z], size: [a * 0.75, 0.08, b * 0.75] });
     this.wallRing(exterior, x, z, a, b, doorPhi + 0.06);
-    this.entranceArch(exterior, b, this.white);
-    mitoringCage(exterior, this.mobile);
+    this.entranceArch(exterior, b, silver);
     // The ring's shank becomes the gateway: visitors walk through the Mitoring to reach the amber.
     const gateZ = b + 3.2;
-    mesh(new THREE.TorusGeometry(3.15, 0.3, 12, 72), this.silver, exterior, 0, 2.1, gateZ);
+    mesh(new THREE.TorusGeometry(3.15, 0.3, 12, 72), silver, exterior, 0, 2.1, gateZ);
     for (const side of [-1, 1]) this.colliders.push({ type: 'box', position: [x + side * 2.85, 1.4, z + gateZ], size: [0.4, 1.4, 0.4] });
     const ceiling = (px: number, pz: number): number => { const rho = Math.min(1, Math.hypot(px / a, pz / b)); return wall + dome * Math.sqrt(1 - rho * rho); };
     this.createInterior('energy', inside, x, z, b - 0.3, { a, b, ceiling, structure: exterior });
@@ -348,7 +350,7 @@ export class Town {
     return true;
   }
   readonly forest = new Forest();
-  async loadAssets(): Promise<void> { await Promise.all([this.forest.load(this.mobile), this.mountains.ready, this.researchReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
+  async loadAssets(): Promise<void> { await Promise.all([this.forest.load(this.mobile), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
     const rand = seeded(3974); const sites: THREE.Vector3[] = [];
     for (let i = 0; i < (this.mobile ? 2600 : 5400); i++) {

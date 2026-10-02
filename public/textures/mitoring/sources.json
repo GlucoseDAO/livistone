@@ -1,0 +1,16 @@
+{
+  "generator": "scripts/build-mitoring-textures.py",
+  "seed": 3475,
+  "source": "https://livia.glucosedao.org/pieces/?tab=mitoring-mitochondria-ring",
+  "references": [
+    {
+      "file": "public/images/jewelry/catalogue/mitoring-1.webp",
+      "sha256": "40568ec6ebbadca866f03dfe760a1e124d1ad729fdc1ae89a125076b9ff11eb2"
+    },
+    {
+      "file": "public/images/jewelry/catalogue/mitoring-2.webp",
+      "sha256": "6e1cf806c006f813ca85920435088a6b8c1e5afb2a6adbfbb7d98600ff451694"
+    }
+  ],
+  "method": "Original periodic cloud fields, resin inclusions and casting roughness; no photographic lighting baked into colour."
+}

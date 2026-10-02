@@ -2,14 +2,32 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import mitoring from './strands/mitoring.json';
 import nanot from './strands/nanot.json';
+import { mitoringSilverMaterial } from './mitoring-materials';
 
 export const ENERGY_HALL = { a: 14, b: 6.6, wall: 4.2, dome: 4.2, doorPhi: 0.24 };
 const UP = new THREE.Vector3(0, 1, 0);
 
+function outsideMitoring(p: THREE.Vector3): THREE.Vector3 {
+  const { a, b, wall, dome } = ENERGY_HALL, rho = Math.hypot(p.x / a, p.z / b);
+  if (p.y < 3.6 && rho < 1.02) return p;
+  const surface = p.clone(), normal = new THREE.Vector3();
+  if (p.y <= wall) {
+    surface.x /= Math.max(rho, .001); surface.z /= Math.max(rho, .001);
+    normal.set(surface.x / (a * a), 0, surface.z / (b * b)).normalize();
+  } else {
+    const scale = Math.hypot(p.x / a, (p.y - wall) / dome, p.z / b);
+    surface.set(p.x / scale, wall + (p.y - wall) / scale, p.z / scale);
+    normal.set(surface.x / (a * a), (surface.y - wall) / (dome * dome), surface.z / (b * b)).normalize();
+  }
+  // Reserve the entire ribbon section and the chord between samples, not just its centreline.
+  if (p.clone().sub(surface).dot(normal) < .34) p.copy(surface).addScaledVector(normal, .34);
+  return p;
+}
+
 // Bevelled ribbon sections give the cast metal broad faces and narrow highlights.
-function band(points: THREE.Vector3[], center: THREE.Vector3, width: number): THREE.BufferGeometry {
-  const section = [[-.7, -1], [.7, -1], [1, -.6], [1, .6], [.7, 1], [-.7, 1], [-1, .6], [-1, -.6]];
-  const vertices: number[] = [], indices: number[] = []; let previous: THREE.Vector3 | undefined;
+function band(points: THREE.Vector3[], center: THREE.Vector3, width: number, rounded = false): THREE.BufferGeometry {
+  const section = rounded ? Array.from({ length: 8 }, (_, i) => [Math.cos(i / 8 * Math.PI * 2), -Math.sin(i / 8 * Math.PI * 2)]) : [[-.7, -1], [.7, -1], [1, -.6], [1, .6], [.7, 1], [-.7, 1], [-1, .6], [-1, -.6]];
+  const vertices: number[] = [], indices: number[] = [], uv: number[] = []; let previous: THREE.Vector3 | undefined, distance = 0;
   for (let i = 0; i < points.length; i++) {
     const p = points[i], tangent = points[Math.min(i + 1, points.length - 1)].clone().sub(points[Math.max(0, i - 1)]).normalize();
     let side = new THREE.Vector3().crossVectors(tangent, p.clone().sub(center)).normalize();
@@ -17,18 +35,21 @@ function band(points: THREE.Vector3[], center: THREE.Vector3, width: number): TH
     if (side.lengthSq() < .01) side = new THREE.Vector3().crossVectors(tangent, Math.abs(tangent.y) < .9 ? UP : new THREE.Vector3(1, 0, 0)).normalize();
     if (previous && side.dot(previous) < 0) side.negate();
     const normal = new THREE.Vector3().crossVectors(side, tangent).normalize(); previous = side;
-    for (const [s, n] of section) {
-      const v = p.clone().addScaledVector(side, s * width / 2).addScaledVector(normal, n * width * .28); vertices.push(v.x, v.y, v.z);
+    if (i) distance += p.distanceTo(points[i - 1]);
+    // Small bevels soften clipped tips without adding a cap mesh or changing the source paths.
+    const bevel = rounded && (i === 0 || i === points.length - 1) ? .74 : 1;
+    for (const [j, [s, n]] of section.entries()) {
+      const v = p.clone().addScaledVector(side, s * width / 2 * bevel).addScaledVector(normal, n * width * .28 * bevel); vertices.push(v.x, v.y, v.z); uv.push(distance / 2, j / 8);
     }
     if (i) for (let j = 0; j < 8; j++) {
       const a = (i - 1) * 8 + j, b = (i - 1) * 8 + (j + 1) % 8; indices.push(a, b, a + 8, b, b + 8, a + 8);
     }
   }
   for (let j = 1; j < 7; j++) { const end = (points.length - 1) * 8; indices.push(0, j + 1, j, end, end + j, end + j + 1); }
-  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geo.setIndex(indices); geo.computeVertexNormals(); return geo;
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(indices); geo.computeVertexNormals(); return geo;
 }
 
-function cage(parent: THREE.Group, strands: number[][], transform: (x: number, y: number, z: number) => THREE.Vector3, allowed: (p: THREE.Vector3) => boolean, center: THREE.Vector3, width: number, mobile: boolean, smooth: boolean, project?: (p: THREE.Vector3) => THREE.Vector3): void {
+function cage(parent: THREE.Group, strands: number[][], transform: (x: number, y: number, z: number) => THREE.Vector3, allowed: (p: THREE.Vector3) => boolean, center: THREE.Vector3, width: number, mobile: boolean, smooth: boolean, project?: (p: THREE.Vector3) => THREE.Vector3, material?: THREE.MeshStandardMaterial, rounded = false): void {
   const geometries: THREE.BufferGeometry[] = [];
   for (const strand of strands) {
     const points: THREE.Vector3[] = [];
@@ -41,7 +62,7 @@ function cage(parent: THREE.Group, strands: number[][], transform: (x: number, y
     let run: THREE.Vector3[] = [];
     const flush = (): void => {
       const length = run.reduce((sum, p, i) => sum + (i ? p.distanceTo(run[i - 1]) : 0), 0);
-      if (run.length > 1 && length >= 1.2) geometries.push(band(run, center, width));
+      if (run.length > 1 && length >= 1.2) geometries.push(band(run, center, width, rounded));
       run = [];
     };
     // Clip sampled curves, not just control points: long struts otherwise bridge across the door.
@@ -52,23 +73,26 @@ function cage(parent: THREE.Group, strands: number[][], transform: (x: number, y
     flush();
   }
   if (!geometries.length) return;
-  const silver = new THREE.MeshStandardMaterial({ color: '#e1e5df', metalness: .78, roughness: .29, side: THREE.DoubleSide });
+  const silver = material ?? new THREE.MeshStandardMaterial({ color: '#e1e5df', metalness: .78, roughness: .29, side: THREE.DoubleSide });
   const sculpture = new THREE.Mesh(mergeGeometries(geometries, false)!, silver); sculpture.name = 'Jewelry silver';
   sculpture.castShadow = true; sculpture.receiveShadow = true; parent.add(sculpture);
   for (const geometry of geometries) geometry.dispose();
 }
 
-export function mitoringCage(parent: THREE.Group, mobile: boolean): void {
-  const { a, b, wall, dome } = ENERGY_HALL;
+export function mitoringCage(parent: THREE.Group, mobile: boolean): THREE.MeshStandardMaterial {
+  const { a, b, wall, dome } = ENERGY_HALL, silver = mitoringSilverMaterial();
   cage(parent, mitoring.strands, (x, y, z) => {
     const fold = THREE.MathUtils.clamp((z - 26.8) / 7.7, 0, 1);
     const p = new THREE.Vector3(x * a / 15.5 * (1 - .36 * fold), (z - 17.3) * wall / 9.5, y * b / 11.8 * (1 - .36 * fold));
     const rho = Math.hypot(p.x / a, p.z / b);
-    // The bezel becomes the facade; the tall setting prongs curl inward over a lower architectural roof.
-    if (z < 26.8 && rho > .2) { const factor = 1.045 / rho; p.x *= factor; p.z *= factor; }
-    if (z >= 26.8) p.y = wall + dome * Math.sqrt(Math.max(0, 1 - Math.min(1, rho) ** 2)) + .24;
+    // Ease from the bezel onto the cabochon: a hard height threshold tears the cast loops at the shoulder.
+    const crown = THREE.MathUtils.smoothstep(z, 25.5, 28.5);
+    if (rho > .2) { const factor = THREE.MathUtils.lerp(1.045 / rho, 1, crown); p.x *= factor; p.z *= factor; }
+    const surface = Math.hypot(p.x / a, p.z / b), roof = wall + dome * Math.sqrt(Math.max(0, 1 - Math.min(1, surface) ** 2)) + .24;
+    p.y = THREE.MathUtils.lerp(p.y, roof, crown);
     return p;
-  }, (p) => p.y > .25 && !(p.y < 4.8 && Math.abs(p.x) < 2.8 && p.z > b * .5) && !(p.y < 3.6 && Math.hypot(p.x / a, p.z / b) < 1.02), new THREE.Vector3(0, wall, 0), .48, mobile, true);
+  }, (p) => p.y > .25 && !(p.y < 4.8 && Math.abs(p.x) < 2.8 && p.z > b * .5) && !(p.y < 3.6 && Math.hypot(p.x / a, p.z / b) < 1.02), new THREE.Vector3(0, wall, 0), .48, mobile, true, outsideMitoring, silver, true);
+  return silver;
 }
 
 export function nanotCage(parent: THREE.Group, radius: number, centerY: number, mobile: boolean): THREE.BufferGeometry {

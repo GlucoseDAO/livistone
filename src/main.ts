@@ -8,6 +8,7 @@ import { TOWN_BOUNDS } from './world/town-layout';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createSky } from './world/sky';
 import { setGatewayQuality } from './world/gateway-materials';
+import { setMitoringAmberQuality } from './world/mitoring-materials';
 import { COLLECTION } from './game/exhibits';
 import { Town } from './world/world';
 import { UI } from './ui/ui';
@@ -304,6 +305,7 @@ class Game {
       for (const material of materials) if (material instanceof THREE.MeshPhysicalMaterial) {
         if (material.userData.myceliumOpal) { material.iridescence = low ? .35 : 1; material.needsUpdate = true; continue; }
         if (material.userData.gatewayGem) { setGatewayQuality(material, low); continue; }
+        if (material.userData.mitoringAmber) { setMitoringAmberQuality(material, low); continue; }
         if (material.userData.pavilionGem) { material.transmission = low ? 0 : .42; material.opacity = low ? .45 : .7; material.needsUpdate = true; continue; }
         material.transmission = low ? 0 : material.userData.stationAmber ? .8 : .45;
         material.opacity = material.userData.stationAmber ? 1 : material.userData.clearGallery ? (low ? .18 : .26) : (low ? .32 : .65); if (material.userData.stationAmber) material.emissiveIntensity = low ? .23 : .2; material.needsUpdate = true;

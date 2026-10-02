@@ -34,6 +34,7 @@ current build is generated in code at load time; binary assets are two tree GLBs
 | Install git hooks | `bun run hooks:install` | Sets `core.hooksPath` to `.githooks` |
 | Regenerate tree GLBs | `bun scripts/generate-trees.mjs` | Needs the dev server running |
 | Landmark screenshots | `node scripts/screenshot-landmarks.mjs [outDir]` | Needs the dev server; headless Chrome with GPU WebGL flags |
+| Mitoring comparisons | `node scripts/screenshot-mitoring.mjs [outDir] [desktop\|touch\|software]` | Fixed daylight/cameras; real SwiftShader is separate from touch emulation |
 | Enhancement assets | `python3 scripts/build-enhancement.py [photoDir]` | Pillow; WebP posters + compact crystal meshes. Regrow crystals with `scripts/generate-enhancement-crystals.py` inside a materialized-enhancements checkout |
 
 `bun run test` uses Vitest; `bun test` would invoke Bun's own runner and fail. Playwright
@@ -219,6 +220,13 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   Structural cristae remain visible in map mode. `Landmark.stretch` in `content.ts` must match
   `a / 7.1` and `b / 7.1`, because tree clearing, garden rings, and the "inside a landmark" test in
   `main.ts` read it.
+  `mitoring-materials.ts` owns its offline-baked cloud/roughness maps and distinct amber
+  quality tag; generic glazing settings must not overwrite its absorption or night emission.
+  Reduced amber uses single-pass partial transparency with refraction and clearcoat
+  disabled. Silver cross-sections keep outward normals and UVs, and shoulder transforms
+  ease smoothly onto the roof. Project every sampled silver span outside the amber with
+  clearance for the full ribbon width; centreline-only checks let folds sink into the shell.
+  Preserve both source strands and pedestrian clearance when refining the cast folds.
 - **View switching preserves the player; map destinations deliberately relocate them.**
   Map / First person (M) and Start / Resume exploring preserve walking position and
   direction. Map labels and list entries use `Landmark.entrance` to arrive just outside
