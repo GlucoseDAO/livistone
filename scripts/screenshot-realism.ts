@@ -32,6 +32,8 @@ const VIEWS: Record<string, View> = Object.fromEntries(([
   // October 2026 owner report: lake water-cell kerbs crossing the garden paving, and the lake jewel stands seen from behind.
   ['lake-path', -10, -122, 0, -.1], ['lake-path-down', -10, -134, 0, -.55], ['lake-crossing', 3, -112, -1.45, -.4], ['vittoria-back', -16, -169, Math.PI, .05], ['dewdrop-back', -12, -118, Math.PI, .02],
   ['lake-west-pools', -27, -101, Math.PI / 2 + .15, -.35], ['lake-east-pool', 2.5, -106, 2.55, -.45],
+  // October 2026 owner report: the opal rill lying on the Mycelium paths.
+  ['rill-crossing', 68, -86, 1.25, -.22], ['rill-culvert', 65, -105, Math.PI / 2 + .25, -.25], ['rill-culvert-down', 57, -104, 0, -.5], ['rill-culvert-mouth', 62.8, -105.9, Math.PI / 4, -.55],
   ['valley-east', 16, 42, -Math.PI / 2, .06], ['summit-northwest', 80, -174, 1, .02, 24], ['summit-southwest', 80, -174, 2.4, -.05, 24], ['ridge-north', 0, -150, 0, .1],
 ] as View[]).map(view => [view[0], view]));
 const SETS: Record<string, string[]> = {
@@ -41,11 +43,12 @@ const SETS: Record<string, string[]> = {
   water: ['bridge-bank', 'shore-closeup', 'east-tributary', 'west-tributary', 'vittoria-lake', 'mycelium-grove'],
   galleries: ['city-hall-gallery', 'energy-gallery', 'science-gallery', 'energy-inside', 'science-inside', 'catalogue-poster', 'embryo-station-platform'],
   lake: ['lake-path', 'lake-path-down', 'lake-crossing', 'lake-west-pools', 'lake-east-pool', 'vittoria-lake', 'vittoria-back', 'dewdrop-back'],
+  intersections: ['rill-crossing', 'rill-culvert', 'rill-culvert-down', 'rill-culvert-mouth'],
   skyline: ['valley-east', 'summit-northwest', 'summit-southwest', 'ridge-north'],
   fixes: ['city-hall-far', 'city-hall-north', 'nanot-arch', 'future-house-entry', 'future-house-neck', 'junction-garden', 'junction-glucose', 'junction-station', 'enhancement-front', 'grove-floor', 'mycelium-grove', 'sky-up', 'ridge-northwest', 'railway-east-portal'],
 };
 // `all` keeps the 33 realism views; `fixes`, `skyline` and `lake` are reviewed on their own.
-SETS.all = [...new Set(Object.entries(SETS).filter(([set]) => set !== 'fixes' && set !== 'skyline' && set !== 'lake').flatMap(([, views]) => views))];
+SETS.all = [...new Set(Object.entries(SETS).filter(([set]) => set !== 'fixes' && set !== 'skyline' && set !== 'lake' && set !== 'intersections').flatMap(([, views]) => views))];
 
 const [outDir, profileArg = 'desktop', setArg = 'quick', time = 'day'] = process.argv.slice(2);
 if (!outDir) throw new Error('Usage: bun scripts/screenshot-realism.ts <outDir> <desktop|touch|software> [viewSet] [day|golden|night]');

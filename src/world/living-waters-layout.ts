@@ -48,7 +48,8 @@ export function rainPlantAllowed(x: number, z: number, radius: number): boolean 
 const panelSites = Object.values(GARDEN_PANELS);
 /** The opal basin and the silver rill that drains it to the lake (local coordinates). */
 export const OPAL_BASIN = { x: 75, z: 0, radius: 3.9 };
-export const RILL = new THREE.CatmullRomCurve3([[75, 0], [72, 10], [63, 17], [53, 14], [42, 8]].map(([x, z]) => new THREE.Vector3(x, .035, z)));
+/** Straight west from the basin, square across the Mycelium paths (it passes under them: living-waters.ts dips it), to the lake. */
+export const RILL = new THREE.CatmullRomCurve3([[75, 0], [70, .6], [62, 1.3], [52, 2.2], [46, 3.6], [42, 6]].map(([x, z]) => new THREE.Vector3(x, .035, z)));
 export const RILL_RADIUS = .28;
 const rillPoints = RILL.getSpacedPoints(80);
 /**
@@ -62,7 +63,7 @@ export function gardenGround(x: number, z: number, radius: number): boolean {
   if (Math.hypot(x, z) < rim(Math.atan2(z, x)) + .05 + radius || Math.hypot(x - OPAL_BASIN.x, z - OPAL_BASIN.z) < OPAL_BASIN.radius + radius) return true;
   // The rill keeps a half-metre bank each side: the grass field's 2 m lookup cannot resolve the 56 cm channel itself.
   const reach = RILL_RADIUS + .5 + radius;
-  if (x < 42 - reach || x > 75 + reach || z < -reach || z > 18 + reach) return false;
+  if (x < 42 - reach || x > 75 + reach || z < -reach || z > 6 + reach) return false;
   for (let i = 1; i < rillPoints.length; i++) {
     const a = rillPoints[i - 1], b = rillPoints[i], dx = b.x - a.x, dz = b.z - a.z, t = Math.min(1, Math.max(0, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz)));
     if (Math.hypot(x - a.x - dx * t, z - a.z - dz * t) < reach) return true;

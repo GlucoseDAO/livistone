@@ -18,9 +18,13 @@ import { COLLECTION, photoSize, photoURL } from '../game/exhibits';
 import { addGlow, nightEmission } from './night-lighting';
 import { createLakePlants } from './lake-plants';
 import { GARDEN_PAVING, walkingSurface } from './walking-surface';
+import { WALKING_NETWORK } from './landscape';
+import { KERB_WIDTH } from './path-kerbs';
 import type { GroundDisc } from './grass-field';
 import { mergeStatic } from './static-batch';
 
+/** A culvert headwall's centre, past the outer face of the path kerb (it is 0.3 m thick, so it clears the kerb by 0.15 m). */
+const CULVERT_SET = .3;
 function shape(points: Point[]): THREE.Shape { return new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, -z))); }
 function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
 /**
@@ -101,10 +105,26 @@ export class LivingWaters {
         if (side > 0) this.interactives.push({ id, object: caption, position: new THREE.Vector3(x + GARDENS.x, 1.8, z + GARDENS.z) });
       }
     }
-    const channel = RILL;
-    this.drainage.push(channel);
-    this.mesh(new THREE.TubeGeometry(channel, 70, RILL_RADIUS, 6, false), this.silver, false);
-    this.mesh(new THREE.TubeGeometry(channel, 70, .18, 5, false), this.water, false, 0, .08);
+    // Where the rill meets the Mycelium paths it runs through a culvert: the pipe ends in a stone headwall just outside each kerb
+    // and nothing shows under the paving. Each open run is its own pipe and water channel, and carries its own drips.
+    const samples = RILL.getSpacedPoints(400), clear = samples.map(p => WALKING_NETWORK.edge(p.x + GARDENS.x, p.z + GARDENS.z, 4) - KERB_WIDTH - CULVERT_SET);
+    let run: THREE.Vector3[] = []; const runs: THREE.CatmullRomCurve3[] = [], walls: THREE.BufferGeometry[] = [];
+    const close = (): void => { if (run.length > 1) runs.push(new THREE.CatmullRomCurve3(run)); run = []; };
+    samples.forEach((p, i) => {
+      if (i > 0 && (clear[i] >= 0) !== (clear[i - 1] >= 0)) {
+        // The headwall stands square to the rill where it crosses the culvert line; the pipe's open end lies inside it.
+        const a = samples[i - 1], t = clear[i - 1] / (clear[i - 1] - clear[i]), at = a.clone().lerp(p, t), along = p.clone().sub(a).normalize();
+        walls.push(new THREE.BoxGeometry(1.05, .5, .3).rotateY(Math.atan2(along.x, along.z)).translate(at.x, .13, at.z));
+        if (clear[i] < 0) { run.push(at); close(); } else run.push(at);
+      }
+      if (clear[i] >= 0) run.push(p);
+    });
+    close(); this.drainage.push(...runs);
+    // One pipe, one water channel and one headwall mesh however many runs the paths leave (the draw budget counts each).
+    const tubes = (radius: number, sides: number): THREE.BufferGeometry => mergeGeometries(runs.map(run => new THREE.TubeGeometry(run, Math.max(4, Math.ceil(run.getLength() * 2)), radius, sides, false)))!;
+    this.mesh(tubes(RILL_RADIUS, 6), this.silver, false).name = 'Rill silver pipe';
+    this.mesh(tubes(.18, 5), this.water, false, 0, .08).name = 'Rill water channel';
+    if (walls.length) this.mesh(mergeGeometries(walls)!, this.stone, true).name = 'Rill culvert headwalls';
     this.mesh(new THREE.CylinderGeometry(3.6, OPAL_BASIN.radius, .14, 40), this.water, false, OPAL_BASIN.x, .025, OPAL_BASIN.z);
     this.mesh(new THREE.IcosahedronGeometry(1.1, 1), new THREE.MeshStandardMaterial({ color: '#bddacf', metalness: .45, roughness: .2 }), true, OPAL_BASIN.x, .65, OPAL_BASIN.z);
     const rain = new Float32Array((mobile ? 150 : 460) * 3), drips = new Float32Array(this.drainage.length * 6 * 3), fall = random(3304);
