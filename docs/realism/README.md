@@ -6,7 +6,7 @@ Planned on 3 October 2026 against commit `5a95bfd`. Line numbers refer to that c
 
 ## Status (3 October 2026)
 
-Round 1: 00–04 are merged into `main` (`a16ad0d`). Round 2 began the same day; **start from [NEXT.md](NEXT.md)**, which has the owner's direction, the evidence, the stage order and the binding agent rules.
+Round 1: 00–04 are merged into `main` (`a16ad0d`). Round 2 (20 WebGPU, 13, 14, 16, 24, 25) is merged into `main` (`ce434dd`); **continue from [round-2-leftovers.md](round-2-leftovers.md)**, and read [NEXT.md](NEXT.md) for the owner's direction and the binding agent rules.
 
 - The owner approved the WebGPU migration ([20 Phase B](20-webgpu-spike.md)); it runs first and alone on the rendering code. Later shader work is TSL only.
 - New in round 2: [21 contrast and aerial perspective](21-contrast-aerial.md), [22 iGPU tier detection](22-igpu-detection.md) (done), [23 flaky Living Waters spec](23-flaky-living-waters-spec.md) (done), [24 architectural surfaces](24-architecture-surfaces.md), [25 frame budget and adaptive resolution](25-frame-budget.md).
