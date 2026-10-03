@@ -11,7 +11,7 @@ export const FUTURE_HOUSE = { x: -64, z: -110, floor: 12, radiusX: 9, radiusZ: 1
 export const NECK_WIDTH = 3.6;
 /**
  * The neck runs straight in plan from the lake path's end (its foot) to the cabin's east threshold, so a visitor walking ahead
- * stays between the rails, and climbs at one even grade (about 32°) between short eased landings. The earlier S-bend peaked at
+ * stays between the rails, and climbs at one even grade (31°, 33° at most) between short eased landings. The earlier S-bend peaked at
  * 41.5° against the character controller's 45° limit, right where its inner rail turned across the walking line, and stalled
  * anyone holding forward there. Level from the threshold, where the deck's top meets it, into the cabin.
  */
