@@ -7,6 +7,7 @@ import { RESEARCH_POSTERS } from '../game/research';
 import { GLUCOSE_PAVILION as SITE, GLUCOSE_POSTERS } from './glucose-layout';
 import insulin from './molecules/insulin.json';
 import glucose from './molecules/glucose.json';
+import { CPU_SIMPLIFY_INDICES, mergeStatic } from './static-batch';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const original = insulin.chains.flatMap((chain) => chain.residues.map((r) => new THREE.Vector3(...r.position as [number, number, number])));
@@ -75,6 +76,10 @@ export function createGlucoseStructure(root: THREE.Object3D, colliders: Collider
     solid(new THREE.BoxGeometry(1.7, .25, .65), white, group, colliders, new THREE.Vector3(site.x, .285, site.z), site.yaw);
     const panel = new THREE.Mesh(new THREE.PlaneGeometry(2.46, 2.94), new THREE.MeshBasicMaterial({ color: '#f2eee3' })); panel.position.copy(position).add(new THREE.Vector3(0, 0, .076).applyAxisAngle(UP, site.yaw)); panel.rotation.y = site.yaw; panel.userData.discovery = RESEARCH_POSTERS[i].id; group.add(panel); return panel;
   });
+  // Every part above gave its own collider; parts sharing a material now draw together (the posters stay separate).
+  const parts = (material: THREE.Material): THREE.Mesh[] => group.children.filter((o): o is THREE.Mesh => o instanceof THREE.Mesh && o.material === material);
+  for (const [material, name] of [[silver, 'Insulin chain A'], [white, 'Insulin supports and poster feet'], [gold, 'Disulfide bridges and gold fittings'], [oxygen, 'Glucose oxygen atoms'], [carbon, 'Glucose carbon atoms'], [bonds, 'Glucose bonds'], [dark, 'Research poster frames']] as const)
+    mergeStatic(parts(material), name, mobile ? CPU_SIMPLIFY_INDICES : Infinity);
   return { group, panels };
 }
 function wrapped(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, width: number, line: number): number {
