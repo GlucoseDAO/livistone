@@ -1,16 +1,183 @@
-[
-  {
-    "asset": "leafy_grass",
-    "author": "Charlotte Baglioni",
-    "license": "CC0",
-    "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/leafy_grass/leafy_grass_diff_1k.jpg",
-    "sha256": "cfa40bc9d9417d1852db8753a8d5917f110c40101179f63543c382e39bc05e4a"
-  },
-  {
-    "asset": "sparse_grass",
-    "author": "Amal Kumar",
-    "license": "CC0",
-    "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sparse_grass/sparse_grass_diff_1k.jpg",
-    "sha256": "ae94f2b34597b9108eefd88217f55eccaec6d6b382e858a478ee92df90e66617"
+{
+  "retrieved": "2026-10-03",
+  "layers": [
+    {
+      "asset": "leafy_grass",
+      "page": "https://polyhaven.com/a/leafy_grass",
+      "author": "Charlotte Baglioni",
+      "license": "CC0",
+      "tileMetres": 2.0,
+      "meanLinearAlbedo": [
+        0.2787,
+        0.2056,
+        0.0933
+      ],
+      "meanRoughness": 0.685,
+      "files": {
+        "diff": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leafy_grass/leafy_grass_diff_2k.jpg",
+          "sha256": "8e1c6d21365d4b89bc5a35ab664da98a78dbc3ab9ba6100474881c8619a5b113",
+          "bytes": 4766204
+        },
+        "nor_gl": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leafy_grass/leafy_grass_nor_gl_2k.jpg",
+          "sha256": "df0cf0ce96e653f033e5b934d5b12995464bda027aa53bd12e329be889aa9f45",
+          "bytes": 6047262
+        },
+        "rough": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leafy_grass/leafy_grass_rough_2k.jpg",
+          "sha256": "34e1733bf4064b6950a575ff57e78c8b7ff71b63749eb48a49221bd65de6fb4f",
+          "bytes": 2274652
+        },
+        "disp": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leafy_grass/leafy_grass_disp_2k.jpg",
+          "sha256": "de34be0f135a3c92fe6e55cca9501a4cc40e02e84de9cc4c7fefded1da5bd3f3",
+          "bytes": 2545281
+        },
+        "ao": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leafy_grass/leafy_grass_ao_2k.jpg",
+          "sha256": "bcce4368f6a1affe11b4a643e14cfed7dfb46abf6bb9e6a28a3b87c2de2ddb11",
+          "bytes": 4175463
+        }
+      }
+    },
+    {
+      "asset": "sparse_grass",
+      "page": "https://polyhaven.com/a/sparse_grass",
+      "author": "Amal Kumar",
+      "license": "CC0",
+      "tileMetres": 2.0,
+      "meanLinearAlbedo": [
+        0.0762,
+        0.046,
+        0.0083
+      ],
+      "meanRoughness": 0.943,
+      "files": {
+        "diff": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/sparse_grass/sparse_grass_diff_2k.jpg",
+          "sha256": "3b655de96161164bf2324e136b3409ad8417c9f94750bc008e9c93ee507c2fac",
+          "bytes": 3733797
+        },
+        "nor_gl": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/sparse_grass/sparse_grass_nor_gl_2k.jpg",
+          "sha256": "5539a5913653a106a4e8a699a1d288f0b41907775b5fb36156ef5be2e937718b",
+          "bytes": 5892473
+        },
+        "rough": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/sparse_grass/sparse_grass_rough_2k.jpg",
+          "sha256": "b023f187999956449b5f25df19f4eaae1c891f474e0a599b23d986118fe706d7",
+          "bytes": 1729786
+        },
+        "disp": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/sparse_grass/sparse_grass_disp_2k.jpg",
+          "sha256": "84301f04bb98bb87a2101bd6923142d17d070a97227f01c55aa3a383ec823297",
+          "bytes": 2312240
+        },
+        "ao": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/sparse_grass/sparse_grass_ao_2k.jpg",
+          "sha256": "92641df46170082a9cfeb42efee5b0ae7a5f30ab2125f8d593cd8fd3daaecd7b",
+          "bytes": 3904928
+        }
+      }
+    },
+    {
+      "asset": "brown_mud_leaves_01",
+      "page": "https://polyhaven.com/a/brown_mud_leaves_01",
+      "author": "Rob Tuytel",
+      "license": "CC0",
+      "tileMetres": 1.3,
+      "meanLinearAlbedo": [
+        0.1266,
+        0.0922,
+        0.0348
+      ],
+      "meanRoughness": 0.92,
+      "files": {
+        "diff": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_mud_leaves_01/brown_mud_leaves_01_diff_2k.jpg",
+          "sha256": "29c997d77f56e4ea16d3e998a306be0c17fddb28ab4822657c7cd8249040ffda",
+          "bytes": 4539452
+        },
+        "nor_gl": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_mud_leaves_01/brown_mud_leaves_01_nor_gl_2k.jpg",
+          "sha256": "b6ec386e00d9d2a1c3a1da6a98a67066b0dfaa88ddb779341df29700cf081bdf",
+          "bytes": 5688696
+        },
+        "rough": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_mud_leaves_01/brown_mud_leaves_01_rough_2k.jpg",
+          "sha256": "9556215f5fef905c37cdf19c77aef7822f124890f8fb7dcce65d57c5eafc0ca5",
+          "bytes": 2421908
+        },
+        "disp": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_mud_leaves_01/brown_mud_leaves_01_disp_2k.jpg",
+          "sha256": "3688c1acc705f604ffdaf956064c898658bcd2d8b0258e437e671390c896abb8",
+          "bytes": 1788400
+        },
+        "ao": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_mud_leaves_01/brown_mud_leaves_01_ao_2k.jpg",
+          "sha256": "76c342dc7b5ee7dc5f2246e24147f16afcaa2c0b31599da4c385404416e16eb8",
+          "bytes": 3813568
+        }
+      }
+    },
+    {
+      "asset": "gravel_floor_02",
+      "page": "https://polyhaven.com/a/gravel_floor_02",
+      "author": "Jenelle van Heerden, Dimitrios Savva",
+      "license": "CC0",
+      "tileMetres": 2.0,
+      "meanLinearAlbedo": [
+        0.3603,
+        0.3428,
+        0.2965
+      ],
+      "meanRoughness": 0.473,
+      "files": {
+        "diff": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_floor_02/gravel_floor_02_diff_2k.jpg",
+          "sha256": "27c8953655dd2f289106106bb2c2c4845f77152bf1621b3d7091bd43b5083ffc",
+          "bytes": 4698557
+        },
+        "nor_gl": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_floor_02/gravel_floor_02_nor_gl_2k.jpg",
+          "sha256": "90f2f22016142f5ad725f8fc5540d8c9ad347db233b7540e2ab33f25ba9298e4",
+          "bytes": 5894173
+        },
+        "rough": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_floor_02/gravel_floor_02_rough_2k.jpg",
+          "sha256": "76f84ef27c72cffb1b1906c6a5b06cb06db664d2d6cb6c0ba2ee996c04e2607d",
+          "bytes": 2698006
+        },
+        "disp": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_floor_02/gravel_floor_02_disp_2k.jpg",
+          "sha256": "0fdfd2961efadaba61e65c2a2557f17cdeb34c0b49b5ce82bef4824618be499f",
+          "bytes": 2160182
+        },
+        "ao": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/gravel_floor_02/gravel_floor_02_ao_2k.jpg",
+          "sha256": "f40680eaf50c5c456b72d1b7466c2c32e26e04559c2b188e92c1adf87ce614d7",
+          "bytes": 4279088
+        }
+      }
+    }
+  ],
+  "derivatives": {
+    "meadow-albedo-1024.webp": 364922,
+    "meadow-nrh-512.webp": 468160,
+    "meadow-albedo-512.webp": 91082,
+    "meadow-nrh-256.webp": 107644,
+    "sparse-albedo-1024.webp": 236966,
+    "sparse-nrh-512.webp": 459674,
+    "sparse-albedo-512.webp": 54876,
+    "sparse-nrh-256.webp": 104918,
+    "soil-albedo-1024.webp": 386330,
+    "soil-nrh-512.webp": 459246,
+    "soil-albedo-512.webp": 98578,
+    "soil-nrh-256.webp": 112230,
+    "gravel-albedo-1024.webp": 448716,
+    "gravel-nrh-512.webp": 447704,
+    "gravel-albedo-512.webp": 112370,
+    "gravel-nrh-256.webp": 103178
   }
-]
+}

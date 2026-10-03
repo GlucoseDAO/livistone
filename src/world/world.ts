@@ -156,7 +156,7 @@ export class Town {
       for (const side of [-1, 1]) addGlow(this.root, new THREE.Vector3(landmark.x + side * 5, 2.5, landmark.z + 7), color, 8, 65, 15, .24);
     }
     for (const x of [-20, 0, 20]) addGlow(arrival, new THREE.Vector3(x, 4.3, -68), '#ffd28a', 12, 70, 17, .3);
-    this.mountains = new Mountains(mobile); this.root.add(this.mountains);
+    this.mountains = new Mountains(mobile, this.tier); this.root.add(this.mountains);
   }
   private createTerrain(): void {
     const geo = townTerrainGeometry();

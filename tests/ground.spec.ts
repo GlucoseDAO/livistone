@@ -9,7 +9,9 @@ for (const mobile of [false, true]) test(`textured ground loads (${mobile ? 'tou
   try {
     await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 });
     const reduced = await page.evaluate(() => (window as any).__livistone.snapshot().reducedGraphics);
-    expect(assets.filter(url => url.endsWith(`${reduced ? 512 : 1024}.webp`))).toHaveLength(2);
+    // Three layers, each an albedo plus a packed normal/roughness/height map (gpu 1024 + 512, reduced 512 + 256).
+    expect(assets.filter(url => url.includes(`-albedo-${reduced ? 512 : 1024}.webp`))).toHaveLength(3);
+    expect(assets.filter(url => url.includes(`-nrh-${reduced ? 256 : 512}.webp`))).toHaveLength(3);
     await page.evaluate(() => (window as any).__livistone.teleport(10, 52, -.9));
     await page.waitForTimeout(700);
     await page.screenshot({ path: `output/testing/ground-${mobile ? 'mobile' : 'desktop'}.png` });

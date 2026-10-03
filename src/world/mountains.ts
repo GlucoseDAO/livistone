@@ -4,6 +4,11 @@ import { RAILWAY, STATION } from './station-layout';
 export { landscapeHeight as mountainHeight } from './terrain';
 import { landscapeHeight } from './terrain';
 import { groundCover } from './ground-cover';
+import { groundLook, groundShaderPatch, groundTextureFiles } from './ground-material';
+import type { GraphicsTier } from '../game/graphics';
+
+/** Baseline meadow vertex colour; the ground shader divides it back out of its palette. */
+const GRASS = new THREE.Color('#c5c5a4');
 
 /** Subtract the rail clearance from the actual hillside triangles, including both far exits. */
 function cutRailwayOpening(source: THREE.BufferGeometry): THREE.BufferGeometry {
@@ -40,7 +45,7 @@ export function mountainGeometry(mobile: boolean): THREE.BufferGeometry {
       const values: number[] = []; for (let value = start; value <= end; value += value >= nearStart && value < nearEnd ? 2 : Math.abs(value) > 520 ? 32 : mobile ? 8 : 4) values.push(value); return values;
     };
     const xs = axis(-1400, 1400, -240, 240), zs = axis(-1280, 1280, -270, 150);
-    const positions: number[] = [], colors: number[] = [], soils: number[] = [], indices: number[] = [], color = new THREE.Color(), grass = new THREE.Color('#c5c5a4'), fresh = new THREE.Color('#a1b894'), stone = new THREE.Color('#a6a294');
+    const positions: number[] = [], colors: number[] = [], soils: number[] = [], indices: number[] = [], color = new THREE.Color(), grass = GRASS, fresh = new THREE.Color('#a1b894'), stone = new THREE.Color('#a6a294');
     for (let j = 0; j < zs.length; j++) for (let i = 0; i < xs.length; i++) {
       const x = xs[i], z = zs[j], y = landscapeHeight(x, z);
       positions.push(x, y, z);
@@ -57,46 +62,21 @@ export function mountainGeometry(mobile: boolean): THREE.BufferGeometry {
 
 export class Mountains extends THREE.Group {
   readonly ready: Promise<void>;
-  constructor(mobile: boolean) {
+  constructor(mobile: boolean, tier: GraphicsTier = mobile ? 'mobile' : 'gpu') {
     super(); this.name = 'Continuous valley and mountain ridges';
     const geo = mountainGeometry(mobile);
     const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .96 });
     const landscape = new THREE.Mesh(geo, material); landscape.name = 'Textured meadow and soil'; landscape.receiveShadow = true; this.add(landscape);
-    const loader = new THREE.TextureLoader(), base = import.meta.env.BASE_URL, size = mobile ? 512 : 1024;
-    const load = (file: string): Promise<THREE.Texture> => loader.loadAsync(base + file);
-    this.ready = Promise.all([load(`textures/ground/meadow-${size}.webp`), load(`textures/ground/soil-${size}.webp`), load('textures/mountains/rock-color.jpg'), mobile ? Promise.resolve(null) : load('textures/mountains/rock-normal.jpg')]).then(([grass, soil, rock, normal]) => {
-      for (const texture of [grass, soil, rock]) texture.colorSpace = THREE.SRGBColorSpace;
-      for (const texture of [grass, soil, rock, normal]) if (texture) { texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.anisotropy = mobile ? 2 : 4; }
-      material.onBeforeCompile = (shader) => {
-        shader.uniforms.grassColor = { value: grass }; shader.uniforms.soilColor = { value: soil }; shader.uniforms.rockColor = { value: rock }; shader.uniforms.rockNormal = { value: normal };
-        shader.vertexShader = 'attribute float groundSoil; varying float soilWeight; varying vec3 mountainPosition; varying vec3 mountainNormal;\n' + shader.vertexShader;
-        shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nmountainPosition=position; mountainNormal=normal; soilWeight=groundSoil;');
-        shader.fragmentShader = 'uniform sampler2D grassColor; uniform sampler2D soilColor; uniform sampler2D rockColor; uniform sampler2D rockNormal; varying float soilWeight; varying vec3 mountainPosition; varying vec3 mountainNormal;\n' + shader.fragmentShader;
-        shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
-          vec3 weights=pow(abs(normalize(mountainNormal)),vec3(4.0)); weights/=max(dot(weights,vec3(1.0)),.001);
-          vec3 p=mountainPosition*.065;
-          float exposed=clamp(smoothstep(.18,.65,1.0-abs(normalize(mountainNormal).y)) + smoothstep(58.0,105.0,mountainPosition.y)*.5,0.0,1.0);
-          vec3 meadow=texture2D(grassColor,mountainPosition.xz/2.8).rgb;
-          vec3 soil=texture2D(soilColor,mat2(.8,-.6,.6,.8)*mountainPosition.xz/3.3).rgb;
-          // Keep the photographed leaf detail in a fresh spring palette.
-          meadow*=vec3(.68,.88,.78);
-          meadow=mix(vec3(dot(meadow,vec3(.2126,.7152,.0722))),meadow,.72);
-          vec3 ground=mix(meadow,soil,soilWeight)*1.65;
-          // Flat garden ground needs only two samples; cliffs keep their triplanar detail.
-          if(exposed>.01) {
-            vec3 rock=texture2D(rockColor,p.yz).rgb*weights.x+texture2D(rockColor,p.xz).rgb*weights.y+texture2D(rockColor,p.xy).rgb*weights.z;
-            ground=mix(ground,rock*1.8,exposed);
-          }
-          diffuseColor.rgb*=ground;
-        `);
-        if (!mobile) shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `
-          if(exposed>.01) {
-            vec2 nx=texture2D(rockNormal,p.yz).xy*2.0-1.0, ny=texture2D(rockNormal,p.xz).xy*2.0-1.0, nz=texture2D(rockNormal,p.xy).xy*2.0-1.0;
-            vec3 detail=vec3(0.0,nx.y,nx.x)*weights.x+vec3(ny.x,0.0,ny.y)*weights.y+vec3(nz.x,nz.y,0.0)*weights.z;
-            normal=normalize(mat3(viewMatrix)*(normalize(mountainNormal)+detail*.32*exposed));
-          }
-        `);
-      };
+    const loader = new THREE.TextureLoader(), base = import.meta.env.BASE_URL, look = groundLook();
+    const load = (file: string, colour: boolean): Promise<THREE.Texture> => loader.loadAsync(base + file).then((texture) => {
+      if (colour) texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.anisotropy = tier === 'gpu' ? 4 : 2; return texture;
+    });
+    const files = groundTextureFiles(tier);
+    this.ready = Promise.all([Promise.all(files.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))), load('textures/mountains/rock-color.jpg', true), tier === 'gpu' ? load('textures/mountains/rock-normal.jpg', false) : Promise.resolve(null)]).then(([ground, rock, rockNormal]) => {
+      const albedo = ground.filter((_, i) => files[i].includes('-albedo-')), nrh = tier === 'cpu' ? albedo : ground.filter((_, i) => files[i].includes('-nrh-'));
+      material.onBeforeCompile = groundShaderPatch(tier, look, { albedo, nrh, rock, rockNormal }, GRASS);
+      material.customProgramCacheKey = () => `livistone-ground-${tier}-${look}`;
       material.needsUpdate = true;
     }).catch(() => { material.color.set('#587448'); /* Playable vertex-coloured terrain if local images fail. */ });
   }
