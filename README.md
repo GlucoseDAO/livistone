@@ -8,7 +8,7 @@ City Hall interprets the Nut of Power with finer walnut relief, curved brass cla
 
 ## Visiting the town
 
-You only need a recent browser with WebGL 2 and hardware acceleration. No installation, IDE, account or login is required to visit the website.
+You only need a recent browser with hardware acceleration. The town renders with WebGPU where the browser offers it and with WebGL 2 everywhere else. No installation, IDE, account or login is required to visit the website.
 
 1. The loading screen introduces Livia with her artistic homepage portrait and shows preparation progress. On short screens, scroll to see the full portrait. The town opens in **first person at the station exit, facing the Livistone entrance**.
 2. Walk towards the bridge and city gate. Choose **Map** (M) to see the town from above or select a named stop to arrive at its entrance.
@@ -87,7 +87,7 @@ bun run test:browser
 bun run check:hosts
 ```
 
-Browser tests require Chrome and use the dev server on port 5173. `check:hosts` requires a completed build and checks real development/preview HTTP responses for the configured hostname and an unapproved hostname.
+Browser tests require Chrome and use the dev server on port 5173. On Linux they turn on headless WebGPU; `LIVISTONE_BACKEND=webgl bun run test:browser` runs the same tests on the WebGL 2 fallback. `check:hosts` requires a completed build and checks real development/preview HTTP responses for the configured hostname and an unapproved hostname.
 
 - [Technical guide: architecture, assets, controls and project history](docs/technical-guide.md)
 - [Design and implementation plan](docs/3d-game-plan.md)
@@ -96,7 +96,7 @@ Browser tests require Chrome and use the dev server on port 5173. `check:hosts` 
 - [Enhancement hill and human-mesh provenance](docs/enhancement-reference.md)
 - [Kalimba credits and source records](public/audio/kalimba/README.md)
 
-Livistone is a playable prototype. Performance varies by device, and physical-phone and Safari verification remain ongoing work. Artwork and recording credits, third-party asset licences and concept references are preserved in the [technical guide](docs/technical-guide.md#credits-and-licensing).
+Livistone is a playable prototype. Performance varies by device, and physical-phone and Safari verification (including Safari's WebGPU) remain ongoing work. Artwork and recording credits, third-party asset licences and concept references are preserved in the [technical guide](docs/technical-guide.md#credits-and-licensing).
 
 Ground cover combines local grass-and-soil photographs with worn path edges, earth near riverbanks and broad spring-green meadow variation. It uses the existing terrain mesh: reduced detail loads two 512 px WebP textures (about 130 KiB combined), while rich detail uses 1024 px textures. Physical-phone performance still needs measurement. Texture sources and regeneration are recorded in `public/textures/ground/ATTRIBUTION.md`.
 
