@@ -1,17 +1,16 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { WATER_EYES, GARDENS } from './living-waters-layout';
+import { GARDENS } from './living-waters-layout';
+import { largestEyes } from './lake-eyes';
 import { nightEmission } from './night-lighting';
 
 /** Sculptural aquatic leaves: Untold's split elliptical wrapping meets Spotlight's folded triangles. */
 export function createLakePlants(parent: THREE.Group, mobile: boolean): void {
   const leaves: THREE.BufferGeometry[] = [], folds: THREE.BufferGeometry[] = [], stems: THREE.BufferGeometry[] = [];
-  WATER_EYES.forEach((cell, index) => {
+  largestEyes().forEach(({ cell: index, center: [x, z], reach: edge }) => {
     if (index % 3 === 0 || (mobile && index % 4 === 0)) return;
-    const x = cell.reduce((s, p) => s + p[0], 0) / cell.length, z = cell.reduce((s, p) => s + p[1], 0) / cell.length;
     if (Math.hypot(x - GARDENS.pavilionX, z) < 15 || (x < -27 && Math.abs(z - 5) < 8)) return;
-    // Reserve a complete canopy within one water cell, clear of every silver walking vein.
-    const edge = Math.min(...cell.map((p, i) => { const q = cell[(i + 1) % cell.length], dx = q[0] - p[0], dz = q[1] - p[1]; return Math.abs(dx * (p[1] - z) - (p[0] - x) * dz) / Math.hypot(dx, dz); }));
+    // Reserve a complete canopy within one water cell, clear of every silver walking vein and path.
     const scale = Math.min(1.25, (edge - .55) / 2.1); if (scale < .5) return;
     const yaw = index * 2.399, matrix = new THREE.Matrix4().compose(new THREE.Vector3(x, -.1, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw), new THREE.Vector3(scale, scale, scale));
     stems.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(.13, 1.4, .1), new THREE.Vector3(0, 3, 0)]), 12, .075, 5, false).applyMatrix4(matrix));

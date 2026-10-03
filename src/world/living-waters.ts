@@ -8,7 +8,9 @@ import type { PlaceSign } from './place-sign';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
 import type { Interactive } from './world';
-import { GARDENS, GARDEN_PANELS, LAKE_OUTLINE, OPAL_BASIN, RILL, RILL_RADIUS, WATER_EYES, gardenHeight, rainPlantAllowed } from './living-waters-layout';
+import { GARDENS, GARDEN_PANELS, LAKE_OUTLINE, OPAL_BASIN, RILL, RILL_RADIUS, gardenHeight, pointInPolygon, rainPlantAllowed } from './living-waters-layout';
+import { clearance, eyeLip, fansFrom, largestEyes, waterEyes } from './lake-eyes';
+import type { WaterEye } from './lake-eyes';
 import type { Point } from './living-waters-layout';
 import { MYCELIUM_RADIUS, MyceliumGrove } from './mycelium';
 import type { GroveInstance } from './mycelium';
@@ -56,13 +58,13 @@ export class LivingWaters {
   private readonly drainage: THREE.Curve<THREE.Vector3>[] = [];
   constructor(private mobile: boolean, private readonly pathMaterial: THREE.Material = new THREE.MeshStandardMaterial({ color: '#d4cfbc', roughness: .91 })) {
     this.root.name = 'Living Waters · town gardens'; this.root.position.set(GARDENS.x, 0, GARDENS.z);
-    const network = shape(LAKE_OUTLINE); WATER_EYES.forEach((cell) => network.holes.push(new THREE.Path(cell.map(([x, z]) => new THREE.Vector2(x, -z)))));
+    // The eyes keep clear of the garden paths' paving and kerbs (lake-eyes.ts), so their stone lips never cross a path.
+    const network = shape(LAKE_OUTLINE); waterEyes().forEach((eye) => network.holes.push(new THREE.Path(eye.outline.map(([x, z]) => new THREE.Vector2(x, -z)))));
     this.mesh(new THREE.ShapeGeometry(network).rotateX(-Math.PI / 2), this.silver, true, 0, .12);
     const eyes: THREE.Mesh[] = [], eyeKerbs: THREE.Mesh[] = [];
-    WATER_EYES.forEach((cell, index) => {
-      const mesh = this.mesh(this.waterEye(cell), this.water, false, 0, -.08 + index % 3 * .012); mesh.castShadow = false; eyes.push(mesh);
-      const outline = cell.map(([x, z]) => new THREE.Vector3(x, .14, z)); outline.push(outline[0].clone());
-      eyeKerbs.push(this.mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(outline, false, 'catmullrom', 0), cell.length * 3, .085, 5, false), this.stone, false));
+    waterEyes().forEach((eye) => {
+      const mesh = this.mesh(this.waterEye(eye), this.water, false, 0, -.08 + eye.cell % 3 * .012); mesh.castShadow = false; eyes.push(mesh);
+      eyeKerbs.push(this.mesh(eyeLip(eye.outline, .14, .085, 5), this.stone, false));
     });
     // Each cell keeps its own surface height and local x/z, so the ripples are unchanged when the eyes draw together.
     mergeStatic(eyes, 'Lake water eyes'); mergeStatic(eyeKerbs, 'Lake water-eye stone kerbs');
@@ -88,11 +90,16 @@ export class LivingWaters {
       }
       for (const dx of [-1, 1]) this.mesh(new THREE.CylinderGeometry(.045, .065, 1.7, 6), this.silver, true, x + dx, .85, z);
       this.mesh(new THREE.BoxGeometry(2.72, 2.9, .1), displayMaterial({ color: '#f4f0e5' }), true, x, 1.82, z);
-      const photo = new THREE.Mesh(new THREE.PlaneGeometry(2.52, 1.32), displayMaterial({ color: '#f4f0e5' }));
-      photo.position.set(x, 2.4, z + .06); photo.userData.discovery = id; photo.userData.kind = 'photo'; if (name === 'vittoria') photo.userData.piece = 'vittoria-amazonica';
-      const caption = new THREE.Mesh(new THREE.PlaneGeometry(2.52, 1.32), displayMaterial({ color: '#f4f0e5' }));
-      caption.position.set(x, 1.18, z + .06); caption.userData.discovery = id; caption.userData.kind = 'caption';
-      this.root.add(photo, caption); this.panels.push(photo, caption); this.interactives.push({ id, object: caption, position: new THREE.Vector3(x + GARDENS.x, 1.8, z + GARDENS.z) });
+      // Both faces carry the photograph and caption: the stands stand free on the lake paths and are walked round.
+      const photoPaper = displayMaterial({ color: '#f4f0e5' }), captionPaper = displayMaterial({ color: '#f4f0e5' });
+      for (const side of [1, -1]) {
+        const photo = new THREE.Mesh(new THREE.PlaneGeometry(2.52, 1.32), photoPaper);
+        photo.position.set(x, 2.4, z + side * .06); photo.rotation.y = side < 0 ? Math.PI : 0; photo.userData.discovery = id; photo.userData.kind = 'photo'; if (name === 'vittoria') photo.userData.piece = 'vittoria-amazonica';
+        const caption = new THREE.Mesh(new THREE.PlaneGeometry(2.52, 1.32), captionPaper);
+        caption.position.set(x, 1.18, z + side * .06); caption.rotation.y = photo.rotation.y; caption.userData.discovery = id; caption.userData.kind = 'caption';
+        this.root.add(photo, caption); this.panels.push(photo, caption);
+        if (side > 0) this.interactives.push({ id, object: caption, position: new THREE.Vector3(x + GARDENS.x, 1.8, z + GARDENS.z) });
+      }
     }
     const channel = RILL;
     this.drainage.push(channel);
@@ -107,9 +114,24 @@ export class LivingWaters {
     const dripGeo = new THREE.BufferGeometry(); dripGeo.setAttribute('position', new THREE.BufferAttribute(drips, 3)); this.drips = new THREE.Points(dripGeo, new THREE.PointsMaterial({ color: '#c7eeef', size: .16 })); this.root.add(this.drips);
     for (const particles of [this.rain, this.drips]) sizedPoints(particles);
   }
-  private waterEye(cell: Point[]): THREE.BufferGeometry {
-    const center = cell.reduce(([x, z], p) => [x + p[0] / cell.length, z + p[1] / cell.length] as Point, [0, 0] as Point), vertices = [center[0], 0, center[1]], colors = [.37, .65, .65], indices: number[] = [];
-    cell.forEach(([x, z], i) => { vertices.push(x, 0, z); colors.push(.78, .87, .68); indices.push(0, (i + 1) % cell.length + 1, i + 1); });
+  /** Deep teal at the eye's centre fading to pale at its lip: a fan from the centre where it covers the outline once, else earcut with interior points shaded by their clearance. */
+  private waterEye({ outline, center, reach }: WaterEye): THREE.BufferGeometry {
+    const vertices = [center[0], 0, center[1]], colors = [.37, .65, .65], indices: number[] = [], deep = (t: number): number[] => [.78 - .41 * t, .87 - .22 * t, .68 - .03 * t];
+    if (fansFrom(outline, center)) outline.forEach(([x, z], i) => { vertices.push(x, 0, z); colors.push(...deep(0)); indices.push(0, (i + 1) % outline.length + 1, i + 1); });
+    else {
+      vertices.length = colors.length = 0;
+      const contour = outline.map(([x, z]) => new THREE.Vector2(x, z)), inner: THREE.Vector2[][] = [], jitter = random(outline.length * 7919);
+      // Earcut takes one-point holes as interior vertices; a jittered 1.2 m lattice keeps the depth shading inside cut pieces.
+      for (let x = Math.min(...outline.map(p => p[0])); x < Math.max(...outline.map(p => p[0])); x += 1.2) for (let z = Math.min(...outline.map(p => p[1])); z < Math.max(...outline.map(p => p[1])); z += 1.2) {
+        const px = x + (jitter() - .5) * .5, pz = z + (jitter() - .5) * .5; if (pointInPolygon(px, pz, outline) && clearance(px, pz, outline) > .6) inner.push([new THREE.Vector2(px, pz)]);
+      }
+      for (const p of [...contour, ...inner.map(([p]) => p)]) { vertices.push(p.x, 0, p.y); colors.push(...deep(Math.min(1, clearance(p.x, p.y, outline) / reach))); }
+      for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(contour, inner)) {
+        const ax = vertices[a * 3], az = vertices[a * 3 + 2], cross = (vertices[b * 3] - ax) * (vertices[c * 3 + 2] - az) - (vertices[b * 3 + 2] - az) * (vertices[c * 3] - ax);
+        // Counter-clockwise in (x, z) faces down; keep the fan's upward winding.
+        indices.push(...(cross > 0 ? [a, c, b] : [a, b, c]));
+      }
+    }
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geometry.setIndex(indices); geometry.computeVertexNormals(); return geometry;
   }
   private wetlandPlanting(): void {
@@ -126,8 +148,7 @@ export class LivingWaters {
     const reeds = new THREE.InstancedMesh(geometry, new THREE.MeshStandardMaterial({ color: '#466347', roughness: .9, side: THREE.DoubleSide }), sites.length), matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion();
     sites.forEach((p, i) => { const scale = .4 + rand() * .5; matrix.compose(p, rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI * 2), new THREE.Vector3(scale, scale, scale)); reeds.setMatrixAt(i, matrix); }); reeds.computeBoundingSphere(); this.root.add(reeds);
     const pads: { x: number; y: number; z: number; angle: number; scale: number }[] = [], jitter = random(4417);
-    WATER_EYES.forEach((cell) => {
-      const x = cell.reduce((sum, p) => sum + p[0], 0) / cell.length, z = cell.reduce((sum, p) => sum + p[1], 0) / cell.length;
+    largestEyes().forEach(({ center: [x, z] }) => {
       const count = 1 + (jitter() < .45 ? 1 : 0) + (jitter() < .2 ? 1 : 0);
       for (let j = 0; j < count; j++) pads.push({ x: x + (jitter() - .5) * 1.8, y: -.05 + jitter() * .024, z: z + (jitter() - .5) * 1.8, angle: jitter() * Math.PI * 2, scale: .75 + jitter() * .45 });
     });
@@ -232,26 +253,28 @@ export class LivingWaters {
       ctx.fillStyle = '#445c4b'; paintPosterText(ctx, body, 40, 110, 940, 340, 44);
       ctx.fillStyle = '#25473b'; ctx.font = '26px sans-serif'; ctx.fillText('Click / E · story and livia.glucosedao.org/pieces', 40, 500);
       const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
+      // Both faces share one caption material.
       const panel = this.panels.find(p => p.userData.discovery === id && p.userData.kind === 'caption'); if (!panel) { map.dispose(); return; }
       const material = panel.material as THREE.MeshBasicMaterial; material.color.set('#ffffff'); material.map = map; material.needsUpdate = true;
     };
     caption('living-vittoria', 'Vittoria Amazonica', 'Silver and aquamarine, 2022. Survival, Romanian Jewelry Week 2023. The lake reads its lily-pad form. Dewdrop, a separate topaz ring, stands by the pavilion.');
     caption('living-dewdrop', 'Dewdrop Ring', 'Adjustable silver around treated Swiss blue topaz. A faceted droplet in an open embrace. Vittoria Amazonica, the aquamarine pendant, has its own stand on the lake.');
-    const dewdrop = this.panels.find(p => p.userData.discovery === 'living-dewdrop' && p.userData.kind === 'photo');
-    if (dewdrop) new THREE.TextureLoader().load(photoURL('dewdrop-ring-stand.webp'), (map) => {
-      map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
-      const image = map.image as HTMLImageElement, size = photoSize(image.naturalWidth, image.naturalHeight, 2.52, 1.32);
-      dewdrop.geometry.dispose(); dewdrop.geometry = new THREE.PlaneGeometry(size.width, size.height);
-      const material = dewdrop.material as THREE.MeshBasicMaterial; material.color.set('#ffffff'); material.map = map; material.needsUpdate = true;
+    const faces = (id: string): THREE.Mesh[] => this.panels.filter(p => p.userData.discovery === id && p.userData.kind === 'photo');
+    const fit = (meshes: THREE.Mesh[], map: THREE.Texture): void => {
+      const image = map.image as HTMLImageElement, size = photoSize(image.naturalWidth, image.naturalHeight, 2.52, 1.32), geometry = new THREE.PlaneGeometry(size.width, size.height);
+      meshes[0]?.geometry.dispose(); for (const mesh of meshes) mesh.geometry = geometry;
+    };
+    const dewdrop = faces('living-dewdrop');
+    if (dewdrop.length) new THREE.TextureLoader().load(photoURL('dewdrop-ring-stand.webp'), (map) => {
+      map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4; fit(dewdrop, map);
+      const material = dewdrop[0].material as THREE.MeshBasicMaterial; material.color.set('#ffffff'); material.map = map; material.needsUpdate = true;
     });
-    const vittoria = COLLECTION.find(p => p.discovery === 'vittoria-amazonica'), photo = this.panels.find(p => p.userData.discovery === 'living-vittoria' && p.userData.kind === 'photo');
-    if (vittoria && photo) {
+    const vittoria = COLLECTION.find(p => p.discovery === 'vittoria-amazonica'), photos = faces('living-vittoria');
+    if (vittoria && photos.length) {
       new THREE.TextureLoader().load(photoURL(vittoria.photos[0].thumb ?? vittoria.photos[0].file), (map) => {
-        map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
-        const image = map.image as HTMLImageElement, size = photoSize(image.naturalWidth, image.naturalHeight, 2.52, 1.32);
-        photo.geometry.dispose(); photo.geometry = new THREE.PlaneGeometry(size.width, size.height);
+        map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4; fit(photos, map);
         // The catalogue thumbnail's sweep is baked to paper: key it to the exact paper, the jewel in its own colours.
-        (photo.material as THREE.Material).dispose(); photo.material = paperPhotoMaterial(map);
+        (photos[0].material as THREE.Material).dispose(); const material = paperPhotoMaterial(map); for (const photo of photos) photo.material = material;
       });
     }
   }

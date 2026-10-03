@@ -29,6 +29,9 @@ const VIEWS: Record<string, View> = Object.fromEntries(([
   ['junction-garden', 6, 12, .876, -.5], ['junction-glucose', 22, -30, -.876, -.5], ['junction-station', 6, 53, .98, -.5],
   ['enhancement-front', 100, -154.6, .575, .05], ['grove-floor', 78, -118, Math.PI, -.3], ['sky-up', 0, 58, .5, .6], ['ridge-northwest', -30, -105, Math.PI / 4, .12],
   // Sub-plan 26: the skyline down the river valley, from the Enhancement summit (dropped from 24 m onto the hill) and below the north ridges.
+  // October 2026 owner report: lake water-cell kerbs crossing the garden paving, and the lake jewel stands seen from behind.
+  ['lake-path', -10, -122, 0, -.1], ['lake-path-down', -10, -134, 0, -.55], ['lake-crossing', 3, -112, -1.45, -.4], ['vittoria-back', -16, -169, Math.PI, .05], ['dewdrop-back', -12, -118, Math.PI, .02],
+  ['lake-west-pools', -27, -101, Math.PI / 2 + .15, -.35], ['lake-east-pool', 2.5, -106, 2.55, -.45],
   ['valley-east', 16, 42, -Math.PI / 2, .06], ['summit-northwest', 80, -174, 1, .02, 24], ['summit-southwest', 80, -174, 2.4, -.05, 24], ['ridge-north', 0, -150, 0, .1],
 ] as View[]).map(view => [view[0], view]));
 const SETS: Record<string, string[]> = {
@@ -37,11 +40,12 @@ const SETS: Record<string, string[]> = {
   ground: ['arrival-meadow', 'north-meadow', 'meadow-ground', 'path-edge', 'garden-path', 'woodland-edge'],
   water: ['bridge-bank', 'shore-closeup', 'east-tributary', 'west-tributary', 'vittoria-lake', 'mycelium-grove'],
   galleries: ['city-hall-gallery', 'energy-gallery', 'science-gallery', 'energy-inside', 'science-inside', 'catalogue-poster', 'embryo-station-platform'],
+  lake: ['lake-path', 'lake-path-down', 'lake-crossing', 'lake-west-pools', 'lake-east-pool', 'vittoria-lake', 'vittoria-back', 'dewdrop-back'],
   skyline: ['valley-east', 'summit-northwest', 'summit-southwest', 'ridge-north'],
   fixes: ['city-hall-far', 'city-hall-north', 'nanot-arch', 'future-house-entry', 'future-house-neck', 'junction-garden', 'junction-glucose', 'junction-station', 'enhancement-front', 'grove-floor', 'mycelium-grove', 'sky-up', 'ridge-northwest', 'railway-east-portal'],
 };
-// `all` keeps the 33 realism views; `fixes` and `skyline` are reviewed on their own.
-SETS.all = [...new Set(Object.entries(SETS).filter(([set]) => set !== 'fixes' && set !== 'skyline').flatMap(([, views]) => views))];
+// `all` keeps the 33 realism views; `fixes`, `skyline` and `lake` are reviewed on their own.
+SETS.all = [...new Set(Object.entries(SETS).filter(([set]) => set !== 'fixes' && set !== 'skyline' && set !== 'lake').flatMap(([, views]) => views))];
 
 const [outDir, profileArg = 'desktop', setArg = 'quick', time = 'day'] = process.argv.slice(2);
 if (!outDir) throw new Error('Usage: bun scripts/screenshot-realism.ts <outDir> <desktop|touch|software> [viewSet] [day|golden|night]');
