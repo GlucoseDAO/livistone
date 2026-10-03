@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { createStream, createWaterfall, foamTexture, sprayGeometry, streamGeometry, streamWhite, waterfallGeometry } from '../src/world/mountain-water';
+import { GORGE_FALL, SNOW_CAVE, brookCourse, createGorgeWater, createStream, createWaterfall, foamTexture, gorgeStreamCourse, snowCaveGeometry, sprayGeometry, streamGeometry, streamWhite, waterfallClearance, waterfallGeometry } from '../src/world/mountain-water';
 import type { Point3, WaterfallSpec } from '../src/world/mountain-water';
+import { GORGE_STREAM, PLATEAU_STREAM, STAGE, TRAIL_HALF, TRAIL_SAMPLES, WATERFALL, gorgeCoords, snowCover, trailDistance } from '../src/world/mountain-layout';
+import { terrainSurfaceHeight } from '../src/world/terrain';
 
 const finite = (attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute): boolean => Array.from(attribute.array as ArrayLike<number>).every(Number.isFinite);
 /** Distance in plan from (x, z) to a polyline. */
@@ -83,7 +85,7 @@ describe('mountain waterfall', () => {
       if (water.getX(i) > .5) { pool++; expect(water.getY(i)).toBeGreaterThanOrEqual(0); continue; }
       sheet++; top = Math.max(top, y); bottom = Math.min(bottom, y);
       // Above the pool the sheet keeps clear of the rock; below it, it sinks into water or ground on purpose.
-      if (y > spec.foot[1] + .01) expect(cliff(x, z)).toBeLessThanOrEqual(y - .35 + .05);
+      if (y > spec.foot[1] + .01) expect(cliff(x, z)).toBeLessThanOrEqual(y - waterfallClearance(y, spec.foot[1]) + .01);
       expect(fall.getY(i)).toBeGreaterThanOrEqual(0); expect(fall.getZ(i)).toBeGreaterThanOrEqual(0); expect(fall.getZ(i)).toBeLessThanOrEqual(1);
       if (Math.abs(y - 24.1) < 1e-3) topWidth = Math.max(topWidth, Math.abs(fall.getX(i)) / Math.max(fall.getW(i), 1e-6));
       if (Math.abs(y - spec.foot[1]) < 1e-3) footWidth = Math.max(footWidth, Math.abs(fall.getX(i)) / Math.max(fall.getW(i), 1e-6));
@@ -102,19 +104,22 @@ describe('mountain waterfall', () => {
     // Free fall from 1.6 m/s over 24 m takes about 1.9 s.
     const landed = sorted.find(([y]) => Math.abs(y - spec.foot[1]) < 1e-3)![1]; expect(landed).toBeGreaterThan(1.7); expect(landed).toBeLessThan(2.3);
   });
-  it('fills only a hollow: level water in a bowl, a thin film over ground that falls away', () => {
-    // The pool (radius 3 here) is centred a little out from the foot; this bowl round that centre holds water to 0 within 2 m.
-    const bowl = (x: number, z: number): number => z < -1 ? 24 : .03 * ((x * x + (z - 4.05) * (z - 4.05)) - 4);
-    for (const [ground, level] of [[bowl, 0], [cliff, .05]] as const) {
+  it('stands level in a hollow or over flat ground, and thins to a film where the ground falls away', () => {
+    // The pool (radius 3 here) is centred a little out from the foot. A bowl round it holds water 0.12 m deep; flat ground a
+    // hand below the level makes a shallow pool; a 1-in-3 slope falling away from the foot leaves only a film.
+    const bowl = (x: number, z: number): number => z < -1 ? 24 : .03 * ((x * x + (z - 3.6) * (z - 3.6)) - 4);
+    const flatFloor = (_x: number, z: number): number => z < -1 ? 24 : -.1, slope = (_x: number, z: number): number => z < -1 ? 24 : -.33 * Math.max(0, z - 2);
+    for (const [ground, level] of [[bowl, 0], [flatFloor, 0], [slope, 0]] as const) {
       const geometry = waterfallGeometry({ ...spec, ledge: undefined, foot: [0, level, 3], pool: 3, ground }, 'gpu'), position = geometry.getAttribute('position'), water = geometry.getAttribute('water');
       let flat = 0, film = 0;
       for (let i = 0; i < position.count; i++) {
         if (water.getX(i) < .5) continue;
         const y = position.getY(i), g = ground(position.getX(i), position.getZ(i));
         if (Math.abs(y - level) < 1e-4 && g < level - .05) flat++; else if (Math.abs(y - g - .03) < 1e-4) film++;
-        expect(y).toBeLessThanOrEqual(Math.max(level, g + .03) + 1e-4);
+        // Never more than a film over ground above the level, nor a sheet floating over ground that falls away.
+        expect(y).toBeLessThanOrEqual(Math.max(level, g + .03) + 1e-4); expect(y - g).toBeLessThanOrEqual(Math.max(.3, level - g) + 1e-4);
       }
-      if (ground === bowl) expect(flat).toBeGreaterThan(film); else expect(flat).toBe(0);
+      if (ground === slope) { expect(film).toBeGreaterThan(flat); } else expect(flat).toBeGreaterThan(film);
     }
   });
   it('is at most two draws: sheet and pool, then mist on gpu and mobile only; lit, never emissive', () => {
@@ -135,5 +140,75 @@ describe('mountain waterfall', () => {
       expect(low / 4096).toBeCloseTo(.5, 1);
     }
     expect(map.wrapS).toBe(THREE.RepeatWrapping); expect(foamTexture(64)).toBe(map);
+  });
+});
+
+describe('the gorge water, placed from the layout', () => {
+  const near = (a: Point3, b: { x: number; z: number }): number => Math.hypot(a[0] - b.x, a[2] - b.z);
+  it('hangs the waterfall from the plateau lip to the pool at the wall foot, clear of the rock everywhere', () => {
+    expect(near(GORGE_FALL.lip, WATERFALL.lip)).toBeLessThan(1e-9); expect(near(GORGE_FALL.foot, WATERFALL.foot)).toBeLessThan(1e-9);
+    // About 40.6 m up at the lip, 22.9 m at the pool: the drop the layout gives.
+    expect(GORGE_FALL.lip[1]).toBeGreaterThan(40); expect(GORGE_FALL.foot[1]).toBeLessThan(23.5); expect(GORGE_FALL.lip[1] - GORGE_FALL.foot[1]).toBeGreaterThan(17);
+    for (const tier of ['gpu', 'mobile', 'cpu'] as const) {
+      const geometry = waterfallGeometry(GORGE_FALL, tier), position = geometry.getAttribute('position'), water = geometry.getAttribute('water'), index = geometry.index!;
+      // Above the pool every vertex keeps its clearance over the rendered rock, and no triangle dips into the rock between them
+      // until the sheet is about to land in its pool.
+      const p = new THREE.Vector3(), q = new THREE.Vector3(), r = new THREE.Vector3(), level = GORGE_FALL.foot[1];
+      let lowest = Infinity;
+      for (let i = 0; i < index.count; i += 3) {
+        const [a, b, c] = [index.getX(i), index.getX(i + 1), index.getX(i + 2)]; if (water.getX(a) > .5) continue;
+        p.fromBufferAttribute(position, a); q.fromBufferAttribute(position, b); r.fromBufferAttribute(position, c);
+        for (const point of [p, q, r]) if (point.y > level + .01) expect(terrainSurfaceHeight(point.x, point.z)).toBeLessThanOrEqual(point.y - waterfallClearance(point.y, level) + .01);
+        for (const point of [p.clone().add(q).add(r).divideScalar(3), p.clone().lerp(q, .5), q.clone().lerp(r, .5), r.clone().lerp(p, .5)]) if (point.y > level + .5) expect(terrainSurfaceHeight(point.x, point.z)).toBeLessThan(point.y - .02);
+        // Hanging just in front of the cliff: never flung across the gorge.
+        for (const point of [p, q, r]) if (point.y > level) lowest = Math.min(lowest, Math.hypot(point.x - GORGE_FALL.foot[0], point.z - GORGE_FALL.foot[2]));
+      }
+      expect(lowest).toBeLessThan(.5);
+      for (let i = 0; i < position.count; i++) if (water.getX(i) < .5) expect(Math.hypot(position.getX(i) - GORGE_FALL.foot[0], position.getZ(i) - GORGE_FALL.foot[2])).toBeLessThan(8);
+      // Its pool keeps off the trail's bare earth.
+      for (let i = 0; i < position.count; i++) if (water.getX(i) > .5 && water.getY(i) > 0) expect(trailDistance(position.getX(i), position.getZ(i))).toBeGreaterThan(TRAIL_HALF);
+    }
+  });
+  it('runs the gorge stream out of the cave and down GORGE_STREAM, and the brook down PLATEAU_STREAM to the lip', () => {
+    const gorge = gorgeStreamCourse(), brook = brookCourse();
+    expect(gorge.length).toBe(GORGE_STREAM.length + 2); gorge.slice(2).forEach((p, i) => expect(near(p, GORGE_STREAM[i])).toBeLessThan(1e-9));
+    // It starts a metre inside the cave, upstream of the snow's snout, and stays off the trail.
+    expect(near(gorge[0], SNOW_CAVE.mouth)).toBeCloseTo(1, 5); expect(gorgeCoords(gorge[0][0], gorge[0][2])!.s).toBeGreaterThan(STAGE.snout);
+    for (const p of gorge) { expect(p[1]).toBeCloseTo(terrainSurfaceHeight(p[0], p[2]), 6); expect(trailDistance(p[0], p[2])).toBeGreaterThan(1.2); }
+    // The brook ends on the lip; its spring is the first point where the crag's face gives way to the meadow.
+    expect(near(brook[brook.length - 1], WATERFALL.lip)).toBeLessThan(1e-9); expect(brook.length).toBeGreaterThan(PLATEAU_STREAM.length - 4);
+    for (let i = 1; i < brook.length; i++) expect(brook[i][1]).toBeLessThan(brook[i - 1][1] + .05);
+    expect((brook[0][1] - brook[1][1]) / Math.hypot(brook[1][0] - brook[0][0], brook[1][2] - brook[0][2])).toBeLessThanOrEqual(1.2);
+  });
+  it('opens the snow cave where the stream leaves the snout: a 1.4 × 0.8 m mouth under a lip in a steep face', () => {
+    expect(near([SNOW_CAVE.mouth.x, 0, SNOW_CAVE.mouth.z], GORGE_STREAM[0])).toBeLessThan(1e-9);
+    expect(SNOW_CAVE.width).toBe(1.4); expect(SNOW_CAVE.height).toBe(.8); expect(SNOW_CAVE.lip).toBeGreaterThanOrEqual(.5); expect(SNOW_CAVE.lip).toBeLessThanOrEqual(.8);
+    // Upstream of the mouth lies the old snow the cave runs into.
+    const inside = { x: SNOW_CAVE.mouth.x - SNOW_CAVE.out.x * 1.2, z: SNOW_CAVE.mouth.z - SNOW_CAVE.out.z * 1.2 }; expect(snowCover(inside.x, inside.z)).toBeGreaterThan(.5);
+    // The face thins away well short of the trail.
+    const trail = TRAIL_SAMPLES[STAGE.snout], side = (trail.x - SNOW_CAVE.mouth.x) * SNOW_CAVE.out.z - (trail.z - SNOW_CAVE.mouth.z) * SNOW_CAVE.out.x;
+    expect(Math.abs(side) - (side < 0 ? SNOW_CAVE.left : SNOW_CAVE.right)).toBeGreaterThanOrEqual(1.1 - 1e-9);
+    for (const tier of ['gpu', 'cpu'] as const) {
+      const geometry = snowCaveGeometry(SNOW_CAVE, tier), position = geometry.getAttribute('position'), colour = geometry.getAttribute('color');
+      expect(finite(position)).toBe(true); expect(finite(colour)).toBe(true); expect(geometry.index!.count / 3).toBeLessThan(tier === 'gpu' ? 2000 : 800);
+      // The opening: nothing of the snow stands in the 1.4 × 0.8 m mouth in front of the cave (the dark interior lies behind it).
+      const g = terrainSurfaceHeight(SNOW_CAVE.mouth.x, SNOW_CAVE.mouth.z);
+      let blocking = 0, thick = 0, dark = 0;
+      for (let i = 0; i < position.count; i++) {
+        const dx = position.getX(i) - SNOW_CAVE.mouth.x, dz = position.getZ(i) - SNOW_CAVE.mouth.z, b = dx * SNOW_CAVE.out.z - dz * SNOW_CAVE.out.x, a = -(dx * SNOW_CAVE.out.x + dz * SNOW_CAVE.out.z), y = position.getY(i) - g;
+        if (Math.abs(b) < .55 && y > .05 && y < .6 && a < -.12) blocking++;
+        if (Math.abs(b) < .3 && a > -.6 && a < .3 && y > 1.3) thick++;
+        if (colour.getX(i) < .05) dark++;
+      }
+      expect(blocking).toBe(0); expect(thick).toBeGreaterThan(0); expect(dark).toBeGreaterThan(0);
+    }
+  });
+  it('adds four draws at most (three on cpu): fall and pool, mist, both streams together, the snow cave', () => {
+    for (const tier of ['gpu', 'mobile', 'cpu'] as const) {
+      const { group, spray } = createGorgeWater(tier), meshes = group.children as THREE.Mesh[];
+      expect(meshes.length).toBe(3); expect(!!spray).toBe(tier !== 'cpu');
+      expect(meshes.map(mesh => mesh.name)).toEqual(['Mountain waterfall', 'Gorge stream and plateau brook', 'Snow cave']);
+      for (const mesh of [...meshes, ...(spray ? [spray] : [])]) { expect(mesh.userData.keepGeometry).toBe(true); expect((mesh.material as THREE.MeshStandardMaterial).emissive?.getHex() ?? 0).toBe(0); }
+    }
   });
 });

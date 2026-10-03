@@ -55,6 +55,7 @@ import { createTrailSigns, paintTrailSigns, trailBoulders } from './mountain-tra
 import { createAlpinePlants } from './alpine-plants';
 import { CRAGS, CragGround, cragObstacles, cragSites, createCrags, useCragMaps } from './crags';
 import type { Crags } from './crags';
+import { createGorgeWater } from './mountain-water';
 import type { ContactSite } from './contact-shadows';
 
 /** Culling flags saved while Town.warmUp() draws everything. */
@@ -433,7 +434,9 @@ export class Town {
       const signs = createTrailSigns(this.colliders, trail, this.forest.sites, this.mobile); this.root.add(signs.mesh); paintTrailSigns(signs, this.tier);
       this.researchPanels.push(signs.mesh); this.interactives.push({ id: 'jepii-mici', object: signs.mesh, position: signs.position });
       // The plateau's rhododendron mats, their cards with the turf's flowers and moss campion: three draws, none on cpu.
-      const plants = createAlpinePlants(this.tier, rocks, FOREST_DETAIL.coverage); this.root.add(...plants.meshes); this.trailContacts = [...signs.contacts, ...plants.contacts, ...this.crags?.contacts ?? []];
+      const plants = createAlpinePlants(this.tier, rocks, FOREST_DETAIL.coverage); if (plants.meshes.length) this.root.add(...plants.meshes); this.trailContacts = [...signs.contacts, ...plants.contacts, ...this.crags?.contacts ?? []];
+      // Round 2's water: the gorge's stream out of its snow cave, the plateau's brook and its waterfall; the mist joins the details.
+      const water = createGorgeWater(this.tier); this.root.add(water.group); if (water.spray) this.details.add(water.spray);
     }
     // Shore pebbles live with the other near-ground details, so map mode hides them; cpu has none. Only nearby cells draw.
     this.pebbles = createPebbles(this.tier, this.rocks); if (this.pebbles) this.details.add(this.pebbles.mesh);

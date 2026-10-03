@@ -1,29 +1,28 @@
-// Sub-plan 27, round 2: the water of the Jepii Mici gorge. A tall waterfall drops from a notch in the crags, in one or two tiers,
-// into a plunge pool with mist at its foot; a stream runs out from under the old snow and tumbles down the gorge. Geometry is
-// DOM-free and placed by its spec in world space, so the gorge layout only passes points in. One clock moves all of it, wind.ts's
+// Sub-plan 27, round 2: the water of the Jepii Mici gorge. The plateau's brook runs across the meadow to its lip and falls into the
+// gorge as a waterfall, with a plunge pool and mist at its foot; the gorge's stream runs out of a cave in the old snow's snout and
+// down the gorge until it sinks among boulders near the mouth. The builders are DOM-free and take their placement as a spec in
+// world space; createGorgeWater places them from mountain-layout.ts on the rendered ground. One clock moves all of it, wind.ts's
 // windTime: the game's elapsed time, frozen by ?capture=1, still under reduced motion (as the lake stands still) and pinned by
-// ?wind=<seconds> for stills. The stream is the river's own shader (water-material.ts, `stream`) on a ribbon that bakes the
+// ?wind=<seconds> for stills. The streams are the river's own shader (water-material.ts, `stream`) on ribbons that bake the
 // attributes the river reads; the waterfall is lit foam on one sheet-and-pool mesh, with mist cards as its second draw. Nothing
-// emits, so neither glows at night. Dev-only ?mountainwater=test places one of each on today's crags and couloir (world.ts).
+// emits, so none of it glows at night.
 import * as THREE from 'three';
-import { Fn, abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, cross, dot, exp, faceDirection, float, fract, length, max, mix, normalWorldGeometry, normalize, positionWorld, pow, property, select, sin, smoothstep, texture, uniform, uv, vec2, vec3, vec4 } from 'three/tsl';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { Fn, abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, cross, dot, exp, faceDirection, float, fract, length, max, mix, mx_noise_float, normalWorldGeometry, normalize, positionWorld, pow, property, select, sin, smoothstep, texture, uv, vec2, vec3, vec4 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
 import { waterMaterial } from './water-material';
 import { rockField } from './water-surface';
 import type { RockSite } from './water-surface';
 import { windTime } from './wind';
+import { terrainSurfaceHeight } from './terrain';
+import { GORGE_STREAM, PLATEAU_STREAM, STAGE, TRAIL_SAMPLES, WATERFALL, gorgeCoords, gorgeHalf } from './mountain-layout';
 
 /** A world-space point: x, y, z. */
 export type Point3 = readonly [number, number, number];
 /** The rendered ground's height at (x, z), e.g. terrainSurfaceHeight. */
 export type Ground = (x: number, z: number) => number;
 type F = Node<'float'>;
-
-/** Dev-only `?mountainwater=test`: a test waterfall and stream on today's crags and couloir until the gorge exists (world.ts). */
-export function mountainWaterTest(): boolean {
-  return !!import.meta.env?.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).get('mountainwater') === 'test';
-}
 
 const TAU = Math.PI * 2, G = 9.81;
 function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
@@ -85,14 +84,18 @@ export interface WaterfallSpec {
 const LIP_SPEED = 1.6, LEDGE_SPEED = 2.4;
 /** Drop over which a falling sheet turns from glassy water to white foam (1 − 1/e of it), metres. */
 const AERATION = 1.6;
-/** The sheet keeps this far in front of the rock, metres. */
+/** The sheet keeps this far above the rock under it, metres. */
 const CLEARANCE = .35;
+/** The clearance at height `y` of a sheet whose pool lies at `level`: full from 1.5 m above the pool, none at its surface. */
+export function waterfallClearance(y: number, level: number): number { return CLEARANCE * THREE.MathUtils.smoothstep(y - level, .05, 1.5); }
 /** Foam tiles per second of launch time, and metres of sheet per tile across. */
 const RATE = .85, STREAK = 2.2;
 /** Pool water stays this far over ground that falls away from it, as a film rather than a sheet floating off the slope. */
 const FILM = .03;
 /** The sheet carries on this far below the pool's level, unpushed, into the water or the ground. */
 const SINK = 1.4;
+/** A pool stands level over ground up to this far below its surface without a hollow to hold it, metres. */
+const SHALLOW = .3;
 const DETAIL = {
   gpu: { rows: 2.4, columns: 14, rings: 9, rays: 30, cards: 18, foam: 256 },
   mobile: { rows: 1.5, columns: 9, rings: 6, rays: 20, cards: 9, foam: 128 },
@@ -172,8 +175,9 @@ export function waterfallGeometry(spec: WaterfallSpec, tier: GraphicsTier): THRE
   const reach = cpu ? 1 : 1.3, grain = cpu ? foamTexture(DETAIL.cpu.foam) : null, rand = random(911);
   const sample = (u: number, v: number, c: number): number => { const n = DETAIL.cpu.foam, x = ((Math.floor(u * n) % n) + n) % n, y = ((Math.floor(v * n) % n) + n) % n; return grain!.image.data![(y * n + x) * 4 + c] / 255; };
   // Each vertex leaves the rock by CLEARANCE; the push then spreads to the rows either side, so the sheet bends rather than kinks.
+  // The clearance gives way over the last metre and a half above the pool, where the water lands on the floor in front of the rock.
   const push = rows.map(() => new Float32Array(columns + 1)), probe = new THREE.Vector3();
-  const buried = (p: THREE.Vector3, by: number): boolean => { probe.copy(p).addScaledVector(f.out, by); return f.ground!(probe.x, probe.z) > probe.y - CLEARANCE; };
+  const buried = (p: THREE.Vector3, by: number): boolean => { probe.copy(p).addScaledVector(f.out, by); return f.ground!(probe.x, probe.z) > probe.y - waterfallClearance(probe.y, f.foot.y); };
   const sunk = (row: Row): boolean => row.centre.y < f.foot.y - .05;
   rows.forEach((row, i) => {
     for (let j = 0; j <= columns; j++) {
@@ -182,9 +186,12 @@ export function waterfallGeometry(spec: WaterfallSpec, tier: GraphicsTier): THRE
       if (sunk(row)) { push[i][j] = push[i - 1][j]; continue; }
       if (!f.ground || !buried(p, 0)) continue;
       // Bracket the way out of the rock by doubling, then halve the bracket: a dozen ground samples rather than one per 10 cm.
-      let inside = 0, clear = .1; while (clear < 8 && buried(p, clear)) { inside = clear; clear *= 2; }
+      // Near the pool a point that stepping out does not clear lies under the rising floor, not in the cliff: it stays, and sinks.
+      const most = p.y - f.foot.y < 1.5 ? .8 : 8;
+      let inside = 0, clear = .1; while (clear < most && buried(p, clear)) { inside = clear; clear *= 2; }
+      if (buried(p, Math.min(clear, most))) continue;
       for (let k = 0; k < 5; k++) { const mid = (inside + clear) / 2; if (buried(p, mid)) inside = mid; else clear = mid; }
-      push[i][j] = Math.min(clear, 8);
+      push[i][j] = clear;
     }
   });
   const spreadPush = push.map((values, i) => values.map((value, j) => sunk(rows[i]) ? value : Math.max(value, (Math.max(push[Math.max(i - 1, 0)][j], value) + 2 * value + Math.max(push[Math.min(i + 1, rows.length - 1)][j], value)) / 4)));
@@ -204,7 +211,7 @@ export function waterfallGeometry(spec: WaterfallSpec, tier: GraphicsTier): THRE
   // Bottom row first: where the lower tier leaves a ledge in front of the upper one's foot, that frothy foot draws over the join.
   for (let i = rows.length - 2; i >= 0; i--) for (let j = 0; j < columns; j++) { const a = i * (columns + 1) + j, b = a + columns + 1; indices.push(a, b, a + 1, a + 1, b, b + 1); }
   if (f.pool > 0) {
-    const start = positions.length / 3, { rings, rays } = detail, centre = f.foot.clone().addScaledVector(f.out, f.pool * .35), level = f.foot.y;
+    const start = positions.length / 3, { rings, rays } = detail, centre = f.foot.clone().addScaledVector(f.out, f.pool * .2), level = f.foot.y;
     const heights: number[][] = [], grounds: number[][] = [], points: THREE.Vector3[][] = [];
     for (let k = 0; k <= rings; k++) {
       heights.push([]); grounds.push([]); points.push([]);
@@ -214,17 +221,19 @@ export function waterfallGeometry(spec: WaterfallSpec, tier: GraphicsTier): THRE
         points[k].push(p); grounds[k].push(f.ground ? f.ground(p.x, p.z) : level - .7 * (1 - (k / rings) ** 2));
       }
     }
-    // Water stands level only in a hollow: flood the grid from its rim inward, lowest first (a priority flood), so each point learns
-    // the lowest rim it would spill over. Elsewhere the splash runs off as a film.
+    // Water stands level in a hollow: flood the grid from its rim inward, lowest first (a priority flood), so each point learns the
+    // lowest rim it would spill over. Over flat ground a hand below the level it stands level too, a shallow pool whose rim fades;
+    // where the ground falls away further it thins to a film, and it never runs up the rock behind the fall.
     const filled = flood(grounds, rings, rays), depths: number[][] = [];
     for (let k = 0; k <= rings; k++) {
       depths.push([]);
       for (let j = 0; j < rays; j++) {
-        const g = grounds[k][j], hollow = !f.ground || filled[k][j] > g + .02;
-        heights[k][j] = hollow ? Math.min(level, f.ground ? filled[k][j] : level) : g + FILM;
-        // A film runs over gentle ground at or below the level only, never up the rock behind the fall.
-        const p = points[k][j], steep = f.ground ? Math.hypot(f.ground(p.x + .3, p.z) - f.ground(p.x - .3, p.z), f.ground(p.x, p.z + .3) - f.ground(p.x, p.z - .3)) / .6 : 0;
-        depths[k].push(hollow ? Math.max(0, heights[k][j] - g) : FILM * THREE.MathUtils.clamp((level + .1 - g) / .2, 0, 1) * (1 - THREE.MathUtils.smoothstep(steep, .5, 1)));
+        const g = grounds[k][j], below = level - g, p = points[k][j];
+        if (!f.ground || filled[k][j] > g + .02) heights[k][j] = f.ground ? Math.min(level, filled[k][j]) : level;
+        else if (below > 0) heights[k][j] = g + THREE.MathUtils.clamp(SHALLOW - 2 * (below - SHALLOW), FILM, Math.min(below, SHALLOW));
+        else heights[k][j] = g + FILM;
+        const steep = f.ground ? Math.hypot(f.ground(p.x + .3, p.z) - f.ground(p.x - .3, p.z), f.ground(p.x, p.z + .3) - f.ground(p.x, p.z - .3)) / .6 : 0;
+        depths[k].push(below > 0 ? Math.max(0, heights[k][j] - g) : FILM * THREE.MathUtils.clamp((level + .1 - g) / .2, 0, 1) * (1 - THREE.MathUtils.smoothstep(steep, .5, 1)));
       }
     }
     for (let k = 0; k <= rings; k++) for (let j = 0; j < rays; j++) {
@@ -379,6 +388,8 @@ export interface StreamOptions {
   rocks?: readonly RockSite[];
   /** Water depth at the middle, metres (0.08 plus a tenth of the width). */
   depth?: number;
+  /** Metres over which the water fades in from the first point and out before the last (0: it starts or ends at full depth). */
+  ends?: readonly [number, number];
 }
 const STREAM_DETAIL = { gpu: { step: .35, columns: 7, bank: [.15, .38] }, mobile: { step: .5, columns: 5, bank: [.38] }, cpu: { step: .8, columns: 4, bank: [] } } as const;
 /** White water from about 11° of fall, all of it from about 40°, and more where the bed steepens. */
@@ -401,7 +412,7 @@ function cpuStreamColour(depth: number, white: number, deepest: number): THREE.C
 export function streamGeometry(points: readonly (Point3 | THREE.Vector3)[], width: number | ((t: number) => number), tier: GraphicsTier, options: StreamOptions = {}): THREE.BufferGeometry {
   const { step, columns, bank } = STREAM_DETAIL[tier], ground = options.ground, wide = typeof width === 'number' ? (): number => width : width;
   const curve = new THREE.CatmullRomCurve3(points.map(p => p instanceof THREE.Vector3 ? p.clone() : new THREE.Vector3(...p)), false, 'centripetal');
-  const n = Math.max(2, Math.ceil(curve.getLength() / step)), samples = curve.getSpacedPoints(n), stones = options.rocks?.length ? rockField(options.rocks) : null;
+  const length = curve.getLength(), n = Math.max(2, Math.ceil(length / step)), samples = curve.getSpacedPoints(n), stones = options.rocks?.length ? rockField(options.rocks) : null, [rise, sink] = options.ends ?? [0, 0];
   const bed = samples.map(p => ground ? ground(p.x, p.z) : p.y), run = [0];
   for (let k = 1; k <= n; k++) run.push(run[k - 1] + Math.hypot(samples[k].x - samples[k - 1].x, samples[k].z - samples[k - 1].z));
   // The fall per metre over about a metre and a half either side, and how much steeper it gets than the stretch above.
@@ -414,7 +425,9 @@ export function streamGeometry(points: readonly (Point3 | THREE.Vector3)[], widt
   for (let k = 0; k <= n; k++) {
     const t = k / n, centre = samples[k], tangent = curve.getTangentAt(t), flat = Math.hypot(tangent.x, tangent.z) || 1, fx = tangent.x / flat, fz = tangent.z / flat;
     if (k) along += Math.hypot(run[k] - run[k - 1], bed[k] - bed[k - 1]);
-    const half = Math.max(wide(t), .05) / 2, depth = options.depth ?? .08 + wide(t) * .1, level = bed[k] + depth, white = streamWhite(fall[k], fall[k] - fall[at(k - span)]);
+    // A spring wells up and a stream that sinks into scree thins away: both ends fade out of depth and white water alike.
+    const fade = (rise ? THREE.MathUtils.smoothstep(t * length, 0, rise) : 1) * (sink ? THREE.MathUtils.smoothstep((1 - t) * length, 0, sink) : 1);
+    const half = Math.max(wide(t), .05) / 2, depth = (options.depth ?? .08 + wide(t) * .1) * fade, level = bed[k] + depth, white = streamWhite(fall[k], fall[k] - fall[at(k - span)]) * fade;
     // The wet margin's outline wanders, so the bank is not drawn with a ruler.
     const ragged = .75 + .5 * hash(k, 0, 17);
     const across = [...[...bank].reverse().map(b => -half - b * ragged), ...water.map(u => u * half), ...bank.map(b => half + b * ragged)];
@@ -426,7 +439,7 @@ export function streamGeometry(points: readonly (Point3 | THREE.Vector3)[], widt
       positions.push(x, y + .015, z); flows.push(fx, fz); alongs.push(along); acrosses.push(a); depths.push(sunk); wets.push(wet);
       // White water churns mid-stream; the edges stay clear, so they fade into the bank.
       const stir = Math.max(white, stones ? stones(x, z) : 0) * (1 - u ** 3); whites.push(stir);
-      if (tier === 'cpu') { const c = cpuStreamColour(sunk, stir, depth); colours.push(c.r, c.g, c.b); }
+      if (tier === 'cpu') { const c = cpuStreamColour(sunk, stir, Math.max(depth, .01)); colours.push(c.r, c.g, c.b); }
       if (k < n && j < count - 1) { const v = k * count + j, below = v + count; indices.push(v, v + 1, below, v + 1, below + 1, below); }
     }
   }
@@ -441,10 +454,157 @@ export function streamGeometry(points: readonly (Point3 | THREE.Vector3)[], widt
   if (tier === 'cpu') geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
   geometry.setIndex(indices); geometry.computeVertexNormals(); geometry.computeBoundingSphere(); return geometry;
 }
-/** A stream (see streamGeometry): one draw, the river's shader per tier on windTime, no colliders: the terrain is its floor. */
-export function createStream(points: readonly (Point3 | THREE.Vector3)[], width: number | ((t: number) => number), tier: GraphicsTier, options: StreamOptions = {}): THREE.Mesh {
-  const mesh = new THREE.Mesh(streamGeometry(points, width, tier, options), waterMaterial(tier, { stream: true, time: windTime }));
-  mesh.name = 'Mountain stream'; mesh.castShadow = false; mesh.receiveShadow = true; mesh.userData.keepGeometry = true;
+/** One draw of the river's shader on the shared clock, for any number of stream ribbons merged into `geometry`. */
+function streamMesh(geometry: THREE.BufferGeometry, tier: GraphicsTier, name: string): THREE.Mesh {
+  const mesh = new THREE.Mesh(geometry, waterMaterial(tier, { stream: true, time: windTime }));
+  mesh.name = name; mesh.castShadow = false; mesh.receiveShadow = true; mesh.userData.keepGeometry = true;
   // As the river: nothing transparent lies under it, so it blends first and later glass or glows stay on top.
   mesh.renderOrder = -1; return mesh;
+}
+/** A stream (see streamGeometry): one draw, the river's shader per tier on windTime, no colliders: the terrain is its floor. */
+export function createStream(points: readonly (Point3 | THREE.Vector3)[], width: number | ((t: number) => number), tier: GraphicsTier, options: StreamOptions = {}): THREE.Mesh {
+  return streamMesh(streamGeometry(points, width, tier, options), tier, 'Mountain stream');
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The snow cave
+
+/** Where a stream leaves old snow through a cave in the steep face of its snout. */
+export interface SnowCaveSpec {
+  /** The cave's floor at the face, in plan: where the stream comes out. */
+  mouth: { x: number; z: number };
+  /** Horizontal direction the stream leaves in; the face looks this way. */
+  out: { x: number; z: number };
+  /** The opening's width and height, and the snow lip's thickness over it, metres. */
+  width: number; height: number; lip: number;
+  /** How far the face runs to the left and right of the mouth, seen from outside, metres; it thins away toward both ends. */
+  left: number; right: number;
+  /** How deep the cave runs into the snow, metres. */
+  depth: number;
+  /** The rendered ground (terrainSurfaceHeight): the snow lies on it and the cave's floor is it. */
+  ground: Ground;
+}
+/** Old snow's albedo, as the ground's (ground-material.ts): grey-white with a little dirt, never paint-white. Linear. */
+const SNOW = new THREE.Color(.43, .445, .47);
+/**
+ * The snout of old snow over a stream, after the owner's photograph of the gully: the slab ends in a steep, ragged face whose top
+ * leans out as a lip, a dark cave mouth at its foot where the stream runs out, the cave going back into the dark. One sheet runs
+ * from the bed up the face, over the lip's rounded nose and back along the snow's top until it sinks under the terrain's own snow;
+ * the cave is an arched tube with a dark floor and back wall. Vertex colours carry the snow's tone and the cave's darkness.
+ */
+export function snowCaveGeometry(spec: SnowCaveSpec, tier: GraphicsTier): THREE.BufferGeometry {
+  const { ground, width, height, depth } = spec, length = Math.hypot(spec.out.x, spec.out.z) || 1, fx = spec.out.x / length, fz = spec.out.z / length;
+  // b runs to the right of someone facing the face; a runs upstream into the snow.
+  const at = (b: number, a: number): { x: number; z: number } => ({ x: spec.mouth.x + fz * b - fx * a, z: spec.mouth.z - fx * b - fz * a });
+  const base = ground(spec.mouth.x, spec.mouth.z), face = height + spec.lip, half = width / 2, over = .3, cpu = tier === 'cpu';
+  const noise = (k: number, seed: number): number => hash(Math.round(k * 7), 0, seed) * .6 + hash(Math.round(k * 2.3), 1, seed) * .4;
+  const ragged = (b: number): number => .2 * (noise(b, 3) - .5), lumps = (b: number): number => 1 + .1 * (noise(b, 5) - .5);
+  // The face is full height round the mouth and thins to nothing at both ends, where it meets the terrain's snow and the wall.
+  const tall = (b: number): number => face * lumps(b) * THREE.MathUtils.smoothstep(b, -spec.left, -spec.left + 1.1) * (1 - THREE.MathUtils.smoothstep(b, spec.right - 1.1, spec.right));
+  const top = (b: number): number => { const p = at(b, 0); return Math.max(ground(p.x, p.z), base + tall(b)); };
+  // The opening: a flattened arch, its edge a little ragged.
+  const arch = (b: number): number => Math.abs(b) >= half ? 0 : height * Math.sqrt(1 - (b / half) ** 2) * (1 + .06 * (noise(b, 9) - .5));
+  // How far the face stands out at height y over column b: its foot ragged, its top leaning out over the stream as the lip.
+  const lean = (b: number, y: number): number => { const p = at(b, 0), g = ground(p.x, p.z); return ragged(b) + over * Math.pow(THREE.MathUtils.clamp((y - g) / Math.max(top(b) - g, .05), 0, 1), 2.2); };
+  const positions: number[] = [], colours: number[] = [], indices: number[] = [], tone = new THREE.Color();
+  const vertex = (x: number, y: number, z: number, shade: number): number => { positions.push(x, y, z); tone.copy(SNOW).multiplyScalar(shade); colours.push(tone.r, tone.g, tone.b); return positions.length / 3 - 1; };
+  // Columns: every 30 cm, denser across the mouth.
+  const columns = [...new Set([...Array.from({ length: Math.ceil((spec.left + spec.right) / .3) + 1 }, (_, j) => Math.min(-spec.left + j * .3, spec.right)), ...[-1, -.8, -.55, -.3, 0, .3, .55, .8, 1].map(k => k * half)])].sort((a, b) => a - b);
+  const faceRows = cpu ? 4 : 7, topRows = cpu ? 5 : 9, reach = 3.6, grid: number[][] = [];
+  for (const b of columns) {
+    const column: number[] = [], foot = at(b, 0), g = ground(foot.x, foot.z), crown = top(b), sill = Math.abs(b) < half ? g + arch(b) : g - .12;
+    for (let k = 0; k <= faceRows; k++) {
+      const y = sill + (crown - sill) * k / faceRows, p = at(b, -lean(b, y));
+      // The lip's underside over the mouth sits in its own shade; the face is greyer than the top, which the sky lights.
+      const under = Math.abs(b) < half ? .55 + .45 * THREE.MathUtils.smoothstep((y - sill) / Math.max(crown - sill, .05), 0, .6) : 1;
+      column.push(vertex(p.x, y, p.z, .86 * under * lumps(b * 3.1)));
+    }
+    for (let k = 1; k <= topRows; k++) {
+      const a = -lean(b, crown) + reach * Math.pow(k / topRows, 1.3), p = at(b, a), g = ground(p.x, p.z), surface = crown + .1 * (a + over);
+      // Snow thinner than a hand would fight the terrain's own snow for the same pixels: it sinks under it instead.
+      column.push(vertex(p.x, surface < g + .1 ? g - .08 : surface, p.z, .97 * lumps(b * 2.3 + a)));
+    }
+    grid.push(column);
+  }
+  for (let j = 0; j < grid.length - 1; j++) for (let k = 0; k < grid[j].length - 1; k++) { const a = grid[j][k], b = grid[j + 1][k], c = grid[j][k + 1], d = grid[j + 1][k + 1]; indices.push(a, b, c, b, d, c); }
+  // The cave: an arched tube from the opening's edge on the face back into the snow, narrowing and lowering, with a dark wet floor
+  // over the terrain's sunlit snow and a back wall. Its first ring lies on the face itself, just outside the opening.
+  const rings = cpu ? 3 : 6, arcs = cpu ? 6 : 10, tube: number[][] = [], floor: number[][] = [];
+  for (let i = 0; i <= rings; i++) {
+    const t = i / rings, w = (half + .05) * (1 - .3 * t), h = (height + .04) * (1 - .4 * t), ring: number[] = [], strip: number[] = [], light = .3 * (1 - THREE.MathUtils.smoothstep(t, 0, .8)) + .025;
+    for (let k = 0; k <= arcs; k++) {
+      const angle = Math.PI * k / arcs, b = w * Math.cos(angle), foot = at(b, 0), g0 = ground(foot.x, foot.z), y0 = g0 + h * Math.sin(angle);
+      const p = at(b, depth * t - lean(b, y0)), g = ground(p.x, p.z);
+      ring.push(vertex(p.x, g + h * Math.sin(angle) - (k === 0 || k === arcs ? .05 : 0), p.z, light));
+    }
+    for (const k of [0, .5, 1]) { const b = w * (1 - 2 * k) * .98, p = at(b, depth * t - lean(b, ground(at(b, 0).x, at(b, 0).z))); strip.push(vertex(p.x, ground(p.x, p.z) + .03, p.z, .2 * (1 - THREE.MathUtils.smoothstep(t, 0, .6)) + .02)); }
+    tube.push(ring); floor.push(strip);
+  }
+  for (let i = 0; i < rings; i++) {
+    for (let k = 0; k < arcs; k++) { const a = tube[i][k], b = tube[i + 1][k], c = tube[i][k + 1], d = tube[i + 1][k + 1]; indices.push(a, c, b, b, c, d); }
+    for (let k = 0; k < 2; k++) { const a = floor[i][k], b = floor[i + 1][k], c = floor[i][k + 1], d = floor[i + 1][k + 1]; indices.push(a, b, c, b, d, c); }
+  }
+  const back = tube[rings], centre = floor[rings][1];
+  for (let k = 0; k < arcs; k++) indices.push(centre, back[k + 1], back[k]);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+  geometry.setIndex(indices); geometry.computeVertexNormals(); geometry.computeBoundingSphere(); return geometry;
+}
+/** Lit snow sharing the ground's look as far as a plain mesh can: mottled grey-white, banded where it stands steep. No glow. */
+function snowCaveMaterial(tier: GraphicsTier): THREE.Material {
+  if (tier === 'cpu') { const material = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); material.name = 'Snow cave'; return material; }
+  const material = new THREE.MeshStandardNodeMaterial({ vertexColors: true, side: THREE.DoubleSide, metalness: 0, roughness: .72 });
+  material.name = 'Snow cave';
+  const p = positionWorld, mottle = mx_noise_float(p.mul(2.3)).mul(.07).add(mx_noise_float(p.mul(9.1)).mul(.04)).add(1);
+  // As the ground's snow where its edge stands steep: greyer, in layers a few tens of centimetres thick.
+  const steep = float(1).sub(smoothstep(.55, .8, normalWorldGeometry.y.abs()));
+  const layers = mix(float(1), sin(p.y.mul(19).add(mx_noise_float(p.mul(1.4)).mul(4))).mul(.07).add(.93).mul(.92), steep);
+  material.colorNode = vec3(mottle.mul(layers));
+  material.roughnessNode = mix(float(.72), float(.62), steep);
+  return material;
+}
+/** The snow cave (see snowCaveGeometry): one draw, no collider; it casts its shade on the stream it lets out. */
+export function createSnowCave(spec: SnowCaveSpec, tier: GraphicsTier): THREE.Mesh {
+  const mesh = new THREE.Mesh(snowCaveGeometry(spec, tier), snowCaveMaterial(tier));
+  mesh.name = 'Snow cave'; mesh.castShadow = true; mesh.receiveShadow = true; mesh.userData.keepGeometry = true; return mesh;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The gorge's water, placed from mountain-layout.ts on the rendered ground
+
+const onGround = (p: { x: number; z: number }, lift = 0): Point3 => [p.x, terrainSurfaceHeight(p.x, p.z) + lift, p.z];
+/** The plateau's brook falls from the lip into the gorge as one tier (WATERFALL), a little wider than the brook, onto its pool. */
+export const GORGE_FALL: WaterfallSpec = { lip: onGround(WATERFALL.lip, .08), foot: onGround(WATERFALL.foot, .1), width: 1.2, spread: 2.4, pool: 1.7, ground: terrainSurfaceHeight };
+/** The cave in the snow's snout (STAGE.snout) where the gorge's stream comes out, facing down the stream. */
+export const SNOW_CAVE: SnowCaveSpec = (() => {
+  const [mouth, next] = GORGE_STREAM, out = { x: next.x - mouth.x, z: next.z - mouth.z }, length = Math.hypot(out.x, out.z), fx = out.x / length, fz = out.z / length;
+  // Lateral offsets (right of someone facing the face) of the trail's centre and the gorge's north wall at the snout.
+  const trail = TRAIL_SAMPLES[STAGE.snout], g = gorgeCoords(mouth.x, mouth.z)!, toTrail = (trail.x - mouth.x) * fz - (trail.z - mouth.z) * fx;
+  // The face thins away 1.1 m short of the trail's centre, so walkers never meet it; on the other side it runs into the wall.
+  const trailSide = Math.max(1.2, Math.abs(toTrail) - 1.1), wallSide = Math.max(1.5, gorgeHalf(g.s) - g.d + .4);
+  return { mouth, out: { x: fx, z: fz }, width: 1.4, height: .8, lip: .7, left: toTrail < 0 ? trailSide : wallSide, right: toTrail < 0 ? wallSide : trailSide, depth: 1.3, ground: terrainSurfaceHeight };
+})();
+/** The gorge's stream: from a metre inside the cave, out of its mouth and down GORGE_STREAM, sinking away near the gorge's mouth. */
+export function gorgeStreamCourse(): Point3[] {
+  const { mouth, out } = SNOW_CAVE, inside = (a: number): { x: number; z: number } => ({ x: mouth.x - out.x * a, z: mouth.z - out.z * a });
+  return [inside(1), inside(.45), ...GORGE_STREAM].map(p => onGround(p));
+}
+/** The plateau's brook: PLATEAU_STREAM from where the crag's face gives way to the meadow (the spring) to the waterfall's lip. */
+export function brookCourse(): Point3[] {
+  const points = PLATEAU_STREAM.map(p => onGround(p)); let start = 0;
+  // The first points can stand on the crag's face above its foot: the spring is where the ground first lies back to the meadow.
+  while (start < points.length - 3 && (points[start][1] - points[start + 1][1]) / Math.hypot(points[start + 1][0] - points[start][0], points[start + 1][2] - points[start][2]) > 1.2) start++;
+  return points.slice(start);
+}
+/**
+ * Everything in the gorge (sub-plan 27, round 2): the waterfall and its pool (one draw, plus mist on gpu and mobile, which belongs
+ * with the near details the map hides), both streams in one draw and the snow cave in another. No colliders: the water is
+ * shallow, the terrain its floor, and the trail keeps clear of the cave.
+ */
+export function createGorgeWater(tier: GraphicsTier): { group: THREE.Group; spray: THREE.Mesh | null } {
+  const group = new THREE.Group(), fall = createWaterfall(GORGE_FALL, tier); group.name = 'Gorge water and snow cave';
+  const streams = [streamGeometry(gorgeStreamCourse(), t => .6 + .6 * t, tier, { ground: terrainSurfaceHeight, ends: [.6, 2] }), streamGeometry(brookCourse(), t => .45 + .35 * t, tier, { ground: terrainSurfaceHeight, ends: [.8, 0] })];
+  const merged = mergeGeometries(streams)!; streams.forEach(geometry => geometry.dispose());
+  group.add(fall.sheet, streamMesh(merged, tier, 'Gorge stream and plateau brook'), createSnowCave(SNOW_CAVE, tier));
+  return { group, spray: fall.spray };
 }
