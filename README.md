@@ -135,6 +135,8 @@ Browser tests require Chrome and use the dev server on port 5173. On Linux they 
 - [Technical guide: architecture, assets, controls and project history](docs/technical-guide.md)
 - [README screenshots and how to retake them](docs/images/README.md)
 - [Design and implementation plan](docs/3d-game-plan.md)
+- [Jewelry STL archive: latest version and parts of every 3D model, and what could extend the town](docs/jewelry-stl-catalogue.md)
+- [Jewelry STL inclusion analysis: print leftovers, decimation limits and a verdict per work](docs/jewelry-stl-inclusion-analysis.md)
 - [Contributor instructions](AGENTS.md)
 - [Artwork and research references](docs/extension-references.md)
 - [Enhancement hill and human-mesh provenance](docs/enhancement-reference.md)

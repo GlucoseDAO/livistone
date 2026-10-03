@@ -229,6 +229,12 @@ class Game {
       } });
       // Dev-only, beside the stable hook: poster texture residency (sub-plan 12) with the renderer's texture memory and the
       // count of node builds and shader programs, so a test can see that swapping poster maps builds nothing.
+      // Dev-only: each building's hovering model this hour, where it hangs and which way its poster faces (capture poses).
+      Object.assign(window, { __featured: () => this.town?.exhibitions.map((exhibition) => {
+        const mesh = exhibition.featured; if (!exhibition.featuredPiece || !mesh.parent) return { id: exhibition.id, piece: null };
+        mesh.updateWorldMatrix(true, false); const at = mesh.getWorldPosition(new THREE.Vector3()), facing = new THREE.Vector3(0, 0, 1).transformDirection(mesh.parent.matrixWorld);
+        return { id: exhibition.id, piece: exhibition.featuredPiece, position: [at.x, at.y, at.z], facing: [facing.x, facing.z], visible: mesh.visible };
+      }) });
       Object.assign(window, { __posters: () => this.town && ({ ...this.town.posters.report(), gpu: { textures: this.renderer.info.memory.textures, bytes: this.renderer.info.memory.texturesSize, programs: this.renderer.info.memory.programs, builds: (this.renderer as unknown as { _nodes?: { nodeBuilderCache?: Map<unknown, unknown> } })._nodes?.nodeBuilderCache?.size ?? 0 } }) });
     }
   }

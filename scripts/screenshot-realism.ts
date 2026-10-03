@@ -50,6 +50,9 @@ const VIEWS: Record<string, View> = Object.fromEntries(([
   ['snow-snout', -43, -248.2, 1.21, .12], ['snow-gully', -58.6, -259, .1, .2], ['snow-prints', -57.91, -258, .365, -.45], ['mountain-flowers', -40, -272, -1.86, -.12],
   ['plateau-crags', -20, -262, 0, .25], ['plateau-view', -26, -258, Math.PI, -.12],
   ['flowers-close', -27.5, -257.6, 0, -.55], ['flowers-mid', -46, -262, -1.45, -.16],
+  // Jewelry models: each building's hovering piece above its poster (src/game/featured.ts; hour 0 under ?capture=1).
+  ['featured-energy', -25.8, -8.8, -1.632, .29], ['featured-science', 27.79, -10.53, -1.204, .29], ['featured-city-hall', .43, -21.26, -1.032, .29],
+  ['featured-station', 6, 71.5, 0, .29], ['featured-station-navette', -17, 71.5, 0, .29], ['featured-timeface', 14.51, -46.66, -2.827, .3, 24.6], ['featured-future-house', -64, -108.9, 0, .32, 13.05], ['mycelium-ring', 75, -123, Math.PI, .22], ['mycelium-ring-far', 56, -99, -1.05, .12],
 ] as View[]).map(view => [view[0], view]));
 const SETS: Record<string, string[]> = {
   quick: ['arrival-meadow', 'city-hall-front', 'energy-front', 'bridge-bank', 'east-tributary', 'meadow-ground', 'city-hall-gallery', 'vittoria-lake'],
@@ -59,6 +62,7 @@ const SETS: Record<string, string[]> = {
   galleries: ['city-hall-gallery', 'energy-gallery', 'science-gallery', 'energy-inside', 'science-inside', 'catalogue-poster', 'embryo-station-platform'],
   lake: ['lake-path', 'lake-path-down', 'lake-crossing', 'lake-west-pools', 'lake-east-pool', 'vittoria-lake', 'vittoria-back', 'dewdrop-back'],
   intersections: ['rill-crossing', 'rill-culvert', 'rill-culvert-down', 'rill-culvert-mouth'],
+  featured: ['featured-energy', 'featured-science', 'featured-city-hall', 'featured-station', 'featured-timeface', 'featured-future-house', 'mycelium-ring', 'mycelium-ring-far'],
   skyline: ['valley-east', 'summit-northwest', 'summit-southwest', 'ridge-north'],
   // Sub-plan 08: front, side and close views of the five building-pieces (Science, Station, Time Tower, Future House, Gateway).
   materials: ['science-front', 'science-side', 'nanot-arch', 'nanot-close', 'science-inside', 'embryo-station-front', 'station-ring-close', 'embryo-station-platform', 'time-tower', 'time-tower-close', 'future-house-entry', 'future-house-legs', 'future-house-neck', 'gateway-front', 'gateway-side', 'gateway-gem'],
@@ -67,7 +71,7 @@ const SETS: Record<string, string[]> = {
   fixes: ['city-hall-far', 'city-hall-north', 'nanot-arch', 'future-house-entry', 'future-house-neck', 'junction-garden', 'junction-glucose', 'junction-station', 'enhancement-front', 'grove-floor', 'mycelium-grove', 'sky-up', 'ridge-northwest', 'railway-east-portal'],
 };
 // `all` keeps the 33 realism views; these sets are reviewed on their own.
-const REVIEWED_ALONE = ['fixes', 'skyline', 'lake', 'intersections', 'materials', 'station', 'mountain'];
+const REVIEWED_ALONE = ['fixes', 'skyline', 'lake', 'intersections', 'materials', 'station', 'mountain', 'featured'];
 SETS.all = [...new Set(Object.entries(SETS).filter(([set]) => !REVIEWED_ALONE.includes(set)).flatMap(([, views]) => views))];
 
 const [outDir, profileArg = 'desktop', setArg = 'quick', time = 'day'] = process.argv.slice(2);

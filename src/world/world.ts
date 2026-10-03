@@ -112,6 +112,7 @@ export class Town {
   private railway!: THREE.Group;
   private researchReady!: Promise<void>;
   private readonly jewelryReady: Promise<void>[] = [];
+  private ringReady: Promise<void> = Promise.resolve();
   private readonly white = new THREE.MeshStandardMaterial({ color: '#f4f0df', roughness: 0.57, metalness: 0.07 });
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#e2e7dd', roughness: 0.26, metalness: 0.65 });
   private readonly gold = new THREE.MeshStandardMaterial({ color: '#b99a55', roughness: 0.3, metalness: 0.7 });
@@ -191,7 +192,7 @@ export class Town {
     label('Embryo Station and train'); this.railway = createRailwayStructure(this.root, this.colliders, mobile); label('Mountain railway');
     await stage(46, 'Growing the lake gardens and elevated galleries…');
     this.gardens = new LivingWaters(mobile, this.paving, this.wind); this.root.add(this.gardens.root);
-    this.gardens.presentLakeJewelry();
+    this.gardens.presentLakeJewelry(); this.ringReady = this.gardens.presentMyceliumRing();
     this.gardens.addInterpretation('living-mycelium', 'Mycelium Rain Garden', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
     this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
     label('Living Waters · town gardens');
@@ -400,7 +401,7 @@ export class Town {
     return PROBE_SITES.flatMap(site => { const parts = this.probeParts.get(site.id); return parts ? [{ site, ...parts }] : []; });
   }
   readonly forest = new Forest();
-  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows, this.wind), this.mountains.ready, this.cragsReady, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
+  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows, this.wind), this.mountains.ready, this.cragsReady, this.researchReady, ...this.jewelryReady, this.ringReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
     const sites = forestSites(this.mobile);
     for (const { x, y, z } of sites) this.colliders.push({ type: 'box', position: [x, y + 2, z], size: [0.3, 2, 0.3] });
@@ -468,12 +469,12 @@ export class Town {
     const crowns = mapView || !cpu ? fullFog : Math.min(fullFog, profile.forest), reach = mapView || (!cpu && HAZE_CLASSIC) ? fullFog : cpu ? Math.min(fullFog, profile.forest) : fullFog * TREE_REACH;
     const trees = this.forest.update(camera, reach, mapView, shadow);
     // Their light silhouette matches, so a cached shadow map waits for its next re-bake.
-    this.gardens.updateDetail(camera, crowns, mapView);
+    this.gardens.updateDetail(camera, crowns, mapView); this.gardens.turnRing();
     // Shrub batches toggle every couple of metres while walking; re-baking for them cost a shadow pass per ~2 m, so their shadows catch up at the next quarter-box re-bake.
     this.planting?.update(camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
     this.pebbles?.update(camera);
     // The map's camera is far above the town; residency follows the walking eye only.
-    if (!mapView) this.posters.update(camera.position);
+    if (!mapView) { this.posters.update(camera.position); for (const exhibition of this.exhibitions) exhibition.updateFeatured(camera.position, ROOM_RANGE); }
     for (const room of this.rooms) {
       const shown = mapView || BUDGET_OFF || camera.position.distanceTo(room.center) < ROOM_RANGE;
       if (shown !== room.shown) { room.shown = shown; for (const part of room.parts) part.visible = shown; }

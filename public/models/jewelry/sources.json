@@ -1,0 +1,692 @@
+{
+  "nucalong": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "03_PARAM 2019/pt ceramica/+nucalong.stl",
+        "sha256": "49203f83bce19bb03fdc76dd97f2eeddb0659c5fabbea42bb75b549f8805031b",
+        "modified": "2024-03-06T13:20:36.067Z",
+        "triangles": 164630
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 164630
+    },
+    "featureMm": 1.716,
+    "metresPerMm": 0.02031,
+    "levels": [
+      {
+        "file": "public/models/jewelry/nucalong.glb",
+        "triangles": 10000,
+        "bytes": 332620,
+        "deviationMm": 0.15,
+        "deviationOfFeature": 0.087
+      }
+    ]
+  },
+  "moldavian-vault": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "02_PARAM 2018/bolta moldov/bolta moldoveneasca+.stl",
+        "sha256": "c2d48b60c80552afa7cfd9b7d14732e5b247fbe3fd15fb40f92ff9cbb11434e3",
+        "modified": "2018-05-05T19:21:30.011Z",
+        "triangles": 18880
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 18880
+    },
+    "featureMm": 1.097,
+    "metresPerMm": 0.05198,
+    "levels": [
+      {
+        "file": "public/models/jewelry/moldavian-vault.glb",
+        "triangles": 10000,
+        "bytes": 212968,
+        "deviationMm": 0.006,
+        "deviationOfFeature": 0.005
+      }
+    ]
+  },
+  "first-ring": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "02_PARAM 2018/inel_propriu_test4livia.stl/inel_propriu_test4livia.stl",
+        "sha256": "4304967c4f2203771c13327a109771ce40b23da28eb26af79591e5a306a99daf",
+        "modified": "2018-11-24T13:51:26.000Z",
+        "triangles": 990
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 990
+    },
+    "featureMm": 0.783,
+    "metresPerMm": 0.05061,
+    "levels": [
+      {
+        "file": "public/models/jewelry/first-ring.glb",
+        "triangles": 990,
+        "bytes": 33636,
+        "deviationMm": 0,
+        "deviationOfFeature": 0
+      }
+    ]
+  },
+  "eyelense-1": {
+    "use": "gate",
+    "sources": [
+      {
+        "file": "+eyelens1-1.stl",
+        "sha256": "0f75f56f31340da08480b52edc66fd37d0a731927b001460efe46ded5d9dd6d3",
+        "modified": "2025-12-02T08:17:38.105Z",
+        "triangles": 54964
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 54964
+    },
+    "featureMm": 3.394,
+    "metresPerMm": 0.14286,
+    "levels": [
+      {
+        "file": "public/models/jewelry/eyelense-1.glb",
+        "triangles": 14982,
+        "bytes": 294024,
+        "deviationMm": 0.014,
+        "deviationOfFeature": 0.004
+      },
+      {
+        "file": "public/models/jewelry/eyelense-1-far.glb",
+        "triangles": 4986,
+        "bytes": 104876,
+        "deviationMm": 0.037,
+        "deviationOfFeature": 0.011
+      }
+    ]
+  },
+  "nocciola": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "07.PARAM 2023/nuca/+nocciola.stl",
+        "sha256": "448ac018ff642b2d98cdb7dc636a2b23785c88a40e9937ee081c162758cd96ec",
+        "modified": "2023-08-25T18:00:36.468Z",
+        "triangles": 656242
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 656242
+    },
+    "featureMm": 0.564,
+    "metresPerMm": 0.03028,
+    "levels": [
+      {
+        "file": "public/models/jewelry/nocciola.glb",
+        "triangles": 9998,
+        "bytes": 241284,
+        "deviationMm": 0.063,
+        "deviationOfFeature": 0.112
+      }
+    ]
+  },
+  "splash": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "02_PARAM 2018/splash/splash.stl",
+        "sha256": "80ddda3281aac396fa1fbb1769ef80be49807a3235606f89e5c398b0ab172425",
+        "modified": "2018-12-22T20:03:32.073Z",
+        "triangles": 397992
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 397026
+    },
+    "featureMm": 0.747,
+    "metresPerMm": 0.03669,
+    "levels": [
+      {
+        "file": "public/models/jewelry/splash.glb",
+        "triangles": 10000,
+        "bytes": 232704,
+        "deviationMm": 0.052,
+        "deviationOfFeature": 0.069
+      }
+    ]
+  },
+  "ice": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "04_PARAM 2020/ice/+1ice.stl",
+        "sha256": "ccdfeb07d1b69f40e9dbd542962668e455ba4caa46e38bd578c059765d620448",
+        "modified": "2020-07-06T18:25:08.836Z",
+        "triangles": 588790
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 588790
+    },
+    "featureMm": 0.443,
+    "metresPerMm": 0.03677,
+    "levels": [
+      {
+        "file": "public/models/jewelry/ice.glb",
+        "triangles": 19980,
+        "bytes": 751028,
+        "deviationMm": 0.075,
+        "deviationOfFeature": 0.17
+      }
+    ]
+  },
+  "amberear": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "05_PARAM 2021/amberear/+++2+amberear.stl",
+        "sha256": "9f42f0be00dcd64ee3fc0ab23064924ce39ebb4f0669d0361e54c6b9ca9c9755",
+        "modified": "2021-10-20T12:26:51.715Z",
+        "triangles": 396540
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 396540
+    },
+    "featureMm": 0.566,
+    "metresPerMm": 0.05013,
+    "levels": [
+      {
+        "file": "public/models/jewelry/amberear.glb",
+        "triangles": 9956,
+        "bytes": 320164,
+        "deviationMm": 0.063,
+        "deviationOfFeature": 0.112
+      }
+    ]
+  },
+  "mountain-of-gold": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "05_PARAM 2021/mountain of gold, mycelium, yellow submarine/+MG3.stl",
+        "sha256": "205fd8a335604eab0b2d634fffcb3561e47ae765ac417a875c06566952f3d8d6",
+        "modified": "2021-02-22T15:45:54.583Z",
+        "triangles": 595256
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 595256
+    },
+    "featureMm": 0.651,
+    "metresPerMm": 0.0277,
+    "levels": [
+      {
+        "file": "public/models/jewelry/mountain-of-gold.glb",
+        "triangles": 10000,
+        "bytes": 345312,
+        "deviationMm": 0.082,
+        "deviationOfFeature": 0.126
+      }
+    ]
+  },
+  "beanut": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "03_PARAM 2019/epiperen/fasolaluna+.stl",
+        "sha256": "8860de72e76fe9425b0c47ffa1fe12fe0e819d122749149530693c5575a26a79",
+        "modified": "2019-12-11T20:25:49.476Z",
+        "triangles": 443912
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 443912
+    },
+    "featureMm": 0.671,
+    "metresPerMm": 0.02077,
+    "levels": [
+      {
+        "file": "public/models/jewelry/beanut.glb",
+        "triangles": 10000,
+        "bytes": 238940,
+        "deviationMm": 0.049,
+        "deviationOfFeature": 0.074
+      }
+    ]
+  },
+  "hessonite": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "06_PARAM 2022/HESSOINTE EYE/+1hse.stl",
+        "sha256": "cf508620829fd9a32eb6663d91c98a26458cc6c6a99fa098c93ccac7de569a0a",
+        "modified": "2022-09-04T16:22:49.127Z",
+        "triangles": 221886
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 221886
+    },
+    "featureMm": 0.536,
+    "metresPerMm": 0.05117,
+    "levels": [
+      {
+        "file": "public/models/jewelry/hessonite.glb",
+        "triangles": 10000,
+        "bytes": 236164,
+        "deviationMm": 0.041,
+        "deviationOfFeature": 0.077
+      }
+    ]
+  },
+  "vittoria-amazonica": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "06_PARAM 2022/sound manipulation/victoria lily/victoria_amazonica_base.stl",
+        "sha256": "56eee64c52fb1834a64facdc543bc5d3d3a3193386a35b4f2c0308ea40dd4e28",
+        "modified": "2022-11-03T07:23:54.939Z",
+        "triangles": 83870
+      },
+      {
+        "file": "06_PARAM 2022/sound manipulation/victoria lily/victoria_amazonica_water.stl",
+        "sha256": "60fee1e4307df64e2578a500e29b8f126c4c432d6cf7e3fa751f3c57ef8acd72",
+        "modified": "2022-11-03T07:24:14.715Z",
+        "triangles": 23790
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 30,
+      "debris": 26,
+      "inverted": 2,
+      "trianglesAfter": 107164
+    },
+    "featureMm": 0.893,
+    "metresPerMm": 0.03575,
+    "levels": [
+      {
+        "file": "public/models/jewelry/vittoria-amazonica.glb",
+        "triangles": 9998,
+        "bytes": 292980,
+        "deviationMm": 0.081,
+        "deviationOfFeature": 0.091
+      }
+    ]
+  },
+  "inline": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "06_PARAM 2022/sound manipulation/INLINE/+2inline.stl",
+        "sha256": "43394799bd60c22a8250542928d95833ec757befd24a1945be99b40de3fb37ae",
+        "modified": "2022-07-28T08:55:26.473Z",
+        "triangles": 200252
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 200252
+    },
+    "featureMm": 0.614,
+    "metresPerMm": 0.05291,
+    "levels": [
+      {
+        "file": "public/models/jewelry/inline.glb",
+        "triangles": 9998,
+        "bytes": 247764,
+        "deviationMm": 0.036,
+        "deviationOfFeature": 0.059
+      }
+    ]
+  },
+  "la-navette": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "05_PARAM 2021/la navette/+1lanavette-cadru.stl",
+        "sha256": "039867156c99779e2e0d2975875d60129e8be57854bcc17ce4241ef63ec212c8",
+        "modified": "2021-06-02T10:51:04.166Z",
+        "triangles": 121980
+      },
+      {
+        "file": "05_PARAM 2021/la navette/1lanavette-piatra.stl",
+        "sha256": "061ea5ee02bdd112987eb25e8d9d18c71ae2af880b818e36e1db45f4b62823fe",
+        "modified": "2021-06-02T10:47:28.174Z",
+        "triangles": 21394
+      },
+      {
+        "file": "05_PARAM 2021/la navette/+1lanavette-aripioara stanga.stl",
+        "sha256": "d0c356734d53581d0bb1fe7564321f35dbadba64abd03b76edbeaaff1927d313",
+        "modified": "2021-06-02T10:54:27.872Z",
+        "triangles": 85766
+      },
+      {
+        "file": "05_PARAM 2021/la navette/+1lanavette-aripioara dreapta.stl",
+        "sha256": "7b927fbeef205cd565155bfde8c74964975b9643dd5e6e78001f12a3cb26b53f",
+        "modified": "2021-06-02T10:55:18.687Z",
+        "triangles": 85788
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 4,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 314870
+    },
+    "featureMm": 0.95,
+    "metresPerMm": 0.03017,
+    "levels": [
+      {
+        "file": "public/models/jewelry/la-navette.glb",
+        "triangles": 12000,
+        "bytes": 278456,
+        "deviationMm": 0.05,
+        "deviationOfFeature": 0.053
+      }
+    ]
+  },
+  "wormy": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "04_PARAM 2020/viermele/+vierme_cati.stl",
+        "sha256": "ed0a4536e8e29f5723e319c81754507dfd765014de39e952323471902f375a1e",
+        "modified": "2020-07-02T22:23:09.896Z",
+        "triangles": 306662
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 306662
+    },
+    "featureMm": 0.505,
+    "metresPerMm": 0.03771,
+    "levels": [
+      {
+        "file": "public/models/jewelry/wormy.glb",
+        "triangles": 10000,
+        "bytes": 395780,
+        "deviationMm": 0.073,
+        "deviationOfFeature": 0.145
+      }
+    ]
+  },
+  "peas-in-pod": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "04_PARAM 2020/peas in pod/+peas.stl",
+        "sha256": "ca68bc844860df3d83103a0de06b01c310f09916eacae23cf5306eab85a88410",
+        "modified": "2020-05-08T06:19:12.821Z",
+        "triangles": 258472
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 258472
+    },
+    "featureMm": 0.637,
+    "metresPerMm": 0.04147,
+    "levels": [
+      {
+        "file": "public/models/jewelry/peas-in-pod.glb",
+        "triangles": 9998,
+        "bytes": 213140,
+        "deviationMm": 0.039,
+        "deviationOfFeature": 0.061
+      }
+    ]
+  },
+  "art-nouveau": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "03_PARAM 2019/cercel covrig/last/inelam1+.stl",
+        "sha256": "db687c6469391860b2df22bbc5f5f12156978d505b29e7e59f4227ed11e1bb9e",
+        "modified": "2019-10-31T20:25:16.163Z",
+        "triangles": 219584
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 219584
+    },
+    "featureMm": 0.635,
+    "metresPerMm": 0.05975,
+    "levels": [
+      {
+        "file": "public/models/jewelry/art-nouveau.glb",
+        "triangles": 10000,
+        "bytes": 236504,
+        "deviationMm": 0.036,
+        "deviationOfFeature": 0.057
+      }
+    ]
+  },
+  "deep-sea-pearl": {
+    "use": "featured",
+    "sources": [
+      {
+        "file": "complete/+deepsea (3).stl",
+        "sha256": "e5d238c96380e384efe6682a13fba641c07eea90da21fa41d645350fa2e85fea",
+        "modified": "2025-11-09T13:04:10.383Z",
+        "triangles": 9660890
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 9660890
+    },
+    "featureMm": 0.803,
+    "metresPerMm": 0.03471,
+    "levels": [
+      {
+        "file": "public/models/jewelry/deep-sea-pearl.glb",
+        "triangles": 10000,
+        "bytes": 225684,
+        "deviationMm": 0.075,
+        "deviationOfFeature": 0.093
+      }
+    ]
+  },
+  "mycelium": {
+    "use": "grove",
+    "sources": [
+      {
+        "file": "05_PARAM 2021/mountain of gold, mycelium, yellow submarine/+mycelium2.stl",
+        "sha256": "fad4b989daf418cf06b5b8d414f8cc6bcee1816262fff04f8150b1ecd973af71",
+        "modified": "2021-02-22T15:22:07.473Z",
+        "triangles": 363938
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 363938
+    },
+    "featureMm": 0.53,
+    "metresPerMm": 0.12793,
+    "levels": [
+      {
+        "file": "public/models/jewelry/mycelium.glb",
+        "triangles": 9978,
+        "bytes": 355312,
+        "deviationMm": 0.074,
+        "deviationOfFeature": 0.139
+      }
+    ]
+  },
+  "eye-of-winter-base": {
+    "use": "gate",
+    "sources": [
+      {
+        "file": "eye of winter/+EOW-base.stl",
+        "sha256": "abc2e5c05bc5fbc661209ccebe251a4de1bf9889b0403ef96b5c3ba823d6147b",
+        "modified": "2026-01-28T22:10:21.000Z",
+        "triangles": 10264076
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 10264076
+    },
+    "featureMm": 0.842,
+    "metresPerMm": 0.2994,
+    "levels": [
+      {
+        "file": "public/models/jewelry/eye-of-winter-base.glb",
+        "triangles": 29998,
+        "bytes": 604260,
+        "deviationMm": 0.037,
+        "deviationOfFeature": 0.044
+      },
+      {
+        "file": "public/models/jewelry/eye-of-winter-base-far.glb",
+        "triangles": 8000,
+        "bytes": 222672,
+        "deviationMm": 0.1,
+        "deviationOfFeature": 0.118
+      }
+    ]
+  },
+  "eye-of-winter-half": {
+    "use": "gate",
+    "sources": [
+      {
+        "file": "eye of winter/+EOW-complex half.stl",
+        "sha256": "f783dd858ff63726e20bc2599b9c4cefa560b4c8f59eb625feba7249f2ff0736",
+        "modified": "2026-01-28T22:13:30.000Z",
+        "triangles": 681158
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 681158
+    },
+    "featureMm": 0.579,
+    "metresPerMm": 0.29927,
+    "levels": [
+      {
+        "file": "public/models/jewelry/eye-of-winter-half.glb",
+        "triangles": 9998,
+        "bytes": 286664,
+        "deviationMm": 0.069,
+        "deviationOfFeature": 0.12
+      },
+      {
+        "file": "public/models/jewelry/eye-of-winter-half-far.glb",
+        "triangles": 3000,
+        "bytes": 147444,
+        "deviationMm": 0.218,
+        "deviationOfFeature": 0.377
+      }
+    ]
+  },
+  "eyelense-2": {
+    "use": "gate",
+    "sources": [
+      {
+        "file": "+eyelens1-2.stl",
+        "sha256": "812a81314274de041a89d9c33347a7067474234aa4643d2e688e25900df19541",
+        "modified": "2025-12-02T08:18:19.686Z",
+        "triangles": 57338
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 57338
+    },
+    "featureMm": 3.354,
+    "metresPerMm": 0.14286,
+    "levels": [
+      {
+        "file": "public/models/jewelry/eyelense-2.glb",
+        "triangles": 15000,
+        "bytes": 298612,
+        "deviationMm": 0.015,
+        "deviationOfFeature": 0.005
+      },
+      {
+        "file": "public/models/jewelry/eyelense-2-far.glb",
+        "triangles": 5000,
+        "bytes": 103184,
+        "deviationMm": 0.039,
+        "deviationOfFeature": 0.012
+      }
+    ]
+  }
+}

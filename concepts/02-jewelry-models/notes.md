@@ -59,3 +59,11 @@ Parameters used: Mitoring `--cell 0.6 --maxdegree 14` (80 strands, 436 points, w
 
 Everything above is Livistone design interpretation; the artifacts' lore powers are fiction and
 are not presented as claims about health or efficacy.
+
+## Update — 3 October 2026
+
+The full Drive export (695 STLs) is now catalogued in [docs/jewelry-stl-catalogue.md](../../docs/jewelry-stl-catalogue.md).
+Measured against the published dimensions of 22 works, the units are **millimetres at life size**, so the
+"ten times life size or tenths of a millimetre" guess under *Measurements* should read 1 unit = 1 mm: the
+Mitoring is 31.5 × 24.3 × 34.5 mm for a published 3.2 × 2.2 cm ring. The Nanot file runs about 1.2–1.45× its
+published size (bail and strand tips included). The measurements and triangle counts above are unchanged.

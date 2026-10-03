@@ -87,6 +87,20 @@ async function browserlessGroups(tier: GraphicsTier): Promise<Group[]> {
   const mobile = tier !== 'gpu', profile = graphicsProfile(tier), range = Math.min(profile.fog, profile.forest), groups: Group[] = [];
   const context = new Proxy({}, { get: (_, key) => key === 'measureText' ? (text: string) => ({ width: text.length * 14 }) : () => undefined });
   (globalThis as { document?: unknown }).document ??= { createElement: () => ({ width: 1, height: 1, style: {}, getContext: () => context }), createElementNS: () => ({ style: {}, addEventListener() {}, removeEventListener() {} }) };
+  // The tree and jewelry models from disk, parsed into the meshes GLTFLoader would give: geometry, a plain material, the part's name.
+  const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js'), { readFileSync } = await import('node:fs');
+  GLTFLoader.prototype.loadAsync = async function (url: string) {
+    const buffer = readFileSync(new URL(`../public/models/${url.includes('/jewelry/') ? 'jewelry' : 'trees'}/${url.split('/').pop()}`, import.meta.url)), length = buffer.readUInt32LE(12), json = JSON.parse(buffer.subarray(20, 20 + length).toString()), binary = buffer.subarray(28 + length);
+    const read = (index: number) => { const accessor = json.accessors[index], view = json.bufferViews[accessor.bufferView], size = { SCALAR: 1, VEC2: 2, VEC3: 3 }[accessor.type as 'SCALAR'], Type = accessor.componentType === 5126 ? Float32Array : accessor.componentType === 5125 ? Uint32Array : Uint16Array, start = binary.byteOffset + (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0); return { array: new Type(binary.buffer.slice(start, start + accessor.count * size * Type.BYTES_PER_ELEMENT)), size }; };
+    const scene = new THREE.Group();
+    for (const node of json.nodes) if (node.mesh !== undefined) {
+      const primitive = json.meshes[node.mesh].primitives[0], geometry = new THREE.BufferGeometry();
+      for (const [name, key] of [['position', 'POSITION'], ['normal', 'NORMAL'], ['uv', 'TEXCOORD_0']]) { if (primitive.attributes[key] === undefined) continue; const { array, size } = read(primitive.attributes[key]); geometry.setAttribute(name, new THREE.BufferAttribute(array, size)); }
+      geometry.setIndex(new THREE.BufferAttribute(read(primitive.indices).array, 1));
+      const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial()); mesh.name = node.name; scene.add(mesh);
+    }
+    return { scene } as unknown as Awaited<ReturnType<InstanceType<typeof GLTFLoader>['loadAsync']>>;
+  };
   const { PlanarExhibition } = await import('../src/world/planar-exhibition'), { CIVIC_LANDMARKS } = await import('../src/game/content'), world = await import('../src/world/world');
   // Placed as Town does: hall collections in the halls, the station's in the turned arrival group, the rest in the town.
   const posters = new THREE.Group(), rooms: { center: THREE_TYPES.Vector3; parts: THREE_TYPES.Object3D[] }[] = [], colliders: ColliderSpec[] = [];
@@ -101,24 +115,10 @@ async function browserlessGroups(tier: GraphicsTier): Promise<Group[]> {
     if (exhibition.objects && exhibition.center && id !== 'timeface') rooms.push({ center: exhibition.center.clone().applyMatrix4(matrix ?? new THREE.Matrix4()).setY(0), parts: exhibition.objects });
   }
   const roomRange = (world as { ROOM_RANGE?: number }).ROOM_RANGE ?? Infinity;
-  groups.push({ name: 'Posters', root: posters, classify: () => 'six collections', prepare: (camera) => { for (const room of rooms) for (const part of room.parts) part.visible = camera.position.distanceTo(room.center) < roomRange; } });
+  groups.push({ name: 'Posters', root: posters, classify: (o) => o.name.startsWith('Featured jewelry') ? 'hovering jewelry models' : 'six collections', prepare: (camera) => { for (const room of rooms) for (const part of room.parts) part.visible = camera.position.distanceTo(room.center) < roomRange; } });
   // Sub-plan 16's seeded woodland; trees before it lived inside Town, so an older checkout measures the posters only.
   const treeSites = await import('../src/world/forest-layout').then((layout) => layout.forestSites, () => null);
   if (!treeSites) return groups;
-  // The tree models from disk, parsed into the meshes GLTFLoader would give: geometry, a plain material, the part's name.
-  const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js'), { readFileSync } = await import('node:fs');
-  GLTFLoader.prototype.loadAsync = async function (url: string) {
-    const buffer = readFileSync(new URL(`../public/models/trees/${url.split('/').pop()}`, import.meta.url)), length = buffer.readUInt32LE(12), json = JSON.parse(buffer.subarray(20, 20 + length).toString()), binary = buffer.subarray(28 + length);
-    const read = (index: number) => { const accessor = json.accessors[index], view = json.bufferViews[accessor.bufferView], size = { SCALAR: 1, VEC2: 2, VEC3: 3 }[accessor.type as 'SCALAR'], Type = accessor.componentType === 5126 ? Float32Array : accessor.componentType === 5125 ? Uint32Array : Uint16Array, start = binary.byteOffset + (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0); return { array: new Type(binary.buffer.slice(start, start + accessor.count * size * Type.BYTES_PER_ELEMENT)), size }; };
-    const scene = new THREE.Group();
-    for (const node of json.nodes) if (node.mesh !== undefined) {
-      const primitive = json.meshes[node.mesh].primitives[0], geometry = new THREE.BufferGeometry();
-      for (const [name, key] of [['position', 'POSITION'], ['normal', 'NORMAL'], ['uv', 'TEXCOORD_0']]) { const { array, size } = read(primitive.attributes[key]); geometry.setAttribute(name, new THREE.BufferAttribute(array, size)); }
-      geometry.setIndex(new THREE.BufferAttribute(read(primitive.indices).array, 1));
-      const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial()); mesh.name = node.name; scene.add(mesh);
-    }
-    return { scene } as unknown as Awaited<ReturnType<InstanceType<typeof GLTFLoader>['loadAsync']>>;
-  };
   const { Forest, FOREST_DETAIL } = await import('../src/world/forest');
   for (const twigless of [false, true]) {
     FOREST_DETAIL.twigless = twigless; const forest = new Forest(); forest.sites = treeSites(mobile); await forest.load(mobile, true);

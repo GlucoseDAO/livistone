@@ -42,6 +42,7 @@ current build is generated in code at load time; binary assets are two tree GLBs
 | Surface maps | `python3 scripts/build-surface-textures.py [previewDir]` | Pillow + numpy, seeded and procedural; ashlar, terrazzo and brass albedo + nrh WebPs into `public/textures/surfaces/` |
 | Enhancement assets | `python3 scripts/build-enhancement.py [photoDir]` | Pillow; WebP posters + compact crystal meshes. Regrow crystals with `scripts/generate-enhancement-crystals.py` inside a materialized-enhancements checkout |
 | Share images | `bun scripts/build-share-images.ts [outDir] [--readme]` | Dev server only; renders the 1200×630 `og:image` card and the loading-screen backdrops into `public/images/share/`, or with `--readme` the README's gate, civic-centre and map screenshots into `docs/images/`. Rerun after visible changes on the arrival path |
+| Jewelry models | `bun scripts/build-jewelry-models.ts [driveDir] [--only id,…] [--preview]` | Cleans and decimates Livia's print STLs per `data/catalogue/models.json` into `public/models/jewelry/*.glb` (LFS) with `sources.json`; previews into `output/testing/jewelry-models/`. Status and next steps: `docs/jewelry-models-plan.md` |
 | Frame budget | `bun scripts/frame-budget.ts [--json] [--far 150]` | No browser: main-pass draw calls and triangles per producer (Living Waters, glucose, Enhancement, terrain, planting; posters and forest under Bun) over the capture poses. Not device timings |
 
 `bun run test` uses Vitest; `bun test` would invoke Bun's own runner and fail. Playwright
@@ -155,6 +156,9 @@ data/models/         Livia's original STL jewelry models (git-ignored, ~50–110
 concepts/            Approved concept image, design brief, generation record, prompts,
                      02-jewelry-models/notes.md = what the STLs contain and how buildings use them
 docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
+docs/jewelry-models-plan.md Owner decisions, status and next steps for 3D jewelry models and the two moon gates
+docs/jewelry-stl-catalogue.md Latest version, parts and measurements of every STL in Livia's Drive export (mm units), plus extension candidates
+docs/jewelry-stl-inclusion-analysis.md Mesh health, decimation limits and a tier per work for bringing STLs into the town
 .githooks/           Version-controlled git hooks
 ```
 
@@ -439,6 +443,12 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   that tool is restored and verified. Preserve the source JSON. Tooling here is Bun/Node.
 - `getByLabel('Time of day')` matches both the menu's select and the top-bar time button ("Time of day: …"), so it fails
   strict mode; locate the select with `getByRole('combobox', { name: 'Time of day' })` or `#time-of-day`.
+- **Never commit Livia's original (3D-printing) models.** Her STLs, Rhino and Grasshopper files stay in the Drive
+  export and the git-ignored `data/models/`. Only optimized derivatives enter the repository: cleaned of print
+  leftovers (supports, debris, duplicate faces, inside-out shells), decimated to the triangle budget and adapted
+  (oriented, scaled), by `scripts/build-jewelry-models.ts` from `data/catalogue/models.json`, which records each
+  source path and SHA-256. Committed models go through Git LFS (`.gitattributes`: `*.stl`, `*.glb` under
+  `public/models/jewelry/`); the six Enhancement crystal STLs predate the rule and stay plain git.
 - Browser tests forbid pointer-lock requests and compare identical drags across movement
   keys. Separately check Left/Right turning, A/D strafing, keyboard turning during a held
   drag, and unpressed mouse movement after release.

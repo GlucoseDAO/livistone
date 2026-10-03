@@ -22,7 +22,8 @@ import { WALKING_NETWORK } from './landscape';
 import { KERB_WIDTH } from './path-kerbs';
 import type { GroundDisc } from './grass-field';
 import { mergeStatic } from './static-batch';
-import { addWindRoots, plantSway, windRoots } from './wind';
+import { addWindRoots, plantSway, windRoots, windTime } from './wind';
+import { MODELS_OFF, modelURL } from '../game/featured';
 
 /** A culvert headwall's centre, past the outer face of the path kerb (it is 0.3 m thick, so it clears the kerb by 0.15 m). */
 const CULVERT_SET = .3;
@@ -44,6 +45,8 @@ function sizedPoints(points: THREE.Points): void {
   classic.visible = false; points.add(sprite);
 }
 // Dev-only ?grove=full|light pins every crown to one detail level without the distance cull, for review (sub-plan 25).
+/** The opal orb's top over the grove floor, and the clear air between it and the floating ring's net. */
+const RING_ORB_TOP = 1.75, RING_GAP = 1, RING_SCALE = 1.6;
 const GROVE_PIN = import.meta.env?.DEV && typeof location !== 'undefined' ? new URLSearchParams(location.search).get('grove') : null;
 export class LivingWaters {
   readonly root = new THREE.Group();
@@ -53,6 +56,9 @@ export class LivingWaters {
   /** Every mushroom stem's foot in world space: the near grass field grows round them and under the crowns. */
   readonly stems: GroundDisc[] = [];
   grove!: MyceliumGrove;
+  /** Livia's Mycelium Ring, decimated from its print STL, floating over the opal orb in the grove's own silver. */
+  readonly ring = new THREE.Mesh(new THREE.BufferGeometry());
+  private ringBase = 0;
   private readonly signs = new Map<string, PlaceSign>();
   private readonly waterTime = uniform(0);
   private readonly water = lakeWaterMaterial(this.waterTime);
@@ -128,7 +134,7 @@ export class LivingWaters {
     this.mesh(tubes(.18, 5), this.water, false, 0, .08).name = 'Rill water channel';
     if (walls.length) this.mesh(mergeGeometries(walls)!, this.stone, true).name = 'Rill culvert headwalls';
     this.mesh(new THREE.CylinderGeometry(3.6, OPAL_BASIN.radius, .14, 40), this.water, false, OPAL_BASIN.x, .025, OPAL_BASIN.z);
-    this.mesh(new THREE.IcosahedronGeometry(1.1, 1), new THREE.MeshStandardMaterial({ color: '#bddacf', metalness: .45, roughness: .2 }), true, OPAL_BASIN.x, .65, OPAL_BASIN.z);
+    this.mesh(new THREE.IcosahedronGeometry(RING_ORB_TOP - .65, 1), new THREE.MeshStandardMaterial({ color: '#bddacf', metalness: .45, roughness: .2 }), true, OPAL_BASIN.x, .65, OPAL_BASIN.z);
     const rain = new Float32Array((mobile ? 150 : 460) * 3), drips = new Float32Array(this.drainage.length * 6 * 3), fall = random(3304);
     for (let i = 0; i < rain.length; i += 3) { rain[i] = -48 + fall() * 152; rain[i + 1] = fall() * 9; rain[i + 2] = -40 + fall() * 76; }
     for (let i = 0; i < drips.length / 3; i++) { const p = this.drainage[i % this.drainage.length].getPoint((i % 6) / 6); drips[i * 3] = p.x; drips[i * 3 + 1] = p.y + .1; drips[i * 3 + 2] = p.z; }
@@ -262,7 +268,25 @@ export class LivingWaters {
       this.colliders.push({ type: 'box', position: [GARDENS.x + site.x, site.height + .08 * site.scale, GARDENS.z + site.z], size: [site.scale * MYCELIUM_RADIUS, .42 * site.scale, site.scale * MYCELIUM_RADIUS] });
     });
     this.grove = new MyceliumGrove(this.root, instances, silver, opal, this.mobile);
+    this.ring.material = silver;
   }
+  /**
+   * Loads the ring (public/models/jewelry/mycelium.glb, one draw, named for the grove's frame-budget group). Its net hangs
+   * open side down over the orb, as the opal sits in the ring; no collider, since it floats out of reach.
+   */
+  async presentMyceliumRing(): Promise<void> {
+    if (MODELS_OFF) return;
+    try {
+      const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js'), gltf = await new GLTFLoader().loadAsync(modelURL('mycelium'));
+      const source = gltf.scene.getObjectByProperty('type', 'Mesh') as THREE.Mesh | undefined; (source?.material as THREE.Material | undefined)?.dispose(); if (!source) return;
+      const geometry = source.geometry; geometry.computeBoundingBox(); geometry.computeBoundingSphere();
+      this.ringBase = RING_ORB_TOP + RING_GAP - geometry.boundingBox!.min.y * RING_SCALE; this.ring.scale.setScalar(RING_SCALE);
+      Object.assign(this.ring, { geometry, name: 'Mycelium ring', castShadow: true }); this.ring.userData.keepGeometry = true;
+      this.ring.position.set(OPAL_BASIN.x, this.ringBase, OPAL_BASIN.z); this.root.add(this.ring);
+    } catch { /* The grove stands without it. */ }
+  }
+  /** A slow turn and sway on the wind clock: still under reduced motion, frozen by ?capture=1. */
+  turnRing(): void { if (!this.ring.parent) return; const t = windTime.value as number; this.ring.rotation.y = t * .12; this.ring.position.y = this.ringBase + .08 * Math.sin(t * .5); }
   /** Gives every grove crown its detail level from the camera, within the forest's fog-limited `range`; see MyceliumGrove. */
   updateDetail(camera: THREE.Camera, range: number, mapView: boolean): boolean {
     return this.grove.update(camera, range, mapView, GROVE_PIN === 'full' || GROVE_PIN === 'light' ? GROVE_PIN : null);

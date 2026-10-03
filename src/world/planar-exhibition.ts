@@ -10,6 +10,8 @@ import type { Interactive } from './world';
 import { POSTER_BOARD, posterBoard, posterLayout } from './poster-layout';
 import { activeSurfaces } from './surfaces';
 import { mergeStatic } from './static-batch';
+import { featuredPiece, modelURL, townHour, FEATURED_CANDIDATES } from '../game/featured';
+import { windTime } from './wind';
 
 /**
  * Texture residency (realism sub-plan 12). Every poster keeps a small copy of its photograph and caption for distant views;
@@ -22,6 +24,15 @@ const DISTANT = { caption: 128, photo: 96 };
 export const POSTER_RANGE = 40, RESIDENT_COLLECTIONS = 2;
 /** Dev-only `?posters=all`: every collection resident from the first walking frame, the memory profile before sub-plan 12, for review. */
 const ALL_RESIDENT = !!import.meta.env?.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).get('posters') === 'all';
+/** Dev-only `?featured=<piece>` hovers that piece in its building (`off`: none, for before/after reviews); `?capture=1` pins hour 0 so captures repeat. */
+const DEV_PARAMS = import.meta.env?.DEV && typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+const PINNED = DEV_PARAMS?.get('featured') ?? null, CAPTURE = !!DEV_PARAMS?.has('capture');
+/**
+ * The hovering model's lowest point stands this far above its poster's board; `inward` moves it toward the room where the
+ * wall curves in above the posters (Energy's fins, the Future House cabin roof), `scale` shrinks it where headroom is short.
+ */
+const HOVER = { gap: .45, bob: .05, spin: .25, scale: 1.35 }, HOVER_SITE: Record<string, { inward?: number; scale?: number; gap?: number }> = { energy: { inward: 1 }, station: { scale: 1, gap: .2 }, 'future-house': { inward: .6, scale: .85 } };
+let featuredSilver: THREE.MeshStandardMaterial | null = null;
 
 function textLines(ctx: CanvasRenderingContext2D, text: string, y: number, size: number, color: string): number {
   ctx.font = `${size}px sans-serif`; ctx.fillStyle = color; let line = '';
@@ -91,7 +102,7 @@ function rail(width: number, z: number): THREE.BufferGeometry {
 }
 let boardMaterial: THREE.MeshStandardMaterial | null = null;
 
-interface Poster { piece: Exhibit; width: number; photo: THREE.MeshBasicNodeMaterial; caption: THREE.MeshBasicNodeMaterial; distant: { photo: THREE.Texture | null; caption: THREE.Texture }; full: THREE.Texture[] }
+interface Poster { piece: Exhibit; group: THREE.Group; width: number; photo: THREE.MeshBasicNodeMaterial; caption: THREE.MeshBasicNodeMaterial; distant: { photo: THREE.Texture | null; caption: THREE.Texture }; full: THREE.Texture[] }
 
 export class PlanarExhibition {
   readonly photos: THREE.Mesh[] = [];
@@ -107,6 +118,11 @@ export class PlanarExhibition {
   private generation = 0;
   private readonly posters: Poster[] = [];
   private worldCenter: THREE.Vector3 | null = null;
+  /** The poster piece shown as a hovering model this hour (src/game/featured.ts); one mesh, its geometry swapped hourly. */
+  readonly featured: THREE.Mesh;
+  featuredPiece: string | null = null;
+  private featuredBase = 0;
+  private featuredLoading: string | null = null;
   constructor(readonly id: string, private readonly parent: THREE.Group, x: number, z: number, colliders: ColliderSpec[], interactives: Interactive[], private readonly tier: GraphicsTier = 'gpu') {
     this.pieces = COLLECTION.filter((piece) => piece.location === id);
     this.selected = this.pieces.find((piece) => piece.discovery === EXHIBITS.find((anchor) => anchor.landmark === id)?.discovery) ?? this.pieces[0];
@@ -137,7 +153,7 @@ export class PlanarExhibition {
           if (face === info) this.textSurfaces.push(back); if (face === picture) this.photos.push(back);
         }
       }
-      const poster: Poster = { piece, width, photo: picture.material as THREE.MeshBasicNodeMaterial, caption: info.material as THREE.MeshBasicNodeMaterial, distant: { photo: null, caption: distantCaption }, full: [] };
+      const poster: Poster = { piece, group, width, photo: picture.material as THREE.MeshBasicNodeMaterial, caption: info.material as THREE.MeshBasicNodeMaterial, distant: { photo: null, caption: distantCaption }, full: [] };
       this.posters.push(poster);
       // The thumbnail sizes the photograph and leaves its distant copy; the full thumbnail returns only while resident.
       tasks.push(new THREE.ImageLoader().loadAsync(photoURL(piece.photos[0].thumb ?? piece.photos[0].file)).then((image) => {
@@ -150,7 +166,44 @@ export class PlanarExhibition {
     });
     // Boards share one lit material, rails and feet the brass, so each collection draws its stands twice; colliders came per poster above.
     this.objects.push(...mergeStatic(lit, `Poster frames · ${id}`, Infinity, parent));
+    // One shared silver for every building, so changing the hour's piece swaps geometry only and builds no shader.
+    featuredSilver ??= new THREE.MeshStandardMaterial({ color: '#e1e5df', metalness: .78, roughness: .29, userData: { heroEnv: true } });
+    this.featured = new THREE.Mesh(new THREE.BufferGeometry(), featuredSilver); this.featured.name = `Featured jewelry · ${id}`; this.featured.visible = false;
+    // The 10k-triangle model is already the reduction; cpu-detail.ts must not simplify it again or batch it.
+    Object.assign(this.featured.userData, { keepGeometry: true, photoIndex: 0, exhibition: id }); this.photos.push(this.featured);
+    const first = this.featuredFor(CAPTURE ? 0 : townHour()); if (first) tasks.push(this.feature(first));
     this.ready = Promise.all(tasks).then(() => undefined);
+  }
+  /** The piece this collection hovers in `hour`, or the dev pin when it belongs here. */
+  featuredFor(hour: number): string | null {
+    if (PINNED === 'off') return null;
+    if (PINNED && FEATURED_CANDIDATES[this.id as keyof typeof FEATURED_CANDIDATES]?.includes(PINNED)) return PINNED;
+    const piece = featuredPiece(this.id, hour); return piece && this.posters.some((poster) => poster.piece.discovery === piece) ? piece : null;
+  }
+  /** Load `piece`'s model and hang it above its poster; a failed load leaves the poster alone. */
+  private async feature(piece: string): Promise<void> {
+    this.featuredLoading = piece;
+    try {
+      const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js'), gltf = await new GLTFLoader().loadAsync(modelURL(piece));
+      const source = gltf.scene.getObjectByProperty('type', 'Mesh') as THREE.Mesh | undefined, poster = this.posters.find((entry) => entry.piece.discovery === piece);
+      (source?.material as THREE.Material | undefined)?.dispose(); if (!source || !poster || this.featuredLoading !== piece) return;
+      const geometry = source.geometry; geometry.computeBoundingBox(); geometry.computeBoundingSphere();
+      const site = HOVER_SITE[this.id] ?? {}, scale = site.scale ?? HOVER.scale, box = geometry.boundingBox!, board = posterBoard(poster.width);
+      this.featured.geometry.dispose(); this.featured.geometry = geometry; this.featured.scale.setScalar(scale);
+      this.featuredBase = board.y + board.halfHeight + (site.gap ?? HOVER.gap) - box.min.y * scale;
+      this.featured.position.set(0, this.featuredBase, site.inward ?? 0); this.featured.userData.piece = piece; this.featuredPiece = piece;
+      poster.group.add(this.featured); this.featured.visible = true;
+    } catch { /* The poster stays; the model is an addition. */ } finally { if (this.featuredLoading === piece) this.featuredLoading = null; }
+  }
+  /**
+   * Turn and bob the model on the wind clock (still under reduced motion, frozen by ?capture=1). When the town hour moves on,
+   * the next piece loads only while the visitor is beyond `far` of this collection, so no one sees it swap.
+   */
+  updateFeatured(position: THREE.Vector3, far: number): void {
+    if (this.featuredPiece) { const t = windTime.value as number; this.featured.rotation.y = t * HOVER.spin; this.featured.position.y = this.featuredBase + HOVER.bob * Math.sin(t * .7); }
+    if (this.featuredLoading || CAPTURE || PINNED) return;
+    const next = this.featuredFor(townHour());
+    if (next && next !== this.featuredPiece && this.distance(position) > far) void this.feature(next);
   }
   select(piece: Exhibit): boolean { if (!this.pieces.includes(piece)) return false; this.selected = piece; return true; }
   turn(direction: number): void { this.selected = this.pieces[(this.pieces.indexOf(this.selected) + direction + this.pieces.length) % this.pieces.length]; }

@@ -1,0 +1,27 @@
+{
+  "about": "Decimated jewelry models built by scripts/build-jewelry-models.ts from Livia Zaharia's Drive export (millimetres, life size). Files are relative to that export; the STLs never enter this repository. rotate is applied in degrees (x, y, z) after STL Z-up becomes Y-up; size is the longest side in metres after scaling.",
+  "models": [
+    { "id": "nucalong", "use": "featured", "files": ["03_PARAM 2019/pt ceramica/+nucalong.stl"], "rotate": [90, 0, -90], "size": 1.3, "triangles": [10000] },
+    { "id": "nocciola", "use": "featured", "files": ["07.PARAM 2023/nuca/+nocciola.stl"], "rotate": [0, 0, 90], "size": 1.3, "triangles": [10000] },
+    { "id": "splash", "use": "featured", "files": ["02_PARAM 2018/splash/splash.stl"], "rotate": [0, 0, 0], "size": 1.3, "triangles": [10000] },
+    { "id": "ice", "use": "featured", "files": ["04_PARAM 2020/ice/+1ice.stl"], "rotate": [0, 0, 0], "size": 1.3, "triangles": [20000] },
+    { "id": "amberear", "use": "featured", "files": ["05_PARAM 2021/amberear/+++2+amberear.stl"], "rotate": [0, 0, 0], "size": 1.3, "triangles": [10000] },
+    { "id": "mountain-of-gold", "use": "featured", "files": ["05_PARAM 2021/mountain of gold, mycelium, yellow submarine/+MG3.stl"], "rotate": [0, 0, 0], "size": 1.4, "triangles": [10000] },
+    { "id": "beanut", "use": "featured", "files": ["03_PARAM 2019/epiperen/fasolaluna+.stl"], "rotate": [0, 0, 0], "size": 1.4, "triangles": [10000] },
+    { "id": "hessonite", "use": "featured", "files": ["06_PARAM 2022/HESSOINTE EYE/+1hse.stl"], "rotate": [90, 0, 90], "size": 1.3, "triangles": [10000] },
+    { "id": "vittoria-amazonica", "use": "featured", "files": ["06_PARAM 2022/sound manipulation/victoria lily/victoria_amazonica_base.stl", "06_PARAM 2022/sound manipulation/victoria lily/victoria_amazonica_water.stl"], "rotate": [90, 0, 0], "size": 1.3, "triangles": [10000] },
+    { "id": "inline", "use": "featured", "files": ["06_PARAM 2022/sound manipulation/INLINE/+2inline.stl"], "rotate": [0, 0, 0], "size": 1.3, "triangles": [10000] },
+    { "id": "la-navette", "use": "featured", "files": ["05_PARAM 2021/la navette/+1lanavette-cadru.stl", "05_PARAM 2021/la navette/1lanavette-piatra.stl", "05_PARAM 2021/la navette/+1lanavette-aripioara stanga.stl", "05_PARAM 2021/la navette/+1lanavette-aripioara dreapta.stl"], "rotate": [0, 0, 0], "size": 1.4, "triangles": [12000] },
+    { "id": "wormy", "use": "featured", "files": ["04_PARAM 2020/viermele/+vierme_cati.stl"], "rotate": [90, 0, 0], "size": 1.3, "triangles": [10000] },
+    { "id": "peas-in-pod", "use": "featured", "files": ["04_PARAM 2020/peas in pod/+peas.stl"], "rotate": [90, 0, 90], "size": 1.3, "triangles": [10000] },
+    { "id": "art-nouveau", "use": "featured", "files": ["03_PARAM 2019/cercel covrig/last/inelam1+.stl"], "rotate": [90, 0, 90], "size": 1.3, "triangles": [10000] },
+    { "id": "moldavian-vault", "use": "featured", "files": ["02_PARAM 2018/bolta moldov/bolta moldoveneasca+.stl"], "rotate": [0, 0, 180], "size": 1.3, "triangles": [10000] },
+    { "id": "first-ring", "use": "featured", "files": ["02_PARAM 2018/inel_propriu_test4livia.stl/inel_propriu_test4livia.stl"], "rotate": [90, 0, 0], "size": 1.2, "triangles": [10000] },
+    { "id": "deep-sea-pearl", "use": "featured", "files": ["complete/+deepsea (3).stl"], "rotate": [0, 0, 0], "size": 1.4, "triangles": [10000] },
+    { "id": "mycelium", "use": "grove", "files": ["05_PARAM 2021/mountain of gold, mycelium, yellow submarine/+mycelium2.stl"], "rotate": [0, 0, 0], "size": 3.6, "triangles": [10000] },
+    { "id": "eye-of-winter-base", "use": "gate", "files": ["eye of winter/+EOW-base.stl"], "rotate": [0, 0, 0], "size": 12, "triangles": [30000, 8000] },
+    { "id": "eye-of-winter-half", "use": "gate", "files": ["eye of winter/+EOW-complex half.stl"], "rotate": [0, 0, 0], "size": 8.5, "triangles": [10000, 3000] },
+    { "id": "eyelense-1", "use": "gate", "files": ["+eyelens1-1.stl"], "rotate": [0, 0, 0], "size": 10, "triangles": [15000, 5000] },
+    { "id": "eyelense-2", "use": "gate", "files": ["+eyelens1-2.stl"], "rotate": [0, 0, 0], "size": 10, "triangles": [15000, 5000] }
+  ]
+}
