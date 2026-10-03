@@ -11,7 +11,7 @@ import type { RockSite } from './water-surface';
 import type { ContactSite } from './contact-shadows';
 import { terrainSurfaceHeight, terrainSurfaceNormal } from './terrain';
 import { rockColliders, rockReach, seatedHeight } from './river-rocks';
-import { PLATEAU, STAGE, TRAILHEAD, TRAILHEAD_TRUNKS, TRAIL_BARRIER, TRAIL_CURVE, TRAIL_HALF, TRAIL_SAMPLES, gorgeHalf, plateauRadius, plateauRim, snowCover, trailDistance, trailLevel, trailheadPoint } from './mountain-layout';
+import { PLATEAU, STAGE, TRAILHEAD, TRAILHEAD_TRUNKS, TRAIL_BARRIER, TRAIL_CURVE, TRAIL_HALF, TRAIL_SAMPLES, gorgeHalf, plateauHeight, plateauRadius, plateauRim, snowCover, trailDistance, trailLevel, trailheadPoint } from './mountain-layout';
 
 const UP = new THREE.Vector3(0, 1, 0), TAU = Math.PI * 2;
 function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
@@ -256,7 +256,11 @@ export function createTrailSigns(colliders: ColliderSpec[], boulders: readonly T
   }
   // The rope fence along the plateau's lip, where the ground beyond falls away (the gorge below, the gully's side); open where the
   // trail comes up from the gully and at the barrier. Posts stand 1.3 m in from the edge.
-  const rim = plateauRim(1.3), posts = rim.map((p) => {
+  const rim = plateauRim(1.3), posts = rim.map((edge) => {
+    // Over the gorge the outline lies on the cut wall, so walk in from it to the meadow's own lip, then a little further.
+    const p = { ...edge };
+    for (let k = 0; k < 20 && terrainSurfaceHeight(p.x, p.z) < plateauHeight(p.x, p.z) - .4; k++) { p.x -= edge.out.x * .5; p.z -= edge.out.z * .5; }
+    p.x -= edge.out.x * .9; p.z -= edge.out.z * .9;
     const beyond = terrainSurfaceHeight(p.x + p.out.x * 3, p.z + p.out.z * 3), here = terrainSurfaceHeight(p.x, p.z);
     const gap = trailDistance(p.x, p.z) < 2.2 || Math.hypot(p.x - TRAIL_BARRIER.x, p.z - TRAIL_BARRIER.z) < BARRIER_HALF + 1.2;
     return here - beyond > 3.5 && !gap ? new THREE.Vector3(p.x, here, p.z) : null;
