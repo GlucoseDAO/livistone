@@ -4,9 +4,13 @@ Livistone is getting more realistic in small, separately reviewed steps. Each fi
 
 Planned on 3 October 2026 against commit `5a95bfd`. Line numbers refer to that commit; re-check them before editing.
 
-## Status after round 1 (3 October 2026)
+## Status (3 October 2026)
 
-00–04 are merged into `main` (`a16ad0d`). 20 (WebGPU, Phase A) is parked on `realism/20-webgpu`. **Start round 2 from [NEXT.md](NEXT.md)**: it has the results, open decisions, the reordered plan and the binding agent rules (capture budget, first-capture checkpoint, visible-change gate, per-sub-plan dev switches, stopping dev servers after merge). New in round 2: [21 contrast and aerial perspective](21-contrast-aerial.md), [22 iGPU tier detection](22-igpu-detection.md), [23 flaky Living Waters spec](23-flaky-living-waters-spec.md).
+Round 1: 00–04 are merged into `main` (`a16ad0d`). Round 2 began the same day; **start from [NEXT.md](NEXT.md)**, which has the owner's direction, the evidence, the stage order and the binding agent rules.
+
+- The owner approved the WebGPU migration ([20 Phase B](20-webgpu-spike.md)); it runs first and alone on the rendering code. Later shader work is TSL only.
+- New in round 2: [21 contrast and aerial perspective](21-contrast-aerial.md), [22 iGPU tier detection](22-igpu-detection.md) (done), [23 flaky Living Waters spec](23-flaky-living-waters-spec.md) (done), [24 architectural surfaces](24-architecture-surfaces.md), [25 frame budget and adaptive resolution](25-frame-budget.md).
+- Parked until Livia sends exports: 09, 10, 11, 19.
 
 ## Owner decisions (3 October 2026)
 
@@ -79,7 +83,7 @@ New scripts are TypeScript, run with `bun scripts/<name>.ts`. Bun runs TypeScrip
 | 03 ✅ | [Ground material rebuild](03-ground-material.md) | 02 | all (graded) | `mountains.ts`, `scripts/build-ground-textures.py` |
 | 04 ✅ | [River water shading rewrite](04-river-water.md) | 02 | all (graded) | new `world/water-material.ts`, `river.ts`, `world.ts` |
 | 05 | [Golden-hour dawn/dusk](05-golden-hour.md) | 02 | all | `daylight.ts`, `sky.ts`, `main.ts`, `ui.ts` |
-| 06 | [Adaptive resolution](06-adaptive-resolution.md) | 00 | gpu, mobile | `main.ts` |
+| 06 → 25 | [Adaptive resolution](06-adaptive-resolution.md) (folded into 25) | 00 | gpu, mobile | `main.ts` |
 | 07 | [Reflection probes](07-reflection-probes.md) | 02 | gpu, mobile | new `world/probes.ts` |
 | 08 | [Building-piece materials a–e](08-building-materials.md) | 07 | all (graded) | per-building modules + bake scripts |
 | 09 | [Piece-model pipeline](09-piece-model-pipeline.md) | 00 | offline | new `scripts/build-piece-models.ts` |
@@ -91,11 +95,13 @@ New scripts are TypeScript, run with `bun scripts/<name>.ts`. Bun runs TypeScrip
 | 15 | [Water reflections (experiment)](15-water-reflections.md) | 04 | gpu | `water-material.ts`, `main.ts` |
 | 16 | [Contact shadows](16-contact-shadows.md) | 00 | all | new `world/contact-shadows.ts`, `ground-cover.ts` |
 | 17 | [Wind](17-wind.md) | 00 | gpu, mobile | `forest.ts`, `planting.ts`, `living-waters.ts` |
-| 18 | [GPU post-processing (experiment)](18-gpu-post.md) | 01, 02 | gpu | `main.ts` |
+| 18 | [Ambient occlusion and restrained bloom](18-gpu-post.md) | 20 B | gpu (mobile if 25 allows) | render pipeline |
 | 19 | [AI reconstructions (gated)](19-ai-reconstructions.md) | 09 | offline | manifest only |
-| 20 ⏸ | [WebGPURenderer spike with WebGL2 fallback (experiment)](20-webgpu-spike.md) | 00, ideally after 03 and 04 | all | `main.ts`, TSL ports of sky, terrain and water |
+| 20 | [WebGPURenderer migration with WebGL2 fallback](20-webgpu-spike.md) (Phase A ✅, Phase B approved) | 00, 03, 04 | all | `main.ts`, `src/render/`, TSL ports of every GLSL patch |
 | 21 | [Sun/ambient contrast and aerial perspective](21-contrast-aerial.md) | 01, 02 (merged) | all | `main.ts`, fog chunk |
-| 22 | [iGPU tier detection](22-igpu-detection.md) | — | probe | `game/graphics.ts` |
-| 23 | [Flaky Living Waters spec](23-flaky-living-waters-spec.md) | — | test | `tests/living-waters.spec.ts` |
+| 22 ✅ | [iGPU tier detection](22-igpu-detection.md) | — | probe | `game/graphics.ts` |
+| 23 ✅ | [Flaky Living Waters spec](23-flaky-living-waters-spec.md) | — | test | `tests/living-waters.spec.ts` |
+| 24 | [Architectural surfaces](24-architecture-surfaces.md) | 20 B | all (graded) | new `scripts/build-surface-textures.py`, `bridge.ts`, `gateway.ts`, `world.ts`, `station.ts` |
+| 25 | [Frame budget and adaptive resolution](25-frame-budget.md) | 20 B | all | `forest.ts`, `planting.ts`, `cpu-detail.ts`, new `game/render-scale.ts` |
 
-01 → 02 → 05 all edit `main.ts`, so run them one after another. 03, 04, 09, 12, 16 and 17 touch separate files and can run in parallel worktrees once 00 exists.
+Round 2: 20 Phase B runs alone on the render path. After it, 21, 18, 05 and 25 edit `main.ts` and merge one after another; 13, 14, 16, 17, 24 and 12 touch separate files and can run in parallel worktrees. Shader code is TSL only.

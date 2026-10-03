@@ -1,4 +1,4 @@
-# 06 — Adaptive resolution for mobile and gpu
+# 06 — Adaptive resolution for mobile and gpu (folded into 25)
 
 **Needs:** 00. **Tiers:** gpu, mobile. cpu already has its own scaler. **Branch:** `realism/06-adaptive`.
 See [README](README.md) for the shared workflow.
@@ -34,3 +34,7 @@ See [README](README.md) for the shared workflow.
 
 - The scale settles without oscillating under synthetic fps traces.
 - The documentation states that physical-device performance is unverified.
+
+## Round 2
+
+Folded into [25](25-frame-budget.md), which also measures the budget the scaler protects.
