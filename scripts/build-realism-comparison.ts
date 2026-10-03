@@ -42,12 +42,12 @@ table{border-collapse:collapse;width:100%;margin:0 0 22px;font-size:13px}th,td{b
 .cmp .after{clip-path:inset(0 0 0 var(--split,50%))}.cmp .handle{position:absolute;top:0;bottom:0;left:var(--split,50%);width:2px;background:var(--accent);pointer-events:none}
 .cmp .tag{position:absolute;top:8px;padding:2px 8px;border-radius:4px;background:#000a;font-size:12px}.cmp .tag.l{left:8px}.cmp .tag.r{right:8px}
 .side{display:grid;grid-template-columns:1fr 1fr;gap:2px;background:#000}.side img{width:100%;display:block}
-.missing{padding:40px;text-align:center;color:var(--muted)}.errors{color:var(--bad);font-size:13px;padding:0 12px 10px}
+.diff{display:block;width:100%;background:#000}.missing{padding:40px;text-align:center;color:var(--muted)}.errors{color:var(--bad);font-size:13px;padding:0 12px 10px}
 </style></head><body><main>
 <h1>${title}</h1><p class="meta" id="meta"></p>
 <div class="bar">
 <label>Compare with <select id="variant"></select></label><label>Profile <select id="profile"></select></label><label>Time <select id="time"></select></label>
-<span><button id="mode-slider" class="on">Slider</button> <button id="mode-side">Side by side</button> <button id="mode-flip">Flip</button></span>
+<span><button id="mode-slider" class="on">Slider</button> <button id="mode-side">Side by side</button> <button id="mode-flip">Flip</button> <button id="mode-diff">Difference</button></span>
 <span class="meta" style="margin:0">Drag across an image to move the split. Fps is headless and informational only.</span>
 </div>
 <table id="summary"></table><div class="grid" id="views"></div>
@@ -67,18 +67,26 @@ function refresh(){
   $('views').innerHTML=before.captures.filter(c=>byName[c.name]).map(b=>{const a=byName[b.name],s0=b.snapshot,s1=a.snapshot;sum.c0+=s0.calls||0;sum.c1+=s1.calls||0;sum.t0+=s0.triangles||0;sum.t1+=s1.triangles||0;
     rows+='<tr><td>'+b.name+'</td><td>'+fmt(s0.calls)+'</td><td>'+fmt(s1.calls)+'</td><td>'+delta(s0.calls,s1.calls)+'</td><td>'+fmt(s0.triangles)+'</td><td>'+fmt(s1.triangles)+'</td><td>'+delta(s0.triangles,s1.triangles)+'</td><td>'+(s0.fps??'—')+' → '+(s1.fps??'—')+'</td></tr>';
     const i0=BASE+'/'+key+'/'+b.name+'.png', i1=variant+'/'+key+'/'+b.name+'.png';
-    const body=mode==='side'?'<div class="side"><img loading="lazy" src="'+i0+'" alt="'+b.name+' '+BASE+'"><img loading="lazy" src="'+i1+'" alt="'+b.name+' '+variant+'"></div>'
+    const body=mode==='diff'?'<canvas class="diff" data-a="'+i0+'" data-b="'+i1+'"></canvas>':mode==='side'?'<div class="side"><img loading="lazy" src="'+i0+'" alt="'+b.name+' '+BASE+'"><img loading="lazy" src="'+i1+'" alt="'+b.name+' '+variant+'"></div>'
       :'<div class="cmp" data-flip="'+(mode==='flip')+'"><img loading="lazy" src="'+i0+'" alt="'+b.name+' '+BASE+'"><img class="after" loading="lazy" src="'+i1+'" alt="'+b.name+' '+variant+'"><div class="handle"></div><span class="tag l">'+BASE+'</span><span class="tag r">'+variant+'</span></div>';
     return '<section class="card"><h2>'+b.name+'<span>calls '+fmt(s0.calls)+' → '+fmt(s1.calls)+' · triangles '+fmt(s0.triangles)+' → '+fmt(s1.triangles)+'</span></h2>'+body+'</section>'}).join('');
   $('summary').innerHTML='<tr><th>View</th><th>Calls before</th><th>after</th><th>Δ</th><th>Triangles before</th><th>after</th><th>Δ</th><th>Fps (headless)</th></tr>'+rows+'<tr><th>Total</th><th>'+fmt(sum.c0)+'</th><th>'+fmt(sum.c1)+'</th><th>'+delta(sum.c0,sum.c1)+'</th><th>'+fmt(sum.t0)+'</th><th>'+fmt(sum.t1)+'</th><th>'+delta(sum.t0,sum.t1)+'</th><th></th></tr>';
   const errs=[...before.errors.map(e=>BASE+': '+e),...after.errors.map(e=>variant+': '+e)]; if(errs.length)$('views').insertAdjacentHTML('afterbegin','<p class="errors">'+errs.join('<br>')+'</p>');
+  document.querySelectorAll('canvas.diff').forEach(drawDiff);
   document.querySelectorAll('.cmp').forEach(el=>{const set=x=>{const r=el.getBoundingClientRect();el.style.setProperty('--split',Math.max(0,Math.min(100,(x-r.left)/r.width*100))+'%')};
     if(el.dataset.flip==='true'){el.style.setProperty('--split','100%');el.style.cursor='pointer';el.onclick=()=>el.style.setProperty('--split',el.style.getPropertyValue('--split')==='0%'?'100%':'0%');return}
     el.onpointerdown=e=>{set(e.clientX);el.setPointerCapture(e.pointerId)};el.onpointermove=e=>{if(e.buttons)set(e.clientX)}});
 }
-options($('variant'),Object.keys(DATA).filter(v=>v!==BASE));
+// Changed pixels in amber over a dimmed copy of the after image, so subtle changes are still visible.
+function drawDiff(canvas){const load=src=>new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src=src});
+  Promise.all([load(canvas.dataset.a),load(canvas.dataset.b)]).then(([a,b])=>{if(!a||!b)return;canvas.width=b.naturalWidth;canvas.height=b.naturalHeight;const c=canvas.getContext('2d');
+    c.drawImage(a,0,0);const pa=c.getImageData(0,0,canvas.width,canvas.height);c.drawImage(b,0,0);const pb=c.getImageData(0,0,canvas.width,canvas.height),o=pb.data,x=pa.data;let changed=0;
+    for(let k=0;k<o.length;k+=4){const d=Math.max(Math.abs(o[k]-x[k]),Math.abs(o[k+1]-x[k+1]),Math.abs(o[k+2]-x[k+2]));const g=(o[k]+o[k+1]+o[k+2])/12;
+      if(d>20){changed++;const t=Math.min(1,d/64);o[k]=g+(255-g)*t;o[k+1]=g+(180-g)*t;o[k+2]=g*(1-t)}else{o[k]=o[k+1]=o[k+2]=g}}
+    c.putImageData(pb,0,0);const h=canvas.closest('.card')?.querySelector('h2 span');if(h)h.textContent+=' · '+(changed/(o.length/4)*100).toFixed(1)+'% of pixels changed'})}
+options($('variant'),Object.keys(DATA).filter(v=>v!==BASE)); $('variant').selectedIndex=$('variant').options.length-1;
 for(const id of ['variant','profile','time'])$(id).onchange=refresh;
-for(const m of ['slider','side','flip'])$('mode-'+m).onclick=()=>{mode=m;document.querySelectorAll('.bar button').forEach(b=>b.classList.toggle('on',b.id==='mode-'+m));refresh()};
+for(const m of ['slider','side','flip','diff'])$('mode-'+m).onclick=()=>{mode=m;document.querySelectorAll('.bar button').forEach(b=>b.classList.toggle('on',b.id==='mode-'+m));refresh()};
 refresh();
 </script></body></html>
 `;
