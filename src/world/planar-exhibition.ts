@@ -6,6 +6,7 @@ import type { Exhibit } from '../game/exhibits';
 import type { ColliderSpec } from '../game/physics';
 import type { Interactive } from './world';
 import { posterLayout } from './poster-layout';
+import { activeSurfaces } from './surfaces';
 
 const textures = new Map<string, Promise<THREE.Texture>>();
 function photograph(file: string): Promise<THREE.Texture> {
@@ -41,7 +42,7 @@ export class PlanarExhibition {
     this.pieces = COLLECTION.filter((piece) => piece.location === id);
     this.selected = this.pieces.find((piece) => piece.discovery === EXHIBITS.find((anchor) => anchor.landmark === id)?.discovery) ?? this.pieces[0];
     const layout = posterLayout(id, this.pieces.length), tasks: Promise<void>[] = [];
-    const frameMaterial = displayMaterial({ color: '#f4f0e5' }), footMaterial = new THREE.MeshStandardMaterial({ color: '#c2aa77', roughness: .4, metalness: .5 });
+    const frameMaterial = displayMaterial({ color: '#f4f0e5' }), footMaterial = activeSurfaces()?.stand ?? new THREE.MeshStandardMaterial({ color: '#c2aa77', roughness: .4, metalness: .5 });
     const width = id === 'science' ? 1.72 : 2, height = 2.95;
     this.pieces.forEach((piece, i) => {
       const site = layout[i], floor = site.y ?? 0, group = new THREE.Group(); group.position.set(site.x, floor, site.z); group.rotation.y = site.yaw; parent.add(group);

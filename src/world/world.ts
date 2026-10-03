@@ -39,6 +39,8 @@ import { terrainHeight, townTerrainGeometry } from './terrain';
 import { transformColliders } from './town-layout';
 import { createRailwayStructure, loadRailwayTextures } from './railway';
 import { createGlucosePavilion } from './glucose-pavilion';
+import { activateSurfaces, bakeMasonry } from './surfaces';
+import type { Surfaces } from './surfaces';
 
 /** Culling flags saved while Town.warmUp() draws everything. */
 const warmCulled = new WeakMap<THREE.Object3D, boolean>();
@@ -107,7 +109,14 @@ export class Town {
   private readonly dark = new THREE.MeshStandardMaterial({ color: '#3e5550', roughness: 0.25, metalness: 0.35 });
   private readonly sphere = new THREE.SphereGeometry(1, 16, 12);
   private rocks: RockSite[] = [];
-  private constructor(private mobile: boolean, private tier: GraphicsTier) { this.water = waterMaterial(tier); this.paving = pavingMaterial(mobile); }
+  /** Sub-plan 24's mapped ashlar, terrazzo and brass; null with ?surfaces=off, which keeps the flat white and gold below. */
+  private readonly surfaces: Surfaces | null;
+  private readonly masonry: THREE.Material;
+  private readonly brass: THREE.Material;
+  private constructor(private mobile: boolean, private tier: GraphicsTier) {
+    this.water = waterMaterial(tier); this.paving = pavingMaterial(mobile);
+    this.surfaces = activateSurfaces(tier); this.masonry = this.surfaces?.masonry ?? this.white; this.brass = this.surfaces?.gold ?? this.gold;
+  }
   static async create(mobile: boolean, stage: (value: number, label: string) => Promise<void>, tier: GraphicsTier = mobile ? 'mobile' : 'gpu'): Promise<Town> {
     const town = new Town(mobile, tier); await town.build(stage); return town;
   }
@@ -115,7 +124,7 @@ export class Town {
     const mobile = this.mobile;
     await stage(20, 'Shaping the river, bridge and town entrance…');
     this.root.name = 'Livistone'; this.root.add(this.interiors, this.details);
-    this.createTerrain(); this.createPaths(); createBridge(this.root, this.colliders, this.white, this.paving, this.gold);
+    this.createTerrain(); this.createPaths(); createBridge(this.root, this.colliders, this.masonry, this.paving, this.brass);
     createGateway(this.root, this.colliders, mobile, this.paving);
     const gatewayPoster = createGatewayPoster(this.root, this.colliders); this.researchPanels.push(...gatewayPoster.panels); this.interactives.push({ id: 'kings-chapel', object: gatewayPoster.panels[0], position: gatewayPoster.position });
     const introduction = createIntroduction(this.root, this.colliders); this.researchPanels.push(...introduction.panels); this.interactives.push({ id: 'about-livistone', object: introduction.panels[0], position: introduction.position });
@@ -142,7 +151,7 @@ export class Town {
     this.gardens.presentLakeJewelry();
     this.gardens.addInterpretation('living-mycelium', 'Mycelium Rain Garden', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
     this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
-    for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.white, this.paving, this.gold, bridge);
+    for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.masonry, this.paving, this.brass, bridge);
     createTimeTower(this.root, this.colliders, this.mobile);
     createFutureHouse(this.root, this.colliders, this.mobile);
     await stage(54, 'Making room for science and bioart…');
@@ -242,10 +251,11 @@ export class Town {
     // World UVs tile the paving at its 4 m scale; the default cap UVs stretched one tile over the whole floor.
     const floorPosition = floor.geometry.getAttribute('position'), floorUV = floor.geometry.getAttribute('uv');
     for (let i = 0; i < floorPosition.count; i++) floorUV.setXY(i, (x + floorPosition.getX(i) * sx) / 4, (z + floorPosition.getZ(i) * sz) / 4);
-    const rim = mesh(new THREE.TorusGeometry(floorR + 0.15, 0.2, 8, 72), this.white, exterior, 0, 0.08); rim.rotation.x = Math.PI / 2; rim.scale.set(sx, sz, 1);
+    const rim = mesh(new THREE.TorusGeometry(floorR + 0.15, 0.2, 8, 72), this.masonry, exterior, 0, 0.08); rim.rotation.x = Math.PI / 2; rim.scale.set(sx, sz, 1);
+    if (this.surfaces) bakeMasonry(rim.geometry, undefined, true); // indoors: no weathering
     this.colliders.push({ type: 'box', position: [x, 0.08, z], size: [floorR * sx * 0.75, 0.08, floorR * sz * 0.75] });
     this.wallRing(exterior, x, z, floorR * sx, floorR * sz, 0.32);
-    this.entranceArch(exterior, floorR * sz, id === 'city-hall' ? this.gold : this.white);
+    this.entranceArch(exterior, floorR * sz, id === 'city-hall' ? this.brass : this.masonry);
     if (id === 'science') {
       const frame = nanotCage(exterior, radius, centerY, this.mobile).clone().translate(x, .16, z);
       this.colliders.push({ type: 'mesh', vertices: new Float32Array(frame.getAttribute('position').array), indices: new Uint32Array(frame.index!.array) }); frame.dispose();
@@ -274,7 +284,8 @@ export class Town {
   }
   private entranceArch(exterior: THREE.Group, depth: number, material: THREE.Material): void {
     const entrance = new THREE.CatmullRomCurve3([new THREE.Vector3(-2.35, 0, depth + 0.05), new THREE.Vector3(-2.3, 2.4, depth + 0.25), new THREE.Vector3(0, 4.1, depth + 0.3), new THREE.Vector3(2.3, 2.4, depth + 0.25), new THREE.Vector3(2.35, 0, depth + 0.05)]);
-    mesh(new THREE.TubeGeometry(entrance, 40, 0.22, 8, false), material, exterior);
+    const arch = mesh(new THREE.TubeGeometry(entrance, 40, 0.22, 8, false), material, exterior);
+    if (material.userData.surface === 'ashlar') bakeMasonry(arch.geometry, new THREE.Matrix4().makeTranslation(exterior.position));
   }
   /** The Mitoring: an amber cup with a domed lid seated inside the bezel's silver basket, entered through the ring. */
   private createEnergyHall(x: number, z: number): void {
@@ -312,7 +323,12 @@ export class Town {
     this.createInterior('energy', inside, x, z, b - 0.3, { a, b, ceiling, structure: exterior });
   }
   private createInterior(id: string, group: THREE.Group, x: number, z: number, floorR: number, hall?: { a: number; b: number; ceiling: (px: number, pz: number) => number; structure: THREE.Group }): void {
-    const floorInset = mesh(new THREE.CircleGeometry(floorR * 0.87, 56), new THREE.MeshStandardMaterial({ color: '#ddd7c4', roughness: 0.95 }), group, 0, 0.14); floorInset.rotation.x = -Math.PI / 2;
+    const floorInset = mesh(new THREE.CircleGeometry(floorR * 0.87, 56), this.surfaces?.floor ?? new THREE.MeshStandardMaterial({ color: '#ddd7c4', roughness: 0.95 }), group, 0, 0.14); floorInset.rotation.x = -Math.PI / 2;
+    if (this.surfaces) {
+      // Terrazzo UVs: world metres over 4 from the hall centre, so a brass strip runs through it (local -y is world +z here).
+      const inset = floorInset.geometry.getAttribute('position'), insetUV = floorInset.geometry.getAttribute('uv');
+      for (let i = 0; i < inset.count; i++) insetUV.setXY(i, inset.getX(i) / 4, -inset.getY(i) / 4);
+    }
     if (id === 'energy') {
       // Folded membranes descend from alternating sides, leaving a clear public hall below.
       const { a, b, ceiling, structure } = hall!;
@@ -351,7 +367,7 @@ export class Town {
     return true;
   }
   readonly forest = new Forest();
-  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
+  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
     const rand = seeded(3974); const sites: THREE.Vector3[] = [];
     for (let i = 0; i < (this.mobile ? 2600 : 5400); i++) {
@@ -375,7 +391,7 @@ export class Town {
     }
     rocks.count = placed; rocks.castShadow = true; rocks.receiveShadow = true; rocks.computeBoundingSphere(); this.root.add(rocks);
     for (const x of [-6.5, 6.5]) for (const z of [5, 13, 39]) {
-      const pole = mesh(new THREE.CylinderGeometry(0.045, 0.065, 2.8, 8), this.gold, this.root, x, 1.4, z);
+      const pole = mesh(new THREE.CylinderGeometry(0.045, 0.065, 2.8, 8), this.brass, this.root, x, 1.4, z);
       const globe = mesh(this.sphere, new THREE.MeshStandardMaterial({ color: '#f3e8c9', emissive: '#e4c881', emissiveIntensity: 0.35, roughness: 0.6 }), this.root, x, 2.8, z); globe.scale.setScalar(0.23); pole.castShadow = false;
       nightEmission(globe.material as THREE.MeshStandardMaterial, '#ffcf79', 3);
       addGlow(this.root, new THREE.Vector3(x, 2.8, z), '#ffcf79', 4.5, 36, 10, .7);

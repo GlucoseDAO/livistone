@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { displayMaterial } from '../render/output';
 import type { ColliderSpec } from '../game/physics';
 import { nightEmission } from './night-lighting';
+import { activeSurfaces } from './surfaces';
 
 /** Building and place signs: larger than any jewelry poster, dark Livia-style face in a pierced cast-gold Voronoi frame. */
 export const PLACE_SIGN = { width: 3, height: 2, frame: .24, centre: 2.05, depth: .07, postX: 1.25 };
@@ -53,7 +54,9 @@ let frameGeometry: THREE.BufferGeometry | undefined;
 /** DOM-independent: frame, board, posts and two blank faces; paintPlaceSign adds the lettering later. */
 export function createPlaceSign(parent: THREE.Object3D, colliders: ColliderSpec[], site: PlaceSite, name: string, offset?: THREE.Vector3): PlaceSign {
   const group = new THREE.Group(); group.name = name; group.position.set(site.x, 0, site.z); group.rotation.y = site.yaw; parent.add(group);
-  const gold = new THREE.MeshStandardMaterial({ color: '#d6a458', metalness: .8, roughness: .26 }); nightEmission(gold, '#d4943a', .22);
+  // Every sign shares the town's tarnished brass when surface maps are on; otherwise each keeps its own plain gold.
+  let gold = activeSurfaces()?.signGold;
+  if (!gold) { const plain = new THREE.MeshStandardMaterial({ color: '#d6a458', metalness: .8, roughness: .26 }); nightEmission(plain, '#d4943a', .22); gold = plain; }
   const frame = new THREE.Mesh(frameGeometry ??= placeFrameGeometry(), gold); frame.position.y = PLACE_SIGN.centre; frame.castShadow = true; frame.name = name + ' · pierced frame'; group.add(frame);
   const board = new THREE.Mesh(new THREE.BoxGeometry(PLACE_SIGN.width + .06, PLACE_SIGN.height + .06, .05), displayMaterial({ color: '#120f0c' })); board.position.y = PLACE_SIGN.centre; group.add(board);
   for (const side of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(.045, .06, BOTTOM + .3, 8), gold); post.position.set(side * PLACE_SIGN.postX, (BOTTOM + .3) / 2, 0); post.castShadow = true; group.add(post); }

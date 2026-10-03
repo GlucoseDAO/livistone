@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
+import { bakeMasonry } from './surfaces';
 
 export function bridgeHeight(z: number): number { return .065 + 2.35 * Math.pow(Math.sin(Math.PI * (z - 12) / 28), 2); }
 
-/** A continuous masonry vault, with its feet buried in the banks and an open waterway. */
-export function createBridge(parent: THREE.Group, colliders: ColliderSpec[], stone: THREE.Material, paving: THREE.Material, metal: THREE.Material): void {
+/** A continuous masonry vault, with its feet buried in the banks and an open waterway. `placement` is where the bridge stands, for the ashlar's weathering. */
+export function createBridge(parent: THREE.Group, colliders: ColliderSpec[], stone: THREE.Material, paving: THREE.Material, metal: THREE.Material, placement = new THREE.Matrix4()): void {
   const masonry: THREE.BufferGeometry[] = [], rails: THREE.BufferGeometry[] = [], joints: THREE.BufferGeometry[] = [];
   const profile = new THREE.Shape(); profile.moveTo(12, bridgeHeight(12) - .008);
   for (let i = 1; i <= 64; i++) { const z = 12 + i / 64 * 28; profile.lineTo(z, bridgeHeight(z) - .008); }
@@ -70,6 +71,7 @@ export function createBridge(parent: THREE.Group, colliders: ColliderSpec[], sto
   for (const x of [-1.1, 1.1]) tube(Array.from({ length: 65 }, (_, i) => { const z = 12 + i / 64 * 28; return new THREE.Vector3(x, bridgeHeight(z) + .006, z); }), .008, joints);
   for (const [geometries, material] of [[masonry, stone], [rails, metal], [joints, new THREE.MeshStandardMaterial({ color: '#9e9580', roughness: 1 })]] as const) {
     const merged = mergeGeometries(geometries.map((g) => g.index ? g.toNonIndexed() : g))!;
+    if (material.userData.surface === 'ashlar') bakeMasonry(merged, placement);
     const mesh = new THREE.Mesh(merged, material); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh);
     geometries.forEach((g) => g.dispose());
   }
@@ -78,10 +80,10 @@ export function createBridge(parent: THREE.Group, colliders: ColliderSpec[], sto
 /** Reuse the vault with exactly the same transform applied to every physics shape. */
 export function createGardenBridge(parent: THREE.Group, colliders: ColliderSpec[], stone: THREE.Material, paving: THREE.Material, metal: THREE.Material, site: { x: number; z: number; yaw: number; scale: number }): void {
   const group = new THREE.Group(), local: ColliderSpec[] = [];
-  createBridge(group, local, stone, paving, metal);
   const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), site.yaw);
   const offset = new THREE.Vector3(0, 0, -26 * site.scale).applyQuaternion(rotation).add(new THREE.Vector3(site.x, 0, site.z));
   group.position.copy(offset); group.quaternion.copy(rotation); group.scale.setScalar(site.scale); group.updateMatrix(); parent.add(group);
+  createBridge(group, local, stone, paving, metal, group.matrix);
   for (const spec of local) {
     if (spec.type === 'mesh') {
       const vertices = spec.vertices.slice(), p = new THREE.Vector3();

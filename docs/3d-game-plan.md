@@ -1,5 +1,11 @@
 # Livistone: browser game implementation plan
 
+## Architectural surfaces (realism 24) — 3 October 2026
+
+The bridges, gateway abutments, hall rims and the Science arch now use a generated pale limestone ashlar. The civic hall floor insets use a honed terrazzo with brass strips every metre, and the town's gold, poster stands and sign frames use a brushed-brass roughness map. `scripts/build-surface-textures.py` bakes all three sets procedurally from fixed seeds, with no photographs or downloads. Each map averages the flat colour it replaces, so the palette is unchanged. Masonry uses an object-space triplanar that keeps courses level. A subtle grime and damp band runs along the bottom metre, and undersides are darker. The paving ring inside each hall now tiles at its true 4 m instead of one stretched tile.
+
+Added download per tier: GPU about 944 KiB (1024 px stone albedo with 512 px normal/roughness/height maps, plus 512 px brass), mobile about 252 KiB (half those sizes; roughness without normals), CPU about 98 KiB (the two 512 px stone albedos on Lambert copies). No meshes are added, so draw calls do not change. The three hall floors now share one material, and all poster stands share another. Dev-only `?surfaces=off` restores the flat colours. Before/after captures and the visible-change gate on WebGPU are still to be taken. Physical-device cost is unmeasured.
+
 ## River water shading — 3 October 2026
 
 Realism sub-plan 04 replaces the opaque green river with transparent water: the river sheet bakes downstream flow, channel distance, depth and rock proximity per vertex from the shared channel field. GPU and mobile water use flow-map ripples that follow every bend and turn smoothly into the river at both confluences, depth absorption over the visible bank, a soft shoreline, Fresnel sky reflection, sun glints and waterline foam; mobile samples one ripple scale. CPU water stays opaque with depth colour baked into vertex colours. Draw calls are unchanged; the CPU sheet keeps about 2,600 more triangles than before. Two dev-only looks (clear stream, deeper garden river) await the owner's choice, see [concepts/14-realism/04-river.md](../concepts/14-realism/04-river.md). Physical-device cost is unmeasured.
