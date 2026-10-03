@@ -4,6 +4,7 @@ import { GORGE_FALL, SNOW_CAVE, brookCourse, createGorgeWater, createStream, cre
 import type { Point3, WaterfallSpec } from '../src/world/mountain-water';
 import { GORGE_STREAM, PLATEAU_STREAM, STAGE, TRAIL_HALF, TRAIL_SAMPLES, WATERFALL, gorgeCoords, snowCover, trailDistance } from '../src/world/mountain-layout';
 import { terrainSurfaceHeight } from '../src/world/terrain';
+import { CragGround, cragGeometry, cragSites } from '../src/world/crags';
 
 const finite = (attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute): boolean => Array.from(attribute.array as ArrayLike<number>).every(Number.isFinite);
 /** Distance in plan from (x, z) to a polyline. */
@@ -207,6 +208,24 @@ describe('the gorge water, placed from the layout', () => {
         if (colour.getX(i) < .05) dark++;
       }
       expect(blocking).toBe(0); expect(thick).toBeGreaterThan(0); expect(dark).toBeGreaterThan(0);
+    }
+  });
+  it('keeps the crags out of the water: in front of the fall and its pool, over both streams and at the cave', () => {
+    // The crags (sub-plan 27, round 2) leave the fall a slot: no block stands within 0.5 m of the sheet or the pool, and none on the
+    // ground within a metre of either stream's course or two of the cave's mouth. Blocks buried in the wall may lie behind the wet rock.
+    const ground = new CragGround(), crag = cragGeometry(cragSites({ ground }), 'gpu', ground).getAttribute('position');
+    const fall = waterfallGeometry(GORGE_FALL, 'gpu'), sheet = fall.getAttribute('position'), water = fall.getAttribute('water');
+    const gorge = gorgeStreamCourse(), brook = brookCourse(), out: number[] = [];
+    for (let i = 0; i < crag.count; i++) {
+      const x = crag.getX(i), y = crag.getY(i), z = crag.getZ(i), above = y - terrainSurfaceHeight(x, z);
+      if (above > -.2 && above < 1.5) { expect(planDistance(gorge, x, z), `gorge stream at ${x.toFixed(1)}, ${z.toFixed(1)}`).toBeGreaterThan(1); expect(planDistance(brook, x, z), `brook at ${x.toFixed(1)}, ${z.toFixed(1)}`).toBeGreaterThan(1); }
+      if (above > -.2 && above < 3) expect(Math.hypot(x - SNOW_CAVE.mouth.x, z - SNOW_CAVE.mouth.z)).toBeGreaterThan(2);
+      out.push(x, y, z);
+    }
+    for (let j = 0; j < sheet.count; j++) {
+      if (Math.round(water.getX(j)) === 2) continue;
+      const px = sheet.getX(j), py = sheet.getY(j), pz = sheet.getZ(j);
+      for (let i = 0; i < out.length; i += 3) if (Math.abs(out[i + 1] - py) < .5) expect(Math.hypot(out[i] - px, out[i + 1] - py, out[i + 2] - pz)).toBeGreaterThan(.5);
     }
   });
   it('adds four draws at most (three on cpu): fall and pool, mist, both streams together, the snow cave', () => {
