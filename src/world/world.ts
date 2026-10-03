@@ -211,7 +211,8 @@ export class Town {
       addGlow(this.root, new THREE.Vector3(landmark.x, 6, landmark.z), color, 25, 90, 24, .3);
       for (const side of [-1, 1]) addGlow(this.root, new THREE.Vector3(landmark.x + side * 5, 2.5, landmark.z + 7), color, 8, 65, 15, .24);
     }
-    for (const x of [-20, 0, 20]) addGlow(arrival, new THREE.Vector3(x, 4.3, -68), '#ffd28a', 12, 70, 17, .3);
+    // The concourse glows stay a quarter below their first strength, so the platform lamps' own pools read at night (sub-plan 28).
+    for (const x of [-20, 0, 20]) addGlow(arrival, new THREE.Vector3(x, 4.3, -68), '#ffd28a', 12, 50, 17, .22);
     this.mountains = new Mountains(mobile, this.tier, this.groundOcclusion, this.grassShade); this.root.add(this.mountains);
   }
   private createTerrain(): void {

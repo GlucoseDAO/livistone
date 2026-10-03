@@ -18,7 +18,7 @@ Every building and garden starts from something Livia actually made: a ring, a p
 
 | | Stop | Inspired by | What you'll find |
 | --- | --- | --- | --- |
-| 1 | **Embryo Station** | The Embryo Ring: raw amber held in silver prongs | You arrive here: a pierced silver ring entrance and a parked maglev train you can board |
+| 1 | **Embryo Station** | The Embryo Ring: raw amber held in silver prongs | You arrive here, under a canopy of deep honey amber that glows from within: a pierced silver ring entrance, a lamplit platform with benches, a clock and a departures board, and a parked maglev train you can board |
 | 2 | **Ministry of Energy** | The Mitoring: amber in silver folds that recall the cristae inside mitochondria | A long amber hall, entered through the ring itself |
 | 3 | **Ministry of Science** | The Nanot of Power pendant | A glass hall inside the pendant's silver lattice |
 | 4 | **City Hall** | The Nut of Power: a walnut shell, amethyst and brass | The heart of the town, joined by brass clasps |
@@ -28,7 +28,7 @@ Every building and garden starts from something Livia actually made: a ring, a p
 | 8 | **Future House** | Camel Dalí: copper, a 3D-printed part and leather | A copper camel drinking from the lake. Climb its neck into the exhibition cabin |
 | 9 | **Mycelium Rain Garden** | The Mycelium ring, whose silver folds let water drain off its opal | Tall silver mushrooms with opal hearts and a visible rain rill |
 | 10 | **Materialized Enhancements** | The [enhancement.bio](https://enhancement.bio/) bioart project | A violet Voronoi hill to climb, with gene-category crystals grown by the project itself |
-| 11 | **Jepii Mici** | A real, steep trail in Romania's Bucegi Mountains, marked with a blue cross and closed in winter | A forest trailhead with a roped warning board, a climb to a plateau of rhododendrons and moss campion, and old snow in a couloir between two peaks |
+| 11 | **Jepii Mici** | A real, steep trail in Romania's Bucegi Mountains, marked with a blue cross and closed in winter | A mountain trail beyond the lake: from a forest trailhead and its warning board, up a rocky gorge with a waterfall and past a gully of old snow to a plateau of rhododendrons |
 
 The facts, photographs and research come from Livia's work and link to their sources; the Jepii Mici trail is a real place, and everything Livistone builds round it is fiction. The powers the town gives its artifacts (the "Livia Lore") are fiction, and the game labels them that way.
 

@@ -36,13 +36,13 @@ export function addGlow(parent: THREE.Object3D, position: THREE.Vector3, color: 
   glow.userData.nightGlow = true; glow.userData.lightSource = { color, intensity, distance }; parent.add(glow); return glow;
 }
 
-/** Metres over which a pooled light fades before it passes to a nearer source (NightLighting.update). */
-export const POOL_FADE = 4;
-
 export function nightEmission(material: THREE.MeshStandardMaterial | THREE.MeshStandardNodeMaterial, color: string, intensity: number): void {
   material.userData.dayEmission = { color: material.emissive.getHex(), intensity: material.emissiveIntensity };
   material.userData.nightEmission = { color, intensity };
 }
+
+/** Metres over which a pooled light fades before it passes to a nearer source (NightLighting.update). */
+const POOL_FADE = 4;
 
 export class NightLighting {
   private readonly halos: THREE.Sprite[] = [];

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { cameraPosition, float, materialColor, materialEmissive, mix, normalWorldGeometry, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
+import { cameraPosition, float, materialClearcoat, materialColor, materialEmissive, mix, normalWorldGeometry, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { STATION_LOCAL as STATION } from './station-layout';
 import { nightEmission } from './night-lighting';
@@ -57,13 +57,14 @@ export function stationAmberGeometry(mobile: boolean, inset = 0, insetZ = inset)
 /**
  * Deeper honey amber (sub-plan 28, round 2; the owner's choice over silver prongs or a wider bezel): a deeper honey body, a
  * darker underside and a stronger glowing core, so from below it reads as a set jewel. `under` darkens the map's red, green
- * and blue toward the soffit; `rim` multiplies the body toward the outline, where a cabochon is thickest; emission is per tier
- * (`rich` sees the core through the transmissive stone, `low` is opaque and glows by itself) and per phase.
+ * and blue toward the soffit; `rim` multiplies the body toward the outline, where a cabochon is thickest, and `coat` is the
+ * share of its clear coat and surface reflection the outline keeps; emission is per tier (`rich` sees the core through the
+ * transmissive stone, `low` is opaque and glows by itself) and per phase.
  */
 const HONEY = {
-  green: 164, under: [.34, .42, .48], color: '#fff2dc', attenuation: '#f5c060', distance: 12, rim: [.62, .48, .38],
+  green: 164, under: [.34, .42, .48], color: '#fff2dc', attenuation: '#f5c060', distance: 12, rim: [.72, .5, .3], coat: .35,
   shell: { color: '#ff9b30', rich: { day: .08, night: .2 }, low: { day: .5, night: .9 } },
-  core: { color: '#fff0c8', glow: '#ffe6b5', day: 2.4, night: 3, side: .45, inset: [.3, .48] },
+  core: { color: '#fff0c8', glow: '#ffe6b5', day: 2.9, night: 3.6, side: .45, inset: [.3, .48] },
 } as const;
 
 function hash(x: number, y: number): number { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); }
@@ -116,8 +117,13 @@ export function stationAmberMaterial(mobile: boolean, classic = false): THREE.Me
   if (!classic) {
     const face = facing();
     material.colorNode = materialColor.rgb.mul(mix(vec3(...HONEY.rim), vec3(1), smoothstep(.04, .75, face)));
-    // The stone glows from inside, most where the view meets it squarely: all the opaque tiers have of the core.
-    material.emissiveNode = materialEmissive.mul(fire(textures.bumpMap)).mul(face.pow(1.2));
+    // Toward the outline the coat and the surface mirrored only the sky: the darkened body went olive by day and purple
+    // against the night. Both mirror less there (`coat`), as the Nut of Power's outline does, so the warm stone shows through.
+    const edge = mix(float(HONEY.coat), float(1), smoothstep(0, .45, face));
+    material.clearcoatNode = materialClearcoat.mul(edge); material.specularIntensityNode = edge;
+    // The stone glows from inside, most where the view meets it squarely and a third of that at its outline, which keeps the
+    // edges warm: all the opaque tiers have of the core.
+    material.emissiveNode = materialEmissive.mul(fire(textures.bumpMap)).mul(mix(float(.3), float(1), face.pow(1.2)));
     nightEmission(material, HONEY.shell.color, HONEY.shell.rich.night);
   }
   material.userData.classicAmber = classic; setStationAmberQuality(material, mobile); return material;
