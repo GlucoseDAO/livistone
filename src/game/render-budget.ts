@@ -5,7 +5,8 @@ export interface DrawCost { calls: number; triangles: number }
 /**
  * Emulates the renderer's opaque/transparent list for one camera without a GPU: visibility inherited from parents,
  * frustum culling against object or instance bounds, hidden materials, material groups and instance counts.
- * Calls and triangles follow `renderer.info.render` (sprites are two triangles, points and lines none).
+ * Calls and triangles follow `renderer.info.render` (sprites are two triangles per instance, points and lines none); passes
+ * beyond the main one (shadows, two-sided glass) are not counted.
  * `classify` attributes each drawable to a named group; returning null leaves it out.
  */
 export function drawCost(root: THREE.Object3D, camera?: THREE.Camera, classify: (object: THREE.Object3D) => string | null = () => 'all'): Record<string, DrawCost> {
@@ -19,9 +20,9 @@ export function drawCost(root: THREE.Object3D, camera?: THREE.Camera, classify: 
     if (drawable && (!camera || !object.frustumCulled || (object instanceof THREE.Sprite ? frustum.intersectsSprite(object) : frustum.intersectsObject(object)))) {
       const key = classify(object);
       if (key) {
-        const geometry = (object as THREE.Mesh).geometry, instances = object instanceof THREE.InstancedMesh ? object.count : 1;
+        const geometry = (object as THREE.Mesh).geometry, instances = object instanceof THREE.InstancedMesh ? object.count : Math.max(1, (object as { count?: number }).count ?? 1);
         const vertices = geometry.index?.count ?? geometry.getAttribute('position').count, range = Math.min(vertices, geometry.drawRange.count) - geometry.drawRange.start;
-        const triangles = (count: number): number => object instanceof THREE.Sprite ? 2 : object instanceof THREE.Mesh ? instances * Math.floor(count / 3) : 0;
+        const triangles = (count: number): number => object instanceof THREE.Sprite ? 2 * instances : object instanceof THREE.Mesh ? instances * Math.floor(count / 3) : 0;
         const material = (object as THREE.Mesh).material;
         if (Array.isArray(material)) { for (const group of geometry.groups) if (material[group.materialIndex ?? 0]?.visible) add(key, triangles(Math.min(group.count, range))); }
         else if (material.visible) add(key, triangles(range));

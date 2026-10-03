@@ -1,16 +1,23 @@
 // Draw calls and triangles of the Living Waters, Glucose Commons and Enhancement hill groups, built in memory (sub-plan 25).
 // Usage: bun scripts/frame-budget.ts [--json]. No browser: drawCost() replays the walking camera's frustum culling over the
-// realism capture poses, so the numbers cover the main pass only (no shadow or transmission passes) and are not device timings.
-import * as THREE from 'three';
-import { LivingWaters } from '../src/world/living-waters';
-import { createGlucoseStructure } from '../src/world/glucose-pavilion';
-import { createEnhancementHill } from '../src/world/enhancement';
-import { terrainHeight } from '../src/world/terrain';
-import { graphicsProfile } from '../src/game/graphics';
+// realism capture poses, so the numbers cover the main pass only (no shadow pass) and are not device timings.
+import type * as THREE_TYPES from 'three';
 import type { GraphicsTier } from '../src/game/graphics';
-import { drawCost } from '../src/game/render-budget';
 import type { DrawCost } from '../src/game/render-budget';
 import type { ColliderSpec } from '../src/game/physics';
+
+// The game and Vitest resolve `three` to `three/webgpu` (vite.config.ts). Bun has no alias, so when Bun runs this file the
+// classic entry re-exports the WebGPU build; every game module is then imported dynamically, after this hook exists.
+const bun = (globalThis as { Bun?: { resolveSync(id: string, from: string): string; plugin(plugin: { name: string; setup(build: { onLoad(options: { filter: RegExp }, load: () => { contents: string; loader: 'js' }): void }): void }): void } }).Bun;
+if (bun) { const webgpu = bun.resolveSync('three/webgpu', import.meta.dirname); bun.plugin({ name: 'three-webgpu', setup: (build) => build.onLoad({ filter: /three[\\/]build[\\/]three\.module\.js$/ }, () => ({ contents: `export * from ${JSON.stringify(webgpu)};`, loader: 'js' })) }); }
+const THREE = await import('three');
+const { LivingWaters } = await import('../src/world/living-waters');
+const { createGlucoseStructure } = await import('../src/world/glucose-pavilion');
+const { createEnhancementHill } = await import('../src/world/enhancement');
+const { terrainHeight } = await import('../src/world/terrain');
+const { graphicsProfile } = await import('../src/game/graphics');
+const { drawCost } = await import('../src/game/render-budget');
+type THREE = typeof THREE_TYPES;
 
 // The capture poses of scripts/screenshot-realism.ts (name, x, z, yaw, pitch); keep the two lists in step.
 export const VIEWS: [string, number, number, number, number?][] = [
@@ -26,12 +33,12 @@ export const VIEWS: [string, number, number, number, number?][] = [
 ];
 export const WALK_FAR = 130;
 
-export function walkCamera(x: number, z: number, yaw: number, pitch = 0): THREE.PerspectiveCamera {
+export function walkCamera(x: number, z: number, yaw: number, pitch = 0): THREE_TYPES.PerspectiveCamera {
   const camera = new THREE.PerspectiveCamera(66, 1280 / 800, .08, 150);
   camera.position.set(x, terrainHeight(x, z) + 1.83, z); camera.rotation.set(pitch, yaw, 0, 'YXZ'); camera.updateProjectionMatrix(); camera.updateMatrixWorld();
   return camera;
 }
-export interface Group { name: string; root: THREE.Object3D; classify: (object: THREE.Object3D) => string | null; prepare?: (camera: THREE.Camera) => void }
+export interface Group { name: string; root: THREE_TYPES.Object3D; classify: (object: THREE_TYPES.Object3D) => string | null; prepare?: (camera: THREE_TYPES.Camera) => void }
 export interface Report { static: Record<string, DrawCost>; perView: Record<string, DrawCost & { views: number; maxCalls: number; maxTriangles: number }> }
 
 export function measure(group: Group): Report {
@@ -52,12 +59,12 @@ export function measure(group: Group): Report {
 /** Builds the three groups for one tier; night halos are left out because they draw only after dark. */
 export function budgetGroups(tier: GraphicsTier): Group[] {
   const mobile = tier !== 'gpu', range = Math.min(WALK_FAR, graphicsProfile(tier).forest);
-  const day = (object: THREE.Object3D): boolean => !object.userData.nightGlow;
-  const gardens = new LivingWaters(mobile) as LivingWaters & { updateDetail?: (camera: THREE.Camera, range: number, mapView: boolean) => boolean };
+  const day = (object: THREE_TYPES.Object3D): boolean => !object.userData.nightGlow;
+  const gardens = new LivingWaters(mobile) as InstanceType<typeof LivingWaters> & { updateDetail?: (camera: THREE_TYPES.Camera, range: number, mapView: boolean) => boolean };
   const glucose = new THREE.Group(), hill = new THREE.Group(), colliders: ColliderSpec[] = [];
   createGlucoseStructure(glucose, colliders, mobile, new THREE.MeshStandardMaterial());
   createEnhancementHill(hill, colliders);
-  const marker = (object: THREE.Object3D): boolean => /arrow|marker/i.test(object.name) || (object as THREE.Mesh).geometry?.type === 'IcosahedronGeometry';
+  const marker = (object: THREE_TYPES.Object3D): boolean => /arrow|marker/i.test(object.name) || (object as THREE_TYPES.Mesh).geometry?.type === 'IcosahedronGeometry';
   return [
     { name: 'Living Waters', root: gardens.root, classify: (o) => !day(o) ? null : o.name.startsWith('Mycelium') ? 'mycelium grove' : 'lake, paths, pavilion', prepare: (camera) => gardens.updateDetail?.(camera, range, false) },
     { name: 'Glucose Commons', root: glucose, classify: (o) => day(o) ? 'structure and posters' : null },

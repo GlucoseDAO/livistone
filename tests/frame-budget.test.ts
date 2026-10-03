@@ -50,6 +50,10 @@ describe('frame budget, renderer-independent geometry', () => {
       // The map keeps the whole grove at light detail.
       gardens.updateDetail(new THREE.PerspectiveCamera().translateX(160).translateY(224).translateZ(192), 630, true);
       expect(crowns()).toBe(70); expect(drawn()).toBe(3);
+      // Loading draws every mushroom at both levels so WebGPU builds all six shaders; the next update repacks from the camera.
+      gardens.warmUp(true); expect(drawn()).toBe(6); expect(crowns()).toBe(140);
+      expect(gardens.updateDetail(walkCamera(0, 52, 0), range, false)).toBe(false); expect(drawn()).toBe(6);
+      gardens.warmUp(false); gardens.updateDetail(walkCamera(0, 52, 0), range, false); expect(drawn()).toBe(0);
     } finally { gardens.dispose(); }
   });
   for (const tier of ['gpu', 'mobile'] as const) it(`stays within the reduced draw budget per group (${tier})`, () => {
