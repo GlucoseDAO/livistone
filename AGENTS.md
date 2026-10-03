@@ -18,7 +18,7 @@ A TypeScript + Vite single-page app. Three.js renders the town on WebGL 2; Rapie
 (WebAssembly) provides a kinematic capsule character controller. There is no backend, no
 API key, no database, and no account system — the entire game is static files plus
 `localStorage`. Every building, tree placement, path, and piece of jewelry geometry in the
-current build is generated in code at load time; binary assets are two tree GLBs, local derivatives of 70 real jewelry photographs, six Materialized Enhancements poster images, two CC0 rock maps, four CC0 ground-map derivatives, nine CC0 railway maps, and two generated limestone paving derivatives.
+current build is generated in code at load time; binary assets are two tree GLBs, local derivatives of 70 real jewelry photographs, six Materialized Enhancements poster images, two CC0 rock maps, four CC0 ground-map derivatives, nine CC0 railway maps, two generated limestone paving derivatives, and two generated river ripple maps.
 
 ## Commands
 
@@ -97,7 +97,8 @@ src/
     mycelium.ts     Curled silver mushroom folds and branching stems
     terrain.ts      One continuous town terrain and physics mesh
     town-layout.ts  Walking bounds and rigid collider transforms
-    river.ts         Environment-lit water with downstream ripples
+    water-material.ts River shader per device tier and the dev-only ?look=a|b variants
+    water-surface.ts Clipped river sheet with baked flow, depth and rock attributes
     waterways.ts     Shared river/tributary boundaries, bridge sites and tower footprint
     time-tower.ts    Silver hourglass, round plaza, guarded spiral gallery and summit terrace
     elevated-layout.ts Shared tower, camel neck and Future House clearances
@@ -219,6 +220,10 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **Water and its banks share their outline.** `terrainHeight` and the water/shore meshes use
   the same river centre and width variation. Match terrain colliders to the rendered bank;
   the river shader uses the baked sky environment and needs no extra reflection camera.
+  `water-surface.ts` bakes `flow`, `along`/`across`, `depth` and `rock` from that same channel field and
+  `riverRockSites`, and joins tributaries into the river without a seam. GPU and mobile water is
+  transparent (no depth write, drawn first among transparent objects) and tagged `heroEnv`; CPU bakes
+  depth colour into opaque vertex colours. Regenerate the ripple maps with `python3 scripts/build-water-textures.py`.
 - **The Mitoring hall is not a sphere.** `createEnergyHall` builds an amber cup with a domed lid
   from `ENERGY_HALL` (`a`, `b` semi-axes, wall and dome heights, door angle); the basket strands
   below the rim are projected onto its outside, and the crown loops curl onto the lower roof.
