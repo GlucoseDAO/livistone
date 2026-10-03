@@ -377,9 +377,10 @@ export class Town {
     if (!camera) return false;
     const profile = graphicsProfile(this.tier);
     const trees = this.forest.update(camera, mapView ? fogFar : Math.min(fogFar, profile.forest), mapView);
-    const plants = updatePlanting(this.plantBatches, camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
+    // Shrub batches toggle every couple of metres while walking; re-baking for them cost a shadow pass per ~2 m, so their shadows catch up at the next quarter-box re-bake.
+    updatePlanting(this.plantBatches, camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
     if (this.tier === 'cpu') this.details.visible = false;
-    return trees || plants;
+    return trees;
   }
   setMapMode(active: boolean): void { this.interiors.visible = !active; this.details.visible = !active; }
 }
