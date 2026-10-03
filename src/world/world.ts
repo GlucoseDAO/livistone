@@ -250,7 +250,8 @@ export class Town {
   }
   private glass(color: string, emissive = '#000000'): THREE.MeshPhysicalMaterial {
     const material = new THREE.MeshPhysicalMaterial({ color, emissive, emissiveIntensity: 0.35, metalness: 0.05, roughness: 0.16, transmission: this.mobile ? 0 : 0.45, thickness: 0.25, transparent: true, opacity: this.mobile ? 0.32 : 0.65, side: THREE.DoubleSide, depthWrite: false });
-    nightEmission(material, color, .5); return material;
+    // hallGlass: the quality switch retunes this glazing (main.ts) and leaves other physical materials alone.
+    material.userData.hallGlass = true; nightEmission(material, color, .5); return material;
   }
   /** Invisible wall segments (colliders + occluders) around an elliptical floor, leaving a gap of ±gap radians at the south door. */
   private wallRing(exterior: THREE.Group, x: number, z: number, a: number, b: number, gap: number): void {

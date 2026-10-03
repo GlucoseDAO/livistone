@@ -1,4 +1,4 @@
 import { defineConfig } from 'vitest/config';
-import { fileURLToPath } from 'node:url';
-// Unit tests run against the default (classic) renderer module; vite.config.ts swaps it for the WebGPU build.
-export default defineConfig({ resolve: { alias: { '@livistone/render': fileURLToPath(new URL('./src/render/classic.ts', import.meta.url)) } }, test: { include: ['tests/**/*.test.ts'] } });
+import { THREE_WEBGPU } from './vite.config.ts';
+// Unit tests load the same three/webgpu core as the game, so node materials and TSL are what they assert.
+export default defineConfig({ resolve: { alias: THREE_WEBGPU }, test: { include: ['tests/**/*.test.ts'] } });

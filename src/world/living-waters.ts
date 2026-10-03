@@ -1,5 +1,7 @@
 import { paintPosterText } from './poster-text';
 import * as THREE from 'three';
+import { cameraViewMatrix, cos, instancedBufferAttribute, length, normalView, normalize, positionLocal, sin, uniform, uv, vec2, vec4 } from 'three/tsl';
+import { displayMaterial } from '../render/output';
 import { createPlaceSign, paintPlaceSign } from './place-sign';
 import type { PlaceSign } from './place-sign';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -13,18 +15,32 @@ import { addGlow, nightEmission } from './night-lighting';
 import { createLakePlants } from './lake-plants';
 import { pathKerbs } from './path-kerbs';
 import { PATH_WIDTH, pathJoin } from './path-surface';
-import { nodes } from '@livistone/render';
 
 function shape(points: Point[]): THREE.Shape { return new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, -z))); }
 function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
+/**
+ * Rain and drips: the Points stay the animated source of truth, but WebGPU point primitives are one pixel wide, so a child
+ * sprite draws one round, size-attenuated quad per point from the same (now instanced) position array.
+ */
+function sizedPoints(points: THREE.Points): void {
+  const source = points.geometry.getAttribute('position'), classic = points.material as THREE.PointsMaterial;
+  const positions = new THREE.InstancedBufferAttribute(source.array as Float32Array, 3); positions.setUsage(THREE.DynamicDrawUsage); points.geometry.setAttribute('position', positions);
+  const material = new THREE.PointsNodeMaterial({ color: classic.color, size: classic.size, transparent: classic.transparent, opacity: classic.opacity, sizeAttenuation: classic.sizeAttenuation, depthWrite: classic.depthWrite });
+  material.positionNode = instancedBufferAttribute(positions);
+  // The classic sprites discarded outside a tall ellipse, so drops read as streaks.
+  material.maskNode = length(uv().sub(.5).mul(vec2(1.8, .8))).lessThanEqual(.45);
+  const sprite = new THREE.Sprite(material); sprite.count = positions.count; sprite.frustumCulled = false; sprite.name = points.name || 'Sized points';
+  // Hiding the Points (cpu-detail) hides the sprite with them; the Points themselves no longer draw.
+  classic.visible = false; points.add(sprite);
+}
 export class LivingWaters {
   readonly root = new THREE.Group();
   readonly colliders: ColliderSpec[] = [];
   readonly interactives: Interactive[] = [];
   readonly panels: THREE.Mesh[] = [];
   private readonly signs = new Map<string, PlaceSign>();
-  private readonly water = new THREE.MeshStandardMaterial({ color: '#507c78', vertexColors: true, metalness: .28, roughness: .32, envMapIntensity: .65, userData: { heroEnv: true } });
-  private readonly waterTime = { value: 0 };
+  private readonly water = new THREE.MeshStandardNodeMaterial({ color: '#507c78', vertexColors: true, metalness: .28, roughness: .32, envMapIntensity: .65, userData: { heroEnv: true } });
+  private readonly waterTime = uniform(0);
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#d9e0d6', metalness: .63, roughness: .32 });
   private readonly stone = new THREE.MeshStandardMaterial({ color: '#d4cfbc', roughness: .91 });
   private readonly rain: THREE.Points;
@@ -32,17 +48,9 @@ export class LivingWaters {
   private readonly drainage: THREE.Curve<THREE.Vector3>[] = [];
   constructor(private mobile: boolean, private readonly pathMaterial: THREE.Material = new THREE.MeshStandardMaterial({ color: '#d4cfbc', roughness: .91 })) {
     this.root.name = 'Living Waters · town gardens'; this.root.position.set(GARDENS.x, 0, GARDENS.z);
-    this.water.onBeforeCompile = (shader) => {
-      shader.uniforms.waterTime = this.waterTime;
-      shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWater;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWater = position;');
-      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float waterTime; varying vec3 vWater;');
-      shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-        vec2 p = vWater.xz; float t = waterTime;
-        vec2 ripple = vec2(sin(p.x*2.8+p.y*1.7-t*.8), cos(p.y*3.1-p.x*1.4-t*.6))*.047;
-        normal = normalize(normal + mat3(viewMatrix)*vec3(ripple.x,0.,ripple.y));`);
-    };
-    this.water.customProgramCacheKey = () => 'living-waters-ripples-v1';
-    if (nodes) this.water = nodes.lakeWater(this.water, this.waterTime);
+    // Two crossing ripple trains tilt the eyes' normals; the game's own clock drives them, so ?capture=1 freezes them too.
+    const p = positionLocal.xz, t = this.waterTime, ripple = vec2(sin(p.x.mul(2.8).add(p.y.mul(1.7)).sub(t.mul(.8))), cos(p.y.mul(3.1).sub(p.x.mul(1.4)).sub(t.mul(.6)))).mul(.047);
+    this.water.normalNode = normalize(normalView.add(cameraViewMatrix.mul(vec4(ripple.x, 0, ripple.y, 0)).xyz));
     const network = shape(LAKE_OUTLINE); WATER_EYES.forEach((cell) => network.holes.push(new THREE.Path(cell.map(([x, z]) => new THREE.Vector2(x, -z)))));
     this.mesh(new THREE.ShapeGeometry(network).rotateX(-Math.PI / 2), this.silver, true, 0, .12);
     WATER_EYES.forEach((cell, index) => {
@@ -79,10 +87,10 @@ export class LivingWaters {
         continue;
       }
       for (const dx of [-1, 1]) this.mesh(new THREE.CylinderGeometry(.045, .065, 1.7, 6), this.silver, true, x + dx, .85, z);
-      this.mesh(new THREE.BoxGeometry(2.72, 2.9, .1), new THREE.MeshBasicMaterial({ color: '#f4f0e5', toneMapped: false }), true, x, 1.82, z);
-      const photo = new THREE.Mesh(new THREE.PlaneGeometry(2.52, 1.32), new THREE.MeshBasicMaterial({ color: '#f4f0e5', toneMapped: false }));
+      this.mesh(new THREE.BoxGeometry(2.72, 2.9, .1), displayMaterial({ color: '#f4f0e5' }), true, x, 1.82, z);
+      const photo = new THREE.Mesh(new THREE.PlaneGeometry(2.52, 1.32), displayMaterial({ color: '#f4f0e5' }));
       photo.position.set(x, 2.4, z + .06); photo.userData.discovery = id; photo.userData.kind = 'photo'; if (name === 'vittoria') photo.userData.piece = 'vittoria-amazonica';
-      const caption = new THREE.Mesh(new THREE.PlaneGeometry(2.52, 1.32), new THREE.MeshBasicMaterial({ color: '#f4f0e5', toneMapped: false }));
+      const caption = new THREE.Mesh(new THREE.PlaneGeometry(2.52, 1.32), displayMaterial({ color: '#f4f0e5' }));
       caption.position.set(x, 1.18, z + .06); caption.userData.discovery = id; caption.userData.kind = 'caption';
       this.root.add(photo, caption); this.panels.push(photo, caption); this.interactives.push({ id, object: caption, position: new THREE.Vector3(x + GARDENS.x, 1.8, z + GARDENS.z) });
     }
@@ -97,8 +105,7 @@ export class LivingWaters {
     for (let i = 0; i < drips.length / 3; i++) { const p = this.drainage[i % this.drainage.length].getPoint((i % 6) / 6); drips[i * 3] = p.x; drips[i * 3 + 1] = p.y + .1; drips[i * 3 + 2] = p.z; }
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.BufferAttribute(rain, 3)); this.rain = new THREE.Points(geometry, new THREE.PointsMaterial({ color: '#e1f3ef', size: .09, transparent: true, opacity: .7 })); this.root.add(this.rain);
     const dripGeo = new THREE.BufferGeometry(); dripGeo.setAttribute('position', new THREE.BufferAttribute(drips, 3)); this.drips = new THREE.Points(dripGeo, new THREE.PointsMaterial({ color: '#c7eeef', size: .16 })); this.root.add(this.drips);
-    for (const particles of [this.rain, this.drips]) (particles.material as THREE.PointsMaterial).onBeforeCompile = (shader) => { shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\nif (length((gl_PointCoord - .5) * vec2(1.8, .8)) > .45) discard;'); };
-    if (nodes) for (const particles of [this.rain, this.drips]) nodes.sizedPoints(particles);
+    for (const particles of [this.rain, this.drips]) sizedPoints(particles);
   }
   private waterEye(cell: Point[]): THREE.BufferGeometry {
     const center = cell.reduce(([x, z], p) => [x + p[0] / cell.length, z + p[1] / cell.length] as Point, [0, 0] as Point), vertices = [center[0], 0, center[1]], colors = [.37, .65, .65], indices: number[] = [];

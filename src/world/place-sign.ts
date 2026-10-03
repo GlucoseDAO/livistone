@@ -1,5 +1,6 @@
 import { paintPosterText } from './poster-text';
 import * as THREE from 'three';
+import { displayMaterial } from '../render/output';
 import type { ColliderSpec } from '../game/physics';
 import { nightEmission } from './night-lighting';
 
@@ -54,9 +55,9 @@ export function createPlaceSign(parent: THREE.Object3D, colliders: ColliderSpec[
   const group = new THREE.Group(); group.name = name; group.position.set(site.x, 0, site.z); group.rotation.y = site.yaw; parent.add(group);
   const gold = new THREE.MeshStandardMaterial({ color: '#d6a458', metalness: .8, roughness: .26 }); nightEmission(gold, '#d4943a', .22);
   const frame = new THREE.Mesh(frameGeometry ??= placeFrameGeometry(), gold); frame.position.y = PLACE_SIGN.centre; frame.castShadow = true; frame.name = name + ' · pierced frame'; group.add(frame);
-  const board = new THREE.Mesh(new THREE.BoxGeometry(PLACE_SIGN.width + .06, PLACE_SIGN.height + .06, .05), new THREE.MeshBasicMaterial({ color: '#120f0c', toneMapped: false })); board.position.y = PLACE_SIGN.centre; group.add(board);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(PLACE_SIGN.width + .06, PLACE_SIGN.height + .06, .05), displayMaterial({ color: '#120f0c' })); board.position.y = PLACE_SIGN.centre; group.add(board);
   for (const side of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(.045, .06, BOTTOM + .3, 8), gold); post.position.set(side * PLACE_SIGN.postX, (BOTTOM + .3) / 2, 0); post.castShadow = true; group.add(post); }
-  const face = new THREE.MeshBasicMaterial({ color: '#120f0c', toneMapped: false }), faces = [1, -1].map(side => {
+  const face = displayMaterial({ color: '#120f0c' }), faces = [1, -1].map(side => {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(PLACE_SIGN.width, PLACE_SIGN.height), face); mesh.position.set(0, PLACE_SIGN.centre, side * .027); if (side < 0) mesh.rotation.y = Math.PI; mesh.name = name + (side < 0 ? ' · reverse' : ''); group.add(mesh); return mesh;
   });
   colliders.push(...placeSignColliders(site, offset));

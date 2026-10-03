@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { GPU_ERROR } from './gpu-errors';
 import type { Page } from '@playwright/test';
 import { GARDENS } from '../src/world/living-waters-layout';
 interface Snapshot { mode: string; zone: string; journey: string | null; position: { x: number; y: number; z: number }; yaw: number; interaction: string | null; progress: { discovered: string[] }; }
@@ -8,7 +9,7 @@ for (const mobile of [false, true]) test(`integrated garden stories, walking and
   test.setTimeout(120000);
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 800 }, isMobile: mobile, hasTouch: mobile });
   try {
-    const page = await context.newPage(), errors: string[] = []; page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (message.type() === 'error' && /Shader|WebGLProgram/.test(message.text())) errors.push(message.text()); });
+    const page = await context.newPage(), errors: string[] = []; page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (message.type() === 'error' && GPU_ERROR.test(message.text())) errors.push(message.text()); });
     await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
     for (const id of ['station', 'city-hall', 'living-waters', 'mycelium-garden']) expect(await page.locator('#marker-' + id).evaluate(e => e.hasAttribute('hidden'))).toBe(false);
     await page.locator('#view-toggle').click();

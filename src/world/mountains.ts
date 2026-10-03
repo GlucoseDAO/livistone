@@ -4,7 +4,7 @@ import { RAILWAY, STATION } from './station-layout';
 export { landscapeHeight as mountainHeight } from './terrain';
 import { landscapeHeight } from './terrain';
 import { groundCover } from './ground-cover';
-import { groundLook, groundShaderPatch, groundTextureFiles } from './ground-material';
+import { groundLook, groundNodes, groundTextureFiles } from './ground-material';
 import type { GraphicsTier } from '../game/graphics';
 
 /** Baseline meadow vertex colour; the ground shader divides it back out of its palette. */
@@ -65,7 +65,8 @@ export class Mountains extends THREE.Group {
   constructor(mobile: boolean, tier: GraphicsTier = mobile ? 'mobile' : 'gpu') {
     super(); this.name = 'Continuous valley and mountain ridges';
     const geo = mountainGeometry(mobile);
-    const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .96 });
+    // The cpu tier lights everything with Lambert (cpu-detail.ts) and keeps only the ground colour, so it starts there.
+    const material = tier === 'cpu' ? new THREE.MeshLambertNodeMaterial({ vertexColors: true }) : new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: .96 });
     const landscape = new THREE.Mesh(geo, material); landscape.name = 'Textured meadow and soil'; landscape.receiveShadow = true; this.add(landscape);
     const loader = new THREE.TextureLoader(), base = import.meta.env.BASE_URL, look = groundLook();
     const load = (file: string, colour: boolean): Promise<THREE.Texture> => loader.loadAsync(base + file).then((texture) => {
@@ -75,8 +76,9 @@ export class Mountains extends THREE.Group {
     const files = groundTextureFiles(tier);
     this.ready = Promise.all([Promise.all(files.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))), load('textures/mountains/rock-color.jpg', true), tier === 'gpu' ? load('textures/mountains/rock-normal.jpg', false) : Promise.resolve(null)]).then(([ground, rock, rockNormal]) => {
       const albedo = ground.filter((_, i) => files[i].includes('-albedo-')), nrh = tier === 'cpu' ? albedo : ground.filter((_, i) => files[i].includes('-nrh-'));
-      material.onBeforeCompile = groundShaderPatch(tier, look, { albedo, nrh, rock, rockNormal }, GRASS);
-      material.customProgramCacheKey = () => `livistone-ground-${tier}-${look}`;
+      const nodes = groundNodes(tier, look, { albedo, nrh, rock, rockNormal }, GRASS);
+      material.colorNode = nodes.colorNode; material.normalNode = nodes.normalNode;
+      if (material instanceof THREE.MeshStandardNodeMaterial) material.roughnessNode = nodes.roughnessNode;
       material.needsUpdate = true;
     }).catch(() => { material.color.set('#587448'); /* Playable vertex-coloured terrain if local images fail. */ });
   }

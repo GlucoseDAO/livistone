@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { Fn, abs, attribute, cameraPosition, cameraViewMatrix, clamp, color, diffuseColor, distance, dot, exp, float, fract, max, min, mix, normalize, positionWorld, pow, property, smoothstep, sqrt, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
+import { PhysicalLightingModel } from 'three/webgpu';
+import type { Node, NodeBuilder } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
 
 /** Review variants (docs/realism/04-river-water.md): a = clear shallow stream, b = deeper green garden river. */
@@ -38,48 +41,52 @@ export function cpuWaterColour(look: WaterLook = waterLook()): (depth: number, r
   };
 }
 
-// Small self-contained GLSL helpers, so a later WebGPU/TSL port can translate them one by one.
-const WATER_GLSL = /* glsl */`
-uniform float waterTime;
-uniform sampler2D waterRipples;
-uniform vec3 waterAbsorption;
-uniform vec3 waterShallow;
-uniform vec3 waterDeep;
-uniform vec4 waterMotion; // x drift m/s, y ripple gain, z foam amount, w shoreline fade depth (m)
-uniform float waterTint;
-varying vec2 vWaterFlow;
-varying float vWaterAlong;
-varying float vWaterAcross;
-varying float vWaterDepth;
-varying float vWaterRock;
-varying vec3 vWaterWorld;
+// Small self-contained node helpers, one per former GLSL function.
+type F = Node<'float'>; type V2 = Node<'vec2'>; type V3 = Node<'vec3'>;
+const LUMA = vec3(.2126, .7152, .0722);
 // Two-phase flow map: the tile drifts along flow; each phase restarts while its weight is zero.
 // In channel coordinates (along, across) flow is simply (1, 0), so stretched ripples follow every bend.
-vec3 waterFlowSample(vec2 p, vec2 flow, float drift, float phase, vec2 scale, vec2 shift) {
-  float a = fract(phase), b = fract(phase + .5), w = abs(1. - 2. * a);
-  vec3 first = texture2D(waterRipples, (p - flow * drift * (a - .5)) * scale + shift).rgb;
-  vec3 second = texture2D(waterRipples, (p - flow * drift * (b - .5)) * scale + shift + vec2(.37, .61)).rgb;
+function flowSample(ripples: ReturnType<typeof texture>, p: V2, flow: V2, drift: F, phase: F, scale: V2, shift: V2): V3 {
+  const a = fract(phase), b = fract(phase.add(.5)), w = abs(float(1).sub(a.mul(2)));
+  const at = (uv: V2): V3 => (ripples.sample(uv) as unknown as Node<'vec4'>).rgb;
+  const first = at(p.sub(flow.mul(drift).mul(a.sub(.5))).mul(scale).add(shift)), second = at(p.sub(flow.mul(drift).mul(b.sub(.5))).mul(scale).add(shift).add(vec2(.37, .61)));
   return mix(first, second, w);
 }
 // The map stores unit-normal x/y; return the surface slope (-dh/du, -dh/dv).
-vec2 waterSlope(vec3 texel) {
-  vec2 n = texel.rg * 2. - 1.;
-  return n / sqrt(max(1. - dot(n, n), .04));
-}
+const slope = (texel: V3): V2 => { const n = texel.xy.mul(2).sub(1); return n.div(sqrt(max(float(1).sub(dot(n, n)), .04))); };
 // Beer-Lambert: down to a bed depth metres below and back up the refracted view ray (water ior 1.333).
-vec3 waterTransmittance(float depth, float cosView, vec3 absorption) {
-  float cosRefracted = sqrt(1. - (1. - cosView * cosView) / 1.777);
-  return exp(-absorption * depth * (1. + 1. / cosRefracted));
-}
-float waterFresnel(float cosView) { return .02 + .98 * pow(1. - cosView, 5.); }
+const transmittance = (depth: F, cosView: F, absorption: V3): V3 => {
+  const cosRefracted = sqrt(float(1).sub(float(1).sub(cosView.mul(cosView)).div(1.777)));
+  return exp(absorption.negate().mul(depth).mul(float(1).add(float(1).div(cosRefracted))));
+};
+const fresnel = (cosView: F): F => float(.02).add(pow(float(1).sub(cosView), 5).mul(.98));
 // Noise is equalised, so a threshold at 1 - cover keeps roughly cover of the surface.
-float waterFoam(float noise, float depth, float rock, float amount) {
-  float edge = smoothstep(.0, .03, depth) * (1. - smoothstep(.03, .4, depth));
-  float cover = clamp(amount * (edge * .6 + rock * .85), 0., .92);
+const foamCover = (noise: F, depth: F, rock: F, amount: number): F => {
+  const edge = smoothstep(0, .03, depth).mul(float(1).sub(smoothstep(.03, .4, depth)));
+  const cover = clamp(edge.mul(.6).add(rock.mul(.85)).mul(amount), 0, .92);
   // Soft, partly see-through foam: it never fully hides the water beneath.
-  return smoothstep(1. - cover, 1. - cover + .2, noise) * smoothstep(.0, .06, cover) * .7;
+  return smoothstep(float(1).sub(cover), float(1.2).sub(cover), noise).mul(smoothstep(0, .06, cover)).mul(.7);
+};
+
+// Values the surface stage computes once and the output stage reuses; each water shader declares its own copies.
+const WATER = { normal: property('vec3', 'waterNormal'), fresnel: property('float', 'waterFresnel'), cover: property('float', 'waterCover'), foam: property('float', 'waterFoam'), shore: property('float', 'waterShore') };
+
+/** Blends as (reflection + body) over the bed: alpha is the share of the bed the eye no longer sees. */
+class WaterLighting extends PhysicalLightingModel {
+  finish(builder: NodeBuilder): void {
+    super.finish(builder);
+    const { outgoingLight } = builder.context as unknown as { outgoingLight: V3 }, lights = (builder as unknown as { lightsNode: { totalDiffuseNode: V3; totalSpecularNode: V3 } }).lightsNode;
+    const gloss = lights.totalSpecularNode.mul(WATER.foam.oneMinus()).toVar(), body = lights.totalDiffuseNode.mul(mix(WATER.fresnel.oneMinus().mul(WATER.cover), 1, WATER.foam));
+    const alpha = mix(float(1).sub(WATER.fresnel.oneMinus().mul(WATER.cover.oneMinus())).mul(WATER.shore), 1, WATER.foam).toVar();
+    // A sun glint brighter than the bed covers it, instead of being diluted by a low alpha.
+    alpha.assign(clamp(max(alpha, min(1, max(max(gloss.x, gloss.y), gloss.z)).mul(WATER.shore)), 0, 1));
+    outgoingLight.assign(gloss.add(body).mul(mix(WATER.shore, 1, WATER.foam)).div(max(alpha, .002)));
+    diffuseColor.a.assign(alpha);
+  }
 }
-`;
+class WaterNodeMaterial extends THREE.MeshPhysicalNodeMaterial {
+  setupLightingModel(): WaterLighting { return new WaterLighting(); }
+}
 
 /**
  * River water. gpu: two flow-map ripple scales, depth absorption, soft transparent shoreline, Fresnel sky reflection,
@@ -88,85 +95,49 @@ float waterFoam(float noise, float depth, float rock, float amount) {
  * The surface geometry must carry `flow`, `along`, `depth` and `rock` (see water-surface.ts).
  */
 export function waterMaterial(tier: GraphicsTier, opts: { look?: WaterLook } = {}): THREE.Material {
-  const look = opts.look ?? waterLook(), optics = LOOKS[look], time = { value: 0 };
+  const look = opts.look ?? waterLook(), optics = LOOKS[look], time = uniform(0);
   if (tier === 'cpu') {
     const material = new THREE.MeshLambertMaterial({ vertexColors: true }); material.name = 'River water';
     material.userData.time = time; return material;
   }
   const mobile = tier === 'mobile';
-  const material = new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: optics.roughness, metalness: 0, ior: 1.333, envMapIntensity: 1, transparent: true, depthWrite: false });
+  const material = new WaterNodeMaterial({ color: '#ffffff', roughness: optics.roughness, metalness: 0, ior: 1.333, envMapIntensity: 1, transparent: true, depthWrite: false });
   material.name = 'River water';
   // heroEnv: sub-plan 02 gives tagged materials an explicit envMap so their own envMapIntensity applies.
-  material.userData.time = time; material.userData.heroEnv = true;
-  const flat = new THREE.DataTexture(new Uint8Array([128, 128, 0, 255]), 1, 1); flat.needsUpdate = true;
-  const ripples = { value: flat as THREE.Texture };
+  material.userData.time = time; material.userData.heroEnv = true; material.userData.look = look; material.userData.layers = mobile ? 1 : 2;
+  const flat = new THREE.DataTexture(new Uint8Array([128, 128, 0, 255]), 1, 1); flat.wrapS = flat.wrapT = THREE.RepeatWrapping; flat.needsUpdate = true;
+  const ripples = texture(flat);
   // Loading needs the DOM; skipping it keeps the material constructible in Vitest.
-  if (typeof document !== 'undefined') new THREE.TextureLoader().load(import.meta.env.BASE_URL + `textures/water/ripples-${mobile ? 256 : 512}.webp`, (texture) => {
-    texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.flipY = false; texture.anisotropy = mobile ? 2 : 4;
-    ripples.value = texture; flat.dispose();
+  if (typeof document !== 'undefined') new THREE.TextureLoader().load(import.meta.env.BASE_URL + `textures/water/ripples-${mobile ? 256 : 512}.webp`, (map) => {
+    map.wrapS = map.wrapT = THREE.RepeatWrapping; map.flipY = false; map.anisotropy = mobile ? 2 : 4;
+    ripples.value = map; flat.dispose();
   }, undefined, () => { /* Flat water without ripples or foam stays readable if the map fails. */ });
-  const uniforms = {
-    waterTime: time, waterRipples: ripples, waterTint: { value: optics.tint },
-    waterAbsorption: { value: new THREE.Vector3(...optics.absorption) },
-    waterShallow: { value: new THREE.Color(optics.shallow) }, waterDeep: { value: new THREE.Color(optics.deep) },
-    waterMotion: { value: new THREE.Vector4(optics.speed, optics.ripple, optics.foam, optics.shore) },
-  };
-  material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms);
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>
-      attribute vec2 flow;
-      attribute float along;
-      attribute float across;
-      attribute float depth;
-      attribute float rock;
-      varying vec2 vWaterFlow;
-      varying float vWaterAlong;
-      varying float vWaterAcross;
-      varying float vWaterDepth;
-      varying float vWaterRock;
-      varying vec3 vWaterWorld;`).replace('#include <begin_vertex>', `#include <begin_vertex>
-      vWaterFlow = flow; vWaterAlong = along; vWaterAcross = across; vWaterDepth = depth; vWaterRock = rock;
-      vWaterWorld = (modelMatrix * vec4(transformed, 1.)).xyz;`);
-    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n#define WATER_LAYERS ${mobile ? 1 : 2}\n${WATER_GLSL}`);
-    shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-      vec3 waterView = normalize(cameraPosition - vWaterWorld);
-      vec2 waterDir = normalize(vWaterFlow + vec2(1e-5, 0.));
-      // Slower over the shallow banks than in mid-channel.
-      float waterDrift = waterMotion.x * mix(.35, 1., smoothstep(.0, 1.1, vWaterDepth)) * 2.2;
-      float waterPhase = waterTime / 2.2 + vWaterAlong * .031;
-      vec2 waterSide = vec2(-waterDir.y, waterDir.x);
-      // Long ripples in channel space: 6.5 m along the flow, 2.6 m across, so gentler slopes along it.
-      vec3 waterA = waterFlowSample(vec2(vWaterAlong, vWaterAcross), vec2(1., 0.), waterDrift, waterPhase, vec2(1. / 6.5, 1. / 2.6), vec2(0.));
-      vec2 waterSlopeA = waterSlope(waterA);
-      vec2 waterGradient = (waterDir * waterSlopeA.x * .4 + waterSide * waterSlopeA.y) * (WATER_LAYERS > 1 ? .5 : .62);
-      float waterNoise = waterA.b;
-      #if WATER_LAYERS > 1
-        // Fine isotropic chop in world space: continuous through confluences, where channel coordinates bend.
-        vec3 waterB = waterFlowSample(vWaterWorld.xz, waterDir, waterDrift * 1.25, waterPhase * 1.37 + .21, vec2(1. / 1.27), vec2(.13, .71));
-        waterGradient += waterSlope(waterB) * .3;
-        waterNoise = waterB.b;
-      #endif
-      // Rocks stir the surface; far ripples settle so distant water reads as a sky mirror instead of aliasing.
-      waterGradient *= waterMotion.y * (1. + vWaterRock * .7) * mix(1., .4, smoothstep(25., 140., distance(cameraPosition, vWaterWorld)));
-      vec3 waterNormal = normalize(vec3(waterGradient.x, 1., waterGradient.y));
-      normal = normalize((viewMatrix * vec4(waterNormal, 0.)).xyz);
-      float waterFres = waterFresnel(clamp(dot(waterNormal, waterView), 0., 1.));
-      float waterSeen = dot(waterTransmittance(vWaterDepth, clamp(waterView.y, 0., 1.), waterAbsorption), vec3(.2126, .7152, .0722));
-      float waterCover = max(1. - waterSeen, waterTint * smoothstep(.0, .25, vWaterDepth));
-      float waterFoamCover = waterFoam(waterNoise, vWaterDepth, vWaterRock, waterMotion.z);
-      diffuseColor.rgb = mix(mix(waterShallow, waterDeep, smoothstep(.0, .85, 1. - waterSeen)), vec3(.6, .63, .6), waterFoamCover);
-      roughnessFactor = mix(roughnessFactor, .75, waterFoamCover);`);
-    // Blend as (reflection + body) over the bed: alpha is the share of the bed the eye no longer sees.
-    shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
-      float waterShore = smoothstep(.0, waterMotion.w, vWaterDepth);
-      vec3 waterGloss = totalSpecular * (1. - waterFoamCover);
-      vec3 waterBody = totalDiffuse * mix((1. - waterFres) * waterCover, 1., waterFoamCover);
-      vec3 waterLight = (waterGloss + waterBody) * mix(waterShore, 1., waterFoamCover) + totalEmissiveRadiance;
-      float waterAlpha = mix((1. - (1. - waterFres) * (1. - waterCover)) * waterShore, 1., waterFoamCover);
-      // A sun glint brighter than the bed covers it, instead of being diluted by a low alpha.
-      waterAlpha = clamp(max(waterAlpha, min(1., max(max(waterGloss.r, waterGloss.g), waterGloss.b)) * waterShore), 0., 1.);
-      gl_FragColor = vec4(waterLight / max(waterAlpha, .002), waterAlpha);`);
-  };
-  material.customProgramCacheKey = () => `livistone-water-v1-${tier}-${look}`;
+  const flow = attribute<'vec2'>('flow', 'vec2'), along = attribute<'float'>('along', 'float'), across = attribute<'float'>('across', 'float'), depth = attribute<'float'>('depth', 'float'), rock = attribute<'float'>('rock', 'float');
+  // The surface stage: ripples, normal, Fresnel, body cover and foam; diffuse colour is the inscattered body.
+  material.colorNode = Fn(() => {
+    const world = positionWorld, view = normalize(cameraPosition.sub(world)).toVar(), dir = normalize(flow.add(vec2(1e-5, 0))).toVar();
+    // Slower over the shallow banks than in mid-channel.
+    const drift = mix(.35, 1, smoothstep(0, 1.1, depth)).mul(optics.speed * 2.2).toVar(), phase = time.div(2.2).add(along.mul(.031)).toVar();
+    const side = vec2(dir.y.negate(), dir.x);
+    // Long ripples in channel space: 6.5 m along the flow, 2.6 m across, so gentler slopes along it.
+    const a = flowSample(ripples, vec2(along, across), vec2(1, 0), drift, phase, vec2(1 / 6.5, 1 / 2.6), vec2(0)).toVar(), slopeA = slope(a);
+    const gradient = dir.mul(slopeA.x).mul(.4).add(side.mul(slopeA.y)).mul(mobile ? .62 : .5).toVar(), noise = a.z.toVar();
+    if (!mobile) {
+      // Fine isotropic chop in world space: continuous through confluences, where channel coordinates bend.
+      const b = flowSample(ripples, world.xz, dir, drift.mul(1.25), phase.mul(1.37).add(.21), vec2(1 / 1.27), vec2(.13, .71)).toVar();
+      gradient.addAssign(slope(b).mul(.3)); noise.assign(b.z);
+    }
+    // Rocks stir the surface; far ripples settle so distant water reads as a sky mirror instead of aliasing.
+    gradient.mulAssign(rock.mul(.7).add(1).mul(optics.ripple).mul(mix(1, .4, smoothstep(25, 140, distance(cameraPosition, world)))));
+    WATER.normal.assign(normalize(vec3(gradient.x, 1, gradient.y)));
+    WATER.fresnel.assign(fresnel(clamp(dot(WATER.normal, view), 0, 1)));
+    const seen = dot(transmittance(depth, clamp(view.y, 0, 1), vec3(...optics.absorption)), LUMA).toVar();
+    WATER.cover.assign(max(float(1).sub(seen), smoothstep(0, .25, depth).mul(optics.tint)));
+    WATER.foam.assign(foamCover(noise, depth, rock, optics.foam));
+    WATER.shore.assign(smoothstep(0, optics.shore, depth));
+    return mix(mix(color(optics.shallow), color(optics.deep), smoothstep(0, .85, float(1).sub(seen))), vec3(.6, .63, .6), WATER.foam);
+  })();
+  material.normalNode = normalize(cameraViewMatrix.mul(vec4(WATER.normal, 0)).xyz);
+  material.roughnessNode = mix(optics.roughness, .75, WATER.foam);
   return material;
 }

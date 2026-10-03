@@ -1,9 +1,10 @@
 import * as THREE from 'three';
+import { dot, mix, texture, uniform, vec3 } from 'three/tsl';
+import type { Node } from 'three/webgpu';
 import { plantingAllowed } from './landscape';
 import { terrainHeight } from './terrain';
 import { riverCenter, tributaryCenter } from './waterways';
 import type { RockSite } from './water-surface';
-import { nodes } from '@livistone/render';
 
 /** One four-metre tile, with separate colour and relief so mortar stays recessed. */
 export function pavingMaterial(mobile = false): THREE.MeshStandardMaterial {
@@ -66,23 +67,13 @@ export function rockGeometry(): THREE.BufferGeometry {
   g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); g.computeVertexNormals(); return g;
 }
 
-export function rockMaterial(mobile: boolean): THREE.MeshStandardMaterial {
-  if (nodes) return nodes.rockMaterial(mobile);
-  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
-  // Retain scanned mineral detail, but remove the source map's rusty brown cast.
-  material.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
-      #ifdef USE_MAP
-        vec4 sampledDiffuseColor = texture2D(map, vMapUv);
-        float mineral = dot(sampledDiffuseColor.rgb, vec3(.2126, .7152, .0722));
-        diffuseColor.rgb *= mix(vec3(.55), vec3(1.05), mineral);
-      #endif`);
-  };
-  material.customProgramCacheKey = () => 'cool-river-limestone-v1';
-  const loader = new THREE.TextureLoader();
+export function rockMaterial(mobile: boolean): THREE.MeshStandardNodeMaterial {
+  const material = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 1 }), loader = new THREE.TextureLoader();
   loader.load(import.meta.env.BASE_URL + 'textures/mountains/rock-color.jpg', (map) => {
     map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping; map.anisotropy = mobile ? 2 : 4;
-    material.map = map; material.needsUpdate = true;
+    // Retain scanned mineral detail, but remove the source map's rusty brown cast: its value shades the rock, not its hue.
+    // colorNode replaces the map multiply; .map stays set for the cpu tier's Lambert copy, which keeps the plain map.
+    material.map = map; material.colorNode = (uniform(material.color) as unknown as Node<'vec3'>).mul(mix(vec3(.55), vec3(1.05), dot(texture(map).rgb, vec3(.2126, .7152, .0722)))); material.needsUpdate = true;
   }, undefined, () => { /* Vertex colour keeps the stones usable without the optional surface map. */ });
   if (!mobile) loader.load(import.meta.env.BASE_URL + 'textures/mountains/rock-normal.jpg', (map) => {
     map.wrapS = map.wrapT = THREE.RepeatWrapping; material.normalMap = map; material.normalScale.set(.65, .65); material.needsUpdate = true;

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { GPU_ERROR } from './gpu-errors';
 import { SPAWN } from '../src/game/content';
 import { GATEWAY_POSTER } from '../src/world/gateway-layout';
 
@@ -7,7 +8,7 @@ for (const touch of [false, true]) test(`walk beneath the gateway and render its
   try {
     const page = await context.newPage(), errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => { if (m.type() === 'error' && /Shader|WebGLProgram/.test(m.text())) errors.push(m.text()); });
+    page.on('console', (m) => { if (m.type() === 'error' && GPU_ERROR.test(m.text())) errors.push(m.text()); });
     await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.locator('#view-toggle').click();
     const snapshot = () => page.evaluate(() => (window as unknown as { __livistone: { snapshot(): { mode: string; position: { x: number; y: number; z: number } } } }).__livistone.snapshot());
     await expect.poll(async () => (await snapshot()).mode).toBe('walking'); expect((await snapshot()).position.z).toBeCloseTo(SPAWN.z);

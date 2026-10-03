@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from '
 import { basename, join } from 'node:path';
 
 interface Capture { name: string; snapshot: { calls?: number; triangles?: number; fps?: number; graphicsTier?: string; backend?: string } }
-interface CaptureFile { profile: string; time: string; commit: string; url: string; capturedAt: string; errors: string[]; captures: Capture[] }
+interface CaptureFile { profile: string; time: string; commit: string; url: string; capturedAt: string; errors: string[]; captures: Capture[]; readyMs?: number | null }
 
 const args = process.argv.slice(2);
 const option = (flag: string) => { const index = args.indexOf(flag); return index >= 0 ? args.splice(index, 2)[1] : undefined; };
@@ -62,7 +62,7 @@ function refresh(){
   options($('profile'),[...new Set(pairs.map(k=>k.split('/')[0]))]); options($('time'),[...new Set(pairs.filter(k=>k.startsWith($('profile').value+'/')).map(k=>k.split('/')[1]))]);
   const key=$('profile').value+'/'+$('time').value, before=DATA[BASE][key], after=DATA[variant]?.[key];
   if(!before||!after){$('views').innerHTML='<p class="missing">No matching captures for '+key+'.</p>';$('summary').innerHTML='';return}
-  const how=f=>{const s=f.captures[0]?.snapshot||{};return [s.backend,s.graphicsTier].filter(Boolean).join(' ')};
+  const how=f=>{const s=f.captures[0]?.snapshot||{};return [s.backend,s.graphicsTier,f.readyMs?'ready '+(f.readyMs/1000).toFixed(1)+' s':''].filter(Boolean).join(' ')};
   $('meta').textContent=BASE+' @ '+before.commit+(how(before)?' ('+how(before)+')':'')+'  →  '+variant+' @ '+after.commit+(how(after)?' ('+how(after)+')':'')+'  ·  '+key+'  ·  captured '+after.capturedAt.slice(0,16).replace('T',' ');
   const byName=Object.fromEntries(after.captures.map(c=>[c.name,c])); let rows='',sum={c0:0,c1:0,t0:0,t1:0};
   $('views').innerHTML=before.captures.filter(c=>byName[c.name]).map(b=>{const a=byName[b.name],s0=b.snapshot,s1=a.snapshot;sum.c0+=s0.calls||0;sum.c1+=s1.calls||0;sum.t0+=s0.triangles||0;sum.t1+=s1.triangles||0;

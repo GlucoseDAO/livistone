@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { RAILWAY, railwayCorridor } from './world/station-layout';
 import { TOWN_BOUNDS } from './world/town-layout';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createSky, HORIZON_HAZE, MOON_DIR, SKY_EXPOSURE, SUN_DIR } from './world/sky';
+import { createSky, HORIZON_HAZE, HORIZON_RADIANCE, MOON_DIR, SKY_EXPOSURE, SUN_DIR } from './world/sky';
 import type { SkyPhase } from './world/sky';
 import { setGatewayQuality } from './world/gateway-materials';
 import { setMitoringAmberQuality } from './world/mitoring-materials';
@@ -25,8 +25,9 @@ import { NightLighting } from './world/night-lighting';
 import { shadowFrame } from './game/shadow-frame';
 import { installShadowFade, shadowFade } from './world/shadow-fade';
 import type { Physics } from './game/physics';
-import { createRenderer, nodes } from '@livistone/render';
-import type { RenderView, SceneRenderer } from './render/types';
+import { createRenderer } from './render/renderer';
+import type { RenderView } from './render/renderer';
+import { OutputPipeline, displayFog } from './render/output';
 
 const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 };
 // Dev-only ?look=a keeps the old hemisphere-heavy fill (sun and haze coherence only). b, the default, lets the baked sky
@@ -44,7 +45,10 @@ const SUN_DISTANCE = 400;
 const SHADOW = { walk: 50, walkReduced: 40, map: 160, lead: .3, fade: [.72, .9], bias: .05, normalBias: .6 };
 
 class Game {
-  private readonly renderer: SceneRenderer;
+  private readonly renderer: THREE.WebGPURenderer;
+  private readonly output: OutputPipeline;
+  /** One fog for the whole session: WebGPU builds its node from the object, so later changes only update its values. */
+  private readonly fog = new THREE.Fog(0, 1, 2);
   private readonly scene = new THREE.Scene();
   private skyBackground: THREE.CubeTexture;
   private readonly skies = new Map<boolean, ReturnType<typeof createSky>>();
@@ -111,17 +115,19 @@ class Game {
     this.night = resolveNight(this.timeOfDay);
     this.renderer.setPixelRatio(this.pixelRatio());
     this.renderer.shadowMap.enabled = this.graphics.shadows; this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    // The output pass (render/output.ts) applies ACES at this exposure, except to display materials.
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = SKY_EXPOSURE[this.phase];
-    this.scene.fog = new THREE.Fog(HORIZON_HAZE[this.phase], MAP_FOG.near, MAP_FOG.far);
+    this.scene.fog = this.fog; this.setFog(MAP_FOG);
     this.hemi = new THREE.HemisphereLight(this.night ? '#8ea4c6' : '#e9f4f0', this.night ? '#121820' : '#73805c', this.fill.hemi);
     this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(this.night ? '#c9d6ee' : '#fff0ce', this.night ? .32 : 2.4); this.sun.castShadow = true;
     this.sun.shadow.mapSize.setScalar(this.reduced ? 1024 : 2048); this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = SUN_DISTANCE * 2;
-    this.scene.add(this.sun, this.sun.target); installShadowFade(); this.aimSun();
+    this.scene.add(this.sun, this.sun.target); installShadowFade(this.sun); this.aimSun();
     const sky = createSky(this.renderer, this.reduced, this.night, this.graphics.tier, LOOK === 'b'); this.skies.set(this.night, sky); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = this.graphics.tier === 'cpu' ? null : sky.environment;
     this.scene.environmentIntensity = this.fill.environment;
-    // The town and sun are static; refresh shadows only when scene visibility changes.
-    this.renderer.shadowMap.autoUpdate = false; this.renderer.shadowMap.needsUpdate = true;
+    // The town and sun are static; refresh shadows only when scene visibility changes. WebGPU schedules shadows per light.
+    this.sun.shadow.autoUpdate = false; this.sun.shadow.needsUpdate = true;
+    this.output = new OutputPipeline(this.renderer, this.scene, this.walkCamera);
     this.mapCamera.position.set(62, 44, 69); this.mapCamera.lookAt(0, 2, -13);
     this.orbit = new OrbitControls(this.mapCamera, ui.canvas); this.orbit.target.set(0, 1, -12); this.orbit.enabled = false;
     this.orbit.enableDamping = true; this.orbit.dampingFactor = 0.08; this.orbit.minDistance = 30; this.orbit.maxDistance = 410;
@@ -148,7 +154,7 @@ class Game {
     this.resize();
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend }),
+        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend }),
         teleport: (x: number, z: number, yaw = 0, y = 1.05, pitch = 0) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = pitch; this.accumulator = 0; },
       } });
     }
@@ -163,21 +169,27 @@ class Game {
     await assets;
     if (this.graphics.tier === 'cpu') {
       await loadingStage(86, 'Preparing the CPU graphics profile…');
-      const { prepareCpuDetail } = await import('./world/cpu-detail'); this.cpuGeometry = await prepareCpuDetail(this.town.root, this.skyBackground, nodes);
+      const { prepareCpuDetail } = await import('./world/cpu-detail'); this.cpuGeometry = await prepareCpuDetail(this.town.root, this.skyBackground);
     }
     this.pointReflections(this.skies.get(this.night)!);
     this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced, this.graphics.tier); this.nightLighting.setNight(this.night);
-    document.querySelector<HTMLElement>('#graphics-profile')!.textContent = 'Device profile: ' + ({ gpu: 'GPU', mobile: 'Mobile / integrated GPU', cpu: 'CPU software renderer' }[this.graphics.tier]) + ({ classic: '', webgpu: ' · WebGPU', 'webgl2-fallback': ' · WebGL 2 fallback' }[this.view.backend]);
+    document.querySelector<HTMLElement>('#graphics-profile')!.textContent = 'Device profile: ' + ({ gpu: 'GPU', mobile: 'Mobile / integrated GPU', cpu: 'CPU software renderer' }[this.graphics.tier]) + ({ webgpu: ' · WebGPU', 'webgl2-fallback': ' · WebGL 2' }[this.view.backend]);
     await loadingStage(92, 'Preparing your first view…');
     this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true);
     this.frameShadow(true);
     this.walkCamera.position.set(SPAWN.x, SPAWN.y + .78, SPAWN.z); this.walkCamera.rotation.set(0, SPAWN.yaw, 0, 'YXZ');
-    await this.renderer.compileAsync(this.scene, this.walkCamera);
+    await this.output.compile(this.renderer, this.walkCamera);
     await loadingStage(100, 'Welcome to Livistone');
     this.lastTime = performance.now(); this.frameId = requestAnimationFrame(this.frame);
-    this.ui.ready(); this.returnMode = 'walking'; this.setMode('walking'); this.updateWalking(0); this.findInteraction(); this.findLocation(); this.renderer.render(this.scene, this.walkCamera);
+    this.ui.ready(); this.returnMode = 'walking'; this.setMode('walking'); this.updateWalking(0); this.findInteraction(); this.findLocation(); this.render(this.walkCamera);
   }
   private get phase(): SkyPhase { return this.night ? 'night' : 'day'; }
+  private render(camera: THREE.Camera): void { this.view.beginFrame(); this.output.render(camera); }
+  /** Fog mixes the pre-tone-mapping horizon radiance, so full fog lands on the displayed sky; display materials fog toward its mapped colour. */
+  private setFog(range: { near: number; far: number }): void {
+    this.fog.color.copy(HORIZON_RADIANCE[this.phase]); this.fog.near = range.near; this.fog.far = range.far;
+    displayFog.color.value.copy(HORIZON_HAZE[this.phase]); displayFog.near.value = range.near; displayFog.far.value = range.far;
+  }
   // CPU has no PMREM environment to take over the fill, so its hemisphere keeps the full share.
   private get fill(): { environment: number; hemi: number } { return FILL[this.graphics.tier === 'cpu' ? 'a' : LOOK][this.phase]; }
   private get mapView(): boolean {
@@ -202,8 +214,7 @@ class Game {
   private setMode(mode: Mode): void {
     this.mode = mode; this.interaction = null; this.input.active = mode === 'walking'; this.input.clear(); this.accumulator = 0;
     this.orbit.enabled = mode === 'map';
-    const haze = HORIZON_HAZE[this.phase], fog = this.mapView ? MAP_FOG : WALK_FOG;
-    this.scene.background = this.mapView ? haze.clone() : this.skyBackground; this.scene.fog = new THREE.Fog(haze, fog.near, fog.far);
+    this.scene.background = this.mapView ? HORIZON_RADIANCE[this.phase].clone() : this.skyBackground; this.setFog(this.mapView ? MAP_FOG : WALK_FOG);
     this.ui.setMode(mode, this.mapView); this.town.setMapMode(this.mapView); this.frameShadow(true); this.resize();
     this.cursorDirty = true;
     if (mode === 'walking') this.ui.canvas.focus({ preventScroll: true });
@@ -333,9 +344,8 @@ class Game {
     this.hemi.color.set(night ? '#8ea4c6' : '#e9f4f0'); this.hemi.groundColor.set(night ? '#121820' : '#73805c'); this.hemi.intensity = this.fill.hemi;
     this.sun.color.set(night ? '#c9d6ee' : '#fff0ce'); this.sun.intensity = night ? .32 : 2.4;
     this.aimSun();
-    const haze = HORIZON_HAZE[this.phase], fog = this.mapView ? MAP_FOG : WALK_FOG;
-    this.scene.background = this.mapView ? haze.clone() : this.skyBackground; this.scene.fog = new THREE.Fog(haze, fog.near, fog.far);
-    this.nightLighting.setNight(night); this.renderer.shadowMap.needsUpdate = true;
+    this.scene.background = this.mapView ? HORIZON_RADIANCE[this.phase].clone() : this.skyBackground; this.setFog(this.mapView ? MAP_FOG : WALK_FOG);
+    this.nightLighting.setNight(night); this.sun.shadow.needsUpdate = true;
   }
   /** r186 gives any material without its own envMap scene.environmentIntensity instead of its envMapIntensity, so heroEnv
    *  materials carry the sky explicitly (look b). CPU Lambert metals sample the plain cube instead; no PMREM exists there. */
@@ -345,7 +355,7 @@ class Game {
       if (!(object instanceof THREE.Mesh)) return;
       for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
         if (cpu) { if (material instanceof THREE.MeshLambertMaterial && material.envMap) material.envMap = sky.background; }
-        else if (material.userData.heroEnv && material instanceof THREE.MeshStandardMaterial) material.envMap = sky.environment;
+        else if (material.userData.heroEnv && (material instanceof THREE.MeshStandardMaterial || (material as THREE.MeshStandardNodeMaterial).isMeshStandardNodeMaterial)) (material as THREE.MeshStandardMaterial).envMap = sky.environment;
       }
     });
   }
@@ -362,12 +372,13 @@ class Game {
     camera.left = frame.left; camera.right = frame.right; camera.top = frame.top; camera.bottom = frame.bottom; camera.updateProjectionMatrix();
     this.sun.target.position.set(frame.target.x, frame.target.y, frame.target.z); this.sun.position.copy(this.sun.target.position).addScaledVector(this.sunDirection, SUN_DISTANCE);
     this.sun.shadow.normalBias = frame.texel * SHADOW.normalBias; this.sun.shadow.bias = -SHADOW.bias / (camera.far - camera.near);
-    shadowFade.x = walking ? half * SHADOW.fade[0] : 0; shadowFade.y = walking ? half * SHADOW.fade[1] : 0;
-    this.renderer.shadowMap.needsUpdate = true;
+    shadowFade.value.set(walking ? half * SHADOW.fade[0] : 0, walking ? half * SHADOW.fade[1] : 0);
+    this.sun.shadow.needsUpdate = true;
   }
   private quality(low: boolean): void {
     this.lowQuality = low || this.graphics.tier === 'cpu'; this.renderScale = Math.min(low ? 1 : 1.5, this.graphics.pixelRatio); this.renderer.setPixelRatio(this.pixelRatio());
-    this.sun.shadow.mapSize.setScalar(low ? 1024 : 2048); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; this.frameShadow(true);
+    // WebGPU resizes the light's shadow target to mapSize on its next render; frameShadow requests that render.
+    this.sun.shadow.mapSize.setScalar(low ? 1024 : 2048); this.frameShadow(true);
     this.scene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
@@ -377,6 +388,8 @@ class Game {
         if (material.userData.cityHallCrystal) { setCityHallCrystalQuality(material, low); continue; }
         if (material.userData.mitoringAmber) { setMitoringAmberQuality(material, low); continue; }
         if (material.userData.pavilionGem) { material.transmission = low ? 0 : .42; material.opacity = low ? .45 : .7; material.needsUpdate = true; continue; }
+        // Only hall glazing and station amber follow the generic switch; the river and Future House glass keep their own optics.
+        if (!material.userData.hallGlass && !material.userData.stationAmber) continue;
         material.transmission = low ? 0 : material.userData.stationAmber ? .8 : .45;
         material.opacity = material.userData.stationAmber ? 1 : material.userData.clearGallery ? (low ? .18 : .26) : (low ? .32 : .65); if (material.userData.stationAmber) material.emissiveIntensity = low ? .23 : .2; material.needsUpdate = true;
       }
@@ -461,11 +474,11 @@ class Game {
     if (this.mode === 'map') { this.orbit.update(); this.updateMarkers(); }
     const camera = this.mapView ? this.mapCamera : this.walkCamera;
     // Walking re-bakes when near shrubs or tree detail change, so their shadows appear with them; the map keeps its one bake.
-    if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : WALK_FOG.far, this.mapView) && !this.mapView && this.graphics.shadows) this.renderer.shadowMap.needsUpdate = true;
+    if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : WALK_FOG.far, this.mapView) && !this.mapView && this.graphics.shadows) this.sun.shadow.needsUpdate = true;
     this.updateExhibitionControls();
     this.clockCheck += rawDt; if (this.clockCheck > 30) { this.clockCheck = 0; if (this.timeOfDay === 'auto') this.applyTimeOfDay(); }
     if (this.graphics.shadows) this.frameShadow();
-    this.nightLighting.update(camera); this.renderer.render(this.scene, camera);
+    this.nightLighting.update(camera); this.render(camera);
     if (this.cursorDirty) { this.cursorDirty = false; this.updateCursor(); }
     this.frames++; this.fpsFrames++; this.fpsTime += rawDt;
     if (this.fpsTime >= 1) { this.fps = Math.round(this.fpsFrames / this.fpsTime);
@@ -482,5 +495,5 @@ try {
 } catch (error) {
   console.error('Graphics initialization failed', error);
   const detail = error instanceof Error && error.message ? ' ' + error.message : '';
-  ui.error('Livistone needs a browser with WebGL 2 graphics enabled. Try an updated browser with hardware acceleration, then reload.' + detail);
+  ui.error('Livistone needs a browser with WebGPU or WebGL 2 graphics enabled. Try an updated browser with hardware acceleration, then reload.' + detail);
 }

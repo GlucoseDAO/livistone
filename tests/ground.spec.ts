@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { GPU_ERROR } from './gpu-errors';
 
 for (const mobile of [false, true]) test(`textured ground loads (${mobile ? 'touch' : 'desktop'})`, async ({ browser }) => {
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 800 }, hasTouch: mobile, isMobile: mobile });
   const page = await context.newPage(), errors: string[] = [], assets: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
-  page.on('console', m => { if (m.type() === 'error' && /shader|WebGL/i.test(m.text())) errors.push(m.text()); });
+  page.on('console', m => { if (m.type() === 'error' && GPU_ERROR.test(m.text())) errors.push(m.text()); });
   page.on('response', r => { if (r.url().includes('/textures/ground/')) { assets.push(r.url()); expect(r.ok()).toBe(true); } });
   try {
     await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 });

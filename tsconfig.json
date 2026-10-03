@@ -15,7 +15,7 @@
     "verbatimModuleSyntax": true,
     "resolveJsonModule": true,
     "paths": {
-      "@livistone/render": ["./src/render/classic.ts"]
+      "three": ["./node_modules/@types/three/build/three.webgpu.d.ts"]
     },
     "types": [
       "vite/client",

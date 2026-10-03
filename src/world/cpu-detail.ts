@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import type { NodePatches } from '../render/types';
+
+/** Classic and node standard materials alike: rocks and the lake are node materials with node-only shading Lambert drops. */
+const standard = (material: THREE.Material): material is THREE.MeshStandardMaterial => material instanceof THREE.MeshStandardMaterial || (material as THREE.MeshStandardNodeMaterial).isMeshStandardNodeMaterial === true;
 
 /** CPU rendering keeps the same town and collision world, with cheap lighting and boundary-locked visual meshes. */
-export async function prepareCpuDetail(root: THREE.Object3D, reflection: THREE.CubeTexture, nodes: NodePatches | null = null): Promise<{ before: number; after: number }> {
+export async function prepareCpuDetail(root: THREE.Object3D, reflection: THREE.CubeTexture): Promise<{ before: number; after: number }> {
   const { MeshoptSimplifier } = await import('meshoptimizer/simplifier'); await MeshoptSimplifier.ready;
   const geometries = new Map<THREE.BufferGeometry, THREE.BufferGeometry>(), materials = new Map<THREE.Material, THREE.Material>();
   let before = 0, after = 0;
@@ -17,12 +19,10 @@ export async function prepareCpuDetail(root: THREE.Object3D, reflection: THREE.C
     const mesh = meshes[i];
     const convert = (source: THREE.Material): THREE.Material => {
       const cached = materials.get(source); if (cached) return cached;
-      if (!(source instanceof THREE.MeshStandardMaterial) && !nodes?.isStandard(source)) return source;
+      if (!standard(source)) return source;
       const material = new THREE.MeshLambertMaterial({ color: source.color, map: source.map, emissive: source.emissive, emissiveIntensity: source.emissiveIntensity, emissiveMap: source.emissiveMap, vertexColors: source.vertexColors, transparent: source.transparent, opacity: source.opacity, alphaTest: source.alphaTest, side: source.side, depthWrite: source.depthWrite, flatShading: source.flatShading, fog: source.fog });
       material.name = source.name; material.userData = { ...source.userData };
       if (source.metalness > .4) { material.envMap = reflection; material.reflectivity = .28; }
-      if (mesh.name === 'Textured meadow and soil') { material.onBeforeCompile = source.onBeforeCompile; material.customProgramCacheKey = () => 'cpu-meadow'; }
-      if (nodes && mesh.name === 'Textured meadow and soil') { const terrain = nodes.lambertTerrain(source, material); materials.set(source, terrain); return terrain; }
       materials.set(source, material); return material;
     };
     mesh.material = Array.isArray(mesh.material) ? mesh.material.map(convert) : convert(mesh.material);

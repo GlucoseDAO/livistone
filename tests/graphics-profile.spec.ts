@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { EXPECTED_BACKEND } from './gpu-errors';
 
 for (const tier of ['gpu', 'mobile', 'cpu'] as const) test(`the ${tier} profile loads the same walkable world and changes its full rendering budget`, async ({ page }) => {
   test.setTimeout(180000);
@@ -6,7 +7,7 @@ for (const tier of ['gpu', 'mobile', 'cpu'] as const) test(`the ${tier} profile 
   await page.goto('/?graphics=' + tier);
   await page.waitForFunction(() => (window as any).__livistone?.snapshot().ready, null, { timeout: 120000 });
   const initial = await page.evaluate(() => (window as any).__livistone.snapshot());
-  expect(initial.graphicsTier).toBe(tier); expect(initial.reducedGraphics).toBe(tier !== 'gpu');
+  expect(initial.graphicsTier).toBe(tier); expect(initial.reducedGraphics).toBe(tier !== 'gpu'); expect(initial.backend).toBe(EXPECTED_BACKEND);
   if (tier === 'cpu') {
     expect(initial.cpuGeometry.after).toBeLessThan(initial.cpuGeometry.before);
     expect(initial.renderScale).toBeLessThanOrEqual(.55);
