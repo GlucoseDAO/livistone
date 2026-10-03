@@ -1,6 +1,7 @@
 import { paintPosterText } from './poster-text';
 import * as THREE from 'three';
-import { cameraViewMatrix, cos, instancedBufferAttribute, length, normalView, normalize, positionLocal, sin, uniform, uv, vec2, vec4 } from 'three/tsl';
+import { instancedBufferAttribute, length, uniform, uv, vec2 } from 'three/tsl';
+import { lakeWaterMaterial } from './water-material';
 import { displayMaterial } from '../render/output';
 import { createPlaceSign, paintPlaceSign } from './place-sign';
 import type { PlaceSign } from './place-sign';
@@ -39,8 +40,8 @@ export class LivingWaters {
   readonly interactives: Interactive[] = [];
   readonly panels: THREE.Mesh[] = [];
   private readonly signs = new Map<string, PlaceSign>();
-  private readonly water = new THREE.MeshStandardNodeMaterial({ color: '#507c78', vertexColors: true, metalness: .28, roughness: .32, envMapIntensity: .65, userData: { heroEnv: true } });
   private readonly waterTime = uniform(0);
+  private readonly water = lakeWaterMaterial(this.waterTime);
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#d9e0d6', metalness: .63, roughness: .32 });
   private readonly stone = new THREE.MeshStandardMaterial({ color: '#d4cfbc', roughness: .91 });
   private readonly rain: THREE.Points;
@@ -48,9 +49,6 @@ export class LivingWaters {
   private readonly drainage: THREE.Curve<THREE.Vector3>[] = [];
   constructor(private mobile: boolean, private readonly pathMaterial: THREE.Material = new THREE.MeshStandardMaterial({ color: '#d4cfbc', roughness: .91 })) {
     this.root.name = 'Living Waters · town gardens'; this.root.position.set(GARDENS.x, 0, GARDENS.z);
-    // Two crossing ripple trains tilt the eyes' normals; the game's own clock drives them, so ?capture=1 freezes them too.
-    const p = positionLocal.xz, t = this.waterTime, ripple = vec2(sin(p.x.mul(2.8).add(p.y.mul(1.7)).sub(t.mul(.8))), cos(p.y.mul(3.1).sub(p.x.mul(1.4)).sub(t.mul(.6)))).mul(.047);
-    this.water.normalNode = normalize(normalView.add(cameraViewMatrix.mul(vec4(ripple.x, 0, ripple.y, 0)).xyz));
     const network = shape(LAKE_OUTLINE); WATER_EYES.forEach((cell) => network.holes.push(new THREE.Path(cell.map(([x, z]) => new THREE.Vector2(x, -z)))));
     this.mesh(new THREE.ShapeGeometry(network).rotateX(-Math.PI / 2), this.silver, true, 0, .12);
     WATER_EYES.forEach((cell, index) => {

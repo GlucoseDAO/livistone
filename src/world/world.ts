@@ -31,6 +31,7 @@ import type { RockSite } from './water-surface';
 import { pavingMaterial, riverRockSites, rockMaterial } from './stone';
 import { createRiverRocks, rockColliders } from './river-rocks';
 import { createPebbles } from './pebbles';
+import { shoreTime } from './shore-nodes';
 import type { ShorePebbles } from './pebbles';
 import { createCityHallFacade, loadCityHallTextures } from './city-hall';
 import { mitoringAmberMaterial, loadMitoringAmberTextures, loadMitoringSilverTexture } from './mitoring-materials';
@@ -376,7 +377,7 @@ export class Town {
   }
   /** Returns whether a shadow caster changed detail or visibility this frame. */
   update(time: number, camera?: THREE.Camera, fogFar = 220, mapView = false, shadow?: THREE.LightShadow): boolean {
-    this.water.userData.time.value = time;
+    this.water.userData.time.value = time; shoreTime.value = time;
     if (!camera) return false;
     const profile = graphicsProfile(this.tier);
     const trees = this.forest.update(camera, mapView ? fogFar : Math.min(fogFar, profile.forest), mapView, shadow);

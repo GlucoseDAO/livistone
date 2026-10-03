@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Fn, abs, attribute, cameraPosition, cameraViewMatrix, clamp, color, diffuseColor, distance, dot, exp, float, fract, max, min, mix, normalize, positionWorld, pow, property, smoothstep, sqrt, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
+import { Fn, abs, attribute, cameraPosition, cameraViewMatrix, clamp, color, cos, diffuseColor, distance, dot, exp, float, fract, max, min, mix, normalView, normalize, positionLocal, positionWorld, pow, property, sin, smoothstep, sqrt, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
 import { PhysicalLightingModel } from 'three/webgpu';
 import type { Node, NodeBuilder } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
@@ -139,5 +139,21 @@ export function waterMaterial(tier: GraphicsTier, opts: { look?: WaterLook } = {
   })();
   material.normalNode = normalize(cameraViewMatrix.mul(vec4(WATER.normal, 0)).xyz);
   material.roughnessNode = mix(optics.roughness, .75, WATER.foam);
+  return material;
+}
+
+/**
+ * Living Waters' shallow eyes (sub-plan 14, step 4): the river's look on an opaque sheet, since each eye is only a few
+ * centimetres deep over the garden floor. Water's own Fresnel (ior 1.333) reflects the sky through heroEnv; vertex colours
+ * keep each eye deepest at its centre, toward the river's deep body. Two crossing ripple trains run on `time`, which
+ * LivingWaters.update drives from the game clock. Nothing emits, so at night the outer lake stays dark around the lit pavilion.
+ * The cpu tier's Lambert copy keeps the colour and vertex colours.
+ */
+export function lakeWaterMaterial(time: Node<'float'>): THREE.MeshPhysicalNodeMaterial {
+  const optics = LOOKS.b;
+  const material = new THREE.MeshPhysicalNodeMaterial({ color: '#385c4a', vertexColors: true, metalness: 0, roughness: optics.roughness + .02, ior: 1.333, envMapIntensity: 1 });
+  material.name = 'Lake water'; material.userData.heroEnv = true;
+  const p = positionLocal.xz, ripple = vec2(sin(p.x.mul(2.8).add(p.y.mul(1.7)).sub(time.mul(.8))), cos(p.y.mul(3.1).sub(p.x.mul(1.4)).sub(time.mul(.6)))).mul(.047);
+  material.normalNode = normalize(normalView.add(cameraViewMatrix.mul(vec4(ripple.x, 0, ripple.y, 0)).xyz));
   return material;
 }

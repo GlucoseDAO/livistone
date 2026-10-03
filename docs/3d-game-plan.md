@@ -1,8 +1,10 @@
 # Livistone: browser game implementation plan
 
-## Shore rocks and pebbles, geometry part (realism 14, branch only) — 3 October 2026
+## Shores, riverbed and rocks (realism 14, branch only) — 3 October 2026
 
-The faceted icosahedron rocks are replaced by rounded, seeded boulders: four noise-displaced, softly faceted shape variants with smooth normals, blended per rock through instanced morph targets, so the rocks remain a single instanced draw. Colliders are now one trimesh sampled from each rock's own blended shape and transform (previously unrotated boxes). Rocks rest on the triangulated walking ground and sink only where a slope would lift their underside. Sixteen rocks (ten on mobile) stand partly in the shallow edge, so the water's rock foam is now visible. About 3,200 shore pebbles (1,100 on mobile, none on cpu) add one unshadowed instanced draw near the water. The wet band, riverbed, caustics, moss mask and lake material are TSL work that waits for the WebGPU migration. Physical-device cost is unmeasured.
+The faceted icosahedron rocks are replaced by rounded, seeded boulders: four noise-displaced, softly faceted shape variants with smooth normals, blended per rock through instanced morph targets, so the rocks remain a single instanced draw. Colliders are one trimesh sampled from each rock's own blended shape and transform (previously unrotated boxes). Rocks rest on the triangulated walking ground and sink only where a slope would lift their underside. Sixteen rocks (ten on mobile) stand partly in the shallow edge, so the water's rock foam is visible. Shore pebbles (3,200 gpu, 1,100 mobile, none on cpu) are one unshadowed instanced mesh refilled from the 8 m cells around the camera, so a few hundred draw at a time.
+
+On WebGPU the ground's colour stage now shades the river shores from a GPU copy of the channel field: gravel patches at the waterline (the sub-plan 03 shore scan, gpu and mobile), a darker wet band that is glossy above the water, dark silt on the bed and, on gpu, caustics on the shallow bed that the transparent river shows; they run on game time, so `?capture=1` freezes them. River rocks get moss on upward faces and a wet foot at the river. The lake moved into `water-material.ts` with the river's optics on an opaque sheet; it emits nothing, so the outer lake stays subdued at night. Physical-device cost is unmeasured.
 
 ## River water shading — 3 October 2026
 

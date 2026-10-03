@@ -1,4 +1,4 @@
-/** Shared channel boundaries for terrain, water, rocks and planting. */
+/** Shared channel boundaries for terrain, water, rocks and planting. `channelDistance` in shore-nodes.ts mirrors this field on the GPU. */
 export function riverCenter(x: number): number { return 26 + Math.sin(x * .036) * 4 + Math.sin(x * .075) * 3 * Math.min(1, Math.abs(x) / 35); }
 export function riverWidthVariation(x: number): number { return .38 * Math.sin(x * .19) + .18 * Math.sin(x * .53); }
 export function tributaryCenter(z: number, side: number): number { return side * (57 + 6 * Math.sin((z + 12) * .065)); }

@@ -4,6 +4,7 @@ import type { Node } from 'three/webgpu';
 import { plantingAllowed } from './landscape';
 import { terrainSurfaceHeight } from './terrain';
 import { rockReach, seatedHeight, streamRockSites } from './river-rocks';
+import { rockShore } from './shore-nodes';
 import { riverCenter, tributaryCenter } from './waterways';
 import type { RockSite } from './water-surface';
 
@@ -57,11 +58,14 @@ export function pavingMaterial(mobile = false): THREE.MeshStandardMaterial {
 
 export function rockMaterial(mobile: boolean): THREE.MeshStandardNodeMaterial {
   const material = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 1 }), loader = new THREE.TextureLoader();
+  // Moss and the wet band at the river (sub-plan 14) shade the plain colour until the mineral map arrives.
+  const shade = (base: Node<'vec3'>): void => { const nodes = rockShore(base); material.colorNode = nodes.colorNode; material.roughnessNode = nodes.roughnessNode; };
+  shade(uniform(material.color) as unknown as Node<'vec3'>);
   loader.load(import.meta.env.BASE_URL + 'textures/mountains/rock-color.jpg', (map) => {
     map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping; map.anisotropy = mobile ? 2 : 4;
     // Retain scanned mineral detail, but remove the source map's rusty brown cast: its value shades the rock, not its hue.
     // colorNode replaces the map multiply; .map stays set for the cpu tier's Lambert copy, which keeps the plain map.
-    material.map = map; material.colorNode = (uniform(material.color) as unknown as Node<'vec3'>).mul(mix(vec3(.55), vec3(1.05), dot(texture(map).rgb, vec3(.2126, .7152, .0722)))); material.needsUpdate = true;
+    material.map = map; shade((uniform(material.color) as unknown as Node<'vec3'>).mul(mix(vec3(.55), vec3(1.05), dot(texture(map).rgb, vec3(.2126, .7152, .0722))))); material.needsUpdate = true;
   }, undefined, () => { /* Vertex colour keeps the stones usable without the optional surface map. */ });
   if (!mobile) loader.load(import.meta.env.BASE_URL + 'textures/mountains/rock-normal.jpg', (map) => {
     map.wrapS = map.wrapT = THREE.RepeatWrapping; material.normalMap = map; material.normalScale.set(.65, .65); material.needsUpdate = true;

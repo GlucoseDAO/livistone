@@ -5,6 +5,7 @@ export { landscapeHeight as mountainHeight } from './terrain';
 import { landscapeHeight } from './terrain';
 import { groundCover } from './ground-cover';
 import { groundLook, groundNodes, groundTextureFiles } from './ground-material';
+import { shoreTextureFiles } from './shore-nodes';
 import type { GraphicsTier } from '../game/graphics';
 
 /** Baseline meadow vertex colour; the ground shader divides it back out of its palette. */
@@ -73,10 +74,12 @@ export class Mountains extends THREE.Group {
       if (colour) texture.colorSpace = THREE.SRGBColorSpace;
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.anisotropy = tier === 'gpu' ? 4 : 2; return texture;
     });
-    const files = groundTextureFiles(tier);
-    this.ready = Promise.all([Promise.all(files.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))), load('textures/mountains/rock-color.jpg', true), tier === 'gpu' ? load('textures/mountains/rock-normal.jpg', false) : Promise.resolve(null)]).then(([ground, rock, rockNormal]) => {
+    const files = groundTextureFiles(tier), shoreFiles = shoreTextureFiles(tier);
+    // The shore gravel is optional: without it the banks keep their wet band, silt and caustics.
+    const shore = Promise.all(shoreFiles.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))).catch(() => []);
+    this.ready = Promise.all([Promise.all(files.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))), load('textures/mountains/rock-color.jpg', true), tier === 'gpu' ? load('textures/mountains/rock-normal.jpg', false) : Promise.resolve(null), shore]).then(([ground, rock, rockNormal, gravel]) => {
       const albedo = ground.filter((_, i) => files[i].includes('-albedo-')), nrh = tier === 'cpu' ? albedo : ground.filter((_, i) => files[i].includes('-nrh-'));
-      const nodes = groundNodes(tier, look, { albedo, nrh, rock, rockNormal }, GRASS);
+      const nodes = groundNodes(tier, look, { albedo, nrh, rock, rockNormal, shore: gravel.length === 2 ? { albedo: gravel[0], nrh: gravel[1] } : null }, GRASS);
       material.colorNode = nodes.colorNode; material.normalNode = nodes.normalNode;
       if (material instanceof THREE.MeshStandardNodeMaterial) material.roughnessNode = nodes.roughnessNode;
       material.needsUpdate = true;

@@ -5,7 +5,7 @@ See [README](README.md) for the shared workflow.
 
 ## Status (3 October 2026)
 
-The renderer-independent part is done on `realism/14-shore` and is not merged: step 2 and step 3's geometry and colliders, plus a few rocks moved into the stream. Rocks now carry `uv` and a 0–1 `moss` attribute for the moss mask. Still to do in TSL after Stage A: step 1, the step 3 moss/triplanar mask, and step 4.
+Implemented on `realism/14-shore`, rebased on the WebGPU branch and not merged: every step. Steps 1 and 3's moss are TSL (`src/world/shore-nodes.ts`); pebbles refill from the cells near the camera; the lake material is `lakeWaterMaterial` in `water-material.ts`. Captures wait for the WebGPU merge.
 
 ## Steps
 

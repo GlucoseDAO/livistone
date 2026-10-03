@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { WATER_EDGE, WATER_LEVEL, waterDepth, waterFlow, waterSurfaceGeometry } from '../src/world/water-surface';
-import { cpuWaterColour, waterMaterial } from '../src/world/water-material';
+import { cpuWaterColour, lakeWaterMaterial, waterMaterial } from '../src/world/water-material';
+import { uniform } from 'three/tsl';
 import { riverRockSites } from '../src/world/stone';
 import { riverCenter, tributaryCenter, waterDistance } from '../src/world/waterways';
 import { terrainHeight } from '../src/world/terrain';
@@ -108,5 +109,13 @@ describe('water materials', () => {
     expect(luminance(deep)).toBeGreaterThan(luminance(bank));
     const geometry = waterSurfaceGeometry([], colour, 2);
     expect(geometry.getAttribute('color').count).toBe(geometry.getAttribute('position').count);
+  });
+  it('gives the lake the river look on an opaque sheet: water Fresnel, hero sky reflection, game-clock ripples and no glow', () => {
+    const time = uniform(0), material = lakeWaterMaterial(time);
+    expect(material.isMeshPhysicalNodeMaterial).toBe(true); expect(material.ior).toBeCloseTo(1.333, 6); expect(material.metalness).toBe(0);
+    expect(material.transparent).toBe(false); expect(material.vertexColors).toBe(true); expect(material.userData.heroEnv).toBe(true);
+    expect(material.roughness).toBeLessThan(.1); expect(material.normalNode?.isNode).toBe(true);
+    // Nothing emits, so at night only the pavilion's own lights reach the outer lake.
+    expect(material.emissive.getHex()).toBe(0); expect(material.userData.nightEmission).toBeUndefined();
   });
 });

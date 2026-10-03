@@ -84,9 +84,10 @@ function directions(detail: number): { points: THREE.Vector3[]; index: number[] 
 /**
  * The shared rock mesh for one subdivision level. Variant 0 is the base; variants 1–3 are relative morph targets (positions and
  * smooth normals). It also carries `uv` (stereographic from the top, so the only seam is the buried bottom pole) for the rock
- * map, baked mineral/cavity/moss `color`, and a 0–1 `moss` mask for a later up-facing moss shader.
+ * map, baked mineral and cavity `color`, and a 0–1 `moss` mask that the node material turns into moss on upward faces. The
+ * cpu tier's Lambert copy has no node shading, so its colours also bake the lichen in (`lichen`).
  */
-export function rockGeometry(detail: number): THREE.BufferGeometry {
+export function rockGeometry(detail: number, lichen = true): THREE.BufferGeometry {
   const { points, index } = directions(detail), count = points.length, p = new THREE.Vector3();
   const shapes = VARIANTS.map((_, k) => {
     const g = new THREE.BufferGeometry(), positions = new Float32Array(count * 3);
@@ -95,7 +96,7 @@ export function rockGeometry(detail: number): THREE.BufferGeometry {
     return { positions, normals: g.getAttribute('normal').array as Float32Array };
   });
   const uv: number[] = [], colors: number[] = [], moss: number[] = [], color = new THREE.Color();
-  const mineral = new THREE.Color('#bcc3c1'), warm = new THREE.Color('#b2a790'), lichen = new THREE.Color('#66774a');
+  const mineral = new THREE.Color('#bcc3c1'), warm = new THREE.Color('#b2a790'), green = new THREE.Color('#66774a');
   const smooth = THREE.MathUtils.smoothstep;
   for (const d of points) {
     const lift = Math.max(1 + d.y, .12); uv.push(.5 + .42 * d.x / lift, .5 + .42 * d.z / lift);
@@ -103,7 +104,8 @@ export function rockGeometry(detail: number): THREE.BufferGeometry {
     // Mottled mineral, darker fine hollows and a damp foot; lichen collects on the upper faces in patches.
     color.multiplyScalar((.84 + .2 * noise(d.x * 4.3, d.y * 4.3, d.z * 4.3 + 9, 92)) * (.78 + .22 * smooth(fineRelief(d), -.035, .03)) * (.8 + .2 * smooth(d.y, -.55, .05)));
     const m = smooth(d.y * .9 + .38 * noise(d.x * 2.4 + 5, d.y * 2.4, d.z * 2.4, 93), .15, .7) * (.6 + .4 * smooth(noise(d.x * 6.2, d.y * 6.2, d.z * 6.2 - 4, 94), -.2, .4));
-    color.lerp(lichen, m * .7); colors.push(color.r, color.g, color.b); moss.push(m);
+    if (lichen) color.lerp(green, m * .7);
+    colors.push(color.r, color.g, color.b); moss.push(m);
   }
   const geometry = new THREE.BufferGeometry(), base = shapes[0];
   geometry.setAttribute('position', new THREE.BufferAttribute(base.positions, 3));
@@ -138,13 +140,14 @@ export function inStream(site: RockSite): boolean { return waterDistance(site.x,
 
 /** All rocks as one instanced draw: shared transforms, per-rock morph blend and a slight per-rock tint (wet in the stream). */
 export function createRiverRocks(sites: readonly RockSite[], material: THREE.Material, tier: GraphicsTier): THREE.InstancedMesh {
-  const geometry = rockGeometry(ROCK_DETAIL[tier]), rocks = new THREE.InstancedMesh(geometry, material, sites.length);
+  const geometry = rockGeometry(ROCK_DETAIL[tier], tier === 'cpu'), rocks = new THREE.InstancedMesh(geometry, material, sites.length);
   const weights = new THREE.Mesh(geometry), matrix = new THREE.Matrix4(), tint = new THREE.Color();
   sites.forEach((site, i) => {
     rocks.setMatrixAt(i, rockMatrix(site, matrix));
     weights.morphTargetInfluences!.splice(0, 3, ...rockWeights(site)); rocks.setMorphAt(i, weights);
     const rand = random(Math.floor(site.yaw * 1e6) + i), shade = .88 + rand() * .18;
-    rocks.setColorAt(i, inStream(site) ? tint.setRGB(shade * .74, shade * .77, shade * .76) : tint.setRGB(shade, shade * (.98 + rand() * .03), shade * (.96 + rand() * .05)));
+    // In the stream the node material darkens the wet foot; the slightly darker tint carries it on cpu.
+    rocks.setColorAt(i, inStream(site) ? tint.setRGB(shade * .82, shade * .85, shade * .84) : tint.setRGB(shade, shade * (.98 + rand() * .03), shade * (.96 + rand() * .05)));
   });
   rocks.morphTexture!.needsUpdate = true; rocks.name = 'River rocks';
   rocks.castShadow = true; rocks.receiveShadow = true; rocks.computeBoundingSphere(); return rocks;
