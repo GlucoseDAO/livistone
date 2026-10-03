@@ -3,6 +3,10 @@
 **Needs:** 03, 04 and 20 Phase B for the shader steps. **Tiers:** all, graded. **Branch:** `realism/14-shore`.
 See [README](README.md) for the shared workflow.
 
+## Status (3 October 2026)
+
+Implemented on `realism/14-shore`, rebased on the WebGPU branch and not merged: every step. Steps 1 and 3's moss are TSL (`src/world/shore-nodes.ts`); pebbles refill from the cells near the camera; the lake material is `lakeWaterMaterial` in `water-material.ts`. Captures wait for the WebGPU merge.
+
 ## Steps
 
 1. **Terrain shader near water** (`mountains.ts`, using `waterDistance` and the 04 depth). The ground darkens and its roughness drops in a wet band at the waterline, plus:

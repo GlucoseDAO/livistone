@@ -18,7 +18,7 @@ A TypeScript + Vite single-page app. Three.js renders the town on WebGL 2; Rapie
 (WebAssembly) provides a kinematic capsule character controller. There is no backend, no
 API key, no database, and no account system — the entire game is static files plus
 `localStorage`. Every building, tree placement, path, and piece of jewelry geometry in the
-current build is generated in code at load time; binary assets are two tree GLBs, local derivatives of 70 real jewelry photographs, six Materialized Enhancements poster images, two CC0 rock maps, four CC0 ground-map derivatives, nine CC0 railway maps, two generated limestone paving derivatives, and two generated river ripple maps.
+current build is generated in code at load time; binary assets are two tree GLBs, local derivatives of 70 real jewelry photographs, six Materialized Enhancements poster images, two CC0 rock maps, four CC0 ground-map derivatives, nine CC0 railway maps, two generated limestone paving derivatives, two generated river ripple maps, and three generated architectural surface sets (ashlar, terrazzo, brass).
 
 ## Commands
 
@@ -37,7 +37,9 @@ current build is generated in code at load time; binary assets are two tree GLBs
 | Realism captures | `bun scripts/screenshot-realism.ts <outDir> <desktop\|touch\|software> [quick\|exteriors\|ground\|water\|galleries\|all] [day\|golden\|night]` | Dev server only (`LIVISTONE_BENCHMARK_URL`, default port 5173); loads `?capture=1`, which freezes animation time, CPU render scale and physics stepping so runs are pixel-close. See `docs/realism/` |
 | Realism review page | `bun scripts/build-realism-comparison.ts <dir> [--base before] [--title text]` | Writes `<dir>/index.html`: before/after sliders, variants, draw-call/triangle deltas. Serve the folder over HTTP to view it |
 | Mitoring comparisons | `node scripts/screenshot-mitoring.mjs [outDir] [desktop\|touch\|software]` | Fixed daylight/cameras; real SwiftShader is separate from touch emulation |
+| Surface maps | `python3 scripts/build-surface-textures.py [previewDir]` | Pillow + numpy, seeded and procedural; ashlar, terrazzo and brass albedo + nrh WebPs into `public/textures/surfaces/` |
 | Enhancement assets | `python3 scripts/build-enhancement.py [photoDir]` | Pillow; WebP posters + compact crystal meshes. Regrow crystals with `scripts/generate-enhancement-crystals.py` inside a materialized-enhancements checkout |
+| Frame budget | `bun scripts/frame-budget.ts [--json] [--far 150]` | No browser: main-pass draw calls and triangles per producer (Living Waters, glucose, Enhancement, terrain, planting; posters and forest under Bun) over the capture poses. Not device timings |
 
 `bun run test` uses Vitest; `bun test` would invoke Bun's own runner and fail. Playwright
 reuses an already-running dev server, so leave one up while iterating.
@@ -64,6 +66,8 @@ src/
     research-art.ts  Drawn figures for non-research garden stories; research uses source images
     piece-stories.ts Artist and exhibition stories overlaid on the jewellery catalogue
     enhancement.ts   Materialized Enhancements poster captions and gene-category facts
+    render-budget.ts GPU-free draw estimate per camera, the dev snapshot().budget tracker, ?budget=off
+    render-scale.ts  Adaptive resolution: per-tier frame-rate targets with hysteresis
     jewelry-catalogue.json Generated source-hashed catalogue and image manifest
   world/
     world.ts         Town: terrain, river, paths, bridges, landmarks, interiors, tower,
@@ -72,6 +76,8 @@ src/
     walnut.ts        Procedural walnut shell relief and material
     strands/         mitoring.json, nanot.json: preserved wire centerlines from the STLs
     forest.ts        Batched GLB tree instancing, mobile foliage cut, and distance LOD
+    forest-layout.ts Seeded tree sites and their clearances, DOM-independent for tests
+    contact-shadows.ts One multiply-blended decal batch grounding trees, rocks, feet, posts and benches
     landscape.ts     Shared path curves and planting clearance
     path-kerbs.ts    Batched bevelled borders, junction gaps and shared collision geometry
     cpu-detail.ts    CPU-only visual simplification, vertex lighting and static batching
@@ -82,6 +88,8 @@ src/
     station-layout.ts Shared station, tunnel, railway planting and walking clearance
     railway.ts       Textured rail geometry, Dark Nut portals, lined bores and matching colliders
     planting.ts      Spatially batched leafy shrubs, blossoms, blade grass, distance cull
+    grass-field.ts   Near-player grass: one instanced draw of world-anchored blade patches over a baked 2 m lookup
+    wind.ts          Shared wind clock (game time, still under reduced motion) and plant sway
     bridge.ts        Solid arch bridge, deck, rails, and matching colliders
     gateway.ts       King's Chapel entrance arch, faceted tourmaline, raised lettering and colliders
     gateway-materials.ts Procedural silver, limestone and colour-zoned gem materials
@@ -94,11 +102,16 @@ src/
     glucose-layout.ts Shared molecular court and planting clearance
     living-waters.ts Integrated lake, pavilion, silver mushroom grove and garden platform
     living-waters-layout.ts Shared lake cells, paths and full canopy clearance
-    mycelium.ts     Curled silver mushroom folds and branching stems
+    mycelium.ts     Curled silver mushroom folds, branching stems, light crown and the grove's detail batches
+    static-batch.ts Merges static parts that share a material after their colliders are taken
     terrain.ts      One continuous town terrain and physics mesh
     town-layout.ts  Walking bounds and rigid collider transforms
     water-material.ts River shader per device tier and the dev-only ?look=a|b variants
     water-surface.ts Clipped river sheet with baked flow, depth and rock attributes
+    surfaces.ts      Mapped ashlar, terrazzo and brass for plain architecture, per tier; dev-only ?surfaces=off
+    river-rocks.ts   Blended boulder variants (instanced morphs), seated and in-stream placement, one collider trimesh
+    pebbles.ts       Seeded shore pebbles: one unshadowed mesh refilled from the cells near the camera, none on cpu
+    shore-nodes.ts   TSL shore: channel distance on the GPU, gravel, wet band, silt bed, caustics; rock moss and wet foot
     waterways.ts     Shared river/tributary boundaries, bridge sites and tower footprint
     time-tower.ts    Silver hourglass, round plaza, guarded spiral gallery and summit terrace
     elevated-layout.ts Shared tower, camel neck and Future House clearances
@@ -133,6 +146,15 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   tuft radius, including flowers; keep civic doorway approaches and the bridge clear.
   Shrubs and grass are spatially instanced, with reduced mobile density. Bridge rail
   colliders follow the deck height; update their physics tests when changing the span.
+- **The near grass field shares the planting clearance.** `grass-field.ts` bakes, on the terrain's 2 m vertices, the rendered
+  height and a signed clearance equal to `plantingAllowed` at every point (`footprintReserved`, binned path samples, water);
+  blades start 0.25 m beyond it, on the terrain mesh's own triangles. New reserved ground belongs in `footprintReserved` or the
+  path and water clearances, never in `plantingAllowed` alone; `tests/grass-field.test.ts` checks the agreement. The field is
+  one draw (gpu 52k blades to 22 m, mobile 19k to 12 m, none on cpu), lives in the details group so map mode hides it, shades
+  the ground between its blades, takes the terrain's baked crown and wall occlusion (`groundShadeField`) as its own aoNode,
+  and sinks `planting.ts` tufts inside its radius. Animate plants only through `wind.ts`
+  (`windTime`: the game's elapsed time, frozen by `?capture=1`, still under reduced motion), never TSL's `time`. Dev switches:
+  `?grass=off`, and `?eye=<metres>` for low captures.
 - **The bridge gateway follows the approved King's Chapel ring concept.** Keep its paired
   inward-facing silver tips, fan-spoked bezel, long green tourmaline and raised LIVISTONE
   letters above the stone. `gateway-layout.ts` reserves the side abutments and paved approach;
@@ -208,7 +230,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **Jewelry collections have permanent homes.** `data/catalogue/selection.json` contains reviewed source facts; `scripts/build-catalogue.mjs` generates `game/jewelry-catalogue.json` and local WebP derivatives using offline Sharp tooling. City Hall/Energy/Science/station keep 8/8/9/7 physical works. Timeface has six and Future House has three; the catalogue has 41. The additional attributed archive manifest is `game/archive-catalogue.json`. Keep one physical assignment per work. `piece-stories.ts` overlays artist texts from https://livia.glucosedao.org/pieces and official Romanian Jewelry Week collection pages; do not invent a studio story when the public tab has none. Rotary Magnetic keeps the 2026 amber caption and does not mix the older tourmaline note. `planar-exhibition.ts` uses uncropped thumbnails, aspect-matched caption canvases and simple stand colliders; full images load only for inspection. `poster-layout.ts` keeps the central axes and entrances clear. Do not restore rotating cylinders, pedestal tables or lore lecterns. Source facts and artist descriptions stay separate from Livistone fiction. Native in-hall controls remain hidden until keyboard focus; 1–4 give facts, collection, photo and place story. Failed photographs leave facts available.
 - **All rail facilities belong to southern Embryo Station.** Keep one parked train and its platform at the placed station, with both main guideways at z = 79/85. There is no northern platform, duplicate train or garden rail loop. Preserve snapshot diagnostics (`zone: 'town'`, `journey: null`) and the save version. Garden access is by continuous walking paths.
 - **Terrain is continuous, not a flat town inside a mountain ring.** `terrain.ts` owns the shared river banks, lake depression, woodland foothills and asymmetrical elongated ridges. `mountains.ts` renders the whole ground with meadow/rock blending and actual tunnel apertures. Ground cover uses local meadow/soil WebP maps (512 px reduced, 1024 px rich), with path wear and bank soil baked by `ground-cover.ts` into existing vertices. Preserve soil attributes when clipping tunnels. No extra terrain draw call or per-frame CPU work is needed; reduced detail skips the mountain normal map. Regenerate derivatives with `python3 scripts/build-ground-textures.py`; provenance is under `public/textures/ground/`. The two-metre near grid agrees with the terrain collider. Grade railway approaches and far exits; reserve full tree canopies and taper planting naturally up slopes.
-- **Living Waters belongs to the town.** `living-waters-layout.ts` defines the lake at `(0, -110)`, asymmetrical water cells, 2.2 m nerve network and paths into the civic gardens. Use the shared `terrain.ts` ground and town Rapier world; never restore remote scene switching or a second terrain. Keep both pavilion entries, shallow-water escape and the dry Mycelium loop traversable in both quality tiers. Place mushrooms, reeds, lily pads and rain with seeded scatter and path clearance, not a modular lattice. The mushroom crowns use the actual Mycelium photographs: curled open silver folds around opal hearts, with branching stems, never fabric umbrellas. Also instance a lower shrub-scale ring population. Reserve every crown’s full radius from paths. Vittoria and Dewdrop garden stands present both jewels with local photographs from Livia’s archive. The pavilion borrows Dewdrop’s silhouette, whose original stone is topaz, not aquamarine. Rain/drainage respects reduced motion; audio remains opt-in. Physical-device performance remains release work.
+- **Living Waters belongs to the town.** `living-waters-layout.ts` defines the lake at `(0, -110)`, asymmetrical water cells, 2.2 m nerve network and paths into the civic gardens. Use the shared `terrain.ts` ground and town Rapier world; never restore remote scene switching or a second terrain. Keep both pavilion entries, shallow-water escape and the dry Mycelium loop traversable in both quality tiers. Place mushrooms, reeds, lily pads and rain with seeded scatter and path clearance, not a modular lattice. The mushroom crowns use the actual Mycelium photographs: curled open silver folds around opal hearts, with branching stems, never fabric umbrellas. Also instance a lower shrub-scale ring population. Reserve every crown’s full radius from paths. Tall crowns and shrubs share six instanced batches (full and light crown, stem, opal): `MyceliumGrove` gives each mushroom full detail within 36 m per unit of crown scale and the light crown (every fold, about 2k triangles, flat-normal ribbon straps) beyond, hides it at `forestLod`'s fog margin outside the map, and repacks only when a level changes; do not give spatial cells their own meshes, which multiplies draws. `?grove=full|light` pins one level for review. Water eyes, their stone outlines, path ribbons and joins draw as merged meshes via `mergeStatic` after each part gave its collider; keep the names that `cpu-detail.ts` skips (`walking network`, `path borders`, `kerb`) and leave the water channel and pool unmerged. Vittoria and Dewdrop garden stands present both jewels with local photographs from Livia’s archive. The pavilion borrows Dewdrop’s silhouette, whose original stone is topaz, not aquamarine. Rain/drainage respects reduced motion; audio remains opt-in. Physical-device performance remains release work.
 - **Photo clicking must not break looking.** A short scene press with no drag can raycast
   a planar photograph or caption. Activate on the native click after pointerup, so a
   synthesized touch click cannot hit a newly focused dialog button. Track its pointer independently from the joystick; cancelled gestures,
@@ -224,6 +246,21 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   `riverRockSites`, and joins tributaries into the river without a seam. GPU and mobile water is
   transparent (no depth write, drawn first among transparent objects) and tagged `heroEnv`; CPU bakes
   depth colour into opaque vertex colours. Regenerate the ripple maps with `python3 scripts/build-water-textures.py`.
+- **River rocks are one instanced draw.** `river-rocks.ts` blends four seeded shape variants per rock through relative
+  instanced morph targets (gpu/mobile/cpu: 320/180/80 triangles); `rockMatrix` and `rockWeights` place both the render and
+  `rockColliders`, one trimesh sampled from the same blended shape. `riverRockSites` (`stone.ts`) stays the single list for
+  rocks, colliders and the water's `rock` foam; a few stream rocks lean with the bank and `seatedHeight` buries every
+  underside in the ground, so none floats or overhangs the channel. Props on the ground use `terrainSurfaceHeight` /
+  `terrainSurfaceNormal` (the triangulated two-metre grid), not the analytic `terrainHeight`; `layoutAllows` is planting
+  clearance without the water band. Shore pebbles are one unshadowed mesh in `details` (map mode hides it, cpu has none),
+  refilled like the forest from the 8 m cells within two cells of the camera, only when the camera crosses a cell.
+- **Shores are shaded on the GPU from the same channel field.** `channelDistance` in `shore-nodes.ts` mirrors `waterDistance`;
+  keep the two in step. The ground's colour stage calls `shoreGround`: gravel from the sub-plan 03 shore scan (gpu, mobile),
+  a ragged wet band up to 0.4 m above the water (glossy above it), dark silt under the river and, on gpu, caustics driven by
+  `shoreTime`, which `Town.update` sets from game time so `?capture=1` freezes them. `rockShore` gives the node rock material
+  moss from the `moss` attribute and the world normal, and a wet foot at the river; the cpu tier's Lambert copy keeps baked
+  lichen instead. The lake material is `lakeWaterMaterial` in `water-material.ts`: the river's optics on an opaque sheet,
+  `heroEnv`, no emission, so the outer lake stays subdued at night around the lit pavilion.
 - **The Mitoring hall is not a sphere.** `createEnergyHall` builds an amber cup with a domed lid
   from `ENERGY_HALL` (`a`, `b` semi-axes, wall and dome heights, door angle); the basket strands
   below the rim are projected onto its outside, and the crown loops curl onto the lower roof.
@@ -262,8 +299,11 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **No new runtime dependencies without a reason.** Runtime deps are Three.js, Rapier and the CPU-only lazy meshoptimizer simplifier; EZ-Tree is a dev-time asset generator. Prefer generating geometry over adding a
   library.
 - **Time of day is selectable.** `daylight.ts` resolves persistent Auto / Day / Night; Auto follows the local clock without requesting GPS. Cache each `createSky` result on first use and switch fog, reflections, emissions and light sources without rebuilding town meshes or moving the player. `night-lighting.ts` keeps depth-tested additive halos and a fixed pool of six/ten nearby point lights. Lake lighting concentrates on the central briolette; keep the outer lake subdued. Quality changes must preserve night emissions.
+- **Contact shadows ground objects in one draw.** `contact-shadows.ts` builds a single multiply-blended `MeshBasicNodeMaterial` batch (shared 64 px `DataTexture`, no depth write, polygon offset, `renderOrder` -1) of soft footprints: crown-wide and trunk patches per tree, bank rocks, lamp posts, poster and stand feet, place signs, plinths and station benches, taken from the layouts that place them. The multiply scales linear light before the output pass; its `KEEP_DISPLAY` MRT leaves the ground's paper mask and fog factor untouched, so far decals fog with the ground. Terrain patches reuse the rendered terrain's 2 m grid and diagonal, so they are coplanar with the ground; floor sites are flat quads at their floor height. Tree patches follow `forestCells` and stay out of the index until `Forest.onCells` reports their cell's trunks, never per frame. Keep tree and rock patches inside their planting clearance, off paths and water. The batch hides in map mode, where bare trunks would leave unexplained blots. `userData.keepGeometry` keeps `cpu-detail.ts` from simplifying it. `ground-cover.ts` bakes a `groundShade` terrain attribute (crowns, trunks, building walls; 1 = open sky) that the ground material reads as its `aoNode`, dimming only indirect light on Lambert and standard alike. Dev-only `?contact=off` leaves out both for review.
 - **Sky, sun and haze share one source.** `sky.ts` exports `SUN_DIR` / `MOON_DIR` (the light sits at its target + direction × `SUN_DISTANCE`, kept in `Game.sunDirection`), `SKY_EXPOSURE` and the pre-tone-mapped `HORIZON_HAZE` used for fog and map backgrounds; do not hard-code fog colours. In r186 a material without its own `envMap` gets `scene.environmentIntensity` instead of its `envMapIntensity`, so tag materials whose reflection strength matters with `userData.heroEnv = true`; `main.ts` points them at the current sky after load and on day/night switches (CPU keeps its Lambert re-pointing).
 - **Graphics has three device profiles.** `graphics.ts` selects GPU, mobile/typical integrated graphics, or CPU software WebGL. Profiles cover raster and sky resolution, foliage range, lighting and architecture. CPU uses `cpu-detail.ts` to reduce visual geometry with locked boundaries and batch static opaque architecture, preserving collision geometry and parent visibility. CPU disables shadows and rain, retaining night emission and a bounded light pool. Test profile overrides do not prove actual device performance.
+- **Plain architecture wears generated maps.** `surfaces.ts` puts the ashlar on the town white (bridges, hall rims, the Science arch) and gateway abutments, terrazzo on the hall floor insets, and brass on the town gold, poster stands and place-sign frames (tarnish only). Each albedo averages the flat colour it replaces and the material colour is that colour over the set's mean (`SURFACE_SETS`, kept equal to `sources.json` by `tests/surfaces.test.ts`), so the palette holds. Masonry uses an object-space triplanar with v up on every side face (three's `triplanarTexture` would stand courses on end); any new mesh with the masonry material needs `bakeMasonry()`, which adds the cpu UVs and the `surfaceClearance` that drives the weathering. gpu reads albedo, normal and roughness, mobile albedo and roughness, cpu only the stone albedo through the Lambert copy. Share these materials rather than making variants; dev-only `?surfaces=off` restores the flat colours.
+- **Frame budget (sub-plan 25).** `render-scale.ts` adapts resolution once a second: gpu holds 50 fps between scales 1 and 1.5, mobile 28 fps between .75 and 1, falling after 2 s short and recovering .05 every 4 s with 15% headroom; a scale that failed stays out of reach until headroom triples. The cpu tier keeps its .05-per-second fall to .3. `?capture=1` freezes the scale. The walk camera's far plane is the walking fog's far distance, so lengthening the fog lengthens the view. `terrainTiles` splits the ground into 33 culled tiles that keep every vertex attribute (soil, `groundShade`), the one ground material with its `aoNode` and shore layer, and the name `cpu-detail.ts` skips. Hall interiors and the station and Future House collections hide their meshes beyond `ROOM_RANGE` (never their lights, which WebGPU builds into shaders) and show during `Town.warmUp`. Poster frames and feet merge per collection without touching display materials. Distant trees draw branches without twigs through one view-only mesh; shadows and the map keep every branch. Flowers are one geometry coloured per instance by a `petal` mask, except on cpu. `?budget=off` restores the 150 m far plane, interiors and twigs for review; `snapshot().budget` (dev only) lists the last frame's draws by top-level town group.
 - **Mobile is a first-class target, not a later port.** `Town` takes a `mobile` flag
   (coarse pointer, software GL, or a typical laptop iGPU — not a discrete card) and
   materials/foliage are already reduced for it. Walking hides far vegetation and thins
@@ -282,7 +322,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   driven headlessly through Rapier (`tests/physics.test.ts` walks a capsule into a wall).
 - Playwright drives the real game in Chrome through `window.__livistone`, which exposes
   `snapshot()` (mode, position, yaw, fps, draw calls, triangles, progress,
-  `reducedGraphics`) and `teleport(x, z, yaw)`. **That hook is test infrastructure —
+  `reducedGraphics`, and `budget`, the last frame's draws by town group) and `teleport(x, z, yaw)`. **That hook is test infrastructure —
   keep it working and keep its shape stable**, including the mobile-viewport run with
   touch emulation.
 - Browser tests launch headless Chrome with GPU flags and fall back to whatever Chrome

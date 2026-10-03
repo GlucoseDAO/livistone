@@ -7,6 +7,7 @@ import { ENHANCEMENT_URL } from '../game/enhancement';
 import { solidMesh, walkwayGeometry, guardRail } from './walkway';
 import { addGlow, nightEmission } from './night-lighting';
 import type { ColliderSpec } from '../game/physics';
+import { mergeStatic } from './static-batch';
 
 /** Satin violet after the project's rendered and printed crystals; coplanar triangles share a tone so each Voronoi facet reads. */
 function facetColors(geometry: THREE.BufferGeometry): void {
@@ -45,22 +46,25 @@ export function createEnhancementHill(parent: THREE.Group, colliders: ColliderSp
   const ray=new THREE.Raycaster();
   const arrowShape=new THREE.Shape();arrowShape.moveTo(-.4,-.25);arrowShape.lineTo(0,.3);arrowShape.lineTo(.4,-.25);arrowShape.lineTo(.2,-.25);arrowShape.lineTo(0,.03);arrowShape.lineTo(-.2,-.25);arrowShape.closePath();
   const arrowMaterial=new THREE.MeshStandardMaterial({color:'#ffe0a6',roughness:.7,side:THREE.DoubleSide});nightEmission(arrowMaterial,'#ffb457',1);
+  const arrows:THREE.Mesh[]=[],lamps:THREE.Mesh[]=[];
   for(let i=1;i<17;i++){
     const t=i/17,x=100+(87.2-100)*t,z=-154.617+(-174.35+154.617)*t;
     ray.set(new THREE.Vector3(x,30,z),new THREE.Vector3(0,-1,0));const hit=ray.intersectObject(shell)[0];if(!hit)continue;
     const normal=hit.face!.normal.clone();if(normal.y<0)normal.negate();const forward=new THREE.Vector3(-12.8,0,-19.733).projectOnPlane(normal).normalize(),right=forward.clone().cross(normal).normalize();
-    const arrow=new THREE.Mesh(new THREE.ShapeGeometry(arrowShape),arrowMaterial);arrow.setRotationFromMatrix(new THREE.Matrix4().makeBasis(right,forward,normal));arrow.position.copy(hit.point).addScaledVector(normal,.025);arrow.name='Outside ascent · painted arrow';parent.add(arrow);
+    const arrow=new THREE.Mesh(new THREE.ShapeGeometry(arrowShape),arrowMaterial);arrow.setRotationFromMatrix(new THREE.Matrix4().makeBasis(right,forward,normal));arrow.position.copy(hit.point).addScaledVector(normal,.025);parent.add(arrow);arrows.push(arrow);
   }
   const caveLink=new THREE.CatmullRomCurve3([[100,-154.617],[108,-159],[112,-170],[111,-178]].map(([x,z])=>new THREE.Vector3(x,.3,z)));
-  for(let i=0;i<7;i++){const p=caveLink.getPoint(i/6);const beacon=new THREE.Mesh(new THREE.IcosahedronGeometry(.18,0),lamp);beacon.position.copy(p);parent.add(beacon);addGlow(parent,p,'#ffbb79',2,8,5,.2);}
+  for(let i=0;i<7;i++){const p=caveLink.getPoint(i/6);const beacon=new THREE.Mesh(new THREE.IcosahedronGeometry(.18,0),lamp);beacon.position.copy(p);parent.add(beacon);lamps.push(beacon);addGlow(parent,p,'#ffbb79',2,8,5,.2);}
   for(let i=0;i<12;i++) {
     const t=i/12,x=100+(87.2-100)*t,z=-154.617+(-174.35+154.617)*t;
     for(const side of [-1,1]) {
       ray.set(new THREE.Vector3(x+side*1.25,30,z),new THREE.Vector3(0,-1,0));const hit=ray.intersectObject(shell)[0];
       const p=hit?hit.point.clone():new THREE.Vector3(x+side*1.25,0,z);p.y+=.25;
-      const light=new THREE.Mesh(new THREE.IcosahedronGeometry(.2,0),lamp);light.position.copy(p);parent.add(light);addGlow(parent,p,'#ffb76e',2.2,6,5,.23);
+      const light=new THREE.Mesh(new THREE.IcosahedronGeometry(.2,0),lamp);light.position.copy(p);parent.add(light);lamps.push(light);addGlow(parent,p,'#ffb76e',2.2,6,5,.23);
     }
   }
+  // The painted arrows and amber lamps are fixed decoration without colliders, so each set draws as one mesh.
+  mergeStatic(arrows,'Outside ascent · painted arrows');mergeStatic(lamps,'Enhancement · amber marker lamps');
 }
 /** The participation sign stands beside the start of the marked climb, turned toward arrivals. */
 export function createEnhancementPanel(parent: THREE.Group, colliders: ColliderSpec[]): { panels: THREE.Mesh[]; position: THREE.Vector3 } {

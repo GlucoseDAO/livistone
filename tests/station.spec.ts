@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { GPU_ERROR } from './gpu-errors';
 import type { Page } from '@playwright/test';
 import { TRAIN_ANNOUNCEMENTS } from '../src/world/train';
 import { stationPoint } from '../src/world/station-layout';
@@ -9,7 +10,7 @@ const teleport = (page: Page, x: number, z: number): Promise<void> => page.evalu
 
 test('enter the Embryo ring, explore the station, discover its story, and resume from its map card', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
-  page.on('console', (message) => { if (message.type() === 'error' && /Shader|WebGLProgram/.test(message.text())) errors.push(message.text()); });
+  page.on('console', (message) => { if (message.type() === 'error' && GPU_ERROR.test(message.text())) errors.push(message.text()); });
   await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.click('#view-toggle');
   await teleport(page, -16, -56); await page.keyboard.down('KeyW');
   await expect.poll(async () => (await snapshot(page)).position.z, { timeout: 20000 }).toBeGreaterThan(67); await page.keyboard.up('KeyW');

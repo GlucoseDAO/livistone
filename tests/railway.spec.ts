@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { GPU_ERROR } from './gpu-errors';
 import { RAILWAY, STATION } from '../src/world/station-layout';
 
 for (const mobile of [false, true]) test(`textured railway and mountain passage render and remain traversable on ${mobile ? 'touch' : 'desktop'}`, async ({ browser }) => {
@@ -6,7 +7,7 @@ for (const mobile of [false, true]) test(`textured railway and mountain passage 
   try {
     const page = await context.newPage(), errors: string[] = [], textures = new Set<string>();
     page.on('pageerror', (error) => errors.push(error.message));
-    page.on('console', (message) => { if (message.type() === 'error' && /Shader|WebGLProgram/.test(message.text())) errors.push(message.text()); });
+    page.on('console', (message) => { if (message.type() === 'error' && GPU_ERROR.test(message.text())) errors.push(message.text()); });
     page.on('response', (response) => { if (response.url().includes('/textures/railway/') && response.ok()) textures.add(response.url().split('/').at(-1)!); });
     await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.locator('#view-toggle').click();
     const reduced = await page.evaluate(() => (window as any).__livistone.snapshot().reducedGraphics);

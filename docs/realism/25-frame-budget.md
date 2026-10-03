@@ -38,6 +38,33 @@ Smaller: river rocks 73k / 41k (180 triangles each), glucose pavilion 66 meshes,
 3. **Adaptive resolution (06).** Move the cpu-only scaler in `main.ts` into a pure `src/game/render-scale.ts` with hysteresis: lower quickly after 2 s below target, recover by +0.05 every 4 s when more than 15% above target. Targets: mobile ≥ 28 fps (floor 0.75), gpu ≥ 50 fps (floor 1.0, ceiling 1.5), cpu unchanged. `?capture=1` freezes the scale. r186's `FSR1Node` could upscale a lower internal resolution later; measure before adopting it.
 4. **Record** the before/after budget table per tier in `docs/3d-game-plan.md`, saying plainly that headless numbers are not device benchmarks.
 
+## Part one — renderer-independent geometry (3 October 2026, branch `realism/25-budget`)
+
+Done before the WebGPU merge: the mycelium grove's detail batches, the Living Waters merges, the glucose pavilion merge by material and the enhancement markers. `bun scripts/frame-budget.ts` replays the 33 capture poses in memory (main pass only, classic and WebGPU alike); `tests/frame-budget.test.ts` pins loose ceilings.
+
+| Group, per capture view | gpu before → after | mobile before → after |
+| --- | --- | --- |
+| Mycelium grove | 3.8 calls, 1.11M triangles, drawn in 21/33 → 0.8, 25k, 8/33 | 3.8, 377k, 21/33 → 0.6, 9k, 6/33 |
+| Lake, paths, pavilion | 84.9 → 18.3 calls (177 → 36 built) | same calls; triangles +2k from larger merged bounds |
+| Glucose Commons | 28.2 → 7.0 calls (65 → 15 built) | 28.2 → 7.4 (65 → 16 built) |
+| Enhancement climb markers | 4.1 → 0.4 calls (39 → 2 built) | same |
+
+The grove's worst view is now inside it: about 640k triangles on gpu (was 1.75M) and 267k on mobile, from crowns within 36 m at full detail; the light crown measured 4.2% of pixels changed at 18 m and 1.2% at 36 m, so the switch stays at 36 m per unit of crown scale. Colliders, seeded matrices, drainage routes, night halos and the full-detail geometry hash identically to `main`. Classic WebGL snapshots (all passes) dropped from 1039 to 691 calls at east-tributary (gpu) and from 441 to 222 at glucose-pavilion (mobile); headless numbers are not device benchmarks.
+
+## Part two — on WebGPU, rebased onto `realism/20-webgpu` (3 October 2026)
+
+Code is ready for captures; numbers below are in memory (`bun scripts/frame-budget.ts`, main pass, 33 capture poses), before = Stage A head `baa5456` with its 150 m far plane:
+
+| Group, per capture view | gpu before → after | mobile before → after |
+| --- | --- | --- |
+| Terrain (33 culled tiles, far plane at the fog's 130 m) | 1 call, 352k → 9.4 calls, 113k | 1, 240k → 9.4, 93k |
+| Posters (frames and feet merged, collections hidden beyond 50 m) | 69.4 → 21.4 calls | same |
+| Flowers (one geometry, petal colour per instance) | 3.5 → 0.9 calls | 3.2 → 0.9 |
+| Forest branches (no twigs beyond 36 m; shadows keep them) | 295k → 172k triangles, +0.7 calls | 113k → 67k, +0.5 |
+| All measured groups but the forest (with part one) | 200 calls, 1.95M → 60 calls, 0.62M | 200, 764k → 60, 249k |
+
+One WebGPU sanity load each with and without `?budget=off` (headless, integrated GPU, all passes): garden-overview 296 → 193 calls (hall interiors 87 → 0), 1.79M → 1.59M triangles; woodland-edge 2.32M → 1.89M triangles (forest 1.54M → 1.12M). Pixels changed by more than 20 levels: 0.19% and 0.67% (distant twigs, one hazy ridge edge past 130 m). Adaptive resolution lives in `src/game/render-scale.ts` with `tests/render-scale.test.ts`; `snapshot().budget` and the capture log give the per-group draws. Not done here: tree impostors, shrub LOD, cheaper shadow casters for distant cells, `BundleGroup`.
+
 ## Keep
 
 - Every collider, the walking surfaces and the foliage look within walking range.

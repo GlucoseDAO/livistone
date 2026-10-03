@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
+import { ShellMaterial } from '../render/shell';
 import { nightEmission } from './night-lighting';
 import { walnutMaterial, walnutRadius, loadWalnutTextures } from './walnut';
 
@@ -10,14 +11,14 @@ function point(phi: number, theta: number, radius: number): THREE.Vector3 {
   return new THREE.Vector3(Math.sin(phi) * Math.sin(theta) * radius, Math.cos(theta) * radius + CITY_HALL.centerY, Math.cos(phi) * Math.sin(theta) * radius);
 }
 
-export function cityHallCrystalMaterial(low: boolean): THREE.MeshPhysicalMaterial {
-  const material = new THREE.MeshPhysicalMaterial({ color: '#e1dce5', roughness: .075, metalness: 0, ior: 1.54, thickness: .9,
+export function cityHallCrystalMaterial(low: boolean): ShellMaterial {
+  const material = new ShellMaterial({ color: '#e1dce5', roughness: .075, metalness: 0, ior: 1.54, thickness: .9,
     attenuationColor: '#c9c3d0', attenuationDistance: 12, envMapIntensity: 1.5, side: THREE.DoubleSide });
   material.name = 'Nut of Power smoky crystal'; material.userData.cityHallCrystal = material.userData.heroEnv = true;
   nightEmission(material, '#c4bad6', .16); setCityHallCrystalQuality(material, low); return material;
 }
 
-export function setCityHallCrystalQuality(material: THREE.MeshPhysicalMaterial, low: boolean): void {
+export function setCityHallCrystalQuality(material: ShellMaterial, low: boolean): void {
   material.transmission = low ? 0 : .78; material.transparent = low; material.opacity = low ? .30 : 1;
   material.depthWrite = !low; material.clearcoat = 0; material.forceSinglePass = true; material.needsUpdate = true;
 }
@@ -54,7 +55,7 @@ function clasp(phi: number, theta: number, halfSpan: number, low: boolean): THRE
 }
 
 /** Facade only: the established floor, doorway, interior and wall colliders remain in Town. */
-export function createCityHallFacade(parent: THREE.Group, low: boolean): { colliders: ColliderSpec[]; walnut: THREE.MeshStandardMaterial; crystal: THREE.MeshPhysicalMaterial } {
+export function createCityHallFacade(parent: THREE.Group, low: boolean): { colliders: ColliderSpec[]; walnut: THREE.MeshStandardMaterial; crystal: ShellMaterial } {
   const wood = walnutMaterial(), crystal = cityHallCrystalMaterial(low);
   const brass = new THREE.MeshStandardMaterial({ color: '#d8bb7c', roughness: .28, metalness: 1, envMapIntensity: 1.2, userData: { heroEnv: true } });
   const silver = new THREE.MeshStandardMaterial({ color: '#eeeae5', roughness: .25, metalness: 1, envMapIntensity: 1, userData: { heroEnv: true } });
@@ -97,7 +98,7 @@ export function createCityHallFacade(parent: THREE.Group, low: boolean): { colli
   return { colliders, walnut: wood, crystal };
 }
 
-export async function loadCityHallTextures(wood: THREE.MeshStandardMaterial, crystal: THREE.MeshPhysicalMaterial, low: boolean): Promise<void> {
+export async function loadCityHallTextures(wood: THREE.MeshStandardMaterial, crystal: ShellMaterial, low: boolean): Promise<void> {
   await Promise.all([loadWalnutTextures(wood, low), (async () => {
     try {
       const map = await new THREE.TextureLoader().loadAsync(`${import.meta.env.BASE_URL}textures/city-hall/crystal-cloud-${low ? 256 : 512}.webp`);

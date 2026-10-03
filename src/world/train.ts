@@ -1,5 +1,6 @@
 import { paintTransitAd } from './transit-art';
 import * as THREE from 'three';
+import { displayMaterial } from '../render/output';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
@@ -142,7 +143,7 @@ function cabinPoster(width: number, height: number, paint: (ctx: CanvasRendering
   const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = Math.max(128, Math.round(1024 * height / width));
   const ctx = canvas.getContext('2d')!; paint(ctx, canvas.width, canvas.height);
   const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
-  return new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ map, toneMapped: false, side: THREE.FrontSide }));
+  return new THREE.Mesh(new THREE.PlaneGeometry(width, height), displayMaterial({ map, side: THREE.FrontSide }));
 }
 
 /** Cabin boards face the boarding bays or sit on bulkheads. They add no colliders and never cover window holes. */

@@ -1,22 +1,22 @@
 import * as THREE from 'three';
+import { PCFShadowFilter, mix, positionView, renderGroup, smoothstep, uniform } from 'three/tsl';
+import type { Node } from 'three/webgpu';
 
 /** View-distance band (start, end) in metres over which sun shadows fade out; an end of 0 keeps them at every distance. */
-export const shadowFade = { x: 0, y: 0 };
+// The render group, because a material without node properties refreshes only shared uniform groups between frames.
+export const shadowFade = uniform(new THREE.Vector2()).setGroup(renderGroup);
 
-const DIRECTIONAL = /\? (getShadow\( directionalShadowMap\[ i \],[^;]*?vDirectionalShadowCoord\[ i \] \)) : 1\.0;/;
+// ShadowNode calls a light's filterNode with one object; @types/three r186 declares neither the property nor that argument.
+type FilterInputs = { depthTexture: unknown; shadowCoord: Node<'vec3'>; shadow: THREE.LightShadow; depthLayer: number };
+const pcf = PCFShadowFilter as unknown as (inputs: FilterInputs) => Node<'float'>;
 
 /**
  * Fade sun shadows with view distance. The walking shadow box covers only the near town, so re-centring it would pop distant shadows in
- * and out; fading them out well inside the box hides both its edge and every re-bake. Lit materials share `shadowFade` itself, because
- * UniformsUtils.clone copies a plain (non-three) object by reference. Call before any material compiles; returns false if three's
- * shader chunk no longer matches, which leaves shadows unfaded rather than broken.
+ * and out; fading them out well inside the box hides both its edge and every re-bake. WebGPU has no shared shader chunks to patch, so
+ * this wraps the light's own PCF filter: every receiving material compiles it, and all of them read the one `shadowFade` uniform.
  */
-export function installShadowFade(): boolean {
-  if (THREE.ShaderLib.standard.uniforms.shadowFade) return true;
-  if (!DIRECTIONAL.test(THREE.ShaderChunk.lights_fragment_begin)) return false;
-  THREE.ShaderChunk.lights_fragment_begin = THREE.ShaderChunk.lights_fragment_begin.replace(DIRECTIONAL,
-    '? mix( $1, 1.0, shadowFade.y > 0.0 ? smoothstep( shadowFade.x, shadowFade.y, length( geometryPosition ) ) : 0.0 ) : 1.0;');
-  THREE.ShaderChunk.lights_pars_begin = 'uniform vec2 shadowFade;\n' + THREE.ShaderChunk.lights_pars_begin;
-  for (const id of ['standard', 'physical', 'lambert', 'phong', 'toon']) THREE.ShaderLib[id].uniforms.shadowFade = { value: shadowFade };
-  return true;
+export function installShadowFade(light: THREE.DirectionalLight): void {
+  // A plain function, not Fn: ShadowNode passes the filter inputs straight through, and PCFShadowFilter expects them as given.
+  (light.shadow as unknown as { filterNode: (inputs: FilterInputs) => Node<'float'> }).filterNode = (inputs) =>
+    mix(pcf(inputs), 1, shadowFade.y.greaterThan(0).select(smoothstep(shadowFade.x, shadowFade.y, positionView.length()), 0));
 }

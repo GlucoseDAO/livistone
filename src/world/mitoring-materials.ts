@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { ShellMaterial } from '../render/shell';
 import { nightEmission } from './night-lighting';
 
-export function mitoringAmberMaterial(mobile: boolean): THREE.MeshPhysicalMaterial {
-  const material = new THREE.MeshPhysicalMaterial({ color: '#dba347', metalness: 0, roughness: .23,
+/** A ShellMaterial: from inside the hall the rich amber shows the classic renderer's second amber layer. */
+export function mitoringAmberMaterial(mobile: boolean): ShellMaterial {
+  const material = new ShellMaterial({ color: '#dba347', metalness: 0, roughness: .23,
     ior: 1.54, thickness: 1.8, attenuationColor: '#e9a044', attenuationDistance: 6,
     envMapIntensity: 1.25, clearcoatRoughness: .12, side: THREE.DoubleSide,
     emissive: '#b34c06', emissiveIntensity: .045 });
@@ -10,13 +12,15 @@ export function mitoringAmberMaterial(mobile: boolean): THREE.MeshPhysicalMateri
   nightEmission(material, '#e8a235', .24); setMitoringAmberQuality(material, mobile); return material;
 }
 
-export function setMitoringAmberQuality(material: THREE.MeshPhysicalMaterial, low: boolean): void {
+export function setMitoringAmberQuality(material: ShellMaterial, low: boolean): void {
   material.transmission = low ? 0 : .68; material.clearcoat = low ? 0 : .28;
-  material.opacity = low ? .76 : 1; material.transparent = low; material.depthWrite = !low;
+  // The reduced amber blends in linear light before tone mapping, where the bright sky behind it outweighs what it did in
+  // the classic renderer's blend of encoded colours: .92 here looks as the classic .76 did.
+  material.opacity = low ? .92 : 1; material.transparent = low; material.depthWrite = !low;
   material.forceSinglePass = true; material.needsUpdate = true;
 }
 
-export async function loadMitoringAmberTextures(material: THREE.MeshPhysicalMaterial, mobile: boolean): Promise<void> {
+export async function loadMitoringAmberTextures(material: ShellMaterial, mobile: boolean): Promise<void> {
   const loader = new THREE.TextureLoader(), size = mobile ? 512 : 1024, base = import.meta.env.BASE_URL;
   await Promise.all((['colour', 'roughness'] as const).map(async kind => {
     try {

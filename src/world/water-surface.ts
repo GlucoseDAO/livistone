@@ -5,8 +5,11 @@ import { terrainHeight } from './terrain';
 /** The river sheet height. The bank (`terrainHeight` = distance / 1.3 inside the channel) crosses it at WATER_EDGE. */
 export const WATER_LEVEL = -.42;
 export const WATER_EDGE = WATER_LEVEL * 1.3;
-/** A rock footprint that can stir the surface: centre, base scale and yaw as the instanced rocks use them. */
-export interface RockSite { x: number; y: number; z: number; s: number; yaw: number }
+/**
+ * A rock footprint that can stir the surface: centre, base scale and yaw as the instanced rocks use them. `lean` is the horizontal
+ * part of the up axis of a rock settled against a bank; the footprint below ignores it, which its 12 % allowance and halo absorb.
+ */
+export interface RockSite { x: number; y: number; z: number; s: number; yaw: number; lean?: readonly [number, number] }
 
 const slope = (f: (t: number) => number, t: number): number => (f(t + .01) - f(t - .01)) / .02;
 function arcTable(f: (t: number) => number, start: number, end: number): Float64Array {

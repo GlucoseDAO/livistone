@@ -6,11 +6,13 @@ import './style.css';
 import * as THREE from 'three';
 import { RAILWAY, railwayCorridor } from './world/station-layout';
 import { TOWN_BOUNDS } from './world/town-layout';
+import { terrainHeight } from './world/terrain';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createSky, HORIZON_HAZE, MOON_DIR, SKY_EXPOSURE, SUN_DIR } from './world/sky';
+import { createSky, HORIZON_HAZE, HORIZON_RADIANCE, MOON_DIR, SKY_EXPOSURE, SUN_DIR } from './world/sky';
 import type { SkyPhase } from './world/sky';
 import { setGatewayQuality } from './world/gateway-materials';
 import { setMitoringAmberQuality } from './world/mitoring-materials';
+import { ShellMaterial } from './render/shell';
 import { COLLECTION } from './game/exhibits';
 import { Town } from './world/world';
 import { UI } from './ui/ui';
@@ -18,13 +20,21 @@ import type { Mode } from './ui/ui';
 import { Input } from './game/input';
 import { Ambience } from './game/audio';
 import { LANDMARKS, DISCOVERIES, SPAWN, readProgress, writeProgress } from './game/content';
-import { graphicsProfile, probeGraphics } from './game/graphics';
+import { graphicsProfile } from './game/graphics';
 import { parseTimeOfDay, readTimeOfDay, resolveNight, saveTimeOfDay } from './game/daylight';
 import type { TimeOfDay } from './game/daylight';
 import { NightLighting } from './world/night-lighting';
+import { SHADOW_LAYER } from './world/forest';
 import { shadowFrame } from './game/shadow-frame';
 import { installShadowFade, shadowFade } from './world/shadow-fade';
 import type { Physics } from './game/physics';
+import { createRenderer } from './render/renderer';
+import type { RenderView } from './render/renderer';
+import { OutputPipeline, displayFog } from './render/output';
+import { TownLighting } from './render/lighting';
+import { RenderScale, SCALE_RULES } from './game/render-scale';
+import { BUDGET_OFF, trackDraws } from './game/render-budget';
+import type { DrawCost } from './game/render-budget';
 
 const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 };
 // Dev-only ?look=a keeps the old hemisphere-heavy fill (sun and haze coherence only). b, the default, lets the baked sky
@@ -42,14 +52,17 @@ const SUN_DISTANCE = 400;
 const SHADOW = { walk: 50, walkReduced: 40, map: 160, lead: .3, fade: [.72, .9], bias: .05, normalBias: .6 };
 
 class Game {
-  private readonly renderer: THREE.WebGLRenderer;
+  private readonly renderer: THREE.WebGPURenderer;
+  private readonly output: OutputPipeline;
   private readonly scene = new THREE.Scene();
   private skyBackground: THREE.CubeTexture;
   private readonly skies = new Map<boolean, ReturnType<typeof createSky>>();
   private nightLighting!: NightLighting;
   private timeOfDay: TimeOfDay = readTimeOfDay();
   private clockCheck = 0;
-  private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, 150);
+  // Past the walking fog's far distance a surface shows only haze, so the walk camera stops there and follows the fog if it
+  // lengthens (sub-plan 25); ?budget=off keeps the earlier 150 m for review.
+  private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, BUDGET_OFF ? 150 : WALK_FOG.far);
   private readonly mapCamera = new THREE.PerspectiveCamera(44, 1, 0.2, 800);
   private readonly orbit: OrbitControls;
   private town!: Town;
@@ -65,10 +78,17 @@ class Game {
   private readonly raycaster = new THREE.Raycaster();
   private readonly direction = new THREE.Vector3();
   private readonly point = new THREE.Vector3();
-  private readonly graphics: ReturnType<typeof probeGraphics>;
+  private readonly graphics: RenderView['graphics'];
   private renderScale: number;
+  private scaler: RenderScale;
+  /** Dev-only: draws of the last frame by top-level town group, all passes (snapshot().budget). */
+  private drawBudget: (() => Record<string, DrawCost>) | null = null;
+  private readonly drawGroups = new WeakMap<THREE.Object3D, string>();
   // Dev-only ?capture=1: frozen animation time and render scale so before/after screenshots match.
   private readonly capture = import.meta.env.DEV && new URLSearchParams(location.search).has('capture');
+  // Dev-only ?eye=<metres>: camera height above the ground under the player, for low ground captures (realism 13). Measured
+  // from the terrain too, because a capture teleport can leave the capsule partly sunk into a meadow roll.
+  private readonly eye = ((value: number) => import.meta.env.DEV && Number.isFinite(value) ? value : null)(parseFloat(new URLSearchParams(location.search).get('eye') ?? ''));
   private frames = 0;
   private cpuGeometry = { before: 0, after: 0 };
   private readonly reduced: boolean;
@@ -95,33 +115,38 @@ class Game {
   private selection: string | null = null;
   private hoverPointer: { x: number; y: number; buttons: number } | null = null;
   private cursorDirty = false;
-  constructor(private ui: UI) {
+  constructor(private ui: UI, private readonly view: RenderView) {
     this.ambience.onStateChange = enabled => this.ui.setSound(enabled);
     this.ui.setSound(this.ambience.enabled);
     this.ambience.start();
-    const coarse = matchMedia('(pointer: coarse)').matches;
-    this.renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: !coarse, powerPreference: 'high-performance' });
-    this.graphics = probeGraphics(this.renderer.getContext() as WebGL2RenderingContext);
+    this.renderer = view.renderer; this.graphics = view.graphics;
     if (import.meta.env.DEV) {
       const override = new URLSearchParams(location.search).get('graphics');
       if (override === 'cpu' || override === 'mobile' || override === 'gpu') Object.assign(this.graphics, graphicsProfile(override));
     }
-    this.renderScale = this.graphics.pixelRatio;
+    // The night pool, hall and station lamps: room for the pool plus the fixed lamps (render/lighting.ts).
+    this.renderer.lighting = new TownLighting({ maxPointLights: this.graphics.lights + 8 });
+    this.renderScale = this.graphics.pixelRatio; this.scaler = new RenderScale(SCALE_RULES[this.graphics.tier], this.renderScale);
+    if (import.meta.env.DEV) this.drawBudget = trackDraws(this.renderer.info, (object) => this.drawGroup(object));
     this.reduced = this.graphics.reduced; this.lowQuality = this.reduced;
     this.night = resolveNight(this.timeOfDay);
     this.renderer.setPixelRatio(this.pixelRatio());
     this.renderer.shadowMap.enabled = this.graphics.shadows; this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = SKY_EXPOSURE[this.phase];
-    this.scene.fog = new THREE.Fog(HORIZON_HAZE[this.phase], MAP_FOG.near, MAP_FOG.far);
+    // The output pass (render/output.ts) applies the classic ACES fit at this exposure, except to display materials.
+    this.renderer.toneMapping = THREE.NoToneMapping; this.renderer.toneMappingExposure = SKY_EXPOSURE[this.phase];
+    this.setFog(MAP_FOG);
     this.hemi = new THREE.HemisphereLight(this.night ? '#8ea4c6' : '#e9f4f0', this.night ? '#121820' : '#73805c', this.fill.hemi);
     this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(this.night ? '#c9d6ee' : '#fff0ce', this.night ? .32 : 2.4); this.sun.castShadow = true;
     this.sun.shadow.mapSize.setScalar(this.reduced ? 1024 : 2048); this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = SUN_DISTANCE * 2;
-    this.scene.add(this.sun, this.sun.target); installShadowFade(); this.aimSun();
+    // The shadow camera also draws the forest's shadow-only meshes, which the view cameras skip.
+    this.sun.shadow.camera.layers.enable(SHADOW_LAYER);
+    this.scene.add(this.sun, this.sun.target); installShadowFade(this.sun); this.aimSun();
     const sky = createSky(this.renderer, this.reduced, this.night, this.graphics.tier, LOOK === 'b'); this.skies.set(this.night, sky); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = this.graphics.tier === 'cpu' ? null : sky.environment;
     this.scene.environmentIntensity = this.fill.environment;
-    // The town and sun are static; refresh shadows only when scene visibility changes.
-    this.renderer.shadowMap.autoUpdate = false; this.renderer.shadowMap.needsUpdate = true;
+    // The town and sun are static; refresh shadows only when scene visibility changes. WebGPU schedules shadows per light.
+    this.sun.shadow.autoUpdate = false; this.sun.shadow.needsUpdate = true;
+    this.output = new OutputPipeline(this.renderer, this.scene);
     this.mapCamera.position.set(62, 44, 69); this.mapCamera.lookAt(0, 2, -13);
     this.orbit = new OrbitControls(this.mapCamera, ui.canvas); this.orbit.target.set(0, 1, -12); this.orbit.enabled = false;
     this.orbit.enableDamping = true; this.orbit.dampingFactor = 0.08; this.orbit.minDistance = 30; this.orbit.maxDistance = 410;
@@ -141,17 +166,24 @@ class Game {
       if (document.hidden) { this.input.clear(); this.ambience.suspend(); }
       else this.ambience.resume();
     });
-    ui.canvas.addEventListener('webglcontextlost', (event) => {
-      event.preventDefault(); this.input.active = false; this.input.clear(); cancelAnimationFrame(this.frameId);
+    view.onLost(() => {
+      this.input.active = false; this.input.clear(); cancelAnimationFrame(this.frameId);
       ui.error('The graphics connection was interrupted. Reload to return to the town. Your discoveries are saved.');
     });
     this.resize();
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames }),
+        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined }),
         teleport: (x: number, z: number, yaw = 0, y = 1.05, pitch = 0) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = pitch; this.accumulator = 0; },
       } });
     }
+  }
+  /** Dev-only: the top-level town group of a drawn object, or the frame's own passes outside the town. */
+  private drawGroup(object: THREE.Object3D): string {
+    let group = this.drawGroups.get(object); if (group) return group;
+    let top = object; while (top.parent && top.parent !== this.town?.root) top = top.parent;
+    group = top.parent ? top.name || object.name || 'Town · unnamed' : 'Frame · ' + (object.name || object.type);
+    this.drawGroups.set(object, group); return group;
   }
   async load(): Promise<void> {
     this.town = await Town.create(this.reduced, loadingStage, this.graphics.tier); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
@@ -167,17 +199,29 @@ class Game {
     }
     this.pointReflections(this.skies.get(this.night)!);
     this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced, this.graphics.tier); this.nightLighting.setNight(this.night);
-    document.querySelector<HTMLElement>('#graphics-profile')!.textContent = 'Device profile: ' + ({ gpu: 'GPU', mobile: 'Mobile / integrated GPU', cpu: 'CPU software renderer' }[this.graphics.tier]);
+    document.querySelector<HTMLElement>('#graphics-profile')!.textContent = 'Device profile: ' + ({ gpu: 'GPU', mobile: 'Mobile / integrated GPU', cpu: 'CPU software renderer' }[this.graphics.tier]) + ({ webgpu: ' · WebGPU', 'webgl2-fallback': ' · WebGL 2' }[this.view.backend]);
     await loadingStage(92, 'Preparing your first view…');
-    this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true);
     this.frameShadow(true);
-    this.walkCamera.position.set(SPAWN.x, SPAWN.y + .78, SPAWN.z); this.walkCamera.rotation.set(0, SPAWN.yaw, 0, 'YXZ');
-    await this.renderer.compileAsync(this.scene, this.walkCamera);
+    this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true, this.sun.shadow);
+    this.walkCamera.position.set(SPAWN.x, this.eyeHeight(SPAWN), SPAWN.z); this.walkCamera.rotation.set(0, SPAWN.yaw, 0, 'YXZ');
+    // Build every shader now, culled or not, and the shadow pass with one rendered frame: on WebGPU each shader costs a
+    // synchronous node build, which would otherwise stall the first frames that show a new object.
+    this.town.warmUp(true);
+    await this.output.compile(this.walkCamera, [...this.town.root.children, ...this.scene.children.filter(child => child !== this.town.root && !(child as THREE.Light).isLight)]);
+    if (this.graphics.shadows) { this.sun.shadow.needsUpdate = true; this.render(this.walkCamera); }
+    this.town.warmUp(false); this.town.update(this.elapsed, this.walkCamera, WALK_FOG.far, false, this.sun.shadow);
     await loadingStage(100, 'Welcome to Livistone');
     this.lastTime = performance.now(); this.frameId = requestAnimationFrame(this.frame);
-    this.ui.ready(); this.returnMode = 'walking'; this.setMode('walking'); this.updateWalking(0); this.findInteraction(); this.findLocation(); this.renderer.render(this.scene, this.walkCamera);
+    this.ui.ready(); this.returnMode = 'walking'; this.setMode('walking'); this.updateWalking(0); this.findInteraction(); this.findLocation(); this.render(this.walkCamera);
   }
   private get phase(): SkyPhase { return this.night ? 'night' : 'day'; }
+  /** The walking eye stands .78 m above the capsule's centre, which is .82 m above its feet. */
+  private eyeHeight(p: { x: number; y: number; z: number }): number { return this.eye === null ? p.y + .78 : Math.max(p.y - .82, terrainHeight(p.x, p.z)) + this.eye; }
+  private render(camera: THREE.Camera): void { this.view.beginFrame(); this.output.render(camera); }
+  /** The output pass fogs every surface toward the displayed horizon after tone mapping, as the classic renderer did. */
+  private setFog(range: { near: number; far: number }): void {
+    displayFog.color.value.copy(HORIZON_HAZE[this.phase]); displayFog.near.value = range.near; displayFog.far.value = range.far;
+  }
   // CPU has no PMREM environment to take over the fill, so its hemisphere keeps the full share.
   private get fill(): { environment: number; hemi: number } { return FILL[this.graphics.tier === 'cpu' ? 'a' : LOOK][this.phase]; }
   private get mapView(): boolean {
@@ -202,8 +246,7 @@ class Game {
   private setMode(mode: Mode): void {
     this.mode = mode; this.interaction = null; this.input.active = mode === 'walking'; this.input.clear(); this.accumulator = 0;
     this.orbit.enabled = mode === 'map';
-    const haze = HORIZON_HAZE[this.phase], fog = this.mapView ? MAP_FOG : WALK_FOG;
-    this.scene.background = this.mapView ? haze.clone() : this.skyBackground; this.scene.fog = new THREE.Fog(haze, fog.near, fog.far);
+    this.scene.background = this.mapView ? HORIZON_RADIANCE[this.phase].clone() : this.skyBackground; this.setFog(this.mapView ? MAP_FOG : WALK_FOG);
     this.ui.setMode(mode, this.mapView); this.town.setMapMode(this.mapView); this.frameShadow(true); this.resize();
     this.cursorDirty = true;
     if (mode === 'walking') this.ui.canvas.focus({ preventScroll: true });
@@ -333,9 +376,8 @@ class Game {
     this.hemi.color.set(night ? '#8ea4c6' : '#e9f4f0'); this.hemi.groundColor.set(night ? '#121820' : '#73805c'); this.hemi.intensity = this.fill.hemi;
     this.sun.color.set(night ? '#c9d6ee' : '#fff0ce'); this.sun.intensity = night ? .32 : 2.4;
     this.aimSun();
-    const haze = HORIZON_HAZE[this.phase], fog = this.mapView ? MAP_FOG : WALK_FOG;
-    this.scene.background = this.mapView ? haze.clone() : this.skyBackground; this.scene.fog = new THREE.Fog(haze, fog.near, fog.far);
-    this.nightLighting.setNight(night); this.renderer.shadowMap.needsUpdate = true;
+    this.scene.background = this.mapView ? HORIZON_RADIANCE[this.phase].clone() : this.skyBackground; this.setFog(this.mapView ? MAP_FOG : WALK_FOG);
+    this.nightLighting.setNight(night); this.sun.shadow.needsUpdate = true;
   }
   /** r186 gives any material without its own envMap scene.environmentIntensity instead of its envMapIntensity, so heroEnv
    *  materials carry the sky explicitly (look b). CPU Lambert metals sample the plain cube instead; no PMREM exists there. */
@@ -345,7 +387,7 @@ class Game {
       if (!(object instanceof THREE.Mesh)) return;
       for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
         if (cpu) { if (material instanceof THREE.MeshLambertMaterial && material.envMap) material.envMap = sky.background; }
-        else if (material.userData.heroEnv && material instanceof THREE.MeshStandardMaterial) material.envMap = sky.environment;
+        else if (material.userData.heroEnv && (material instanceof THREE.MeshStandardMaterial || (material as THREE.MeshStandardNodeMaterial).isMeshStandardNodeMaterial)) (material as THREE.MeshStandardMaterial).envMap = sky.environment;
       }
     });
   }
@@ -362,21 +404,27 @@ class Game {
     camera.left = frame.left; camera.right = frame.right; camera.top = frame.top; camera.bottom = frame.bottom; camera.updateProjectionMatrix();
     this.sun.target.position.set(frame.target.x, frame.target.y, frame.target.z); this.sun.position.copy(this.sun.target.position).addScaledVector(this.sunDirection, SUN_DISTANCE);
     this.sun.shadow.normalBias = frame.texel * SHADOW.normalBias; this.sun.shadow.bias = -SHADOW.bias / (camera.far - camera.near);
-    shadowFade.x = walking ? half * SHADOW.fade[0] : 0; shadowFade.y = walking ? half * SHADOW.fade[1] : 0;
-    this.renderer.shadowMap.needsUpdate = true;
+    shadowFade.value.set(walking ? half * SHADOW.fade[0] : 0, walking ? half * SHADOW.fade[1] : 0);
+    // The forest culls its shadow casters against this frustum before the next bake.
+    this.sun.updateMatrixWorld(); this.sun.target.updateMatrixWorld(); this.sun.shadow.updateMatrices(this.sun);
+    this.sun.shadow.needsUpdate = true;
   }
   private quality(low: boolean): void {
-    this.lowQuality = low || this.graphics.tier === 'cpu'; this.renderScale = Math.min(low ? 1 : 1.5, this.graphics.pixelRatio); this.renderer.setPixelRatio(this.pixelRatio());
-    this.sun.shadow.mapSize.setScalar(low ? 1024 : 2048); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; this.frameShadow(true);
+    this.lowQuality = low || this.graphics.tier === 'cpu'; this.renderScale = Math.min(low ? 1 : 1.5, this.graphics.pixelRatio); this.scaler = new RenderScale(SCALE_RULES[this.graphics.tier], this.renderScale); this.renderer.setPixelRatio(this.pixelRatio());
+    // WebGPU resizes the light's shadow target to mapSize on its next render; frameShadow requests that render.
+    this.sun.shadow.mapSize.setScalar(low ? 1024 : 2048); this.frameShadow(true);
     this.scene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of materials) if (material instanceof THREE.MeshPhysicalMaterial) {
+      for (const material of materials) if (material instanceof ShellMaterial) {
+        if (material.userData.mitoringAmber) setMitoringAmberQuality(material, low);
+        if (material.userData.cityHallCrystal) setCityHallCrystalQuality(material, low);
+      } else if (material instanceof THREE.MeshPhysicalMaterial) {
         if (material.userData.myceliumOpal) { material.iridescence = low ? .35 : 1; material.needsUpdate = true; continue; }
         if (material.userData.gatewayGem) { setGatewayQuality(material, low); continue; }
-        if (material.userData.cityHallCrystal) { setCityHallCrystalQuality(material, low); continue; }
-        if (material.userData.mitoringAmber) { setMitoringAmberQuality(material, low); continue; }
         if (material.userData.pavilionGem) { material.transmission = low ? 0 : .42; material.opacity = low ? .45 : .7; material.needsUpdate = true; continue; }
+        // Only hall glazing and station amber follow the generic switch; the river and Future House glass keep their own optics.
+        if (!material.userData.hallGlass && !material.userData.stationAmber) continue;
         material.transmission = low ? 0 : material.userData.stationAmber ? .8 : .45;
         material.opacity = material.userData.stationAmber ? 1 : material.userData.clearGallery ? (low ? .18 : .26) : (low ? .32 : .65); if (material.userData.stationAmber) material.emissiveIntensity = low ? .23 : .2; material.needsUpdate = true;
       }
@@ -396,7 +444,7 @@ class Game {
     if (pos.y < -.5 || ((pos.x < b.minX || pos.x > b.maxX || pos.z < b.minZ || pos.z > b.maxZ) && !railwayCorridor(pos.x, pos.z))) { this.physics.teleport(SPAWN); this.input.yaw = SPAWN.yaw; this.ui.toast('Back on the station garden path.'); }
     this.ambience.setGarden(pos.z < -60);
 
-    const current = this.physics.position(); this.walkCamera.position.set(current.x, current.y + 0.78, current.z); this.walkCamera.rotation.set(this.input.pitch, this.input.yaw, 0, 'YXZ');
+    const current = this.physics.position(); this.walkCamera.position.set(current.x, this.eyeHeight(current), current.z); this.walkCamera.rotation.set(this.input.pitch, this.input.yaw, 0, 'YXZ');
     this.updateClock += dt;
     if (this.updateClock > 0.12) { this.updateClock = 0; this.findInteraction(); this.findLocation(); this.cursorDirty = true; }
   }
@@ -460,16 +508,18 @@ class Game {
     if (this.graphics.tier !== 'cpu') this.town.gardens.update(this.elapsed, this.mode === 'walking' && !this.capture ? dt : 0, matchMedia('(prefers-reduced-motion: reduce)').matches);
     if (this.mode === 'map') { this.orbit.update(); this.updateMarkers(); }
     const camera = this.mapView ? this.mapCamera : this.walkCamera;
+    // The shadow box first: the forest picks its shadow casters from the frustum this frame bakes with.
+    if (this.graphics.shadows) this.frameShadow();
     // Walking re-bakes when near shrubs or tree detail change, so their shadows appear with them; the map keeps its one bake.
-    if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : WALK_FOG.far, this.mapView) && !this.mapView && this.graphics.shadows) this.renderer.shadowMap.needsUpdate = true;
+    if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : WALK_FOG.far, this.mapView, this.graphics.shadows ? this.sun.shadow : undefined) && !this.mapView && this.graphics.shadows) this.sun.shadow.needsUpdate = true;
     this.updateExhibitionControls();
     this.clockCheck += rawDt; if (this.clockCheck > 30) { this.clockCheck = 0; if (this.timeOfDay === 'auto') this.applyTimeOfDay(); }
-    if (this.graphics.shadows) this.frameShadow();
-    this.nightLighting.update(camera); this.renderer.render(this.scene, camera);
+    this.nightLighting.update(camera); this.render(camera);
     if (this.cursorDirty) { this.cursorDirty = false; this.updateCursor(); }
     this.frames++; this.fpsFrames++; this.fpsTime += rawDt;
     if (this.fpsTime >= 1) { this.fps = Math.round(this.fpsFrames / this.fpsTime);
-      if (this.graphics.tier === 'cpu' && !this.capture && this.fps < 18 && this.renderScale > .3) { this.renderScale = Math.max(.3, this.renderScale - .05); this.renderer.setPixelRatio(this.pixelRatio()); }
+      // Adaptive resolution (render-scale.ts); ?capture=1 keeps the scale fixed so captures stay comparable.
+      if (!this.capture) { const scale = this.scaler.sample(this.fps, this.fpsTime); if (scale !== this.renderScale) { this.renderScale = scale; this.renderer.setPixelRatio(this.pixelRatio()); } }
       this.fpsFrames = 0; this.fpsTime = 0; }
   };
 }
@@ -477,10 +527,10 @@ let game: Game | undefined;
 const ui = new UI((action) => { if (action === 'reload') location.reload(); else void game?.action(action); });
 try {
   await loadingStage(12, 'Preparing the sky and light…');
-  game = new Game(ui);
+  game = new Game(ui, await createRenderer(ui.canvas, !matchMedia('(pointer: coarse)').matches));
   game.load().catch((error: unknown) => { console.error('Town initialization failed', error); ui.error('The town could not finish loading. Check your connection and try again.'); });
 } catch (error) {
   console.error('Graphics initialization failed', error);
   const detail = error instanceof Error && error.message ? ' ' + error.message : '';
-  ui.error('Livistone needs a browser with WebGL 2 graphics enabled. Try an updated browser with hardware acceleration, then reload.' + detail);
+  ui.error('Livistone needs a browser with WebGPU or WebGL 2 graphics enabled. Try an updated browser with hardware acceleration, then reload.' + detail);
 }

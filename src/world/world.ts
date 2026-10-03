@@ -8,13 +8,21 @@ import { addGlow, nightEmission } from './night-lighting';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
 import { mitoringCage, nanotCage, ENERGY_HALL } from './jewelry';
-import { Forest } from './forest';
+import { Forest, forestCells } from './forest';
+import { forestSites } from './forest-layout';
+import { createContactShadows, objectContactSites, rockContactSites, TOWN_SHADE_FOOTPRINTS, treeContactSites, treeShadeDiscs } from './contact-shadows';
+import type { ContactShadows } from './contact-shadows';
+import { groundShadeField } from './ground-cover';
 import { createBridge, createGardenBridge } from './bridge';
 import { createGateway } from './gateway';
 import { createGatewayPoster } from './gateway-poster';
-import { gatewayApproachWidth, gatewayClearing } from './gateway-layout';
-import { createPlanting, updatePlanting } from './planting';
-import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from './landscape';
+import { gatewayApproachWidth } from './gateway-layout';
+import { createPlanting } from './planting';
+import { createGrassField } from './grass-field';
+import type { GrassShade } from './ground-material';
+import { updateWind } from './wind';
+import type { Planting } from './planting';
+import { PATH_CURVES, PATH_WIDTH } from './landscape';
 import { pathKerbs } from './path-kerbs';
 import { GLUCOSE_PAVILION } from './glucose-layout';
 import { TIME_TOWER } from './waterways';
@@ -27,21 +35,34 @@ import { createFutureHouse } from './future-house';
 import { cpuWaterColour, waterMaterial } from './water-material';
 import { waterSurfaceGeometry } from './water-surface';
 import type { RockSite } from './water-surface';
-import { pavingMaterial, riverRockSites, rockGeometry, rockMaterial } from './stone';
+import { pavingMaterial, riverRockSites, rockMaterial } from './stone';
+import { createRiverRocks, rockColliders } from './river-rocks';
+import { createPebbles } from './pebbles';
+import { shoreTime } from './shore-nodes';
+import type { ShorePebbles } from './pebbles';
 import { createCityHallFacade, loadCityHallTextures } from './city-hall';
 import { mitoringAmberMaterial, loadMitoringAmberTextures, loadMitoringSilverTexture } from './mitoring-materials';
 import { CIVIC_LANDMARKS } from '../game/content';
 import { createStation } from './station';
 import { STATION } from './station-layout';
 import { LivingWaters } from './living-waters';
-import { terrainHeight, townTerrainGeometry } from './terrain';
-import { transformColliders } from './town-layout';
+import { terrainHeight, terrainVertexHeight, townTerrainGeometry } from './terrain';
+import { LAMP_POSTS, transformColliders } from './town-layout';
 import { createRailwayStructure, loadRailwayTextures } from './railway';
 import { createGlucosePavilion } from './glucose-pavilion';
+import { activateSurfaces, bakeMasonry } from './surfaces';
+import type { Surfaces } from './surfaces';
+import { BUDGET_OFF } from '../game/render-budget';
+
+/** Culling flags saved while Town.warmUp() draws everything. */
+const warmCulled = new WeakMap<THREE.Object3D, boolean>();
+/** Within this many metres of its centre an enclosed collection draws; farther, glazing and haze leave its posters faint specks. */
+export const ROOM_RANGE = 50;
 import type { Landmark } from '../game/content';
 
 export interface Interactive { id: string; object: THREE.Object3D; position: THREE.Vector3; }
-const UP = new THREE.Vector3(0, 1, 0);
+// Dev-only ?contact=off leaves out the contact-shadow decals and the baked ground shade, for sub-plan 16's before/after review.
+const CONTACT_OFF = import.meta.env.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).get('contact') === 'off';
 const TAU = Math.PI * 2;
 function seeded(seed: number): () => number {
   return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -99,24 +120,45 @@ export class Town {
   private readonly gold = new THREE.MeshStandardMaterial({ color: '#b99a55', roughness: 0.3, metalness: 0.7 });
   private readonly wood = new THREE.MeshStandardMaterial({ color: '#d1a37d', roughness: 0.8, map: texture('walnut') });
   private readonly paving: THREE.MeshStandardMaterial;
-  private plantBatches: THREE.InstancedMesh[] = [];
+  private planting?: Planting;
   private readonly dark = new THREE.MeshStandardMaterial({ color: '#3e5550', roughness: 0.25, metalness: 0.35 });
   private readonly sphere = new THREE.SphereGeometry(1, 16, 12);
   private rocks: RockSite[] = [];
-  private constructor(private mobile: boolean, private tier: GraphicsTier) { this.water = waterMaterial(tier); this.paving = pavingMaterial(mobile); }
+  /** Hall interiors and enclosed collections, whose meshes (never their lights, which WebGPU builds into shaders) hide beyond ROOM_RANGE. */
+  private readonly rooms: { center: THREE.Vector3; parts: THREE.Object3D[]; shown: boolean | null }[] = [];
+  private contactShadows!: ContactShadows;
+  private pebbles: ShorePebbles | null = null;
+  /** Sub-plan 24's mapped ashlar, terrazzo and brass; null with ?surfaces=off, which keeps the flat white and gold below. */
+  private readonly surfaces: Surfaces | null;
+  private readonly masonry: THREE.Material;
+  private readonly brass: THREE.Material;
+  /** The walking terrain's vertices (terrain.ts TERRAIN_GRID): the grass field reads its heights instead of recomputing them. */
+  private terrainVertices = new Float32Array(0);
+  private grassShade?: GrassShade;
+  private groundOcclusion?: (x: number, z: number) => number;
+  private constructor(private mobile: boolean, private tier: GraphicsTier) {
+    this.water = waterMaterial(tier); this.paving = pavingMaterial(mobile);
+    this.surfaces = activateSurfaces(tier); this.masonry = this.surfaces?.masonry ?? this.white; this.brass = this.surfaces?.gold ?? this.gold;
+  }
   static async create(mobile: boolean, stage: (value: number, label: string) => Promise<void>, tier: GraphicsTier = mobile ? 'mobile' : 'gpu'): Promise<Town> {
     const town = new Town(mobile, tier); await town.build(stage); return town;
   }
   private async build(stage: (value: number, label: string) => Promise<void>): Promise<void> {
     const mobile = this.mobile;
     await stage(20, 'Shaping the river, bridge and town entrance…');
-    this.root.name = 'Livistone'; this.root.add(this.interiors, this.details);
-    this.createTerrain(); this.createPaths(); createBridge(this.root, this.colliders, this.white, this.paving, this.gold);
-    createGateway(this.root, this.colliders, mobile, this.paving);
+    this.root.name = 'Livistone'; this.interiors.name = 'Hall interiors'; this.details.name = 'Meadow grass details'; this.root.add(this.interiors, this.details);
+    // Dev budget breakdown (snapshot().budget): each producer names its unnamed top-level objects.
+    let mark = this.root.children.length;
+    const label = (name: string): void => { for (const child of this.root.children.slice(mark)) if (!child.name) child.name = name; mark = this.root.children.length; };
+    this.createTerrain(); this.createPaths(); label('Paths and civic paving'); createBridge(this.root, this.colliders, this.masonry, this.paving, this.brass); label('Livistone bridge');
+    createGateway(this.root, this.colliders, mobile, this.paving); label('Gateway');
     const gatewayPoster = createGatewayPoster(this.root, this.colliders); this.researchPanels.push(...gatewayPoster.panels); this.interactives.push({ id: 'kings-chapel', object: gatewayPoster.panels[0], position: gatewayPoster.position });
+    label('Gateway poster');
     const introduction = createIntroduction(this.root, this.colliders); this.researchPanels.push(...introduction.panels); this.interactives.push({ id: 'about-livistone', object: introduction.panels[0], position: introduction.position });
+    label('Introduction sign');
     await stage(28, 'Turning jewellery into civic buildings…');
     for (const landmark of CIVIC_LANDMARKS) landmark.id === 'energy' ? this.createEnergyHall(landmark.x, landmark.z) : this.createLandmark(landmark.id, landmark.x, landmark.z);
+    label('Hall paving');
     await stage(38, 'Building Embryo Station and its train…');
     const arrival = new THREE.Group(), stationColliders: ColliderSpec[] = [], stationInteractions: Interactive[] = [];
     const station = createStation(arrival, stationColliders, mobile, this.paving);
@@ -128,39 +170,46 @@ export class Town {
     this.researchPanels.push(...station.posters);
     const gallery = new THREE.Group(); arrival.add(gallery);
     this.exhibitions.push(new PlanarExhibition('station', gallery, 0, 0, stationColliders, stationInteractions));
-    arrival.rotation.y = Math.PI; arrival.position.x = -16; arrival.updateMatrix(); this.root.add(arrival);
+    arrival.rotation.y = Math.PI; arrival.position.x = -16; arrival.updateMatrix(); arrival.name = 'Embryo Station and train'; this.root.add(arrival);
+    this.addRoom(this.exhibitions[this.exhibitions.length - 1], arrival.matrix);
     this.colliders.push(...transformColliders(stationColliders, arrival.matrix, Math.PI));
     this.interactives.push(...stationInteractions.map(item => ({ ...item, position: item.position.applyMatrix4(arrival.matrix) })));
     this.train = arrival.getObjectByName('Panoramic maglev')!;
-    this.railway = createRailwayStructure(this.root, this.colliders, mobile);
+    label('Embryo Station and train'); this.railway = createRailwayStructure(this.root, this.colliders, mobile); label('Mountain railway');
     await stage(46, 'Growing the lake gardens and elevated galleries…');
     this.gardens = new LivingWaters(mobile, this.paving); this.root.add(this.gardens.root);
     this.gardens.presentLakeJewelry();
     this.gardens.addInterpretation('living-mycelium', 'Mycelium Rain Garden', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
     this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
-    for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.white, this.paving, this.gold, bridge);
-    createTimeTower(this.root, this.colliders, this.mobile);
-    createFutureHouse(this.root, this.colliders, this.mobile);
+    label('Living Waters · town gardens');
+    for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.masonry, this.paving, this.brass, bridge);
+    label('Garden bridges'); createTimeTower(this.root, this.colliders, this.mobile); label('Time tower');
+    createFutureHouse(this.root, this.colliders, this.mobile); label('Future House');
     await stage(54, 'Making room for science and bioart…');
     createEnhancementHill(this.root, this.colliders);
+    label('Enhancement hill');
     const enhancementSign = createEnhancementPanel(this.root, this.colliders); this.researchPanels.push(...enhancementSign.panels); this.interactives.push({ id: 'materialized-enhancements', object: enhancementSign.panels[0], position: enhancementSign.position });
     const enhancementGallery = createEnhancementGallery(this.root, this.colliders); this.researchPanels.push(...enhancementGallery.panels); this.interactives.push(...enhancementGallery.interactives);
-    for (const id of ['timeface', 'future-house']) this.exhibitions.push(new PlanarExhibition(id, this.root, 0, 0, this.colliders, this.interactives));
+    label('Enhancement gallery');
+    for (const id of ['timeface', 'future-house']) { this.exhibitions.push(new PlanarExhibition(id, this.root, 0, 0, this.colliders, this.interactives)); label('Posters · ' + id); }
+    // Timeface hangs its posters on the open gallery, seen across town; the Future House keeps its three inside the cabin.
+    this.addRoom(this.exhibitions[this.exhibitions.length - 1]);
+    label('Glucose Commons');
     const research = createGlucosePavilion(this.root, this.colliders, mobile, this.paving); this.researchPanels.push(...research.panels); this.interactives.push(...research.interactives);
     this.researchReady = Promise.all([research.ready, enhancementGallery.ready, gatewayPoster.ready]).then(() => undefined);
     await stage(62, 'Planting the woodland and mountain slopes…');
-    this.createTrees(); this.createGardens();
+    label('Glucose Commons'); this.createTrees(); this.createGardens(); this.createContactShadows(); label('River rocks and lamps');
     for (const landmark of CIVIC_LANDMARKS) {
       const color = landmark.id === 'energy' ? '#ffbf66' : landmark.id === 'science' ? '#99ded7' : '#ffe0a3';
       addGlow(this.root, new THREE.Vector3(landmark.x, 6, landmark.z), color, 25, 90, 24, .3);
       for (const side of [-1, 1]) addGlow(this.root, new THREE.Vector3(landmark.x + side * 5, 2.5, landmark.z + 7), color, 8, 65, 15, .24);
     }
     for (const x of [-20, 0, 20]) addGlow(arrival, new THREE.Vector3(x, 4.3, -68), '#ffd28a', 12, 70, 17, .3);
-    this.mountains = new Mountains(mobile, this.tier); this.root.add(this.mountains);
+    this.mountains = new Mountains(mobile, this.tier, this.groundOcclusion, this.grassShade); this.root.add(this.mountains);
   }
   private createTerrain(): void {
-    const geo = townTerrainGeometry();
-    this.colliders.push({ type: 'mesh', vertices: new Float32Array(geo.getAttribute('position').array), indices: new Uint32Array(geo.index!.array) }); geo.dispose();
+    const geo = townTerrainGeometry(); this.terrainVertices = new Float32Array(geo.getAttribute('position').array);
+    this.colliders.push({ type: 'mesh', vertices: this.terrainVertices, indices: new Uint32Array(geo.index!.array) }); geo.dispose();
     // One clipped sheet carries flow, depth and rock proximity; CPU bakes its absorption colour instead of blending.
     this.rocks = riverRockSites(this.mobile);
     const cpu = this.tier === 'cpu', water = mesh(waterSurfaceGeometry(this.rocks, cpu ? cpuWaterColour() : undefined, cpu ? 2 : 1), this.water, this.root);
@@ -220,7 +269,7 @@ export class Town {
     return mesh(geo, material, parent);
   }
   private createLandmark(id: string, x: number, z: number): void {
-    const exterior = new THREE.Group(); exterior.position.set(x, 0.16, z); this.root.add(exterior);
+    const exterior = new THREE.Group(); exterior.position.set(x, 0.16, z); exterior.name = 'Hall · ' + id; this.root.add(exterior);
     const inside = new THREE.Group(); inside.position.copy(exterior.position); this.interiors.add(inside);
     const radius = id === 'science' ? 8.5 : 10; const centerY = id === 'science' ? 6 : 5.7;
     const sx = 1, sz = 1;
@@ -235,10 +284,14 @@ export class Town {
       this.surface(.29, TAU - .58, doorwayTheta, maxTheta - doorwayTheta, radius, centerY, glass, exterior, sx, sz);
     }
     const floor = mesh(new THREE.CylinderGeometry(floorR, floorR + 0.3, 0.3, 64), this.paving, exterior, 0, -0.03); floor.scale.set(sx, 1, sz);
-    const rim = mesh(new THREE.TorusGeometry(floorR + 0.15, 0.2, 8, 72), this.white, exterior, 0, 0.08); rim.rotation.x = Math.PI / 2; rim.scale.set(sx, sz, 1);
+    // World UVs tile the paving at its 4 m scale; the default cap UVs stretched one tile over the whole floor.
+    const floorPosition = floor.geometry.getAttribute('position'), floorUV = floor.geometry.getAttribute('uv');
+    for (let i = 0; i < floorPosition.count; i++) floorUV.setXY(i, (x + floorPosition.getX(i) * sx) / 4, (z + floorPosition.getZ(i) * sz) / 4);
+    const rim = mesh(new THREE.TorusGeometry(floorR + 0.15, 0.2, 8, 72), this.masonry, exterior, 0, 0.08); rim.rotation.x = Math.PI / 2; rim.scale.set(sx, sz, 1);
+    if (this.surfaces) bakeMasonry(rim.geometry, undefined, true); // indoors: no weathering
     this.colliders.push({ type: 'box', position: [x, 0.08, z], size: [floorR * sx * 0.75, 0.08, floorR * sz * 0.75] });
     this.wallRing(exterior, x, z, floorR * sx, floorR * sz, 0.32);
-    this.entranceArch(exterior, floorR * sz, id === 'city-hall' ? this.gold : this.white);
+    this.entranceArch(exterior, floorR * sz, id === 'city-hall' ? this.brass : this.masonry);
     if (id === 'science') {
       const frame = nanotCage(exterior, radius, centerY, this.mobile).clone().translate(x, .16, z);
       this.colliders.push({ type: 'mesh', vertices: new Float32Array(frame.getAttribute('position').array), indices: new Uint32Array(frame.index!.array) }); frame.dispose();
@@ -250,7 +303,8 @@ export class Town {
   }
   private glass(color: string, emissive = '#000000'): THREE.MeshPhysicalMaterial {
     const material = new THREE.MeshPhysicalMaterial({ color, emissive, emissiveIntensity: 0.35, metalness: 0.05, roughness: 0.16, transmission: this.mobile ? 0 : 0.45, thickness: 0.25, transparent: true, opacity: this.mobile ? 0.32 : 0.65, side: THREE.DoubleSide, depthWrite: false });
-    nightEmission(material, color, .5); return material;
+    // hallGlass: the quality switch retunes this glazing (main.ts) and leaves other physical materials alone.
+    material.userData.hallGlass = true; nightEmission(material, color, .5); return material;
   }
   /** Invisible wall segments (colliders + occluders) around an elliptical floor, leaving a gap of ±gap radians at the south door. */
   private wallRing(exterior: THREE.Group, x: number, z: number, a: number, b: number, gap: number): void {
@@ -266,12 +320,13 @@ export class Town {
   }
   private entranceArch(exterior: THREE.Group, depth: number, material: THREE.Material): void {
     const entrance = new THREE.CatmullRomCurve3([new THREE.Vector3(-2.35, 0, depth + 0.05), new THREE.Vector3(-2.3, 2.4, depth + 0.25), new THREE.Vector3(0, 4.1, depth + 0.3), new THREE.Vector3(2.3, 2.4, depth + 0.25), new THREE.Vector3(2.35, 0, depth + 0.05)]);
-    mesh(new THREE.TubeGeometry(entrance, 40, 0.22, 8, false), material, exterior);
+    const arch = mesh(new THREE.TubeGeometry(entrance, 40, 0.22, 8, false), material, exterior);
+    if (material.userData.surface === 'ashlar') bakeMasonry(arch.geometry, new THREE.Matrix4().makeTranslation(exterior.position));
   }
   /** The Mitoring: an amber cup with a domed lid seated inside the bezel's silver basket, entered through the ring. */
   private createEnergyHall(x: number, z: number): void {
     const { a, b, wall, dome, doorPhi } = ENERGY_HALL;
-    const exterior = new THREE.Group(); exterior.position.set(x, 0.16, z); this.root.add(exterior);
+    const exterior = new THREE.Group(); exterior.position.set(x, 0.16, z); exterior.name = 'Hall · energy'; this.root.add(exterior);
     const inside = new THREE.Group(); inside.position.copy(exterior.position); this.interiors.add(inside);
     // A cabochon: the wall flares slightly up to the rim, then the dome closes over the hall.
     const profile: [number, number][] = [[0, 0.98], [3.7, 1], [wall, 1]];
@@ -290,6 +345,8 @@ export class Town {
     mesh(shell, amberShell, exterior).name = 'Mitoring amber cup';
     const silver = mitoringCage(exterior, this.mobile); this.jewelryReady.push(loadMitoringSilverTexture(silver, this.mobile));
     const floor = mesh(new THREE.CylinderGeometry(a, a + 0.3, 0.3, 72), this.paving, exterior, 0, -0.03); floor.scale.z = b / a;
+    const floorPosition = floor.geometry.getAttribute('position'), floorUV = floor.geometry.getAttribute('uv');
+    for (let i = 0; i < floorPosition.count; i++) floorUV.setXY(i, (x + floorPosition.getX(i)) / 4, (z + floorPosition.getZ(i) * b / a) / 4);
     const rim = mesh(new THREE.TorusGeometry(a + 0.15, 0.2, 8, 96), silver, exterior, 0, 0.08); rim.rotation.x = Math.PI / 2; rim.scale.y = b / a;
     this.colliders.push({ type: 'box', position: [x, 0.08, z], size: [a * 0.75, 0.08, b * 0.75] });
     this.wallRing(exterior, x, z, a, b, doorPhi + 0.06);
@@ -302,7 +359,12 @@ export class Town {
     this.createInterior('energy', inside, x, z, b - 0.3, { a, b, ceiling, structure: exterior });
   }
   private createInterior(id: string, group: THREE.Group, x: number, z: number, floorR: number, hall?: { a: number; b: number; ceiling: (px: number, pz: number) => number; structure: THREE.Group }): void {
-    const floorInset = mesh(new THREE.CircleGeometry(floorR * 0.87, 56), new THREE.MeshStandardMaterial({ color: '#ddd7c4', roughness: 0.95 }), group, 0, 0.14); floorInset.rotation.x = -Math.PI / 2;
+    const floorInset = mesh(new THREE.CircleGeometry(floorR * 0.87, 56), this.surfaces?.floor ?? new THREE.MeshStandardMaterial({ color: '#ddd7c4', roughness: 0.95 }), group, 0, 0.14); floorInset.rotation.x = -Math.PI / 2;
+    if (this.surfaces) {
+      // Terrazzo UVs: world metres over 4 from the hall centre, so a brass strip runs through it (local -y is world +z here).
+      const inset = floorInset.geometry.getAttribute('position'), insetUV = floorInset.geometry.getAttribute('uv');
+      for (let i = 0; i < inset.count; i++) insetUV.setXY(i, inset.getX(i) / 4, -inset.getY(i) / 4);
+    }
     if (id === 'energy') {
       // Folded membranes descend from alternating sides, leaving a clear public hall below.
       const { a, b, ceiling, structure } = hall!;
@@ -329,58 +391,79 @@ export class Town {
     this.exhibitions.push(new PlanarExhibition(id, group, x, z, this.colliders, this.interactives));
     const light = new THREE.PointLight(id === 'energy' ? '#ffc56d' : '#fff2d5', this.mobile ? 7 : 12, 18, 1.8); light.position.set(0, 5.5, 0); group.add(light);
     const lantern = mesh(new THREE.TorusGeometry(2.7, 0.025, 6, 50), new THREE.MeshBasicMaterial({ color: '#f4dfad' }), group, 0, 6, 0); lantern.rotation.x = Math.PI / 2;
-  }
-  private clearForTree(x: number, z: number): boolean {
-    if (gatewayClearing(x, z, 6)) return false;
-    if (!plantingAllowed(x, z, 6.9)) return false;
-    if (Math.abs(x) < 6 && z > -13 && z < 49) return false;
-    if (Math.abs(x - 17) < 6 && z > -45 && z < -19) return false;
-    // Frame the station-to-bridge arrival with full tree crowns outside the sightline.
-    if (Math.abs(x) < 8 && z > 39 && z < STATION.front + 2) return false;
-    if (CIVIC_LANDMARKS.some((l) => Math.hypot((x - l.x) / l.stretch.x, (z - l.z) / Math.max(1, l.stretch.z)) < 14)) return false;
-    return true;
+    this.rooms.push({ center: new THREE.Vector3(x, 0, z), parts: group.children.filter((child) => !(child as THREE.Light).isLight), shown: null });
   }
   readonly forest = new Forest();
-  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.forest.load(this.mobile), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
+  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
-    const rand = seeded(3974); const sites: THREE.Vector3[] = [];
-    for (let i = 0; i < (this.mobile ? 2600 : 5400); i++) {
-      const x = (rand() - 0.5) * 410, z = (rand() - 0.5) * 385 - 62;
-      const height = terrainHeight(x, z), slope = Math.hypot(terrainHeight(x + 2, z) - height, terrainHeight(x, z + 2) - height) / 2;
-      if (height > 47 + rand() * 13 || slope > .95 || Math.hypot(x / 218, (z + 60) / 210) > .82 + rand() * .18 || !this.clearForTree(x, z) || sites.some((p) => Math.hypot(p.x - x, p.z - z) < (this.mobile ? 6 : 4.8))) continue;
-      sites.push(new THREE.Vector3(x, terrainHeight(x, z), z));
-      this.colliders.push({ type: 'box', position: [x, terrainHeight(x, z) + 2, z], size: [0.3, 2, 0.3] });
-    }
-    this.forest.sites = sites; this.root.add(this.forest);
+    const sites = forestSites(this.mobile);
+    for (const { x, y, z } of sites) this.colliders.push({ type: 'box', position: [x, y + 2, z], size: [0.3, 2, 0.3] });
+    this.forest.sites = sites; this.forest.name = 'Forest'; this.root.add(this.forest);
   }
   private createGardens(): void {
-    this.plantBatches = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter);
-    const matrix = new THREE.Matrix4(), q = new THREE.Quaternion();
-    const stone = rockMaterial(this.mobile);
-    const rocks = new THREE.InstancedMesh(rockGeometry(), stone, this.rocks.length);
-    let placed = 0;
-    for (const { x, y, z, s, yaw } of this.rocks) {
-      matrix.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(UP, yaw), new THREE.Vector3(s * 1.4, s * .8, s)); rocks.setMatrixAt(placed++, matrix);
-      this.colliders.push({ type: 'box', position: [x, y, z], size: [s * 1.1, s * .65, s * .85] });
-    }
-    rocks.count = placed; rocks.castShadow = true; rocks.receiveShadow = true; rocks.computeBoundingSphere(); this.root.add(rocks);
-    for (const x of [-6.5, 6.5]) for (const z of [5, 13, 39]) {
-      const pole = mesh(new THREE.CylinderGeometry(0.045, 0.065, 2.8, 8), this.gold, this.root, x, 1.4, z);
+    // The near grass field (gpu and mobile) replaces the meadow tufts close to the camera; map mode hides it with the details.
+    // The ground's baked crown and wall occlusion (sub-plan 16), shared by the terrain and the grass standing on it.
+    this.groundOcclusion = CONTACT_OFF ? undefined : groundShadeField(treeShadeDiscs(this.forest.sites), TOWN_SHADE_FOOTPRINTS);
+    const grass = createGrassField(this.tier, { rocks: this.rocks, height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
+    if (grass) { this.details.add(grass.mesh); this.grassShade = grass.ground; }
+    this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter, this.tier, grass?.ground.radius ?? 0);
+    // One instanced draw of blended boulder variants; one collider mesh sampled from the same shapes and transforms.
+    this.root.add(createRiverRocks(this.rocks, rockMaterial(this.mobile), this.tier)); this.colliders.push(rockColliders(this.rocks));
+    // Shore pebbles live with the other near-ground details, so map mode hides them; cpu has none. Only nearby cells draw.
+    this.pebbles = createPebbles(this.tier, this.rocks); if (this.pebbles) this.details.add(this.pebbles.mesh);
+    for (const [x, z] of LAMP_POSTS) {
+      const pole = mesh(new THREE.CylinderGeometry(0.045, 0.065, 2.8, 8), this.brass, this.root, x, 1.4, z);
       const globe = mesh(this.sphere, new THREE.MeshStandardMaterial({ color: '#f3e8c9', emissive: '#e4c881', emissiveIntensity: 0.35, roughness: 0.6 }), this.root, x, 2.8, z); globe.scale.setScalar(0.23); pole.castShadow = false;
       nightEmission(globe.material as THREE.MeshStandardMaterial, '#ffcf79', 3);
       addGlow(this.root, new THREE.Vector3(x, 2.8, z), '#ffcf79', 4.5, 36, 10, .7);
     }
   }
+  /** One multiply-blended draw grounds trunks, rocks, feet, posts and benches; tree patches follow the forest's own cells. */
+  private createContactShadows(): void {
+    const trees = forestCells(this.forest.sites).map(cell => cell.sites.flatMap(({ p, index }) => treeContactSites(p, index)));
+    this.contactShadows = createContactShadows([...objectContactSites(), ...rockContactSites(this.rocks)], trees);
+    if (!CONTACT_OFF) this.root.add(this.contactShadows.mesh);
+    this.forest.onCells = this.contactShadows.showGroups;
+  }
   /** Returns whether a shadow caster changed detail or visibility this frame. */
-  update(time: number, camera?: THREE.Camera, fogFar = 220, mapView = false): boolean {
-    this.water.userData.time.value = time;
+  update(time: number, camera?: THREE.Camera, fogFar = 220, mapView = false, shadow?: THREE.LightShadow): boolean {
+    this.water.userData.time.value = time; shoreTime.value = time; updateWind(time);
     if (!camera) return false;
     const profile = graphicsProfile(this.tier);
-    const trees = this.forest.update(camera, mapView ? fogFar : Math.min(fogFar, profile.forest), mapView);
+    const range = mapView ? fogFar : Math.min(fogFar, profile.forest), trees = this.forest.update(camera, range, mapView, shadow);
+    // Grove crowns follow the forest's range; their light silhouette matches, so a cached shadow map waits for its next re-bake.
+    this.gardens.updateDetail(camera, range, mapView);
     // Shrub batches toggle every couple of metres while walking; re-baking for them cost a shadow pass per ~2 m, so their shadows catch up at the next quarter-box re-bake.
-    updatePlanting(this.plantBatches, camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
+    this.planting?.update(camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
+    this.pebbles?.update(camera);
+    for (const room of this.rooms) {
+      const shown = mapView || BUDGET_OFF || camera.position.distanceTo(room.center) < ROOM_RANGE;
+      if (shown !== room.shown) { room.shown = shown; for (const part of room.parts) part.visible = shown; }
+    }
     if (this.tier === 'cpu') this.details.visible = false;
     return trees;
   }
-  setMapMode(active: boolean): void { this.interiors.visible = !active; this.details.visible = !active; }
+  setMapMode(active: boolean): void { this.interiors.visible = !active; this.details.visible = !active; this.contactShadows.mesh.visible = !active; }
+  /** An enclosed collection whose posters hide with distance; `matrix` places its parent in the town. */
+  private addRoom(exhibition: PlanarExhibition, matrix?: THREE.Matrix4): void {
+    const center = exhibition.center.clone(); if (matrix) center.applyMatrix4(matrix);
+    this.rooms.push({ center: center.setY(0), parts: exhibition.objects, shown: null });
+  }
+  /**
+   * Before the first frame: every tree and plant instanced, and culling off, so the precompile and the first shadow pass build
+   * each shader during loading; on WebGPU a shader first built while walking would stall that frame. Photographs, captions and
+   * signs keep their culling: the view from the station already builds their two shaders, and uploading every canvas and photo
+   * now would only move their upload from first sight to loading.
+   */
+  warmUp(on: boolean): void {
+    this.forest.warmUp(on); this.planting?.warmUp(on); this.pebbles?.warmUp(on); this.gardens.warmUp(on);
+    // Rooms draw during the warm-up, so their shaders build now; the next update() hides the distant ones again.
+    if (on) for (const room of this.rooms) { room.shown = null; for (const part of room.parts) part.visible = true; }
+    this.root.traverse((object) => {
+      const material = (object as THREE.Mesh).material;
+      if (!Array.isArray(material) && material?.userData.display) return;
+      if (on) { warmCulled.set(object, object.frustumCulled); object.frustumCulled = false; }
+      else { const culled = warmCulled.get(object); if (culled !== undefined) object.frustumCulled = culled; }
+    });
+  }
 }

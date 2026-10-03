@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
+/** Classic and node standard materials alike: the Lambert copies of the rocks and lake drop their node shading, as the classic copies dropped GLSL patches. */
+const standard = (material: THREE.Material): material is THREE.MeshStandardMaterial => material instanceof THREE.MeshStandardMaterial || (material as THREE.MeshStandardNodeMaterial).isMeshStandardNodeMaterial === true;
+
 /** CPU rendering keeps the same town and collision world, with cheap lighting and boundary-locked visual meshes. */
 export async function prepareCpuDetail(root: THREE.Object3D, reflection: THREE.CubeTexture): Promise<{ before: number; after: number }> {
   const { MeshoptSimplifier } = await import('meshoptimizer/simplifier'); await MeshoptSimplifier.ready;
@@ -16,18 +19,18 @@ export async function prepareCpuDetail(root: THREE.Object3D, reflection: THREE.C
     const mesh = meshes[i];
     const convert = (source: THREE.Material): THREE.Material => {
       const cached = materials.get(source); if (cached) return cached;
-      if (!(source instanceof THREE.MeshStandardMaterial)) return source;
+      if (!standard(source)) return source;
       const material = new THREE.MeshLambertMaterial({ color: source.color, map: source.map, emissive: source.emissive, emissiveIntensity: source.emissiveIntensity, emissiveMap: source.emissiveMap, vertexColors: source.vertexColors, transparent: source.transparent, opacity: source.opacity, alphaTest: source.alphaTest, side: source.side, depthWrite: source.depthWrite, flatShading: source.flatShading, fog: source.fog });
       material.name = source.name; material.userData = { ...source.userData };
       if (source.metalness > .4) { material.envMap = reflection; material.reflectivity = .28; }
-      if (mesh.name === 'Textured meadow and soil') { material.onBeforeCompile = source.onBeforeCompile; material.customProgramCacheKey = () => 'cpu-meadow'; }
       materials.set(source, material); return material;
     };
     mesh.material = Array.isArray(mesh.material) ? mesh.material.map(convert) : convert(mesh.material);
     const source = mesh.geometry, count = source.index?.count ?? source.getAttribute('position')?.count ?? 0;
     const instances = mesh instanceof THREE.InstancedMesh ? mesh.count : 1; before += count / 3 * instances;
-    // The river sheet keeps every vertex: its baked bank-to-deep colour gradient lives in them.
-    if (count > 3600 && !Array.isArray(mesh.material) && mesh.name !== 'Textured meadow and soil' && mesh.name !== 'River water' && !mesh.name.includes('walking network') && !mesh.name.includes('kerb') && !mesh.name.includes('path borders')) {
+    // The river sheet keeps every vertex: its baked bank-to-deep colour gradient lives in them. Meshes whose vertices must stay
+    // exact, such as contact-shadow patches lying on the ground triangles, opt out with userData.keepGeometry.
+    if (count > 3600 && !Array.isArray(mesh.material) && !mesh.userData.keepGeometry && mesh.name !== 'Textured meadow and soil' && mesh.name !== 'River water' && !mesh.name.includes('walking network') && !mesh.name.includes('kerb') && !mesh.name.includes('path borders')) {
       let geometry = geometries.get(source);
       if (!geometry) {
         const position = source.getAttribute('position');

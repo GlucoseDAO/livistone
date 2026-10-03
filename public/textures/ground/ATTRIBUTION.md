@@ -5,7 +5,7 @@ All CC0, from Poly Haven (2K JPG map sets: colour, OpenGL normal, roughness, dis
 - [Leafy Grass](https://polyhaven.com/a/leafy_grass), Charlotte Baglioni — `meadow-*`
 - [Sparse Grass](https://polyhaven.com/a/sparse_grass), Amal Kumar — `sparse-*` (worn and dry grass)
 - [Brown Mud Leaves 01](https://polyhaven.com/a/brown_mud_leaves_01), Rob Tuytel — `soil-*` (path wear, banks)
-- [Gravel Floor 02](https://polyhaven.com/a/gravel_floor_02), Jenelle van Heerden and Dimitrios Savva — `gravel-*` (reserved for the shore, sub-plan 14; not loaded yet)
+- [Gravel Floor 02](https://polyhaven.com/a/gravel_floor_02), Jenelle van Heerden and Dimitrios Savva — `gravel-*` (the river shore band, sub-plan 14: the 512 px albedo and 256 px nrh on gpu and mobile)
 
 Retrieved 3 October 2026. `sources.json` records every original URL, SHA-256 and size. The
 originals are cached outside git under `data/textures-src/ground/`.

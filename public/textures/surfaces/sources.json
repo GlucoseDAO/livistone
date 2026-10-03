@@ -1,0 +1,113 @@
+[
+  {
+    "stem": "ashlar",
+    "generator": "scripts/build-surface-textures.py",
+    "seed": 2401,
+    "license": "project-original",
+    "tileMetres": 4.0,
+    "replaces": "src/world/world.ts:97 town white (bridge masonry, hall rims)",
+    "targetSRGB": "#f4f0df",
+    "meanLinearAlbedo": [
+      0.9046,
+      0.8714,
+      0.7379
+    ],
+    "meanRoughness": 0.752,
+    "heightRangeMetres": [
+      -0.005887,
+      0.001657
+    ],
+    "files": {
+      "ashlar-albedo-1024.webp": {
+        "bytes": 87154,
+        "sha256": "5f1e17fdbb553405c0f33aa7e2fc2b397e4b70ccdec229a6fcdaa517b73e4a3b"
+      },
+      "ashlar-albedo-512.webp": {
+        "bytes": 15952,
+        "sha256": "33ef2aab007a8f40b0eb54a00cd667bb404fedc3cbd4eb7b4817e1e585ae0d88"
+      },
+      "ashlar-nrh-512.webp": {
+        "bytes": 268574,
+        "sha256": "0beefd591491d6d22bdced645380c0da88b797d4747331a8a2d69eff0b70497a"
+      },
+      "ashlar-nrh-256.webp": {
+        "bytes": 72062,
+        "sha256": "813a261b5e685ed64346028a19680d691f49ae067e34969a1d40302c9c8264c7"
+      }
+    }
+  },
+  {
+    "stem": "terrazzo",
+    "generator": "scripts/build-surface-textures.py",
+    "seed": 2402,
+    "license": "project-original",
+    "tileMetres": 4.0,
+    "replaces": "src/world/world.ts:305 hall floor inset",
+    "targetSRGB": "#ddd7c4",
+    "meanLinearAlbedo": [
+      0.7231,
+      0.6795,
+      0.552
+    ],
+    "meanRoughness": 0.406,
+    "heightRangeMetres": [
+      -0.000351,
+      0.000285
+    ],
+    "files": {
+      "terrazzo-albedo-1024.webp": {
+        "bytes": 262166,
+        "sha256": "7f6d93c3f539296c2cc6b12b88dad809a45ba37a05728c925cfdbb36cdffc3e7"
+      },
+      "terrazzo-albedo-512.webp": {
+        "bytes": 84006,
+        "sha256": "ba3edce0e286277d6544251f06e123fc0861cb0f2a8c8100d917e337ba992c9e"
+      },
+      "terrazzo-nrh-512.webp": {
+        "bytes": 261196,
+        "sha256": "363dd5c99a89d8fbb419822484f1cdbe33a57861e7da87414b8c7fb6a5d187d9"
+      },
+      "terrazzo-nrh-256.webp": {
+        "bytes": 57272,
+        "sha256": "a3d6e801e2e9cf739d4cab44dad7300441fe01ab4c0d4f94e1944853f5f26edb"
+      }
+    }
+  },
+  {
+    "stem": "brass",
+    "generator": "scripts/build-surface-textures.py",
+    "seed": 2403,
+    "license": "project-original",
+    "tileMetres": 1.0,
+    "replaces": "src/world/planar-exhibition.ts:43 poster stand feet",
+    "targetSRGB": "#c2aa77",
+    "meanLinearAlbedo": [
+      0.5395,
+      0.402,
+      0.1845
+    ],
+    "meanRoughness": 0.352,
+    "heightRangeMetres": [
+      -0.000303,
+      0.000127
+    ],
+    "files": {
+      "brass-albedo-512.webp": {
+        "bytes": 3760,
+        "sha256": "bd7e7fc42fbeea9d1fce7db6eef112ebcdce8c0448fcde07c97973715a0d34b3"
+      },
+      "brass-albedo-256.webp": {
+        "bytes": 1254,
+        "sha256": "e8a103b5fe240e01bf8ca436a64eb5079e24d6e2d7316fb9c1fa7798b5683ea0"
+      },
+      "brass-nrh-512.webp": {
+        "bytes": 83946,
+        "sha256": "71f1539967ba4c030c435da59673c5dabd9b8763ee752b6084ec3d450e2461da"
+      },
+      "brass-nrh-256.webp": {
+        "bytes": 27498,
+        "sha256": "14bca1dbbdd853e08b84a10b2d90e0845e7fc69bb7cb8d126d25d1e17e9b7f35"
+      }
+    }
+  }
+]

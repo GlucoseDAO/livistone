@@ -2,6 +2,8 @@
 // Needs a dev server: the ?capture=1 freeze and the __livistone hook exist only in dev builds.
 // Usage: bun scripts/screenshot-realism.ts <outDir> <desktop|touch|software> [viewSet] [day|golden|night]
 // Writes <outDir>/<profile>/<time>/<view>.png and captures.json. LIVISTONE_BENCHMARK_URL selects the server.
+// WebGPURenderer captures (docs/realism/20-webgpu-spike.md): desktop and touch get the flags that expose WebGPU to headless Chrome
+// on Linux; LIVISTONE_PARAMS=backend=webgl forces its WebGL 2 fallback. captures.json records the backend and the time to ready.
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
@@ -49,7 +51,11 @@ if (profileArg === 'desktop') url.searchParams.set('graphics', 'gpu');
 for (const [key, value] of new URLSearchParams(process.env.LIVISTONE_PARAMS ?? '')) url.searchParams.set(key, value);
 const software = profile === 'software', frameTimeout = software ? 240_000 : 60_000;
 const gpu = software ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : process.platform === 'win32' ? ['--use-angle=d3d11', '--ignore-gpu-blocklist'] : ['--use-gl=angle', '--use-angle=gl', '--ignore-gpu-blocklist'];
-const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', '--headless=new', ...gpu] });
+// Vulkan gives headless Chrome a hardware WebGPU adapter; WebGL keeps its flags above. The low-power (integrated) adapter is
+// forced because headless canvas presentation fails on the NVIDIA dGPU here, and it is the GPU the WebGL captures use anyway.
+// Software gets no WebGPU adapter, as on a machine without a GPU, so it renders through the automatic WebGL 2 fallback.
+const webgpu = software || process.platform !== 'linux' ? [] : ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-webgpu-power-preference=force-low-power'];
+const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', '--headless=new', ...gpu, ...webgpu] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, isMobile: profile === 'touch', hasTouch: profile === 'touch', reducedMotion: 'reduce' });
 const errors: string[] = [], captures: { name: string; view: View; snapshot: Record<string, unknown> }[] = [];
 page.on('pageerror', error => errors.push(error.message));
@@ -60,9 +66,25 @@ const settle = async (count: number) => {
   const start = await page.evaluate(() => ((window as unknown as { __livistone: Hook }).__livistone.snapshot().frames));
   await page.waitForFunction(([from, n]) => (window as unknown as { __livistone: Hook }).__livistone.snapshot().frames >= from + n, [start, count], { timeout: frameTimeout, polling: 100 });
 };
+// A teleported capsule drops or steps onto the ground over several physics steps (one per frame under ?capture=1). Wait until
+// it has held its position for a few frames, so no view depends on how long the network took (bridge-bank was caught mid-drop).
+const still = async (frames: number) => {
+  await page.evaluate(() => { delete (window as unknown as { __still?: unknown }).__still; });
+  await page.waitForFunction((n) => {
+    const w = window as unknown as { __livistone: Hook; __still?: { at: string; since: number } };
+    const s = w.__livistone.snapshot(), p = s.position as { x: number; y: number; z: number } | undefined;
+    if (!p) return false;
+    const at = [p.x, p.y, p.z].map((v) => v.toFixed(3)).join();
+    if (w.__still?.at !== at) { w.__still = { at, since: s.frames }; return false; }
+    return s.frames - w.__still.since >= n;
+  }, frames, { timeout: frameTimeout, polling: 100 });
+};
+let readyMs: number | null = null;
 try {
+  const loadStart = performance.now();
   await page.goto(url.href, { timeout: 120_000 });
   await page.waitForFunction(() => { const hook = (window as unknown as { __livistone?: Hook }).__livistone; return !!hook && hook.snapshot().ready && hook.snapshot().mode === 'walking'; }, null, { timeout: software ? 600_000 : 180_000 });
+  readyMs = Math.round(performance.now() - loadStart);
   if (!(await page.evaluate(() => (window as unknown as { __livistone: Hook }).__livistone.snapshot().capture))) errors.push('Server ignored ?capture=1; captures are not frozen (is this a dev server with the 00 harness?).');
   await page.addStyleTag({ content: '#app > :not(canvas) { visibility: hidden !important; }' });
   for (const name of names) {
@@ -70,13 +92,16 @@ try {
     await page.evaluate(([x, z, yaw, pitch]) => (window as unknown as { __livistone: Hook }).__livistone.teleport(x, z, yaw, 1.05, pitch), [x, z, yaw, pitch] as const);
     await settle(software ? 3 : 8);
     // Thumbnails and lazily built galleries finish asynchronously; give the network a moment, then settle again.
-    await page.waitForLoadState('networkidle').catch(() => undefined); await settle(software ? 2 : 6);
+    await page.waitForLoadState('networkidle').catch(() => undefined); await still(software ? 2 : 4); await settle(software ? 2 : 6);
     await page.screenshot({ path: `${dir}/${name}.png` });
     captures.push({ name, view, snapshot: await page.evaluate(() => (window as unknown as { __livistone: Hook }).__livistone.snapshot()) });
+    // Sub-plan 25: the frame's draws by town group (all passes), heaviest first, so the budget reads off the log.
+    const budget = Object.entries((captures.at(-1)!.snapshot.budget ?? {}) as Record<string, { calls: number; triangles: number }>).sort((a, b) => b[1].triangles - a[1].triangles).slice(0, 5);
+    if (budget.length) console.log(`    ${captures.at(-1)!.snapshot.calls} calls, ${captures.at(-1)!.snapshot.triangles} triangles; ` + budget.map(([group, cost]) => `${group} ${cost.calls}/${Math.round(cost.triangles / 1000)}k`).join(' · '));
     console.log(`  ${profile}/${time}/${name}`);
   }
 } finally {
-  writeFileSync(`${dir}/captures.json`, JSON.stringify({ profile, time, set: setArg, url: url.href, commit, browser: browser.version(), viewport: { width: 1280, height: 800 }, capturedAt: new Date().toISOString(), errors, captures }, null, 2) + '\n');
+  writeFileSync(`${dir}/captures.json`, JSON.stringify({ profile, time, set: setArg, url: url.href, commit, backend: captures[0]?.snapshot.backend ?? null, webgpuFlags: !!webgpu.length, readyMs, browser: browser.version(), viewport: { width: 1280, height: 800 }, capturedAt: new Date().toISOString(), errors, captures }, null, 2) + '\n');
   await browser.close();
 }
 console.log(`${dir}: ${captures.length}/${names.length} captures; errors: ${errors.length ? JSON.stringify(errors) : 'none'}`);

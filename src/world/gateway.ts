@@ -8,6 +8,7 @@ import type { ColliderSpec } from '../game/physics';
 import serif from './fonts/monument-serif.json';
 import { GATEWAY } from './gateway-layout';
 import { gatewayMaterials } from './gateway-materials';
+import { activeSurfaces, bakeMasonry } from './surfaces';
 
 type Point = [number, number, number];
 function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
@@ -73,11 +74,14 @@ export function createGateway(parent: THREE.Group, colliders: ColliderSpec[], mo
   // Thin claws hold the prism at its corners; the long table stays unobscured.
   for (const x of [-3.46, 3.46]) for (const side of [-1, 1]) tube([[x, GATEWAY.stoneY + side * .6, -.3], [x, GATEWAY.stoneY + side * .49, .17], [x, GATEWAY.stoneY + side * .31, .43]], .045);
   const baseGeometry = merge(bases), pos = baseGeometry.getAttribute('position'), normal = baseGeometry.getAttribute('normal'), uv = baseGeometry.getAttribute('uv');
-  for (let i = 0; i < pos.count; i++) {
+  // The town's ashlar (sub-plan 24) brings its own UVs and weathering data; the procedural limestone keeps its box UVs.
+  const ashlar = activeSurfaces()?.abutments;
+  if (ashlar) bakeMasonry(baseGeometry);
+  else for (let i = 0; i < pos.count; i++) {
     const nx = Math.abs(normal.getX(i)), ny = Math.abs(normal.getY(i)), nz = Math.abs(normal.getZ(i));
     uv.setXY(i, (nx > nz ? pos.getZ(i) : pos.getX(i)) * .75, (ny > .7 ? pos.getZ(i) : pos.getY(i)) * .75);
   }
-  add(baseGeometry, materials.limestone, 'Textured limestone gateway abutments');
+  add(baseGeometry, ashlar ?? materials.limestone, 'Textured limestone gateway abutments');
   const font = new FontLoader().parse(serif), letters: THREE.BufferGeometry[] = [], centers: number[] = []; let advance = 0;
   for (const character of 'LIVISTONE') {
     const g = new TextGeometry(character, { font, size: .65, depth: .085, curveSegments: mobile ? 4 : 8, bevelEnabled: true, bevelThickness: .009, bevelSize: .006, bevelSegments: 2 });

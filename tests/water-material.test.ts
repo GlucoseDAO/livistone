@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { WATER_EDGE, WATER_LEVEL, waterDepth, waterFlow, waterSurfaceGeometry } from '../src/world/water-surface';
-import { cpuWaterColour, waterMaterial } from '../src/world/water-material';
+import { cpuWaterColour, lakeWaterMaterial, waterMaterial } from '../src/world/water-material';
+import { uniform } from 'three/tsl';
 import { riverRockSites } from '../src/world/stone';
 import { riverCenter, tributaryCenter, waterDistance } from '../src/world/waterways';
 import { terrainHeight } from '../src/world/terrain';
@@ -83,22 +84,21 @@ describe('baked river surface', () => {
 });
 
 describe('water materials', () => {
-  it('blends gpu and mobile water over the bed and tags it for the explicit hero environment', () => {
-    const keys = new Set<string>();
+  it('blends gpu and mobile water over the bed through its own lighting output and tags it for the hero environment', () => {
+    const materials = new Set<THREE.Material>();
     for (const tier of ['gpu', 'mobile'] as const) for (const look of ['a', 'b'] as const) {
-      const material = waterMaterial(tier, { look }) as THREE.MeshPhysicalMaterial;
+      const material = waterMaterial(tier, { look }) as THREE.MeshPhysicalNodeMaterial;
+      expect(material.isMeshPhysicalNodeMaterial).toBe(true); expect(material.ior).toBeCloseTo(1.333, 6);
       expect(material.transparent).toBe(true); expect(material.depthWrite).toBe(false); expect(material.side).toBe(THREE.FrontSide);
-      expect(material.userData.heroEnv).toBe(true); expect(material.userData.time.value).toBe(0);
-      keys.add(material.customProgramCacheKey());
-      const shader = { uniforms: {} as Record<string, THREE.IUniform>, vertexShader: THREE.ShaderLib.physical.vertexShader, fragmentShader: THREE.ShaderLib.physical.fragmentShader };
-      material.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, undefined as unknown as THREE.WebGLRenderer);
-      // Every injection point must still exist in this three.js release.
-      for (const text of ['attribute vec2 flow', 'vWaterDepth = depth']) expect(shader.vertexShader).toContain(text);
-      for (const text of ['waterFlowSample', `#define WATER_LAYERS ${tier === 'gpu' ? 2 : 1}`, 'normal = normalize((viewMatrix', 'gl_FragColor = vec4(waterLight']) expect(shader.fragmentShader).toContain(text);
-      expect(shader.fragmentShader).not.toContain('#include <opaque_fragment>');
-      expect(shader.uniforms.waterRipples).toBeDefined();
+      expect(material.userData.heroEnv).toBe(true); expect(material.userData.time.value).toBe(0); expect(material.userData.time.isNode).toBe(true);
+      expect(material.userData.look).toBe(look); expect(material.userData.layers).toBe(tier === 'gpu' ? 2 : 1);
+      // The surface stage sets body colour, ripple normal and foam roughness; the lighting model rebuilds the output and alpha.
+      for (const node of [material.colorNode, material.normalNode, material.roughnessNode]) expect(node?.isNode).toBe(true);
+      const lighting = (material as unknown as { setupLightingModel(): THREE.PhysicalLightingModel }).setupLightingModel();
+      expect(lighting).toBeInstanceOf(THREE.PhysicalLightingModel); expect(lighting.constructor.name).toBe('WaterLighting');
+      materials.add(material);
     }
-    expect(keys.size).toBe(4);
+    expect(materials.size).toBe(4);
   });
   it('keeps cpu water opaque, with absorption baked from depth into vertex colours', () => {
     const material = waterMaterial('cpu', { look: 'a' });
@@ -109,5 +109,13 @@ describe('water materials', () => {
     expect(luminance(deep)).toBeGreaterThan(luminance(bank));
     const geometry = waterSurfaceGeometry([], colour, 2);
     expect(geometry.getAttribute('color').count).toBe(geometry.getAttribute('position').count);
+  });
+  it('gives the lake the river look on an opaque sheet: water Fresnel, hero sky reflection, game-clock ripples and no glow', () => {
+    const time = uniform(0), material = lakeWaterMaterial(time);
+    expect(material.isMeshPhysicalNodeMaterial).toBe(true); expect(material.ior).toBeCloseTo(1.333, 6); expect(material.metalness).toBe(0);
+    expect(material.transparent).toBe(false); expect(material.vertexColors).toBe(true); expect(material.userData.heroEnv).toBe(true);
+    expect(material.roughness).toBeLessThan(.1); expect(material.normalNode?.isNode).toBe(true);
+    // Nothing emits, so at night only the pavilion's own lights reach the outer lake.
+    expect(material.emissive.getHex()).toBe(0); expect(material.userData.nightEmission).toBeUndefined();
   });
 });

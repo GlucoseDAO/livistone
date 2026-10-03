@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { displayMaterial } from '../render/output';
 import { ENHANCEMENT_CATEGORIES, ENHANCEMENT_POSTERS, ENHANCEMENT_URL, enhancementImage } from '../game/enhancement';
 import type { CategoryIcon, EnhancementCategory, EnhancementPoster } from '../game/enhancement';
 import { photoSize } from '../game/exhibits';
@@ -102,14 +103,14 @@ function clickable(mesh: THREE.Mesh, name: string): THREE.Mesh { mesh.name = nam
 export function createEnhancementGallery(parent: THREE.Group, colliders: ColliderSpec[]): { panels: THREE.Mesh[]; interactives: Interactive[]; ready: Promise<void> } {
   const panels: THREE.Mesh[] = [], interactives: Interactive[] = [], tasks: Promise<void>[] = [];
   colliders.push(...enhancementGalleryColliders());
-  const paper = new THREE.MeshBasicMaterial({ color: PAPER, toneMapped: false }), metal = new THREE.MeshStandardMaterial({ color: '#8f8aa8', metalness: .6, roughness: .35 });
-  const back = new THREE.MeshBasicMaterial({ map: canvasTexture(512, 768, ctx => { ctx.fillStyle = PAPER; ctx.fillRect(0, 0, 512, 768); ctx.fillStyle = '#5b4bc4'; ctx.textAlign = 'center'; ctx.font = '600 30px sans-serif'; ctx.fillText('MATERIALIZED', 256, 330); ctx.fillText('ENHANCEMENTS', 256, 372); ctx.fillStyle = '#25473b'; ctx.font = '26px sans-serif'; ctx.fillText('enhancement.bio ↗', 256, 440); }), toneMapped: false });
+  const paper = displayMaterial({ color: PAPER }), metal = new THREE.MeshStandardMaterial({ color: '#8f8aa8', metalness: .6, roughness: .35 });
+  const back = displayMaterial({ map: canvasTexture(512, 768, ctx => { ctx.fillStyle = PAPER; ctx.fillRect(0, 0, 512, 768); ctx.fillStyle = '#5b4bc4'; ctx.textAlign = 'center'; ctx.font = '600 30px sans-serif'; ctx.fillText('MATERIALIZED', 256, 330); ctx.fillText('ENHANCEMENTS', 256, 372); ctx.fillStyle = '#25473b'; ctx.font = '26px sans-serif'; ctx.fillText('enhancement.bio ↗', 256, 440); }) });
   ENHANCEMENT_POSTERS.forEach((poster, i) => {
     const site = POSTER_SITES[i], group = new THREE.Group(); group.position.copy(site); group.name = 'Enhancement poster · ' + poster.title; parent.add(group);
     const board = new THREE.Mesh(new THREE.BoxGeometry(GALLERY.posterWidth, BOARD.height, BOARD.depth), paper); board.position.y = BOARD.y; group.add(board);
     const foot = new THREE.Mesh(new THREE.BoxGeometry(GALLERY.posterWidth * .7, .24, .48), metal); foot.position.y = .12; group.add(foot);
-    const caption = clickable(new THREE.Mesh(new THREE.PlaneGeometry(2, 1.25), new THREE.MeshBasicMaterial({ map: posterCaption(poster), toneMapped: false })), 'Enhancement poster caption'); caption.position.set(0, 1.05, BOARD.depth / 2 + .006); group.add(caption);
-    const picture = clickable(new THREE.Mesh(new THREE.PlaneGeometry(1.96, 1.72), new THREE.MeshBasicMaterial({ color: PAPER, toneMapped: false })), 'Enhancement poster photo'); picture.position.set(0, 2.56, BOARD.depth / 2 + .008); group.add(picture);
+    const caption = clickable(new THREE.Mesh(new THREE.PlaneGeometry(2, 1.25), displayMaterial({ map: posterCaption(poster) })), 'Enhancement poster caption'); caption.position.set(0, 1.05, BOARD.depth / 2 + .006); group.add(caption);
+    const picture = clickable(new THREE.Mesh(new THREE.PlaneGeometry(1.96, 1.72), displayMaterial({ color: PAPER })), 'Enhancement poster photo'); picture.position.set(0, 2.56, BOARD.depth / 2 + .008); group.add(picture);
     const reverse = clickable(new THREE.Mesh(new THREE.PlaneGeometry(2, 3), back), 'Enhancement poster reverse'); reverse.position.set(0, BOARD.y, -BOARD.depth / 2 - .006); reverse.rotation.y = Math.PI; group.add(reverse);
     panels.push(caption, picture, reverse);
     interactives.push({ id: STORY, object: caption, position: site.clone().setY(1.6) });
@@ -124,10 +125,10 @@ export function createEnhancementGallery(parent: THREE.Group, colliders: Collide
     const base = new THREE.Mesh(new THREE.BoxGeometry(GALLERY.standWidth, PLINTH.height, PLINTH.depth), plinth); base.position.y = PLINTH.height / 2; group.add(base);
     const accent = new THREE.MeshStandardMaterial({ color: category.color, metalness: .15, roughness: .42, flatShading: true }); nightEmission(accent, category.color, .5);
     const rim = new THREE.Mesh(new THREE.BoxGeometry(GALLERY.standWidth + .04, .05, PLINTH.depth + .04), accent); rim.position.y = PLINTH.height + .025; group.add(rim);
-    const label = clickable(new THREE.Mesh(new THREE.PlaneGeometry(1.3, .8), new THREE.MeshBasicMaterial({ color: PAPER, toneMapped: false })), 'Enhancement category label'); label.position.set(0, .48, PLINTH.depth / 2 + .005); group.add(label);
+    const label = clickable(new THREE.Mesh(new THREE.PlaneGeometry(1.3, .8), displayMaterial({ color: PAPER })), 'Enhancement category label'); label.position.set(0, .48, PLINTH.depth / 2 + .005); group.add(label);
     stands.push({ category, group, accent, label });
     const post = new THREE.Mesh(new THREE.CylinderGeometry(.035, .035, 1.12, 8), metal); post.position.set(0, PLINTH.height + .56, EMBLEM.z); group.add(post);
-    const face = new THREE.MeshBasicMaterial({ map: emblem(category), toneMapped: false });
+    const face = displayMaterial({ map: emblem(category) });
     for (const side of [1, -1]) {
       const disc = clickable(new THREE.Mesh(new THREE.CircleGeometry(EMBLEM.radius, 48), face), 'Enhancement category emblem'); disc.position.set(0, EMBLEM.y, EMBLEM.z + side * .045); if (side < 0) disc.rotation.y = Math.PI; group.add(disc); panels.push(disc);
     }

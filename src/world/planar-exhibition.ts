@@ -1,10 +1,13 @@
 import { paintPosterText } from './poster-text';
 import * as THREE from 'three';
+import { displayMaterial } from '../render/output';
 import { COLLECTION, EXHIBITS, photoURL, photoSize } from '../game/exhibits';
 import type { Exhibit } from '../game/exhibits';
 import type { ColliderSpec } from '../game/physics';
 import type { Interactive } from './world';
 import { posterLayout } from './poster-layout';
+import { activeSurfaces } from './surfaces';
+import { mergeStatic } from './static-batch';
 
 const textures = new Map<string, Promise<THREE.Texture>>();
 function photograph(file: string): Promise<THREE.Texture> {
@@ -33,6 +36,9 @@ function caption(piece: Exhibit, width: number): THREE.CanvasTexture {
 export class PlanarExhibition {
   readonly photos: THREE.Mesh[] = [];
   readonly textSurfaces: THREE.Mesh[] = [];
+  /** Everything this exhibition added to its parent, and the parent-space centre of its posters (for distance hiding). */
+  readonly objects: THREE.Object3D[] = [];
+  readonly center = new THREE.Vector3();
   readonly ready: Promise<void>;
   readonly pieces: Exhibit[];
   selected: Exhibit;
@@ -40,18 +46,19 @@ export class PlanarExhibition {
     this.pieces = COLLECTION.filter((piece) => piece.location === id);
     this.selected = this.pieces.find((piece) => piece.discovery === EXHIBITS.find((anchor) => anchor.landmark === id)?.discovery) ?? this.pieces[0];
     const layout = posterLayout(id, this.pieces.length), tasks: Promise<void>[] = [];
-    const frameMaterial = new THREE.MeshBasicMaterial({ color: '#f4f0e5', toneMapped: false }), footMaterial = new THREE.MeshStandardMaterial({ color: '#c2aa77', roughness: .4, metalness: .5 });
-    const width = id === 'science' ? 1.72 : 2, height = 2.95;
+    const frameMaterial = displayMaterial({ color: '#f4f0e5' }), footMaterial = activeSurfaces()?.stand ?? new THREE.MeshStandardMaterial({ color: '#c2aa77', roughness: .4, metalness: .5 });
+    const width = id === 'science' ? 1.72 : 2, height = 2.95, frames: THREE.Mesh[] = [], feet: THREE.Mesh[] = [];
     this.pieces.forEach((piece, i) => {
-      const site = layout[i], floor = site.y ?? 0, group = new THREE.Group(); group.position.set(site.x, floor, site.z); group.rotation.y = site.yaw; parent.add(group);
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(width + .1, height, .09), frameMaterial); frame.position.y = 1.82; group.add(frame);
-      const foot = new THREE.Mesh(new THREE.BoxGeometry(width * .7, .16, id === 'timeface' ? .2 : .48), footMaterial); foot.position.y = .23; group.add(foot);
-      if (id === 'timeface') { const bracket = new THREE.Mesh(new THREE.BoxGeometry(.16, .1, .55), footMaterial); bracket.position.set(0, .23, .2); group.add(bracket); }
+      const site = layout[i], floor = site.y ?? 0, group = new THREE.Group(); group.position.set(site.x, floor, site.z); group.rotation.y = site.yaw; parent.add(group); this.objects.push(group);
+      this.center.addScaledVector(group.position, 1 / this.pieces.length);
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(width + .1, height, .09), frameMaterial); frame.position.y = 1.82; group.add(frame); frames.push(frame);
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(width * .7, .16, id === 'timeface' ? .2 : .48), footMaterial); foot.position.y = .23; group.add(foot); feet.push(foot);
+      if (id === 'timeface') { const bracket = new THREE.Mesh(new THREE.BoxGeometry(.16, .1, .55), footMaterial); bracket.position.set(0, .23, .2); group.add(bracket); feet.push(bracket); }
       colliders.push({ type: 'box', position: [x + site.x, floor + 1.82 + (site.y === undefined && id !== 'station' ? .16 : 0), z + site.z], size: [(width + .1) / 2, height / 2, .09], yaw: site.yaw });
       colliders.push({ type: 'box', position: [x + site.x, floor + .23 + (site.y === undefined && id !== 'station' ? .16 : 0), z + site.z], size: [width * .35, .08, id === 'timeface' ? .1 : .24], yaw: site.yaw });
-      const info = new THREE.Mesh(new THREE.PlaneGeometry(width, 1.4), new THREE.MeshBasicMaterial({ map: caption(piece, width), toneMapped: false })); info.position.set(0, 1.07, .051); info.userData.posterInfo = true; info.userData.piece = piece.discovery; group.add(info); this.textSurfaces.push(info);
-      const paper = new THREE.Mesh(new THREE.PlaneGeometry(width, 1.45), new THREE.MeshBasicMaterial({ color: '#f4f0e5', toneMapped: false })); paper.position.set(0, 2.49, .051); group.add(paper);
-      const picture = new THREE.Mesh(new THREE.PlaneGeometry(width - .06, 1.4), new THREE.MeshBasicMaterial({ color: '#f4f0e5', toneMapped: false })); picture.position.set(0, 2.49, .057); picture.userData.piece = piece.discovery; picture.userData.photoIndex = 0; picture.userData.exhibition = id; group.add(picture); this.photos.push(picture);
+      const info = new THREE.Mesh(new THREE.PlaneGeometry(width, 1.4), displayMaterial({ map: caption(piece, width) })); info.position.set(0, 1.07, .051); info.userData.posterInfo = true; info.userData.piece = piece.discovery; group.add(info); this.textSurfaces.push(info);
+      const paper = new THREE.Mesh(new THREE.PlaneGeometry(width, 1.45), displayMaterial({ color: '#f4f0e5' })); paper.position.set(0, 2.49, .051); group.add(paper);
+      const picture = new THREE.Mesh(new THREE.PlaneGeometry(width - .06, 1.4), displayMaterial({ color: '#f4f0e5' })); picture.position.set(0, 2.49, .057); picture.userData.piece = piece.discovery; picture.userData.photoIndex = 0; picture.userData.exhibition = id; group.add(picture); this.photos.push(picture);
       const backPicture = id === 'station' ? picture.clone() : undefined;
       if (backPicture) {
         for (const face of [info, paper, picture]) {
@@ -61,10 +68,12 @@ export class PlanarExhibition {
       }
       tasks.push(photograph(piece.photos[0].thumb ?? piece.photos[0].file).then((map) => {
         const image = map.image as HTMLImageElement, size = photoSize(image.naturalWidth, image.naturalHeight, width - .06, 1.4);
-        picture.geometry.dispose(); picture.geometry = new THREE.PlaneGeometry(size.width, size.height); const material = picture.material as THREE.MeshBasicMaterial; material.color.set('#f4f0e5'); material.map = map; material.needsUpdate = true; if (backPicture) backPicture.geometry = picture.geometry;
+        picture.geometry.dispose(); picture.geometry = new THREE.PlaneGeometry(size.width, size.height); const material = picture.material; material.color.set('#f4f0e5'); material.map = map; material.needsUpdate = true; if (backPicture) backPicture.geometry = picture.geometry;
       }).catch(() => { picture.visible = false; if (backPicture) backPicture.visible = false; }));
       interactives.push({ id: piece.discovery, object: info, position: new THREE.Vector3(x + site.x, floor + 1.75, z + site.z) });
     });
+    // Frames share one paper material and feet one brass material, so each set draws once; colliders came per poster above.
+    this.objects.push(...mergeStatic(frames, `Poster frames · ${id}`, Infinity, parent), ...mergeStatic(feet, `Poster feet · ${id}`, Infinity, parent));
     this.ready = Promise.all(tasks).then(() => undefined);
   }
   select(piece: Exhibit): boolean { if (!this.pieces.includes(piece)) return false; this.selected = piece; return true; }
