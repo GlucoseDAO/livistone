@@ -55,7 +55,7 @@ import { createTrailSigns, paintTrailSigns, trailBoulders } from './mountain-tra
 import { createAlpinePlants } from './alpine-plants';
 import { CRAGS, CragGround, cragObstacles, cragSites, createCrags, useCragMaps } from './crags';
 import type { Crags } from './crags';
-import { createGorgeWater } from './mountain-water';
+import { brookGround, createGorgeWater } from './mountain-water';
 import type { ContactSite } from './contact-shadows';
 
 /** Culling flags saved while Town.warmUp() draws everything. */
@@ -420,7 +420,8 @@ export class Town {
       const ground = new CragGround((x, z) => terrainVertexHeight(this.terrainVertices, x, z));
       this.crags = createCrags(this.tier, cragSites({ obstacles, ground }), ground); this.root.add(this.crags.mesh); this.colliders.push(this.crags.collider);
     }
-    const grass = createGrassField(this.tier, { rocks, stems: [...this.gardens.stems, ...this.crags?.discs ?? []], height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
+    // The plateau's brook (sub-plan 27, round 2) keeps the blades off its water; the gorge's floor grows none.
+    const grass = createGrassField(this.tier, { rocks, stems: [...this.gardens.stems, ...MOUNTAIN ? brookGround() : [], ...this.crags?.discs ?? []], height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
     if (grass) { this.details.add(grass.mesh); this.grassShade = grass.ground; }
     this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter, this.tier, grass?.ground.radius ?? 0, this.wind);
     // One instanced draw of blended boulder variants; one collider mesh sampled from the same shapes and transforms.
