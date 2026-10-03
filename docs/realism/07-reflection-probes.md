@@ -3,6 +3,8 @@
 **Needs:** 02. **Tiers:** gpu and mobile; cpu has none. **Branch:** `realism/07-probes`.
 See [README](README.md) for the shared workflow.
 
+> **Status, 3 October 2026:** implemented on `realism/07-probes` (`src/world/probes.ts`, `tests/probes.test.ts`, dev switch `?probes=off`); measured load time and memory are in [docs/3d-game-plan.md](../3d-game-plan.md#reflection-probes-realism-07--3-october-2026). Exterior and interior probes as below; the river probes (step 1, third item) are not done. Interiors are 128 px on gpu and 64 on mobile. Review page: `review/07-probes`.
+
 ## Why
 
 Today every metal, glass and amber surface reflects only the baked sky. Silver on City Hall, Energy and Science shows no gardens or neighbouring buildings. Interior brass reflects the outdoor sky.

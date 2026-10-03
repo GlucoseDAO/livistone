@@ -47,6 +47,8 @@ import { createGlucosePavilion } from './glucose-pavilion';
 import { activateSurfaces, bakeMasonry } from './surfaces';
 import type { Surfaces } from './surfaces';
 import { BUDGET_OFF } from '../game/render-budget';
+import { PROBE_SITES } from './probes';
+import type { ProbeScope } from './probes';
 
 /** Culling flags saved while Town.warmUp() draws everything. */
 const warmCulled = new WeakMap<THREE.Object3D, boolean>();
@@ -124,6 +126,8 @@ export class Town {
   private groundOcclusion?: (x: number, z: number) => number;
   /** Plants sway (wind.ts) on the gpu and mobile tiers; the cpu tier and dev-only ?wind=off keep them still. */
   private get wind(): boolean { return this.tier !== 'cpu' && !WIND_OFF; }
+  /** Sub-plan 07: per probe site, the parts that reflect it and the envelope hidden while it bakes. */
+  private readonly probeParts = new Map<string, { objects: THREE.Object3D[]; hide: THREE.Object3D[] }>();
   private constructor(private mobile: boolean, private tier: GraphicsTier) {
     this.water = waterMaterial(tier); this.paving = pavingMaterial(mobile);
     this.surfaces = activateSurfaces(tier); this.masonry = this.surfaces?.masonry ?? this.white; this.brass = this.surfaces?.gold ?? this.gold;
@@ -139,7 +143,7 @@ export class Town {
     let mark = this.root.children.length;
     const label = (name: string): void => { for (const child of this.root.children.slice(mark)) if (!child.name) child.name = name; mark = this.root.children.length; };
     this.createTerrain(); this.createPaths(); label('Paths and civic paving'); createBridge(this.root, this.colliders, this.masonry, this.paving, this.brass); label('Livistone bridge');
-    createGateway(this.root, this.colliders, mobile, this.paving); label('Gateway');
+    const gateway = createGateway(this.root, this.colliders, mobile, this.paving); label('Gateway'); this.probeParts.set('gateway', { objects: [gateway], hide: [gateway] });
     const gatewayPoster = createGatewayPoster(this.root, this.colliders); this.researchPanels.push(...gatewayPoster.panels); this.interactives.push({ id: 'kings-chapel', object: gatewayPoster.panels[0], position: gatewayPoster.position });
     label('Gateway poster');
     const introduction = createIntroduction(this.root, this.colliders); this.researchPanels.push(...introduction.panels); this.interactives.push({ id: 'about-livistone', object: introduction.panels[0], position: introduction.position });
@@ -163,6 +167,12 @@ export class Town {
     this.colliders.push(...transformColliders(stationColliders, arrival.matrix, Math.PI));
     this.interactives.push(...stationInteractions.map(item => ({ ...item, position: item.position.applyMatrix4(arrival.matrix) })));
     this.train = arrival.getObjectByName('Panoramic maglev')!;
+    // The ring, its prongs and jambs and the amber are the station's envelope, reflecting the town from the ring entrance;
+    // the foyer, platform, train and posters below the amber reflect the concourse.
+    const envelope = ['Sculpted amber body', 'Amber resin core', 'Pierced ring and clasping silver prongs', 'Ring foyer vault'].map(name => arrival.getObjectByName(name)).filter((part): part is THREE.Object3D => !!part);
+    const structure = arrival.getObjectByName('Embryo Station')!;
+    this.probeParts.set('station', { objects: [arrival], hide: envelope });
+    this.probeParts.set('station-concourse', { objects: [gallery, ...structure.children.filter(part => !envelope.includes(part))], hide: [] });
     label('Embryo Station and train'); this.railway = createRailwayStructure(this.root, this.colliders, mobile); label('Mountain railway');
     await stage(46, 'Growing the lake gardens and elevated galleries…');
     this.gardens = new LivingWaters(mobile, this.paving, this.wind); this.root.add(this.gardens.root);
@@ -171,8 +181,9 @@ export class Town {
     this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
     label('Living Waters · town gardens');
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.masonry, this.paving, this.brass, bridge);
-    label('Garden bridges'); createTimeTower(this.root, this.colliders, this.mobile); label('Time tower');
-    createFutureHouse(this.root, this.colliders, this.mobile); label('Future House');
+    label('Garden bridges'); let first = this.root.children.length; createTimeTower(this.root, this.colliders, this.mobile); label('Time tower');
+    const tower = this.root.children.slice(first); first = this.root.children.length;
+    createFutureHouse(this.root, this.colliders, this.mobile); label('Future House'); const house = this.root.children.slice(first);
     await stage(54, 'Making room for science and bioart…');
     createEnhancementHill(this.root, this.colliders);
     label('Enhancement hill');
@@ -180,6 +191,8 @@ export class Town {
     const enhancementGallery = createEnhancementGallery(this.root, this.colliders); this.researchPanels.push(...enhancementGallery.panels); this.interactives.push(...enhancementGallery.interactives);
     label('Enhancement gallery');
     for (const id of ['timeface', 'future-house']) { this.exhibitions.push(new PlanarExhibition(id, this.root, 0, 0, this.colliders, this.interactives, this.tier)); label('Posters · ' + id); }
+    // The tower's posters hang on its spiral and the house's stand in its cabin: both vanish with the envelope they belong to.
+    for (const [id, parts] of [['timeface', tower], ['future-house', house]] as const) { const posters = this.exhibitions.find(e => e.id === id)!.objects; this.probeParts.set(id, { objects: [...parts, ...posters], hide: [...parts, ...posters] }); }
     // Timeface hangs its posters on the open gallery, seen across town; the Future House keeps its three inside the cabin.
     this.addRoom(this.exhibitions[this.exhibitions.length - 1]);
     label('Glucose Commons');
@@ -238,6 +251,7 @@ export class Town {
   private createLandmark(id: string, x: number, z: number): void {
     const exterior = new THREE.Group(); exterior.position.set(x, 0.16, z); exterior.name = 'Hall · ' + id; this.root.add(exterior);
     const inside = new THREE.Group(); inside.position.copy(exterior.position); this.interiors.add(inside);
+    this.probeParts.set(id, { objects: [exterior], hide: [exterior, inside] }); this.probeParts.set(id + '-inside', { objects: [inside], hide: [] });
     const radius = id === 'science' ? 8.5 : 10; const centerY = id === 'science' ? 6 : 5.7;
     const sx = 1, sz = 1;
     const floorR = Math.sqrt(radius * radius - centerY * centerY);
@@ -296,6 +310,7 @@ export class Town {
     const { a, b, wall, dome, doorPhi } = ENERGY_HALL;
     const exterior = new THREE.Group(); exterior.position.set(x, 0.16, z); exterior.name = 'Hall · energy'; this.root.add(exterior);
     const inside = new THREE.Group(); inside.position.copy(exterior.position); this.interiors.add(inside);
+    this.probeParts.set('energy', { objects: [exterior], hide: [exterior, inside] }); this.probeParts.set('energy-inside', { objects: [inside], hide: [] });
     // A cabochon: the wall flares slightly up to the rim, then the dome closes over the hall.
     const profile: [number, number][] = [[0, 0.98], [3.7, 1], [wall, 1]];
     for (let k = 1; k <= 8; k++) profile.push([wall + dome * Math.sin(k / 8 * Math.PI / 2), Math.cos(k / 8 * Math.PI / 2)]);
@@ -349,17 +364,23 @@ export class Town {
           vertices.push(wx, ceiling(wx, pz) - .12, pz, wx, bottom, pz); edge.push(new THREE.Vector3(wx, bottom, pz));
           if (k < 32) { const n = k * 2; indices.push(n, n + 1, n + 2, n + 1, n + 3, n + 2); }
         }
-        lineTube(edge, .09, this.silver, structure);
+        this.probeParts.get('energy-inside')!.objects.push(lineTube(edge, .09, this.silver, structure));
         const fin = new THREE.BufferGeometry(); fin.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); fin.setIndex(indices); fin.computeVertexNormals(); fins.push(fin);
       }
       const amber = new THREE.MeshStandardMaterial({ color: '#dc9140', emissive: '#a94908', emissiveIntensity: 0.18, transparent: true, opacity: 0.68, side: THREE.DoubleSide, depthWrite: false, roughness: 0.4 });
-      const shelves = new THREE.Mesh(mergeGeometries(fins, false)!, amber); shelves.position.y = -0.16; structure.add(shelves);
+      const shelves = new THREE.Mesh(mergeGeometries(fins, false)!, amber); shelves.position.y = -0.16; structure.add(shelves); this.probeParts.get('energy-inside')!.objects.push(shelves);
       for (const fin of fins) fin.dispose();
     }
     this.exhibitions.push(new PlanarExhibition(id, group, x, z, this.colliders, this.interactives, this.tier));
     const light = new THREE.PointLight(id === 'energy' ? '#ffc56d' : '#fff2d5', this.mobile ? 7 : 12, 18, 1.8); light.position.set(0, 5.5, 0); group.add(light);
     const lantern = mesh(new THREE.TorusGeometry(2.7, 0.025, 6, 50), new THREE.MeshBasicMaterial({ color: '#f4dfad' }), group, 0, 6, 0); lantern.rotation.x = Math.PI / 2;
     this.rooms.push({ center: new THREE.Vector3(x, 0, z), parts: group.children.filter((child) => !(child as THREE.Light).isLight), shown: null });
+  }
+  /** Trees as a probe at `position` sees them, in every direction (the bake's per-site hook). */
+  surround(position: THREE.Vector3): void { this.forest.surround(position, graphicsProfile(this.tier).forest); }
+  /** Probe sites with the parts each serves (probes.ts); the cpu tier bakes none. */
+  probeScopes(): ProbeScope[] {
+    return PROBE_SITES.flatMap(site => { const parts = this.probeParts.get(site.id); return parts ? [{ site, ...parts }] : []; });
   }
   readonly forest = new Forest();
   async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows, this.wind), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }

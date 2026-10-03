@@ -209,6 +209,8 @@ Mitoring's Ministry of Energy uses cloudy honey-coloured amber and rounded cast-
 
 On the GPU profile, screen-space ambient occlusion darkens corners, kerbs, the feet of stands, dense grass and the folds of the buildings, and a restrained bloom lets the neon gate, lamps and other lights brighter than white glow softly at night. Posters, photographs, captions and signs keep their exact colours. The mobile and CPU profiles skip both; the aerial map and the Gentle visual-detail setting skip the occlusion but keep the bloom. Development builds accept `?post=off` to compare without them, and `?post=gi` for an experimental, still noisy screen-space bounce light.
 
+The silver, brass, amber, glass and gems of the building-pieces reflect their own surroundings instead of only the sky: after loading, the GPU and mobile profiles photograph the town once from inside each building-piece and each hall (reflection probes), and again the first time you switch between day and night. Metals inside the halls reflect their hall. The CPU profile keeps sky reflections. Development builds accept `?probes=off` to compare without them.
+
 ## Content model
 
 Landmarks and stories live in [src/game/content.ts](../src/game/content.ts): ten destinations on one town map, and source-linked jewelry, place and research discoveries. The catalogue manifest contributes the additional physical works. All stories can be read from the journal without a prerequisite visit; reading and visits are tracked separately. Text distinguishes the real jewelry and research from new Livistone fiction.

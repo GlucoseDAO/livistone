@@ -221,6 +221,17 @@ export class Forest extends THREE.Group {
     return casters;
   }
   /**
+   * A reflection probe (probes.ts) looks every way at once: each cell takes the detail its distance from `origin` gives,
+   * unculled. The next update() restores the view's own cells.
+   */
+  surround(origin: THREE.Vector3, fogFar: number): void {
+    for (const cell of this.cells) {
+      const lod = forestLod(origin.distanceTo(cell.center), fogFar);
+      cell.state = lod === 'hidden' ? HIDDEN : lod === 'full' ? FULL : REDUCED; cell.seen = cell.state !== HIDDEN;
+    }
+    for (let species = 0; species < this.matrices.length; species++) this.refill(species);
+  }
+  /**
    * Before the first frame, draw every tree in every mesh with culling off, so the precompile and first shadow pass build
    * each shader now rather than when a cell first comes into view. update() restores the cells afterwards.
    */
