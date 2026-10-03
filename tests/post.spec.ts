@@ -14,16 +14,18 @@ const paperShare = async (page: Page): Promise<number> => page.evaluate(async (p
 }, (await page.screenshot()).toString('base64'));
 
 // Ambient occlusion and bloom (render/post.ts) act before tone mapping and skip display pixels: the catalogue poster's paper
-// covers about 26% of this view and keeps its exact colour by day and by night. Occlusion leaking onto the paper, even by a
-// level, halved that share (13%) when tried, so 20% is the gate.
+// keeps its exact colour by day and by night. Occlusion leaking onto the paper, even by a level, halved the exact share when
+// tried, so the gate compares it with the same view under ?post=off (about 16% since the posters gained brass rails and a
+// light pool in their captions, sub-plan 12) rather than with a fixed share.
 test('poster paper stays exactly #f4f0e5 under ambient occlusion and bloom, day and night', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error' && GPU_ERROR.test(m.text())) errors.push(m.text()); });
   await page.addInitScript(() => { try { localStorage.setItem('livistone-time-of-day', 'day'); } catch { /* the default is still day or night */ } });
-  await page.goto('/?graphics=gpu&capture=1');
-  await page.waitForFunction(() => { const s = (window as any).__livistone?.snapshot(); return s?.ready && s.mode === 'walking'; }, null, { timeout: 120000 });
+  const open = async (post: string) => {
+    await page.goto(`/?graphics=gpu&capture=1&post=${post}`);
+    await page.waitForFunction(() => { const s = (window as any).__livistone?.snapshot(); return s?.ready && s.mode === 'walking'; }, null, { timeout: 120000 });
+  };
   const snapshot = () => page.evaluate(() => (window as any).__livistone.snapshot());
-  expect((await snapshot()).post).toBe('ao'); expect((await snapshot()).backend).toBe(EXPECTED_BACKEND);
   const frames = async (count: number) => { const start = (await snapshot()).frames; await page.waitForFunction(([from, n]) => (window as any).__livistone.snapshot().frames >= from + n, [start, count], { timeout: 60000 }); };
   const look = async () => {
     await page.evaluate(() => (window as any).__livistone.teleport(2.51, -18.21, -2.409));
@@ -31,10 +33,13 @@ test('poster paper stays exactly #f4f0e5 under ambient occlusion and bloom, day 
     const hide = await page.addStyleTag({ content: '#app > :not(canvas) { visibility: hidden !important; }' }); await frames(2);
     const share = await paperShare(page); await hide.evaluate((style) => (style as Element).remove()); return share;
   };
-  expect(await look()).toBeGreaterThan(.2);
+  await open('off'); expect((await snapshot()).post).toBe('off');
+  const plain = await look(); expect(plain).toBeGreaterThan(.1);
+  await open('ao'); expect((await snapshot()).post).toBe('ao'); expect((await snapshot()).backend).toBe(EXPECTED_BACKEND);
+  expect(await look()).toBeGreaterThanOrEqual(plain - .002);
   await page.getByRole('button', { name: 'Open menu' }).click(); await page.locator('#time-of-day').selectOption('night');
   await expect.poll(async () => (await snapshot()).night).toBe(true);
   await page.keyboard.press('Escape'); await expect.poll(async () => (await snapshot()).mode).toBe('walking');
-  expect(await look()).toBeGreaterThan(.2);
+  expect(await look()).toBeGreaterThanOrEqual(plain - .002);
   expect(errors).toEqual([]);
 });
