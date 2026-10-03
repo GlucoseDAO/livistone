@@ -8,6 +8,9 @@ import { FUTURE_NECK } from '../src/world/elevated-layout';
 import { CAVE_APPROACH } from '../src/world/enhancement-layout';
 import { GLUCOSE_PAVILION } from '../src/world/glucose-layout';
 import { STATION } from '../src/world/station-layout';
+import { WALKING_NETWORK } from '../src/world/landscape';
+import { kerbOpening, walkingSurface } from '../src/world/walking-surface';
+import type { Road } from '../src/world/path-network';
 
 const point = (x: number, z: number): THREE.Vector3 => new THREE.Vector3(x, 0, z);
 const line = (a: THREE.Vector3, b: THREE.Vector3): THREE.LineCurve3 => new THREE.LineCurve3(a, b);
@@ -63,5 +66,92 @@ describe('town walking network', () => {
     }
     const foot = FUTURE_NECK.getPoint(0);
     expect(samples.some(s => touches([foot], s, .1))).toBe(true);
+  });
+});
+
+describe('merged junctions', () => {
+  const { paving, kerbs } = walkingSurface(false), roads = WALKING_NETWORK.roads;
+  const half = (road: Road, p: THREE.Vector3): number => (typeof road.width === 'number' ? road.width : road.width(p)) / 2;
+  // Paving triangles binned by 2 m cell, in plan.
+  const cells = new Map<string, number[][]>();
+  for (const geometry of paving) {
+    const p = geometry.getAttribute('position'), index = geometry.index!;
+    for (let k = 0; k < index.count; k += 3) {
+      const t = [0, 1, 2].flatMap(o => [p.getX(index.getX(k + o)), p.getY(index.getX(k + o)), p.getZ(index.getX(k + o))]);
+      for (let i = Math.floor(Math.min(t[0], t[3], t[6]) / 2); i <= Math.floor(Math.max(t[0], t[3], t[6]) / 2); i++)
+        for (let j = Math.floor(Math.min(t[2], t[5], t[8]) / 2); j <= Math.floor(Math.max(t[2], t[5], t[8]) / 2); j++) cells.set(`${i},${j}`, [...cells.get(`${i},${j}`) ?? [], t]);
+    }
+  }
+  /** Heights of the paving triangles covering a point in plan, edges included unless it must lie `inset` inside them. */
+  const cover = (x: number, z: number, inset = 0): number[] => (cells.get(`${Math.floor(x / 2)},${Math.floor(z / 2)}`) ?? []).flatMap(([x0, y0, z0, x1, y1, z1, x2, y2, z2]) => {
+    const d = (z1 - z2) * (x0 - x2) + (x2 - x1) * (z0 - z2), a = ((z1 - z2) * (x - x2) + (x2 - x1) * (z - z2)) / d, b = ((z2 - z0) * (x - x2) + (x0 - x2) * (z - z2)) / d;
+    if (!(a > -1e-6 && b > -1e-6 && a + b < 1 + 1e-6)) return [];
+    // Barycentric weight over the opposite edge's height is the distance from that edge.
+    const edges = [[x1, z1, x2, z2, a], [x2, z2, x0, z0, b], [x0, z0, x1, z1, 1 - a - b]].map(([ax, az, bx, bz, w]) => w * Math.abs(d) / Math.hypot(bx - ax, bz - az));
+    return Math.min(...edges) >= inset ? [a * y0 + b * y1 + (1 - a - b) * y2] : [];
+  });
+  const covered = (x: number, z: number): boolean => cover(x, z).length > 0;
+  /** Points across each road's own ribbon, with the ribbon's direction. */
+  const ribbon = (road: Road, offsets: number[]): { x: number; z: number; offset: number }[] => {
+    const points = road.curve.getSpacedPoints(Math.ceil(road.curve.getLength() / .25));
+    return points.flatMap((q, i) => {
+      const a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)], l = Math.hypot(b.x - a.x, b.z - a.z), nx = -(b.z - a.z) / l, nz = (b.x - a.x) / l;
+      return offsets.map(offset => ({ x: q.x + nx * offset * half(road, q), z: q.z + nz * offset * half(road, q), offset }));
+    });
+  };
+  const ends = roads.flatMap(road => [0, 1].map(t => road.curve.getPoint(t)));
+  const junctions = ends.filter(p => !WALKING_NETWORK.freeEnds.some(e => Math.hypot(e.x - p.x, e.z - p.z) < 1e-6));
+
+  it('paves every route, junctions included, as one layer with no overlapping strips', () => {
+    for (const road of roads) for (const { x, z } of ribbon(road, [-.97, -.5, 0, .5, .97])) {
+      const layers = cover(x, z);
+      // Points on a shared triangle edge count twice; never more, and never at two heights.
+      expect(layers.length, `${x}, ${z}`).toBeGreaterThan(0); expect(Math.max(...layers) - Math.min(...layers), `${x}, ${z}: ${layers}`).toBeLessThan(.002);
+    }
+    // Nothing paved beyond the merged outline: no skirts, shoulders or stray strip ends in the lawn.
+    for (const geometry of paving) { const p = geometry.getAttribute('position'); for (let i = 0; i < p.count; i++) expect(WALKING_NETWORK.edge(p.getX(i), p.getZ(i), 1)).toBeLessThan(.01); }
+  });
+
+  it('fillets the inside corners of every junction', () => {
+    expect(junctions.length).toBeGreaterThan(24);
+    const centres = roads.map(road => ribbon(road, [0]).map(q => ({ ...q, half: half(road, new THREE.Vector3(q.x, 0, q.z)) })));
+    for (const p of junctions) {
+      // Ground just outside every ribbon but inside the corner two of them make is paved.
+      const near = centres.flatMap(list => list.filter(q => Math.hypot(q.x - p.x, q.z - p.z) < 6));
+      let fillet = 0;
+      for (let dx = -3; dx <= 3 && fillet <= 3; dx += .1) for (let dz = -3; dz <= 3 && fillet <= 3; dz += .1) {
+        const x = p.x + dx, z = p.z + dz;
+        if (near.every(q => Math.hypot(q.x - x, q.z - z) >= q.half + .05) && covered(x, z)) fillet++;
+      }
+      expect(fillet, `junction ${p.x}, ${p.z}`).toBeGreaterThan(3);
+    }
+  });
+
+  it('runs kerbs along the merged outline, never across paving, open only at thresholds and free ends', () => {
+    const stones = new Map<string, number[]>();
+    for (const geometry of kerbs) {
+      const p = geometry.getAttribute('position');
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), z = p.getZ(i);
+        // No kerb on the merged paving, so none runs into another route's surface; the inner face rests on its edge.
+        expect(cover(x, z, .002), `${x}, ${z}`).toHaveLength(0);
+        expect(kerbOpening(x, z), `${x}, ${z}`).toBe(false);
+        const key = `${Math.floor(x)},${Math.floor(z)}`; stones.set(key, [...stones.get(key) ?? [], x, z]);
+      }
+    }
+    const near = (x: number, z: number, reach: number): boolean => {
+      for (let i = Math.floor(x - reach); i <= Math.floor(x + reach); i++) for (let j = Math.floor(z - reach); j <= Math.floor(z + reach); j++) {
+        const list = stones.get(`${i},${j}`) ?? []; for (let k = 0; k < list.length; k += 2) if (Math.hypot(list[k] - x, list[k + 1] - z) < reach) return true;
+      } return false;
+    };
+    let edges = 0;
+    for (const road of roads) for (const { x, z } of ribbon(road, [-1.1, 1.1])) {
+      // Wherever the outline runs along a ribbon edge, outside thresholds and the free ends, a kerb lines it.
+      // A stone reaching into a threshold is left out whole, so the opening can widen by up to one block.
+      const threshold = Array.from({ length: 9 }, (_, k) => k < 8 ? [Math.cos(k * Math.PI / 4) * 1.8, Math.sin(k * Math.PI / 4) * 1.8] : [0, 0]).some(([dx, dz]) => kerbOpening(x + dx, z + dz));
+      if (Math.abs(WALKING_NETWORK.edge(x, z, 1) - (1.1 - 1) * 1.3) > .05 || threshold || WALKING_NETWORK.freeEnds.some(e => Math.hypot(e.x - x, e.z - z) < 2.6)) continue;
+      edges++; expect(near(x, z, .9), `${x}, ${z}`).toBe(true);
+    }
+    expect(edges).toBeGreaterThan(3000);
   });
 });

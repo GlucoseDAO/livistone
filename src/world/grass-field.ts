@@ -2,8 +2,7 @@ import * as THREE from 'three';
 import { Fn, attribute, cameraPosition, cameraViewMatrix, clamp, cos, cross, dot, exp2, float, floor, fract, instanceIndex, ivec2, length, max, min, mix, normalize, positionGeometry, pow, sin, smoothstep, step, texture, textureLoad, varyingProperty, vec2, vec3, vec4 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
-import { PATH_CLEARANCE, PATH_CURVES, WATER_CLEARANCE, footprintReserved } from './landscape';
-import { GARDEN_PATHS, GARDEN_PATH_CLEARANCE, GARDENS } from './living-waters-layout';
+import { WALKING_NETWORK, WATER_CLEARANCE, groundReserved } from './landscape';
 import { tributaryCenter, waterDistance } from './waterways';
 import { landscapeHeight } from './terrain';
 import { groundCover } from './ground-cover';
@@ -30,7 +29,7 @@ export const GRASS_TIERS = {
 type Spec = (typeof GRASS_TIERS)[keyof typeof GRASS_TIERS];
 
 /**
- * Blade roots keep this much ground clear of every reserved footprint (plantingAllowed's radius); full height from .3 m
+ * Blade roots keep this much ground clear of every reserved footprint (grassAllowed's radius); full height from .3 m
  * further. The 2 m lookup overestimates the clearance by up to ~.2 m outside tight path bends, so kerbs stay bare too.
  */
 export const BLADE_CLEARANCE = .25;
@@ -52,6 +51,9 @@ export function grassFieldEnabled(): boolean {
 // ---------------------------------------------------------------------------------------------------------------------
 // Bake
 
+/** A round footprint on the ground (a trunk or stem), world metres. */
+export interface GroundDisc { x: number; z: number; radius: number }
+
 const STEP = 2, LIMIT = 3, COARSE = 4;
 /** The walkable town on the terrain mesh's 2 m vertex grid (even world coordinates), plus the clearance and tint lookups. */
 export interface GrassBake {
@@ -65,43 +67,21 @@ export interface GrassBake {
   tint: Uint8Array;
 }
 
-/** Nearest of a fixed set of points, via 5 m bins; exact up to `range` metres, `range` beyond. */
-function nearestSample(points: readonly { x: number; z: number }[], range: number): (x: number, z: number) => number {
-  const bin = 5, ox = TOWN_BOUNDS.minX - 20, oz = TOWN_BOUNDS.minZ - 20, nx = Math.ceil((TOWN_BOUNDS.maxX - ox + 20) / bin), nz = Math.ceil((TOWN_BOUNDS.maxZ - oz + 20) / bin);
-  const bins: number[][] = Array.from({ length: nx * nz }, () => []);
-  for (const p of points) {
-    const bx = Math.floor((p.x - ox) / bin), bz = Math.floor((p.z - oz) / bin);
-    for (let i = bx - 1; i <= bx + 1; i++) for (let j = bz - 1; j <= bz + 1; j++) if (i >= 0 && j >= 0 && i < nx && j < nz) bins[j * nx + i].push(p.x, p.z);
-  }
-  return (x, z) => {
-    const bx = Math.floor((x - ox) / bin), bz = Math.floor((z - oz) / bin); if (bx < 0 || bz < 0 || bx >= nx || bz >= nz) return range;
-    const list = bins[bz * nx + bx]; let best = range * range;
-    for (let k = 0; k < list.length; k += 2) { const dx = list[k] - x, dz = list[k + 1] - z, d = dx * dx + dz * dz; if (d < best) best = d; }
-    return Math.sqrt(best);
-  };
-}
-// plantingAllowed's own path samples, so the clearance agrees with it exactly.
-let pathDistances: { routes: (x: number, z: number) => number; garden: (x: number, z: number) => number } | null = null;
-const paths = (): NonNullable<typeof pathDistances> => pathDistances ??= {
-  routes: nearestSample(PATH_CURVES.flatMap(curve => curve.getPoints(160)), PATH_CLEARANCE + LIMIT),
-  garden: nearestSample(GARDEN_PATHS.flatMap(curve => curve.getPoints(120)).map(p => ({ x: p.x + GARDENS.x, z: p.z + GARDENS.z })), GARDEN_PATH_CLEARANCE + LIMIT),
-};
-/** Clearance from water and walking routes, capped at ±LIMIT. */
+/** Clearance from water and from the merged walking network (paving, fillets and planting margins), capped at ±LIMIT. */
 function openClearance(x: number, z: number): number {
-  const { routes, garden } = paths();
-  return Math.max(-LIMIT, Math.min(LIMIT, waterDistance(x, z) - WATER_CLEARANCE, routes(x, z) - PATH_CLEARANCE, garden(x, z) - GARDEN_PATH_CLEARANCE));
+  return Math.max(-LIMIT, Math.min(LIMIT, waterDistance(x, z) - WATER_CLEARANCE, WALKING_NETWORK.clearance(x, z, LIMIT)));
 }
-/** The largest footprint radius that still fits below `upper` (every plantingAllowed predicate grows with the radius). */
+/** The largest footprint radius that still fits below `upper` (every groundReserved predicate grows with the radius). */
 function footprintClearance(x: number, z: number, upper: number): number {
-  if (!footprintReserved(x, z, upper)) return upper;
-  if (footprintReserved(x, z, -LIMIT)) return -LIMIT;
+  if (!groundReserved(x, z, upper)) return upper;
+  if (groundReserved(x, z, -LIMIT)) return -LIMIT;
   let lo = -LIMIT, hi = upper;
-  for (let k = 0; k < 9; k++) { const mid = (lo + hi) / 2; if (footprintReserved(x, z, mid)) hi = mid; else lo = mid; }
+  for (let k = 0; k < 9; k++) { const mid = (lo + hi) / 2; if (groundReserved(x, z, mid)) hi = mid; else lo = mid; }
   return lo;
 }
 /**
- * Signed distance (m, capped at ±3) from the nearest ground plantingAllowed reserves: positive outside, so
- * plantingAllowed(x, z, r) holds exactly where this is at least r.
+ * Signed distance (m, capped at ±3) from the nearest ground grassAllowed reserves: positive outside, so grassAllowed(x, z, r)
+ * holds exactly where this is at least r. Canopy clearings (the mycelium grove, the Enhancement meadow) keep their grass.
  */
 export function grassClearance(x: number, z: number): number {
   const open = openClearance(x, z);
@@ -109,10 +89,11 @@ export function grassClearance(x: number, z: number): number {
 }
 
 /**
- * Bakes the lookups once at load. Rocks keep their own footprint; `height` defaults to the rendered landscape; `shade` is the
- * terrain's baked ground occlusion (groundShadeField), so blades under crowns lose the same sky light as the ground.
+ * Bakes the lookups once at load. Rocks and the grove's stems (LivingWaters.stems: trunk discs, crowns excluded) keep their
+ * own footprints; `height` defaults to the rendered landscape; `shade` is the terrain's baked ground occlusion
+ * (groundShadeField), so blades under crowns lose the same sky light as the ground.
  */
-export function bakeGrassField(options: { rocks?: readonly RockSite[]; height?: (x: number, z: number) => number; shade?: (x: number, z: number) => number } = {}): GrassBake {
+export function bakeGrassField(options: { rocks?: readonly RockSite[]; stems?: readonly GroundDisc[]; height?: (x: number, z: number) => number; shade?: (x: number, z: number) => number } = {}): GrassBake {
   const height = options.height ?? landscapeHeight, shade = options.shade ?? ((): number => 1);
   const minX = STEP * Math.floor(TOWN_BOUNDS.minX / STEP), minZ = STEP * Math.floor(TOWN_BOUNDS.minZ / STEP);
   const width = (STEP * Math.ceil(TOWN_BOUNDS.maxX / STEP) - minX) / STEP + 1, depth = (STEP * Math.ceil(TOWN_BOUNDS.maxZ / STEP) - minZ) / STEP + 1;
@@ -123,7 +104,7 @@ export function bakeGrassField(options: { rocks?: readonly RockSite[]; height?: 
   const reach = (COARSE - 1) * STEP / 2 * Math.SQRT2 + LIMIT + .5;
   for (let j0 = 0; j0 < depth; j0 += COARSE) for (let i0 = 0; i0 < width; i0 += COARSE) {
     const cx = minX + (i0 + (COARSE - 1) / 2) * STEP, cz = minZ + (j0 + (COARSE - 1) / 2) * STEP;
-    const block = !footprintReserved(cx, cz, reach) ? LIMIT : footprintReserved(cx, cz, -reach) ? -LIMIT : NaN;
+    const block = !groundReserved(cx, cz, reach) ? LIMIT : groundReserved(cx, cz, -reach) ? -LIMIT : NaN;
     for (let j = j0; j < Math.min(depth, j0 + COARSE); j++) for (let i = i0; i < Math.min(width, i0 + COARSE); i++) {
       const x = minX + i * STEP, z = minZ + j * STEP, n = j * width + i, open = openClearance(x, z);
       field[n * 4 + 1] = open <= -LIMIT || block === -LIMIT ? -LIMIT : block === LIMIT ? open : footprintClearance(x, z, open);
@@ -139,12 +120,12 @@ export function bakeGrassField(options: { rocks?: readonly RockSite[]; height?: 
     }
   }
   // Rocks keep their footprint and a ring of bank around it. Below about 40 cm the 2 m grid cannot resolve a rock, so a few
-  // short bank blades may still meet the smallest pebbles.
-  for (const rock of options.rocks ?? []) {
-    const radius = rockReach(rock.s) + .5, i0 = Math.floor((rock.x - radius - LIMIT - minX) / STEP), j0 = Math.floor((rock.z - radius - LIMIT - minZ) / STEP);
+  // short bank blades may still meet the smallest pebbles. Stems keep their own trunk disc.
+  for (const disc of [...(options.rocks ?? []).map(rock => ({ x: rock.x, z: rock.z, radius: rockReach(rock.s) + .5 })), ...options.stems ?? []]) {
+    const radius = disc.radius, i0 = Math.floor((disc.x - radius - LIMIT - minX) / STEP), j0 = Math.floor((disc.z - radius - LIMIT - minZ) / STEP);
     for (let j = Math.max(0, j0); j <= Math.min(depth - 1, j0 + Math.ceil((radius + LIMIT) * 2 / STEP) + 1); j++)
       for (let i = Math.max(0, i0); i <= Math.min(width - 1, i0 + Math.ceil((radius + LIMIT) * 2 / STEP) + 1); i++) {
-        const n = (j * width + i) * 4 + 1; field[n] = Math.min(field[n], Math.hypot(minX + i * STEP - rock.x, minZ + j * STEP - rock.z) - radius);
+        const n = (j * width + i) * 4 + 1; field[n] = Math.min(field[n], Math.hypot(minX + i * STEP - disc.x, minZ + j * STEP - disc.z) - radius);
       }
   }
   const colour = new THREE.Color();

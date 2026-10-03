@@ -27,6 +27,12 @@ function neckPoints(): THREE.Vector3[] {
 export const FUTURE_NECK = new THREE.CatmullRomCurve3(neckPoints());
 /** The map arrival: on the lake path just before the foot, facing straight up the neck. */
 export const NECK_ARRIVAL = { x: NECK_FOOT.x + .97, z: NECK_FOOT.z + .25, yaw: Math.atan2(NECK_FOOT.x - NECK_THRESHOLD.x, NECK_FOOT.z - NECK_THRESHOLD.z) };
+/** The camel's copper feet and toes (future-house.ts); its hull rides 8 m up and its neck rises from inside the lake rim. */
+export const FUTURE_FEET = [-7, 7].flatMap(dz => [-1, 1].map(side => ({ x: FUTURE_HOUSE.x + side * 6.9, z: FUTURE_HOUSE.z + dz + 3.1, radius: 1.6 })));
+/** What the Future House stands on: grass grows under the camel; futureClearing keeps trees from its body. */
+export function futureGround(x: number, z: number, radius = 0): boolean {
+  return FUTURE_FEET.some(f => Math.hypot(x - f.x, z - f.z) < f.radius + radius);
+}
 export function futureClearing(x: number, z: number, radius = 0): boolean {
   return Math.hypot((x + 64) / (15 + radius), (z + 110) / (17 + radius)) < 1 || (x > -66 - radius && x < -33.5 + radius && Math.abs(z + 107.75) < 5.25 + radius);
 }

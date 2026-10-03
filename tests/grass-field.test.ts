@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { BLADE_CLEARANCE, bakeGrassField, createGrassField, grassClearance, grassFieldCounts, sampleGrassField } from '../src/world/grass-field';
-import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from '../src/world/landscape';
+import { PATH_CURVES, PATH_WIDTH, WALKING_NETWORK, grassAllowed, plantingAllowed } from '../src/world/landscape';
+import { KERB_WIDTH } from '../src/world/path-kerbs';
+import { ENHANCEMENT, GALLERY, POSTER_SITES, STAND_SITES, enhancementClearing } from '../src/world/enhancement-layout';
+import { OPAL_BASIN, RILL, gardenFootprint } from '../src/world/living-waters-layout';
+import { FUTURE_FEET, futureClearing } from '../src/world/elevated-layout';
 import { GARDEN_PATHS, GARDENS } from '../src/world/living-waters-layout';
 import { waterDistance } from '../src/world/waterways';
 import { mountainGeometry, terrainTiles } from '../src/world/mountains';
@@ -20,26 +24,27 @@ const points = (seed: number, count: number): [number, number][] => {
 const blades = (x: number, z: number): boolean => (sampleGrassField(bake, x, z)?.clearance ?? -1) >= BLADE_CLEARANCE;
 
 describe('near grass field', () => {
-  it('measures exactly the clearance plantingAllowed reserves', () => {
+  it('measures exactly the clearance grassAllowed reserves, which every plant also keeps', () => {
     let checked = 0;
     for (const [x, z] of points(5, 4000)) {
       const clearance = grassClearance(x, z);
       for (const radius of [0, BLADE_CLEARANCE, .6, 1.5]) {
         // The bisection resolves about a centimetre.
         if (Math.abs(clearance - radius) < .02) continue;
-        expect(plantingAllowed(x, z, radius), `${x}, ${z}, r ${radius}`).toBe(clearance >= radius); checked++;
+        expect(grassAllowed(x, z, radius), `${x}, ${z}, r ${radius}`).toBe(clearance >= radius); checked++;
+        if (plantingAllowed(x, z, radius)) expect(grassAllowed(x, z, radius), `${x}, ${z}, r ${radius}`).toBe(true);
       }
     }
     expect(checked).toBeGreaterThan(15000);
   });
 
-  it('grows blades only where plantingAllowed allows them, and everywhere it allows a full tuft', () => {
+  it('grows blades only where grassAllowed allows them, and everywhere it allows a full tuft', () => {
     let grown = 0, open = 0, shortened = 0;
     for (const [x, z] of points(9, 60000)) {
       // The 2 m lookup interpolates the clearance. At the corners of rectangular footprints that runs up to ~.3 m into
       // their reserved margins, which already lie beyond the buildings and displays; paths and water are checked below.
       if (blades(x, z)) { grown++; expect(grassClearance(x, z), `${x}, ${z}`).toBeGreaterThan(-.35); }
-      if (plantingAllowed(x, z, .75)) { open++; if (sampleGrassField(bake, x, z)!.clearance < BLADE_CLEARANCE + .3) shortened++; }
+      if (grassAllowed(x, z, .75)) { open++; if (sampleGrassField(bake, x, z)!.clearance < BLADE_CLEARANCE + .3) shortened++; }
     }
     expect(grown).toBeGreaterThan(30000);
     // Open meadow keeps full-height blades except beside the few river rocks and path junctions.
@@ -58,6 +63,30 @@ describe('near grass field', () => {
     for (let a = 0; a < 6.3; a += .3) for (const r of [0, 4, 9]) expect(blades(GLUCOSE_PAVILION.x + Math.sin(a) * r, GLUCOSE_PAVILION.z + Math.cos(a) * r)).toBe(false);
     for (let x = STATION.x - STATION.halfLength; x <= STATION.x + STATION.halfLength; x += 2) for (let z = STATION.front; z <= STATION.back; z += 2) expect(blades(x, z)).toBe(false);
     for (const rock of rocks) if (rock.s > .4) expect(blades(rock.x, rock.z)).toBe(false);
+    // Junction fillets and kerbs are paving too, wherever the merged outline runs.
+    let fillets = 0;
+    for (const [x, z] of points(19, 120000)) if (WALKING_NETWORK.edge(x, z, 1) < KERB_WIDTH) { fillets++; expect(blades(x, z), `${x}, ${z}`).toBe(false); }
+    expect(fillets).toBeGreaterThan(1500);
+  });
+
+  it('covers the mycelium grove, the Enhancement meadow and the ground under the camel, but not what stands on them', () => {
+    const stems = [{ x: 78, z: -118, radius: .5 }], grove = bakeGrassField({ rocks, stems }), grows = (x: number, z: number): boolean => (sampleGrassField(grove, x, z)?.clearance ?? -1) >= BLADE_CLEARANCE;
+    // Open floor that plants keep clear of still grows grass: most of the grove and the meadow before the hill.
+    let canopy = 0, meadow = 0;
+    for (const [x, z] of points(23, 60000)) {
+      if (!gardenFootprint(x, z, 0) && !enhancementClearing(x, z, 0) && !futureClearing(x, z, 0) || !grassAllowed(x, z, 1)) continue;
+      canopy++; if (grows(x, z)) meadow++;
+    }
+    expect(canopy).toBeGreaterThan(1500); expect(meadow / canopy).toBeGreaterThan(.97);
+    expect(grows(78, -121)).toBe(true); expect(grows(75, -156)).toBe(true); expect(grows(113, -162)).toBe(true); expect(grows(-64, -110)).toBe(true);
+    for (const foot of FUTURE_FEET) expect(grows(foot.x, foot.z)).toBe(false);
+    // Stems, the opal basin, the rill, the hill and its cave, the displays and the lake's silver rim stay bare.
+    expect(grows(78, -118)).toBe(false);
+    for (let a = 0; a < 6.3; a += .5) expect(grows(OPAL_BASIN.x + Math.cos(a) * 3, -110 + OPAL_BASIN.z + Math.sin(a) * 3)).toBe(false);
+    for (const p of RILL.getPoints(30)) expect(grows(p.x, p.z - 110)).toBe(false);
+    for (let x = ENHANCEMENT.x - 18; x <= ENHANCEMENT.x + 18; x += 3) for (let z = ENHANCEMENT.z - 10; z <= ENHANCEMENT.z + 10; z += 3) expect(grows(x, z)).toBe(false);
+    for (const site of [...POSTER_SITES, ...STAND_SITES]) expect(grows(site.x, GALLERY.z)).toBe(false);
+    for (let a = 0; a < 6.3; a += .3) expect(grows(Math.cos(a) * 41, -110 + Math.sin(a) * 41)).toBe(false);
   });
 
   it('shades the ground only where blades grow', () => {

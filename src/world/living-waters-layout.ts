@@ -4,7 +4,9 @@ import * as THREE from 'three';
 export const GARDENS = { x: 0, z: -110, radius: 44, pavilionX: -10, pavilionZ: 0 };
 export const GARDEN_PANELS = { vittoria: [-16, -52], dewdrop: [-13, -1.5], mycelium: [70, -23] } as const;
 export type Point = [number, number];
-const outline: Point[] = Array.from({ length: 80 }, (_, i) => { const angle = i * Math.PI / 40, r = 44 + Math.sin(angle * 3 + .5) * 1.2 + Math.sin(angle * 5) * .7; return [Math.cos(angle) * r, Math.sin(angle) * r]; });
+/** Radius of the lake's silver rim at an angle about the garden centre. */
+const rim = (angle: number): number => 44 + Math.sin(angle * 3 + .5) * 1.2 + Math.sin(angle * 5) * .7;
+const outline: Point[] = Array.from({ length: 80 }, (_, i) => { const angle = i * Math.PI / 40, r = rim(angle); return [Math.cos(angle) * r, Math.sin(angle) * r]; });
 const seeds: Point[] = [[-10, 0], [-16, -17], [-3, -19], [11, -23], [22, -13], [22, 4], [13, 19], [-3, 23], [-20, 19], [-30, 5], [-31, -12], [-24, -28], [-11, -35], [2, -36], [14, -35], [28, -27], [36, -16], [37, -4], [36, 11], [29, 26], [16, 35], [1, 36], [-13, 34], [-29, 29], [-39, 17], [-39, -3], [-35, -24], [4, -5], [7, 8]];
 function clip(polygon: Point[], nx: number, nz: number, distance: number): Point[] {
   const result: Point[] = [];
@@ -44,6 +46,29 @@ export function rainPlantAllowed(x: number, z: number, radius: number): boolean 
 }
 
 const panelSites = Object.values(GARDEN_PANELS);
+/** The opal basin and the silver rill that drains it to the lake (local coordinates). */
+export const OPAL_BASIN = { x: 75, z: 0, radius: 3.9 };
+export const RILL = new THREE.CatmullRomCurve3([[75, 0], [72, 10], [63, 17], [53, 14], [42, 8]].map(([x, z]) => new THREE.Vector3(x, .035, z)));
+export const RILL_RADIUS = .28;
+const rillPoints = RILL.getSpacedPoints(80);
+/**
+ * Ground the garden itself covers: its panels, the silver lake network out to its rim (outline points lie within 2 cm of
+ * rim()), the opal basin and the rill with its banks. Grass grows over the rest of the grove floor, which gardenFootprint keeps for the
+ * mushrooms; their stems are the grass field's own obstacles (grass-field.ts).
+ */
+export function gardenGround(x: number, z: number, radius: number): boolean {
+  x -= GARDENS.x; z -= GARDENS.z;
+  if (panelSites.some(([px, pz]) => Math.hypot(px - x, pz - z) < 2.4 + radius)) return true;
+  if (Math.hypot(x, z) < rim(Math.atan2(z, x)) + .05 + radius || Math.hypot(x - OPAL_BASIN.x, z - OPAL_BASIN.z) < OPAL_BASIN.radius + radius) return true;
+  // The rill keeps a half-metre bank each side: the grass field's 2 m lookup cannot resolve the 56 cm channel itself.
+  const reach = RILL_RADIUS + .5 + radius;
+  if (x < 42 - reach || x > 75 + reach || z < -reach || z > 18 + reach) return false;
+  for (let i = 1; i < rillPoints.length; i++) {
+    const a = rillPoints[i - 1], b = rillPoints[i], dx = b.x - a.x, dz = b.z - a.z, t = Math.min(1, Math.max(0, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz)));
+    if (Math.hypot(x - a.x - dx * t, z - a.z - dz * t) < reach) return true;
+  }
+  return false;
+}
 /** The district's panels, lake disc and mycelium grove, without its paths (the grass field measures those separately). */
 export function gardenFootprint(x: number, z: number, radius: number): boolean {
   x -= GARDENS.x; z -= GARDENS.z;

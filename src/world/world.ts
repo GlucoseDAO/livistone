@@ -16,17 +16,12 @@ import { groundShadeField } from './ground-cover';
 import { createBridge, createGardenBridge } from './bridge';
 import { createGateway } from './gateway';
 import { createGatewayPoster } from './gateway-poster';
-import { gatewayApproachWidth } from './gateway-layout';
 import { createPlanting } from './planting';
 import { createGrassField } from './grass-field';
 import type { GrassShade } from './ground-material';
 import { updateWind } from './wind';
 import type { Planting } from './planting';
-import { PATH_CURVES, PATH_WIDTH } from './landscape';
-import { pathKerbs } from './path-kerbs';
-import { GLUCOSE_PAVILION } from './glucose-layout';
-import { TIME_TOWER } from './waterways';
-import { pathJoin } from './path-surface';
+import { TOWN_PAVING, walkingSurface } from './walking-surface';
 import { Mountains } from './mountains';
 import { PlanarExhibition } from './planar-exhibition';
 import { GARDEN_BRIDGES, riverCenter } from './waterways';
@@ -44,7 +39,6 @@ import { createCityHallFacade, loadCityHallTextures } from './city-hall';
 import { mitoringAmberMaterial, loadMitoringAmberTextures, loadMitoringSilverTexture } from './mitoring-materials';
 import { CIVIC_LANDMARKS } from '../game/content';
 import { createStation } from './station';
-import { STATION } from './station-layout';
 import { LivingWaters } from './living-waters';
 import { terrainHeight, terrainVertexHeight, townTerrainGeometry } from './terrain';
 import { LAMP_POSTS, transformColliders } from './town-layout';
@@ -71,16 +65,6 @@ export { riverCenter } from './waterways';
 export { terrainHeight } from './terrain';
 function mesh(geometry: THREE.BufferGeometry, material: THREE.Material, parent: THREE.Object3D, x = 0, y = 0, z = 0): THREE.Mesh {
   const m = new THREE.Mesh(geometry, material); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
-}
-function ribbon(curve: THREE.Curve<THREE.Vector3>, width: number | ((p: THREE.Vector3) => number), steps = 80): THREE.BufferGeometry {
-  const vertices: number[] = [], indices: number[] = [], uv: number[] = [];
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps, p = curve.getPoint(t), tangent = curve.getTangent(t);
-    const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize().multiplyScalar((typeof width === 'number' ? width : width(p)) / 2);
-    for (const side of [-1, 1]) { const x = p.x + normal.x * side, z = p.z + normal.z * side; vertices.push(x, p.y + terrainHeight(x, z), z); uv.push(x / 4, z / 4); }
-    if (i < steps) { const n = i * 2; indices.push(n, n + 1, n + 2, n + 1, n + 3, n + 2); }
-  }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(indices); g.computeVertexNormals(); return g;
 }
 function lineTube(points: THREE.Vector3[], radius: number, material: THREE.Material, parent: THREE.Object3D, smooth = true): THREE.Mesh {
   const curve = new THREE.CatmullRomCurve3(points, false, smooth ? 'centripetal' : 'catmullrom', smooth ? 0.5 : 0.02);
@@ -218,36 +202,15 @@ export class Town {
   }
 
   private createPaths(): void {
-    const edging = new THREE.MeshStandardMaterial({ color: '#a79e86', roughness: 1, side: THREE.DoubleSide });
-    const paving: THREE.BufferGeometry[] = [], borders: THREE.BufferGeometry[] = [];
-    const roadWidth = (p: THREE.Vector3, road: number): number => PATH_CURVES[road].points.every(point => point.x === 0 && point.z >= 40) ? gatewayApproachWidth(p.z) : PATH_WIDTH;
-    for (const [road, curve] of PATH_CURVES.entries()) {
-      borders.push(ribbon(curve, p => roadWidth(p, road) + .32, 100).translate(0, -.012, 0));
-      paving.push(ribbon(curve, p => roadWidth(p, road), 100));
-    }
-    // Continuous round joints at shared nodes and road ends; no exposed triangular gaps.
-    const nodes = new Map<string, { point: THREE.Vector3; width: number }>();
-    for (const [road, curve] of PATH_CURVES.entries()) for (const point of curve.points) {
-      const key = `${point.x},${point.z}`; nodes.set(key, { point, width: Math.max(nodes.get(key)?.width ?? 0, roadWidth(point, road)) });
-    }
-    for (const { point, width } of nodes.values()) {
-      const y = point.y + terrainHeight(point.x, point.z);
-      borders.push(pathJoin(point.x, point.z, (width + .32) / 2, y - .011));
-      paving.push(pathJoin(point.x, point.z, width / 2, y + .001));
-    }
-    // Shared world UVs let connected ribbons and joints share two draws without changing their footprint.
-    for (const [parts, material, name] of [[paving, this.paving, 'Limestone walking network'], [borders, edging, 'Weathered path borders']] as const) {
-      const surface = mesh(mergeGeometries(parts)!, material, this.root); surface.name = name; surface.castShadow = false; parts.forEach(g => g.dispose());
-    }
-    const open = (x: number, z: number): boolean => z >= STATION.front - 1
-      || Math.hypot(x - TIME_TOWER.x, z - TIME_TOWER.z) < TIME_TOWER.radius + .5
-      || Math.hypot(x - GLUCOSE_PAVILION.x, z - GLUCOSE_PAVILION.z) < GLUCOSE_PAVILION.radius + .5
-      || CIVIC_LANDMARKS.some(l => Math.hypot((x - l.x) / spread(l, .85).x, (z - l.z) / spread(l, .85).z) < 10.9);
-    const kerbs = pathKerbs(PATH_CURVES, roadWidth, terrainHeight, open, this.mobile);
+    // The town's share of the merged walking network (walking-surface.ts): one paving mesh with world UVs whose junctions are
+    // filleted unions, and kerbs that follow its outline. The lake garden builds the other share from the same surface.
+    const { paving, kerbs } = walkingSurface(this.mobile);
+    const surface = mesh(paving[TOWN_PAVING], this.paving, this.root); surface.name = 'Limestone walking network'; surface.castShadow = false;
     const kerbMaterial = new THREE.MeshStandardMaterial({ color: '#e4decf', map: this.paving.map, vertexColors: true, roughness: .97 });
     this.paving.userData.ready.then(() => { kerbMaterial.map = this.paving.map; kerbMaterial.needsUpdate = true; });
-    const border = mesh(kerbs, kerbMaterial, this.root); border.name = 'Bevelled limestone kerbs'; border.castShadow = false;
-    this.colliders.push({ type: 'mesh', vertices: new Float32Array(kerbs.getAttribute('position').array), indices: Uint32Array.from({ length: kerbs.getAttribute('position').count }, (_, i) => i) });
+    const stones = kerbs[TOWN_PAVING], border = mesh(stones, kerbMaterial, this.root); border.name = 'Bevelled limestone kerbs'; border.castShadow = false;
+    this.colliders.push({ type: 'mesh', vertices: new Float32Array(stones.getAttribute('position').array), indices: Uint32Array.from({ length: stones.getAttribute('position').count }, (_, i) => i) });
+    paving.slice(1).concat(kerbs.slice(1)).forEach(g => g.dispose());
     for (const l of CIVIC_LANDMARKS) {
       const ring = mesh(new THREE.RingGeometry(8.4, 10.6, 64), this.paving, this.root, l.x, 0.06, l.z); ring.rotation.x = -Math.PI / 2; ring.castShadow = false; const sp = spread(l, .85); ring.scale.set(sp.x, sp.z, 1);
       const p = ring.geometry.getAttribute('position'), uv = ring.geometry.getAttribute('uv');
@@ -405,7 +368,7 @@ export class Town {
     // The near grass field (gpu and mobile) replaces the meadow tufts close to the camera; map mode hides it with the details.
     // The ground's baked crown and wall occlusion (sub-plan 16), shared by the terrain and the grass standing on it.
     this.groundOcclusion = CONTACT_OFF ? undefined : groundShadeField(treeShadeDiscs(this.forest.sites), TOWN_SHADE_FOOTPRINTS);
-    const grass = createGrassField(this.tier, { rocks: this.rocks, height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
+    const grass = createGrassField(this.tier, { rocks: this.rocks, stems: this.gardens.stems, height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
     if (grass) { this.details.add(grass.mesh); this.grassShade = grass.ground; }
     this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter, this.tier, grass?.ground.radius ?? 0);
     // One instanced draw of blended boulder variants; one collider mesh sampled from the same shapes and transforms.

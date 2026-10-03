@@ -8,15 +8,15 @@ import type { PlaceSign } from './place-sign';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
 import type { Interactive } from './world';
-import { GARDENS, GARDEN_PANELS, GARDEN_PATHS, LAKE_OUTLINE, WATER_EYES, gardenHeight, rainPlantAllowed } from './living-waters-layout';
+import { GARDENS, GARDEN_PANELS, LAKE_OUTLINE, OPAL_BASIN, RILL, RILL_RADIUS, WATER_EYES, gardenHeight, rainPlantAllowed } from './living-waters-layout';
 import type { Point } from './living-waters-layout';
 import { MYCELIUM_RADIUS, MyceliumGrove } from './mycelium';
 import type { GroveInstance } from './mycelium';
 import { COLLECTION, photoSize, photoURL } from '../game/exhibits';
 import { addGlow, nightEmission } from './night-lighting';
 import { createLakePlants } from './lake-plants';
-import { pathKerbs } from './path-kerbs';
-import { PATH_WIDTH, pathJoin } from './path-surface';
+import { GARDEN_PAVING, walkingSurface } from './walking-surface';
+import type { GroundDisc } from './grass-field';
 import { mergeStatic } from './static-batch';
 
 function shape(points: Point[]): THREE.Shape { return new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, -z))); }
@@ -43,6 +43,8 @@ export class LivingWaters {
   readonly colliders: ColliderSpec[] = [];
   readonly interactives: Interactive[] = [];
   readonly panels: THREE.Mesh[] = [];
+  /** Every mushroom stem's foot in world space: the near grass field grows round them and under the crowns. */
+  readonly stems: GroundDisc[] = [];
   grove!: MyceliumGrove;
   private readonly signs = new Map<string, PlaceSign>();
   private readonly waterTime = uniform(0);
@@ -56,7 +58,7 @@ export class LivingWaters {
     this.root.name = 'Living Waters · town gardens'; this.root.position.set(GARDENS.x, 0, GARDENS.z);
     const network = shape(LAKE_OUTLINE); WATER_EYES.forEach((cell) => network.holes.push(new THREE.Path(cell.map(([x, z]) => new THREE.Vector2(x, -z)))));
     this.mesh(new THREE.ShapeGeometry(network).rotateX(-Math.PI / 2), this.silver, true, 0, .12);
-    const eyes: THREE.Mesh[] = [], eyeKerbs: THREE.Mesh[] = [], edges: THREE.Mesh[] = [], paving: THREE.Mesh[] = [];
+    const eyes: THREE.Mesh[] = [], eyeKerbs: THREE.Mesh[] = [];
     WATER_EYES.forEach((cell, index) => {
       const mesh = this.mesh(this.waterEye(cell), this.water, false, 0, -.08 + index % 3 * .012); mesh.castShadow = false; eyes.push(mesh);
       const outline = cell.map(([x, z]) => new THREE.Vector3(x, .14, z)); outline.push(outline[0].clone());
@@ -64,26 +66,16 @@ export class LivingWaters {
     });
     // Each cell keeps its own surface height and local x/z, so the ripples are unchanged when the eyes draw together.
     mergeStatic(eyes, 'Lake water eyes'); mergeStatic(eyeKerbs, 'Lake water-eye stone kerbs');
-    const roadEdge = new THREE.MeshStandardMaterial({ color: '#bbb39e', roughness: .92, side: THREE.DoubleSide });
-    for (const path of GARDEN_PATHS) {
-      edges.push(this.path(path, PATH_WIDTH + .32, roadEdge, -.012));
-      paving.push(this.path(path, PATH_WIDTH, this.pathMaterial));
-    }
-    const roadNodes = new Map<string, THREE.Vector3>();
-    for (const path of GARDEN_PATHS) for (const p of path.points) roadNodes.set(`${p.x},${p.z}`, p);
-    for (const p of roadNodes.values()) {
-      edges.push(this.mesh(pathJoin(p.x, p.z, (PATH_WIDTH + .32) / 2, p.y - .011, GARDENS.x, GARDENS.z), roadEdge, false));
-      paving.push(this.mesh(pathJoin(p.x, p.z, PATH_WIDTH / 2, p.y + .001, GARDENS.x, GARDENS.z), this.pathMaterial, false));
-    }
-    // Shared world UVs let ribbons and joins draw as two meshes, as the town network does; each ribbon already gave its collider.
-    mergeStatic(paving, 'Lake walking network'); mergeStatic(edges, 'Lake path borders');
-    const kerbs = pathKerbs(GARDEN_PATHS, PATH_WIDTH, () => 0, (x, z) => Math.hypot(x - GARDENS.pavilionX, z - GARDENS.pavilionZ) < 7, mobile);
+    // The garden's share of the merged walking network (walking-surface.ts), level at 13 cm; paving and kerbs are both walkable.
+    const { paving, kerbs } = walkingSurface(mobile), local = (g: THREE.BufferGeometry): THREE.BufferGeometry => g.translate(-GARDENS.x, 0, -GARDENS.z);
+    const surface = this.mesh(local(paving[GARDEN_PAVING]), this.pathMaterial, true); surface.name = 'Lake walking network'; surface.castShadow = false;
     const kerbMaterial = new THREE.MeshStandardMaterial({ color: '#e4decf', vertexColors: true, roughness: .97 });
     if (this.pathMaterial instanceof THREE.MeshStandardMaterial) {
       const paving = this.pathMaterial; kerbMaterial.map = paving.map;
       paving.userData.ready?.then(() => { kerbMaterial.map = paving.map; kerbMaterial.needsUpdate = true; });
     }
-    this.mesh(kerbs, kerbMaterial, true).name = 'Lake path stone kerbs';
+    this.mesh(local(kerbs[GARDEN_PAVING]), kerbMaterial, true).name = 'Lake path stone kerbs';
+    paving.filter((_, i) => i !== GARDEN_PAVING).concat(kerbs.filter((_, i) => i !== GARDEN_PAVING)).forEach(g => g.dispose());
     this.pavilion();
     this.mushrooms(); this.wetlandPlanting(); createLakePlants(this.root, mobile);
     for (const [name, [x, z]] of Object.entries(GARDEN_PANELS)) {
@@ -102,12 +94,12 @@ export class LivingWaters {
       caption.position.set(x, 1.18, z + .06); caption.userData.discovery = id; caption.userData.kind = 'caption';
       this.root.add(photo, caption); this.panels.push(photo, caption); this.interactives.push({ id, object: caption, position: new THREE.Vector3(x + GARDENS.x, 1.8, z + GARDENS.z) });
     }
-    const channel = new THREE.CatmullRomCurve3([[75, 0], [72, 10], [63, 17], [53, 14], [42, 8]].map(([x, z]) => new THREE.Vector3(x, .035, z)));
+    const channel = RILL;
     this.drainage.push(channel);
-    this.mesh(new THREE.TubeGeometry(channel, 70, .28, 6, false), this.silver, false);
+    this.mesh(new THREE.TubeGeometry(channel, 70, RILL_RADIUS, 6, false), this.silver, false);
     this.mesh(new THREE.TubeGeometry(channel, 70, .18, 5, false), this.water, false, 0, .08);
-    this.mesh(new THREE.CylinderGeometry(3.6, 3.9, .14, 40), this.water, false, 75, .025, 0);
-    this.mesh(new THREE.IcosahedronGeometry(1.1, 1), new THREE.MeshStandardMaterial({ color: '#bddacf', metalness: .45, roughness: .2 }), true, 75, .65, 0);
+    this.mesh(new THREE.CylinderGeometry(3.6, OPAL_BASIN.radius, .14, 40), this.water, false, OPAL_BASIN.x, .025, OPAL_BASIN.z);
+    this.mesh(new THREE.IcosahedronGeometry(1.1, 1), new THREE.MeshStandardMaterial({ color: '#bddacf', metalness: .45, roughness: .2 }), true, OPAL_BASIN.x, .65, OPAL_BASIN.z);
     const rain = new Float32Array((mobile ? 150 : 460) * 3), drips = new Float32Array(this.drainage.length * 6 * 3), fall = random(3304);
     for (let i = 0; i < rain.length; i += 3) { rain[i] = -48 + fall() * 152; rain[i + 1] = fall() * 9; rain[i + 2] = -40 + fall() * 76; }
     for (let i = 0; i < drips.length / 3; i++) { const p = this.drainage[i % this.drainage.length].getPoint((i % 6) / 6); drips[i * 3] = p.x; drips[i * 3 + 1] = p.y + .1; drips[i * 3 + 2] = p.z; }
@@ -147,14 +139,6 @@ export class LivingWaters {
     const mesh = new THREE.Mesh(geometry, material); mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; this.root.add(mesh);
     if (solid) { mesh.updateWorldMatrix(true, false); const world = geometry.clone().applyMatrix4(mesh.matrixWorld); this.colliders.push({ type: 'mesh', vertices: new Float32Array(world.getAttribute('position').array), indices: world.index ? new Uint32Array(world.index.array) : Uint32Array.from({ length: world.getAttribute('position').count }, (_, i) => i) }); world.dispose(); }
     return mesh;
-  }
-  private path(curve: THREE.Curve<THREE.Vector3>, width: number, material: THREE.Material, lift = 0): THREE.Mesh {
-    const vertices: number[] = [], indices: number[] = [], uv: number[] = [], steps = 100;
-    for (let i = 0; i <= steps; i++) { const p = curve.getPoint(i / steps), tangent = curve.getTangent(i / steps), side = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize().multiplyScalar(width / 2);
-      for (const sign of [-1, 1]) { const x = p.x + side.x * sign, z = p.z + side.z * sign; vertices.push(x, p.y + lift, z); uv.push((x + GARDENS.x) / 4, (z + GARDENS.z) / 4); }
-      if (i < steps) { const n = i * 2; indices.push(n, n + 1, n + 2, n + 1, n + 3, n + 2); }
-    }
-    const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geometry.setIndex(indices); geometry.computeVertexNormals(); return this.mesh(geometry, material, lift === 0);
   }
   private pavilion(): void {
     const x = GARDENS.pavilionX, z = GARDENS.pavilionZ;
@@ -203,6 +187,7 @@ export class LivingWaters {
     const instances: GroveInstance[] = [], rotation = new THREE.Quaternion();
     const place = (site: { x: number; z: number; scale: number; height: number }, stemTop: number, opalLift: number, opalHeight: number): void => {
       const s = site.scale, center = new THREE.Vector3(GARDENS.x + site.x, site.height, GARDENS.z + site.z);
+      this.stems.push({ x: center.x, z: center.z, radius: .34 * s + .05 });
       instances.push({ center, scale: s, crown: new THREE.Matrix4().compose(new THREE.Vector3(site.x, site.height, site.z), rotation, new THREE.Vector3(s, s, s)),
         stem: new THREE.Matrix4().compose(new THREE.Vector3(site.x, 0, site.z), rotation, new THREE.Vector3(s, site.height - stemTop * s, s)),
         opal: new THREE.Matrix4().compose(new THREE.Vector3(site.x, site.height + opalLift * s, site.z), rotation, new THREE.Vector3(s, s * opalHeight, s)) });

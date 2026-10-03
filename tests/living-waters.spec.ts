@@ -28,7 +28,9 @@ for (const mobile of [false, true]) test(`integrated garden stories, walking and
       }
       await page.getByRole('button', { name: 'Continue exploring' }).click();
     }
-    await teleport(page, GARDENS.x + 74, GARDENS.z - 28, Math.PI); await page.waitForTimeout(400); await page.screenshot({ path: `output/testing/gardens/mycelium-${mobile ? 'mobile' : 'desktop'}.png` });
+    // On the grove entrance's merged paving: a metre further, the junction fillet's kerb would leave a capsule teleported at
+    // the default height still rising out of the stone when the map toggles.
+    await teleport(page, GARDENS.x + 74, GARDENS.z - 27, Math.PI); await page.waitForTimeout(400); await page.screenshot({ path: `output/testing/gardens/mycelium-${mobile ? 'mobile' : 'desktop'}.png` });
     await page.locator('#view-toggle').click(); await page.screenshot({ path: `output/testing/gardens/unified-map-${mobile ? 'mobile' : 'desktop'}.png` }); await page.locator('#view-toggle').click();
     const before = await snapshot(page); await page.locator('#view-toggle').click(); await page.locator('#start-exploring').click();
     const after = await snapshot(page); expect(after.zone).toBe('town'); expect(after.journey).toBeNull(); expect(after.position).toEqual(before.position); expect(after.yaw).toBe(before.yaw);
