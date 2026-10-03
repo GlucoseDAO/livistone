@@ -6,9 +6,10 @@ import { INTRODUCTION_SITE } from '../src/world/introduction-layout';
 for (const mobile of [false, true]) test(`loading introduction and first-person arrival (${mobile ? 'touch' : 'desktop'})`, async ({ browser }) => {
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 800 }, hasTouch: mobile, isMobile: mobile });
   const page = await context.newPage(), errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
-  // Hold the game module to verify that the introduction is visible before the heavy startup.
+  // Hold the game module to verify that the introduction is visible before the heavy startup. A running dev server requests
+  // it as main.ts?t=… once a file under it changes, so match the query too.
   let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
-  await page.route('**/src/main.ts', async route => { await held; await route.continue(); });
+  await page.route(/\/src\/main\.ts(\?|$)/, async route => { await held; await route.continue(); });
   try {
     await page.goto('/', { waitUntil: 'commit' });
     await expect(page.locator('#loading-title')).toHaveText(TOWN_INTRO.title);
@@ -62,7 +63,7 @@ for (const mobile of [false, true]) test(`loading introduction and first-person 
 test('enlarged loading introduction remains reachable on short phones', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true });
   const page = await context.newPage(); let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
-  await page.route('**/src/main.ts', async route => { await held; await route.continue(); });
+  await page.route(/\/src\/main\.ts(\?|$)/, async route => { await held; await route.continue(); });
   try {
     await page.goto('/', { waitUntil: 'commit' });
     for (const size of [{ width: 320, height: 568 }, { width: 375, height: 667 }]) {
