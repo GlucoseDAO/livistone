@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-/** Classic and node standard materials alike: rocks and the lake are node materials with node-only shading Lambert drops. */
+/** Classic and node standard materials alike: the Lambert copies of the rocks and lake drop their node shading, as the classic copies dropped GLSL patches. */
 const standard = (material: THREE.Material): material is THREE.MeshStandardMaterial => material instanceof THREE.MeshStandardMaterial || (material as THREE.MeshStandardNodeMaterial).isMeshStandardNodeMaterial === true;
 
 /** CPU rendering keeps the same town and collision world, with cheap lighting and boundary-locked visual meshes. */

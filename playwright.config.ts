@@ -6,6 +6,8 @@ const baseURL = process.env.LIVISTONE_BASE_URL ?? 'http://127.0.0.1:5173';
 // adapter is forced. LIVISTONE_BACKEND=webgl withholds WebGPU instead: the same specs then run on the automatic WebGL 2 fallback.
 const webgpu = process.env.LIVISTONE_BACKEND === 'webgl' ? ['--disable-features=WebGPU'] : process.platform === 'linux' ? ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-webgpu-power-preference=force-low-power'] : [];
 export default defineConfig({
+  // tsconfig.json maps `three` to the WebGPU type declarations for tsc; Playwright would resolve that mapping at run time.
+  tsconfig: './tsconfig.playwright.json',
   testDir: './tests', testMatch: '**/*.spec.ts', fullyParallel: false, workers: 1, timeout: 120000,
   use: {
     baseURL, viewport: { width: 1200, height: 800 }, headless: !process.env.PW_HEADED,

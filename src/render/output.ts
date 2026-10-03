@@ -9,7 +9,8 @@ import type { Node } from 'three/webgpu';
 
 // @types/three r186 leaves these untyped; the casts only restore the shader types three itself infers.
 const exposure = toneMappingExposure as unknown as Node<'float'>;
-const toSRGB = (c: Node<'vec3'>): Node<'vec3'> => sRGBTransferOETF(c) as unknown as Node<'vec3'>, fromSRGB = (c: Node<'vec3'>): Node<'vec3'> => sRGBTransferEOTF(c) as unknown as Node<'vec3'>;
+/** The sRGB transfer curve and its inverse, for colours the classic renderer mixed after encoding. */
+export const toSRGB = (c: Node<'vec3'>): Node<'vec3'> => sRGBTransferOETF(c) as unknown as Node<'vec3'>, fromSRGB = (c: Node<'vec3'>): Node<'vec3'> => sRGBTransferEOTF(c) as unknown as Node<'vec3'>;
 
 // The classic renderer's ACES filmic fit, as sky.ts's acesFilmic() computes it on the CPU. three's TSL copy multiplies the
 // linear denominator term by .983729 as well (about .4% brighter mid-tones); the classic form keeps HORIZON_HAZE exact.
@@ -25,7 +26,10 @@ export class OutputPipeline {
   private readonly scenePass: ReturnType<typeof pass>;
   private readonly pipeline: THREE.RenderPipeline;
   constructor(renderer: THREE.WebGPURenderer, scene: THREE.Scene, camera: THREE.Camera) {
-    this.scenePass = pass(scene, camera); this.scenePass.setMRT(mrt({ output, display: float(0) }));
+    // Other surfaces write a zero mask with their own alpha, under their own blending: opaque ones clear it, glass over a poster
+    // tone-maps its share, additive halos leave it alone. MRT outputs besides `output` would otherwise be written unblended.
+    const targets = mrt({ output, display: vec4(0, 0, 0, output.a) }); targets.setBlendMode('display', new THREE.BlendMode(THREE.MaterialBlending));
+    this.scenePass = pass(scene, camera); this.scenePass.setMRT(targets);
     // Eight bits hold a 0–1 mask and halve its share of the bandwidth.
     this.scenePass.getTexture('display').type = THREE.UnsignedByteType;
     const colour = this.scenePass.getTextureNode('output'), display = this.scenePass.getTextureNode('display').r;
@@ -63,7 +67,6 @@ const ACES_ZERO = (Math.sqrt(.0245786 ** 2 + 4 * .000090537) - .0245786) / 2;
  * The linear radiance that the output pass maps to `display` (linear, 0–1) over a black background. Additive night halos
  * were blended after encoding in the classic renderer; adding this instead shows the same halo over the dark night scene.
  */
-export { toSRGB, fromSRGB };
 export const untoneMapped = Fn(([display]: [Node<'vec3'>]) => {
   const v = mat3(ACES_OUT_INVERSE).mul(min(display, vec3(.985))).clamp(0, 1.01).toVar();
   // (1 - .983729 v) x² + (.0245786 - .432951 v) x - (.000090537 + .238081 v) = 0, positive root.
