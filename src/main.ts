@@ -480,7 +480,7 @@ class Game {
       // The output pipeline's scene target and MRT (render/output.ts), so the bake reuses every compiled shader.
       const { target, targets } = this.output as unknown as { target?: THREE.RenderTarget; targets?: Parameters<THREE.WebGPURenderer['setMRT']>[0] };
       const phase = this.phase, start = performance.now();
-      this.probeTimes[phase] = probes.bake(this.renderer, this.scene, target ? { target, mrt: targets ?? null } : null, phase, sky, [this.town.details], HORIZON_RADIANCE[phase], position => { this.probeEye.position.copy(position); this.nightLighting.update(this.probeEye); this.town.surround(position); });
+      this.probeTimes[phase] = probes.bake(this.renderer, this.scene, target ? { target, mrt: targets ?? null } : null, phase, sky, [this.town.details], HORIZON_RADIANCE[phase], position => { this.probeEye.position.copy(position); this.nightLighting.update(this.probeEye); this.town.surround(position); }, this.ranges ? { scene: this.distant, far: FAR_VIEW } : null);
       const device = (this.renderer.backend as { device?: { queue: { onSubmittedWorkDone(): Promise<void> } } }).device;
       if (import.meta.env.DEV && device) void device.queue.onSubmittedWorkDone().then(() => { this.probeTimes[phase + 'Gpu'] = Math.round(performance.now() - start); });
       if (reframe) this.frameShadow(true); this.setFog();

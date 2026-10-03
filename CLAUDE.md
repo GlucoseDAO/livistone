@@ -332,8 +332,9 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **Reflection probes (sub-plan 07).** `probes.ts` bakes one cube per building-piece exterior (its envelope above 0.6 m
   hidden) and per hall interior plus the concourse, after loading and lazily on the first switch to the other phase: gpu
   256/128 px (exterior/interior), mobile 128/64, none on cpu. Faces render through the output pipeline's own target layout
-  and MRT, so every compiled shader is reused; photographs, captions, near details and night halos stay out (they would upload
-  or build during loading). A site's materials share one `pmremTexture` node as `envNode` (a phase switch swaps its texture,
+  and MRT, so every compiled shader is reused (they go through `renderer.render`, never the output pass, so GTAO and bloom
+  stay out); exterior faces draw the distant ranges' scene first, as the walking view's distant pass does. Photographs,
+  captions, near details and night halos stay out (they would upload or build during loading). A site's materials share one `pmremTexture` node as `envNode` (a phase switch swaps its texture,
   no rebuild), keep an `envMap` so their own `envMapIntensity` applies (non-heroEnv ones get the scene fill per phase), and
   add the probe to `customProgramCacheKey`: three reduces node-valued properties to `{}`, so alike materials would share one
   build and its probe. Materials shared with other buildings are copied per probe before `NightLighting` collects emissive

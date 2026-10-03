@@ -127,8 +127,10 @@ export class ReflectionProbes {
    * would build each town shader again, seconds on an integrated GPU. A quad then copies each face into the cube.
    * Without `source` the faces get a plain half-float target: correct, but every shader then builds again for it.
    * `hidden` (the near-ground details) and each site's `hide` list vanish meanwhile; `visit` runs before a site renders.
+   * `distant`, when the walking view has the distant ranges (sub-plan 26): exterior faces draw that scene first, as the output
+   * pipeline's distant pass does, so silver facing the valley reflects the crests above the haze rather than bare sky.
    */
-  bake(renderer: THREE.WebGPURenderer, scene: THREE.Scene, source: FaceSource | null, phase: SkyPhase, sky: { background: THREE.Texture; environment: THREE.Texture }, hidden: THREE.Object3D[], haze: THREE.Color, visit?: (position: THREE.Vector3) => void): number {
+  bake(renderer: THREE.WebGPURenderer, scene: THREE.Scene, source: FaceSource | null, phase: SkyPhase, sky: { background: THREE.Texture; environment: THREE.Texture }, hidden: THREE.Object3D[], haze: THREE.Color, visit?: (position: THREE.Vector3) => void, distant?: { scene: THREE.Scene; far: number } | null): number {
     const start = performance.now();
     // Buildings already holding probes reflect the phase's sky while baking, never another phase's town.
     this.show(phase, sky.environment);
@@ -150,8 +152,10 @@ export class ReflectionProbes {
       targets.set(size, target); return target;
     };
     const cameras = new THREE.CubeCamera(.1, FAR, new THREE.CubeRenderTarget(1)), pmrem = new THREE.PMREMGenerator(renderer);
-    cameras.coordinateSystem = renderer.coordinateSystem; cameras.updateCoordinateSystem();
-    const state = { background: scene.background, target: renderer.getRenderTarget(), mrt: renderer.getMRT() };
+    // The distant pass's cube: from just inside the town faces' far plane to the ranges' end, as main.ts's far camera.
+    const far = distant ? new THREE.CubeCamera(FAR * .9, distant.far, cameras.renderTarget) : null;
+    for (const cube of far ? [cameras, far] : [cameras]) { cube.coordinateSystem = renderer.coordinateSystem; cube.updateCoordinateSystem(); }
+    const state = { background: scene.background, target: renderer.getRenderTarget(), mrt: renderer.getMRT(), clear: renderer.autoClearColor };
     const visible = new Map<THREE.Object3D, boolean>(), hide = (object: THREE.Object3D): void => { if (!visible.has(object)) visible.set(object, object.visible); object.visible = false; };
     scene.background = sky.background; hidden.forEach(hide); const always = new Set(visible.keys());
     // Photographs, captions and painted signs upload on first sight; drawn into a probe, every one in view of any site would
@@ -163,9 +167,19 @@ export class ReflectionProbes {
         const { site } = scope, envelope = this.envelopes.get(site.id)!, { face, cube, quad } = sized(site.kind === 'exterior' ? this.size : this.size / 2); envelope.forEach(hide);
         cameras.position.set(...site.position); cameras.updateMatrixWorld(true);
         for (const camera of cameras.children as THREE.PerspectiveCamera[]) { camera.near = site.kind === 'exterior' ? .3 : .1; camera.updateProjectionMatrix(); }
+        // Interiors look at their own hall: only exterior faces reach the ranges.
+        const ranges = site.kind === 'exterior' && far && distant ? distant.scene : null;
+        if (ranges) { far!.position.copy(cameras.position); far!.updateMatrixWorld(true); }
         visit?.(cameras.position);
         cameras.children.forEach((camera, i) => {
-          renderer.setRenderTarget(face); renderer.setMRT(source?.mrt ?? null); renderer.render(scene, camera as THREE.Camera);
+          renderer.setRenderTarget(face); renderer.setMRT(source?.mrt ?? null);
+          if (ranges) {
+            // The town then draws over the ranges and their sky with only the depth cleared (render/output.ts).
+            renderer.render(ranges, far!.children[i] as THREE.Camera);
+            scene.background = null; renderer.autoClearColor = false;
+            renderer.render(scene, camera as THREE.Camera);
+            scene.background = sky.background; renderer.autoClearColor = state.clear;
+          } else renderer.render(scene, camera as THREE.Camera);
           renderer.setMRT(null); renderer.setRenderTarget(cube, i); quad.render(renderer);
         });
         // Back in view after its own site, unless hidden for the whole bake (a caption inside a hall's envelope).
@@ -174,7 +188,7 @@ export class ReflectionProbes {
       }
     } finally {
       for (const [object, shown] of visible) object.visible = shown;
-      scene.background = state.background; renderer.setRenderTarget(state.target); renderer.setMRT(state.mrt);
+      scene.background = state.background; renderer.autoClearColor = state.clear; renderer.setRenderTarget(state.target); renderer.setMRT(state.mrt);
       for (const { face, cube, quad } of targets.values()) { face.dispose(); cube.dispose(); (quad.material as THREE.Material).dispose(); }
       cameras.renderTarget.dispose(); pmrem.dispose(); if (own) layout.dispose();
     }
