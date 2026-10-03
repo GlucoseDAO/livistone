@@ -8,7 +8,7 @@
 // emits, so none of it glows at night.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { Fn, abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, cross, dot, exp, faceDirection, float, fract, length, max, mix, mx_noise_float, mx_worley_noise_float, normalWorldGeometry, normalize, positionWorld, pow, property, select, sin, smoothstep, step, texture, uv, vec2, vec3, vec4 } from 'three/tsl';
+import { Fn, abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, cross, dot, exp, faceDirection, float, fract, length, max, mix, mx_noise_float, normalWorldGeometry, normalize, positionWorld, pow, property, select, sin, smoothstep, step, texture, uv, vec2, vec3, vec4 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
 import { waterMaterial } from './water-material';
@@ -595,13 +595,14 @@ function snowCaveMaterial(tier: GraphicsTier): THREE.Material {
   const material = new THREE.MeshStandardNodeMaterial({ vertexColors: true, side: THREE.DoubleSide, metalness: 0, roughness: .72 });
   material.name = 'Snow cave';
   const p = positionWorld, mottle = mx_noise_float(p.mul(2.3)).mul(.07).add(mx_noise_float(p.mul(9.1)).mul(.04)).add(1);
-  // On top, sun cups: shallow hollows some 40 cm across, a shade darker, with grime gathered at their rims.
-  const cups = mx_worley_noise_float(p.xz.mul(2.4)), top = mix(.94, 1.03, smoothstep(.05, .45, cups)).mul(mix(1, .9, smoothstep(.55, .75, cups)));
+  // On top, as the ground's snow (ground-material.ts): soil streaks down the gully's fall line and broad dirt patches, no pattern.
+  const streaks = mx_noise_float(vec3(p.x.mul(.7), 0, p.z.mul(.125))).mul(.5).add(.5), grime = mx_noise_float(vec3(p.x.mul(.32), 7.7, p.z.mul(.32))).mul(.5).add(.5);
+  const dirt = smoothstep(.42, .9, streaks).mul(.5).add(smoothstep(.52, .85, grime).mul(.34)).add(.06), top = mix(vec3(1), vec3(.7, .63, .53), dirt.clamp(0, .8));
   // As the ground's snow where its edge stands steep: in layers a few tens of centimetres thick, with dirt washed down in runnels.
   const steep = float(1).sub(smoothstep(.55, .8, normalWorldGeometry.y.abs()));
   const layers = sin(p.y.mul(19).add(mx_noise_float(p.mul(1.4)).mul(4))).mul(.05).add(.95), runnels = smoothstep(.15, .55, mx_noise_float(vec3(p.x.mul(5.3), p.y.mul(.3), p.z.mul(5.3))));
-  material.colorNode = mix(vec3(mottle.mul(top)), mix(vec3(1), vec3(.72, .67, .6), runnels.mul(.55)).mul(layers).mul(mottle), steep);
-  material.roughnessNode = mix(float(.72), float(.62), steep);
+  material.colorNode = mix(top.mul(mottle), mix(vec3(1), vec3(.72, .67, .6), runnels.mul(.55)).mul(layers).mul(mottle), steep);
+  material.roughnessNode = mix(mix(float(.62), float(.78), dirt.clamp(0, 1)), float(.62), steep);
   return material;
 }
 /** The snow cave (see snowCaveGeometry): one draw, no collider; it casts its shade on the stream it lets out. */
