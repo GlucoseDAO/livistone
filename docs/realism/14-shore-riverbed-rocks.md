@@ -3,6 +3,10 @@
 **Needs:** 03, 04 and 20 Phase B for the shader steps. **Tiers:** all, graded. **Branch:** `realism/14-shore`.
 See [README](README.md) for the shared workflow.
 
+## Status (3 October 2026)
+
+The renderer-independent part is done on `realism/14-shore` and is not merged: step 2 and step 3's geometry and colliders, plus a few rocks moved into the stream. Rocks now carry `uv` and a 0–1 `moss` attribute for the moss mask. Still to do in TSL after Stage A: step 1, the step 3 moss/triplanar mask, and step 4.
+
 ## Steps
 
 1. **Terrain shader near water** (`mountains.ts`, using `waterDistance` and the 04 depth). The ground darkens and its roughness drops in a wet band at the waterline, plus:

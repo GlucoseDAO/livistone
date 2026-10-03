@@ -1,6 +1,9 @@
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { Physics } from '../src/game/physics';
 import type { ColliderSpec } from '../src/game/physics';
+import { ROCK_DETAIL, rockColliders, rockGeometry, rockMatrix, rockWeights } from '../src/world/river-rocks';
+import type { RockSite } from '../src/world/water-surface';
 const floor: ColliderSpec = { type: 'box', position: [0, -0.2, 0], size: [20, 0.2, 20] };
 
 describe('walking physics', () => {
@@ -30,6 +33,36 @@ describe('walking physics', () => {
     expect(physics.position().z).toBeLessThan(-1.3);
     expect(physics.position().y).toBeGreaterThan(0.79);
     physics.dispose();
+  });
+  it('keeps the capsule outside a rounded river rock, touching its rendered surface, and walks over a pebble-sized one', async () => {
+    // A boulder seated on flat ground as riverRockSites would, and a tiny stone off to the side.
+    const boulder: RockSite = { x: 0, y: .26, z: -3, s: 1, yaw: .4 }, stone: RockSite = { x: 4, y: .26 * .16, z: -3, s: .16, yaw: 1.1 };
+    const physics = await Physics.create([floor, rockColliders([boulder, stone])]);
+    const geometry = rockGeometry(ROCK_DETAIL.gpu), base = geometry.getAttribute('position'), w = rockWeights(boulder);
+    geometry.morphAttributes.position!.forEach((target, k) => { for (let i = 0; i < base.count; i++) base.setXYZ(i, base.getX(i) + w[k] * target.getX(i), base.getY(i) + w[k] * target.getY(i), base.getZ(i) + w[k] * target.getZ(i)); });
+    geometry.morphAttributes = {}; geometry.applyMatrix4(rockMatrix(boulder));
+    const rendered = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })), ray = new THREE.Raycaster();
+    // Horizontal gap between the capsule's side and the rendered rock, probed at knee and hip height toward the rock's centre.
+    const gap = (x: number, z: number): number => Math.min(...[.25, .55].map(height => {
+      const from = new THREE.Vector3(x, height, z), to = new THREE.Vector3(boulder.x, height, boulder.z);
+      ray.set(from, to.clone().sub(from).normalize()); const hit = ray.intersectObject(rendered)[0];
+      return hit ? hit.distance - .29 : Infinity;
+    }));
+    try {
+      for (const x of [-.5, 0, .5]) {
+        physics.teleport({ x, y: 1, z: 3 }); let closest = Infinity;
+        for (let i = 0; i < 30; i++) physics.step(0, 0);
+        for (let i = 0; i < 240; i++) {
+          physics.step(0, -4); const p = physics.position(); closest = Math.min(closest, gap(p.x, p.z));
+          expect(p.y).toBeGreaterThan(.79); expect(p.y).toBeLessThan(.9);
+        }
+        // It never cuts into the boulder by more than a few centimetres, yet it does reach the rendered surface.
+        expect(closest).toBeGreaterThan(-.06); expect(closest).toBeLessThan(.08);
+      }
+      physics.teleport({ x: 4, y: 1, z: 1 });
+      for (let i = 0; i < 120; i++) physics.step(0, -4);
+      expect(physics.position().z).toBeLessThan(-4.5); expect(Math.abs(physics.position().x - 4)).toBeLessThan(.3);
+    } finally { physics.dispose(); geometry.dispose(); }
   });
   it('passes through a doorway and steps onto a raised floor', async () => {
     const physics = await Physics.create([floor,

@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { dot, mix, texture, uniform, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { plantingAllowed } from './landscape';
-import { terrainHeight } from './terrain';
+import { terrainSurfaceHeight } from './terrain';
+import { rockReach, seatedHeight, streamRockSites } from './river-rocks';
 import { riverCenter, tributaryCenter } from './waterways';
 import type { RockSite } from './water-surface';
 
@@ -54,19 +55,6 @@ export function pavingMaterial(mobile = false): THREE.MeshStandardMaterial {
   return material;
 }
 
-export function rockGeometry(): THREE.BufferGeometry {
-  const g = new THREE.IcosahedronGeometry(1, 2), p = g.getAttribute('position'), colors: number[] = [], color = new THREE.Color();
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    const r = 1 + .12 * Math.sin(x * 13 + z * 7) * Math.cos(y * 11 - x * 4);
-    p.setXYZ(i, x * r, y * r, z * r);
-    color.set('#c2cbcf').multiplyScalar(.78 + .18 * Math.sin(x * 19 + y * 9 + z * 13));
-    if (y > .2) color.lerp(new THREE.Color('#7b8976'), .32 + .18 * Math.sin(z * 17));
-    colors.push(color.r, color.g, color.b);
-  }
-  g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); g.computeVertexNormals(); return g;
-}
-
 export function rockMaterial(mobile: boolean): THREE.MeshStandardNodeMaterial {
   const material = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 1 }), loader = new THREE.TextureLoader();
   loader.load(import.meta.env.BASE_URL + 'textures/mountains/rock-color.jpg', (map) => {
@@ -81,7 +69,10 @@ export function rockMaterial(mobile: boolean): THREE.MeshStandardNodeMaterial {
   return material;
 }
 
-/** Seeded bank boulders along the river and both tributaries; the instanced rocks, their colliders and the water's rock foam share this list. */
+/**
+ * Seeded boulders along the river and both tributaries, then a few standing in the shallow edge. The instanced rocks, their
+ * colliders and the water's rock foam all read this one list. Bank rocks rest on the triangulated ground the player walks on.
+ */
 export function riverRockSites(mobile: boolean): RockSite[] {
   let seed = 58; const rand = (): number => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   const count = mobile ? 230 : 420, sites: RockSite[] = [];
@@ -90,7 +81,11 @@ export function riverRockSites(mobile: boolean): RockSite[] {
     if (i % 3) { z = -49 + rand() * 70; x = tributaryCenter(z, i % 2 ? 1 : -1) + (i % 4 < 2 ? 1 : -1) * (4.1 + rand() * 1.6); }
     const s = i % 5 ? .16 + rand() * .35 : .65 + rand() * .6;
     if (!plantingAllowed(x, z, s * 1.45)) continue;
-    sites.push({ x, y: Math.max(terrainHeight(x, z) + s * .26, -.62 - s * .2), z, s, yaw: rand() * Math.PI * 2 });
+    const site = { x, y: Math.max(terrainSurfaceHeight(x, z) + s * .26, -.62 - s * .2), z, s, yaw: rand() * Math.PI * 2 };
+    // On a slope the downhill underside would lift clear of the ground: sink the rock just enough to bury it.
+    sites.push({ ...site, y: Math.min(site.y, seatedHeight(site, 0)) });
   }
-  return sites;
+  // The few rocks standing in the stream displace any bank rock they would overlap.
+  const stream = streamRockSites(mobile);
+  return [...sites.filter(b => stream.every(r => Math.hypot(r.x - b.x, r.z - b.z) >= (rockReach(r.s) + rockReach(b.s)) * .9)), ...stream];
 }

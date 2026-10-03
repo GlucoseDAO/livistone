@@ -1,5 +1,9 @@
 # Livistone: browser game implementation plan
 
+## Shore rocks and pebbles, geometry part (realism 14, branch only) — 3 October 2026
+
+The faceted icosahedron rocks are replaced by rounded, seeded boulders: four noise-displaced, softly faceted shape variants with smooth normals, blended per rock through instanced morph targets, so the rocks remain a single instanced draw. Colliders are now one trimesh sampled from each rock's own blended shape and transform (previously unrotated boxes). Rocks rest on the triangulated walking ground and sink only where a slope would lift their underside. Sixteen rocks (ten on mobile) stand partly in the shallow edge, so the water's rock foam is now visible. About 3,200 shore pebbles (1,100 on mobile, none on cpu) add one unshadowed instanced draw near the water. The wet band, riverbed, caustics, moss mask and lake material are TSL work that waits for the WebGPU migration. Physical-device cost is unmeasured.
+
 ## River water shading — 3 October 2026
 
 Realism sub-plan 04 replaces the opaque green river with transparent water: the river sheet bakes downstream flow, channel distance, depth and rock proximity per vertex from the shared channel field. GPU and mobile water use flow-map ripples that follow every bend and turn smoothly into the river at both confluences, depth absorption over the visible bank, a soft shoreline, Fresnel sky reflection, sun glints and waterline foam; mobile samples one ripple scale. CPU water stays opaque with depth colour baked into vertex colours. Draw calls are unchanged; the CPU sheet keeps about 2,600 more triangles than before. Two dev-only looks (clear stream, deeper garden river) await the owner's choice, see [concepts/14-realism/04-river.md](../concepts/14-realism/04-river.md). Physical-device cost is unmeasured.

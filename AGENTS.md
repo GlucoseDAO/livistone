@@ -99,6 +99,8 @@ src/
     town-layout.ts  Walking bounds and rigid collider transforms
     water-material.ts River shader per device tier and the dev-only ?look=a|b variants
     water-surface.ts Clipped river sheet with baked flow, depth and rock attributes
+    river-rocks.ts   Blended boulder variants (instanced morphs), seated and in-stream placement, one collider trimesh
+    pebbles.ts       Seeded shore pebbles: one unshadowed instanced batch, none on cpu
     waterways.ts     Shared river/tributary boundaries, bridge sites and tower footprint
     time-tower.ts    Silver hourglass, round plaza, guarded spiral gallery and summit terrace
     elevated-layout.ts Shared tower, camel neck and Future House clearances
@@ -224,6 +226,14 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   `riverRockSites`, and joins tributaries into the river without a seam. GPU and mobile water is
   transparent (no depth write, drawn first among transparent objects) and tagged `heroEnv`; CPU bakes
   depth colour into opaque vertex colours. Regenerate the ripple maps with `python3 scripts/build-water-textures.py`.
+- **River rocks are one instanced draw.** `river-rocks.ts` blends four seeded shape variants per rock through relative
+  instanced morph targets (gpu/mobile/cpu: 320/180/80 triangles); `rockMatrix` and `rockWeights` place both the render and
+  `rockColliders`, one trimesh sampled from the same blended shape. `riverRockSites` (`stone.ts`) stays the single list for
+  rocks, colliders and the water's `rock` foam; a few stream rocks lean with the bank and `seatedHeight` buries every
+  underside in the ground, so none floats or overhangs the channel. Props on the ground use `terrainSurfaceHeight` /
+  `terrainSurfaceNormal` (the triangulated two-metre grid), not the analytic `terrainHeight`; `layoutAllows` is planting
+  clearance without the water band. Shore pebbles are one unshadowed batch in `details` (map mode hides it, cpu has none),
+  hidden beyond 60 m from water. The `uv` and `moss` rock attributes are ready for the TSL moss/triplanar step.
 - **The Mitoring hall is not a sphere.** `createEnergyHall` builds an amber cup with a domed lid
   from `ENERGY_HALL` (`a`, `b` semi-axes, wall and dome heights, door angle); the basket strands
   below the rim are projected onto its outside, and the crown loops curl onto the lower roof.

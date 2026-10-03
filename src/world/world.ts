@@ -22,13 +22,15 @@ import { TIME_TOWER } from './waterways';
 import { pathJoin } from './path-surface';
 import { Mountains } from './mountains';
 import { PlanarExhibition } from './planar-exhibition';
-import { GARDEN_BRIDGES, riverCenter } from './waterways';
+import { GARDEN_BRIDGES, riverCenter, waterDistance } from './waterways';
 import { createTimeTower } from './time-tower';
 import { createFutureHouse } from './future-house';
 import { cpuWaterColour, waterMaterial } from './water-material';
 import { waterSurfaceGeometry } from './water-surface';
 import type { RockSite } from './water-surface';
-import { pavingMaterial, riverRockSites, rockGeometry, rockMaterial } from './stone';
+import { pavingMaterial, riverRockSites, rockMaterial } from './stone';
+import { createRiverRocks, rockColliders } from './river-rocks';
+import { PEBBLE_RANGE, createPebbles } from './pebbles';
 import { createCityHallFacade, loadCityHallTextures } from './city-hall';
 import { mitoringAmberMaterial, loadMitoringAmberTextures, loadMitoringSilverTexture } from './mitoring-materials';
 import { CIVIC_LANDMARKS } from '../game/content';
@@ -45,7 +47,6 @@ const warmCulled = new WeakMap<THREE.Object3D, boolean>();
 import type { Landmark } from '../game/content';
 
 export interface Interactive { id: string; object: THREE.Object3D; position: THREE.Vector3; }
-const UP = new THREE.Vector3(0, 1, 0);
 const TAU = Math.PI * 2;
 function seeded(seed: number): () => number {
   return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -107,6 +108,7 @@ export class Town {
   private readonly dark = new THREE.MeshStandardMaterial({ color: '#3e5550', roughness: 0.25, metalness: 0.35 });
   private readonly sphere = new THREE.SphereGeometry(1, 16, 12);
   private rocks: RockSite[] = [];
+  private pebbles: THREE.InstancedMesh | null = null;
   private constructor(private mobile: boolean, private tier: GraphicsTier) { this.water = waterMaterial(tier); this.paving = pavingMaterial(mobile); }
   static async create(mobile: boolean, stage: (value: number, label: string) => Promise<void>, tier: GraphicsTier = mobile ? 'mobile' : 'gpu'): Promise<Town> {
     const town = new Town(mobile, tier); await town.build(stage); return town;
@@ -360,15 +362,10 @@ export class Town {
   }
   private createGardens(): void {
     this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter);
-    const matrix = new THREE.Matrix4(), q = new THREE.Quaternion();
-    const stone = rockMaterial(this.mobile);
-    const rocks = new THREE.InstancedMesh(rockGeometry(), stone, this.rocks.length);
-    let placed = 0;
-    for (const { x, y, z, s, yaw } of this.rocks) {
-      matrix.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(UP, yaw), new THREE.Vector3(s * 1.4, s * .8, s)); rocks.setMatrixAt(placed++, matrix);
-      this.colliders.push({ type: 'box', position: [x, y, z], size: [s * 1.1, s * .65, s * .85] });
-    }
-    rocks.count = placed; rocks.castShadow = true; rocks.receiveShadow = true; rocks.computeBoundingSphere(); this.root.add(rocks);
+    // One instanced draw of blended boulder variants; one collider mesh sampled from the same shapes and transforms.
+    this.root.add(createRiverRocks(this.rocks, rockMaterial(this.mobile), this.tier)); this.colliders.push(rockColliders(this.rocks));
+    // Shore pebbles live with the other near-ground details, so map mode hides them; cpu has none.
+    this.pebbles = createPebbles(this.tier, this.rocks); if (this.pebbles) this.details.add(this.pebbles);
     for (const x of [-6.5, 6.5]) for (const z of [5, 13, 39]) {
       const pole = mesh(new THREE.CylinderGeometry(0.045, 0.065, 2.8, 8), this.gold, this.root, x, 1.4, z);
       const globe = mesh(this.sphere, new THREE.MeshStandardMaterial({ color: '#f3e8c9', emissive: '#e4c881', emissiveIntensity: 0.35, roughness: 0.6 }), this.root, x, 2.8, z); globe.scale.setScalar(0.23); pole.castShadow = false;
@@ -384,6 +381,7 @@ export class Town {
     const trees = this.forest.update(camera, mapView ? fogFar : Math.min(fogFar, profile.forest), mapView, shadow);
     // Shrub batches toggle every couple of metres while walking; re-baking for them cost a shadow pass per ~2 m, so their shadows catch up at the next quarter-box re-bake.
     this.planting?.update(camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
+    if (this.pebbles) this.pebbles.visible = waterDistance(camera.position.x, camera.position.z) < PEBBLE_RANGE;
     if (this.tier === 'cpu') this.details.visible = false;
     return trees;
   }
