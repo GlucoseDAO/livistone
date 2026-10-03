@@ -273,8 +273,8 @@ function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean, footp
 }
 
 export interface GroundMaps { albedo: THREE.Texture[]; nrh: THREE.Texture[]; rock: THREE.Texture; rockNormal: THREE.Texture | null; shore?: ShoreMaps | null; footprints?: THREE.Texture | null }
-/** The near grass field's lookup (grass-field.ts): alpha is how fully grass grows on its 2 m grid; radius in metres. */
-export interface GrassShade { mask: THREE.Texture; minX: number; minZ: number; width: number; depth: number; radius: number }
+/** The near grass field's cover (grass-field.ts): how fully grass grows (0–1), bilinear on its 2 m grid; radius in metres. */
+export interface GrassShade { amount: (x: number, z: number) => number; radius: number }
 
 /**
  * Nodes for the vertex-coloured terrain: colour on every tier, roughness on gpu and mobile, detail normals on gpu. The cpu
@@ -322,13 +322,11 @@ export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMa
     // Damp hollows in worn soil and lush patches are a little glossier.
     GROUND.roughness.assign(mix(dot(blendW, vec3(meadowL.rough, sparseL.rough, soilL.rough)), 1, r4(L.roughFloor)).sub(soilW.mul(float(1).sub(soilL.height)).mul(blendW.z).mul(.25)).sub(macro.x.mul(.05)));
     if (grass) {
-      // Under the near grass field the soil between blades lies in the canopy's shade; it fades with the blades. An explicit
-      // level keeps the lookup legal inside the branch.
-      const near = float(1).sub(smoothstep(r4(grass.radius * .35), r4(grass.radius * .9), positionView.length())).toVar();
-      If(near.greaterThan(0), () => {
-        const uv = xz.sub(vec2(grass.minX, grass.minZ)).div(2).add(.5).div(vec2(grass.width, grass.depth));
-        ground.mulAssign(float(1).sub(texture(grass.mask, uv).level(float(0)).a.mul(near).mul(.32)));
-      });
+      // Under the near grass field the soil between blades lies in the canopy's shade; it fades with the blades. Its cover comes
+      // from the terrain's `grassCover` attribute on the same 2 m grid (mountains.ts), not a texture: with the aerial haze's two the
+      // ground would otherwise sample 17 textures in its fragment stage, past WebGPU's (and most WebGL 2 drivers') 16.
+      const near = float(1).sub(smoothstep(r4(grass.radius * .35), r4(grass.radius * .9), positionView.length()));
+      ground.mulAssign(float(1).sub(attribute<'float'>('grassCover', 'float').mul(near).mul(.32)));
     }
     // Smoothed vertex normals lean toward the sky across the two-metre grid's folds, and the top-down projection then streaked the
     // scan down steep faces. Jointed rock drops that projection wherever the triangle itself is steep; the side projections keep the

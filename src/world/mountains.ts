@@ -152,6 +152,8 @@ export class Mountains extends THREE.Group {
     // Sub-plan 27 round 2: steep ground shares the crags' jointed limestone (limestone.ts; on cpu only its pale scan), except with
     // ?crags=off, ?mountain=off or ?ridges=classic.
     const far = tier !== 'cpu' && ridgesLook() === 'ranges', jointed = CRAGS && ridgesLook() === 'ranges', geo = mountainGeometry(mobile, shade, !far, jointed);
+    // The near grass field's cover at every vertex, which the ground shades between the blades (ground-material.ts).
+    if (grass) { const p = geo.getAttribute('position'), cover = new Float32Array(p.count); for (let n = 0; n < p.count; n++) cover[n] = grass.amount(p.getX(n), p.getZ(n)); geo.setAttribute('grassCover', new THREE.BufferAttribute(cover, 1)); }
     // The cpu tier lights everything with Lambert (cpu-detail.ts) and keeps only the ground colour, so it starts there.
     const material = tier === 'cpu' ? new THREE.MeshLambertNodeMaterial({ vertexColors: true }) : new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: .96 });
     // Baked crown, trunk and wall occlusion dims only indirect light (sky, hemisphere, environment), on Lambert and standard alike:

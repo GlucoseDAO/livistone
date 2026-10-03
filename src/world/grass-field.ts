@@ -153,6 +153,14 @@ export function bakeGrassField(options: { rocks?: readonly RockSite[]; stems?: r
 /** How fully grass grows (0–1): outside reserved ground, at the density its soil and slope allow. */
 const meadowAmount = (clearance: number, density: number): number => THREE.MathUtils.smoothstep(clearance, BLADE_CLEARANCE, FULL_CLEARANCE) * density;
 
+/** How fully grass grows at a point: the tint's alpha, bilinear and clamped at the edges as the linear-filtered lookup read it. */
+export function grassAmount(bake: GrassBake, x: number, z: number): number {
+  const gx = THREE.MathUtils.clamp((x - bake.minX) / STEP, 0, bake.width - 1), gz = THREE.MathUtils.clamp((z - bake.minZ) / STEP, 0, bake.depth - 1);
+  const i = Math.min(bake.width - 2, Math.floor(gx)), j = Math.min(bake.depth - 2, Math.floor(gz)), u = gx - i, v = gz - j;
+  const at = (di: number, dj: number): number => bake.tint[((j + dj) * bake.width + i + di) * 4 + 3] / 255;
+  return (at(0, 0) * (1 - u) + at(1, 0) * u) * (1 - v) + (at(0, 1) * (1 - u) + at(1, 1) * u) * v;
+}
+
 /** What the vertex shader reads at a point: the terrain mesh's own triangle for height, bilinear for the rest. */
 export function sampleGrassField(bake: GrassBake, x: number, z: number): { ground: number; clearance: number; density: number; shade: number } | null {
   const gx = (x - bake.minX) / STEP, gz = (z - bake.minZ) / STEP;
@@ -268,5 +276,5 @@ export function createGrassField(tier: GraphicsTier, options: Parameters<typeof 
   const spec = GRASS_TIERS[tier], bake = bakeGrassField(options), material = grassMaterial(spec, bake, look), mesh = new THREE.Mesh(patchGeometry(spec), material);
   // The field follows the camera in the vertex shader, so it is always in view; it receives shadows but casts none.
   mesh.name = 'Near grass field'; mesh.frustumCulled = false; mesh.receiveShadow = true; mesh.castShadow = false;
-  return { mesh, ground: { mask: material.userData.tints as THREE.Texture, minX: bake.minX, minZ: bake.minZ, width: bake.width, depth: bake.depth, radius: fieldRadius(spec) } };
+  return { mesh, ground: { amount: (x, z) => grassAmount(bake, x, z), radius: fieldRadius(spec) } };
 }

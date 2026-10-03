@@ -129,8 +129,10 @@ describe('near grass field', () => {
     expect(mobile.blades).toBeGreaterThan(17000); expect(mobile.blades).toBeLessThan(21000); expect(mobile.radius).toBe(12);
     expect(grassFieldCounts('cpu')).toBeNull(); expect(createGrassField('cpu')).toBeNull();
     for (const tier of ['gpu', 'mobile'] as const) {
-      const { mesh: field, ground } = createGrassField(tier)!, geometry = field.geometry as THREE.InstancedBufferGeometry, counts = grassFieldCounts(tier)!;
-      expect(ground.radius).toBe(counts.radius); expect([ground.width, ground.depth]).toEqual([bake.width, bake.depth]);
+      const { mesh: field, ground } = createGrassField(tier, { rocks })!, geometry = field.geometry as THREE.InstancedBufferGeometry, counts = grassFieldCounts(tier)!;
+      expect(ground.radius).toBe(counts.radius);
+      // The cover the ground shades between blades (its `grassCover` attribute) is the bake's own alpha at every grid point.
+      for (const [i, j] of [[40, 60], [120, 200], [bake.width - 1, bake.depth - 1]]) expect(ground.amount(bake.minX + i * 2, bake.minZ + j * 2)).toBeCloseTo(bake.tint[(j * bake.width + i) * 4 + 3] / 255, 6);
       // One draw: a single mesh instancing one patch, which casts no shadow and is never frustum-culled.
       expect(field).toBeInstanceOf(THREE.Mesh); expect(geometry.isInstancedBufferGeometry).toBe(true);
       expect(geometry.instanceCount).toBe(counts.instances); expect(geometry.index!.count / 3 * geometry.instanceCount).toBe(counts.triangles);

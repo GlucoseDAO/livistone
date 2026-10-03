@@ -179,7 +179,8 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   `canopyReserved`. Rocks and the grove's stems (`LivingWaters.stems`) reach the bake as discs. `tests/grass-field.test.ts`
   checks the agreement. The field is
   one draw (gpu 52k blades to 22 m, mobile 19k to 12 m, none on cpu), lives in the details group so map mode hides it, shades
-  the ground between its blades, takes the terrain's baked crown and wall occlusion (`groundShadeField`) as its own aoNode,
+  the ground between its blades (through the terrain's `grassCover` attribute: the gpu ground material already samples
+  WebGPU's limit of 16 textures per stage, so new ground layers must free a binding first), takes the terrain's baked crown and wall occlusion (`groundShadeField`) as its own aoNode,
   and sinks `planting.ts` tufts inside its radius. Animate plants only through `wind.ts`
   (`windTime`: the game's elapsed time, frozen by `?capture=1`, still under reduced motion), never TSL's `time`. Trees
   (`treeSway`; the distant detail only leans), shrubs, flowers, tufts and lake reeds (`plantSway`) read a per-instance `windRoot` (the instance matrix's
