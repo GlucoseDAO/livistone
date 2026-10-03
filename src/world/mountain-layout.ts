@@ -354,6 +354,41 @@ export function mountainCalm(x: number, z: number): number {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// The water: the gorge's stream from under the snow, the plateau's brook and its waterfall into the gorge (mountain-water.ts)
+
+/** A plan point `offset` metres to the right (+, north in the westward gorge) or left of trail sample `s`. */
+export function besideTrail(s: number, offset: number): { x: number; z: number } {
+  const i = Math.min(TRAIL_SAMPLES.length - 2, Math.max(0, Math.floor(s))), p = TRAIL_CURVE.getPointAt(Math.min(1, s / (TRAIL_SAMPLES.length - 1))), q = TRAIL_SAMPLES[i + 1], o = TRAIL_SAMPLES[i], l = Math.hypot(q.x - o.x, q.z - o.z) || 1;
+  return { x: p.x - (q.z - o.z) / l * offset, z: p.z + (q.x - o.x) / l * offset };
+}
+/**
+ * The gorge's stream in plan, downhill: out from under the snow's snout on the crags' side of the floor (where `meltwater` wets
+ * it), down the gorge clear of the trail, sinking among boulders before the mouth. Heights: the ground's (terrainSurfaceHeight).
+ */
+export const GORGE_STREAM = (() => {
+  const points: { x: number; z: number }[] = [];
+  for (let s = STAGE.snout + 1; s >= STAGE.mouth + 7; s -= 1.5) points.push(besideTrail(s, gorgeHalf(s) * .55));
+  return points;
+})();
+/** The waterfall: from the plateau's lip above the gorge's pool to the pool's edge at the wall's foot, in plan. */
+export const WATERFALL = { lip: besideTrail(STAGE.waterfall, gorgeHalf(STAGE.waterfall) + wallRun(STAGE.waterfall) + .2), foot: besideTrail(STAGE.waterfall, gorgeHalf(STAGE.waterfall) * .72) } as const;
+/** The plateau's brook in plan, downhill: from a spring at the crags' foot across the meadow to the waterfall's lip. */
+export const PLATEAU_STREAM = (() => {
+  const spring = { x: WATERFALL.lip.x + 1.5, z: -279.2 }, points: { x: number; z: number }[] = [];
+  for (let k = 0; k <= 16; k++) { const t = k / 16; points.push({ x: spring.x + (WATERFALL.lip.x - spring.x) * t + 1.1 * Math.sin(t * 7.5) * (1 - t * t), z: spring.z + (WATERFALL.lip.z - spring.z) * t }); }
+  return points;
+})();
+/** Distance in plan from the plateau's brook (8 m at most): mats and flowers keep off it. */
+export function brookDistance(x: number, z: number): number {
+  let best = 8;
+  for (let i = 1; i < PLATEAU_STREAM.length; i++) {
+    const a = PLATEAU_STREAM[i - 1], b = PLATEAU_STREAM[i], dx = b.x - a.x, dz = b.z - a.z, t = clamp(((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz), 0, 1);
+    best = Math.min(best, Math.hypot(x - a.x - dx * t, z - a.z - dz * t));
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // The whole shape
 
 /**
@@ -414,5 +449,5 @@ export function bloomDensity(x: number, z: number): number {
   if (!MOUNTAIN) return 0;
   const inside = plateauInside(x, z); if (inside < 1.5) return 0;
   const patches = mountainNoise(x * .16 + 4.1, z * .16 - 2.3) * .65 + mountainNoise(x * .55 - 7, z * .55 + 1.7) * .35;
-  return smooth(patches, .3, .62) * smooth(inside, 1.5, 4) * smooth(trailDistance(x, z), TRAIL_HALF + .6, TRAIL_HALF + 1.8);
+  return smooth(patches, .3, .62) * smooth(inside, 1.5, 4) * smooth(trailDistance(x, z), TRAIL_HALF + .6, TRAIL_HALF + 1.8) * smooth(brookDistance(x, z), .9, 2);
 }

@@ -13,8 +13,8 @@ import { RAILWAY, STATION } from '../src/world/station-layout';
 // trail, its plateau, the peaks and the couloir out after the draws, so every other site is unchanged, and appended a few round
 // the trailhead (the last site is one of them).
 const FOREST: [boolean, number, [number, number], [number, number]][] = [
-  [false, 910, [-27.918645669706166, -199.93845618027262], [-22.31657310872749, -199.0044028444865]],
-  [true, 517, [-27.918645669706166, -199.93845618027262], [-18.43786784085531, -205.5658622716235]],
+  [false, 910, [-27.918645669706166, -199.93845618027262], [-22.32522038852804, -199.00970863348874]],
+  [true, 517, [-27.918645669706166, -199.93845618027262], [-18.4485683455656, -205.57238135935123]],
 ];
 
 describe('distant ranges (sub-plan 26)', () => {
