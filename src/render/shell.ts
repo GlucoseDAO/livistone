@@ -1,6 +1,6 @@
 // Thin transmissive shells (the Mitoring amber, the Nut of Power crystal) seen from inside, as the classic renderer showed them.
 import * as THREE from 'three';
-import { EnvironmentBRDF, F_Schlick, attenuationColor, attenuationDistance, cameraPosition, cameraProjectionMatrix, cameraViewMatrix, clearcoat, clearcoatNormalView, diffuseContribution, exp, float, frontFacing, ior, length, log, log2, materialEmissive, modelScale, normalWorld, positionViewDirection, positionWorld, refract, roughness, screenSize, specularColorBlended, specularF90, textureBicubicLevel, thickness, transmission, vec2, vec3, vec4, viewportOpaqueMipTexture } from 'three/tsl';
+import { EnvironmentBRDF, F_Schlick, attenuationColor, attenuationDistance, cameraPosition, cameraProjectionMatrix, cameraViewMatrix, clearcoat, clearcoatNormalView, diffuseContribution, exp, float, frontFacing, ior, length, log, log2, materialEmissive, max, modelScale, normalWorld, positionViewDirection, positionWorld, refract, roughness, screenSize, specularColorBlended, specularF90, textureBicubicLevel, thickness, transmission, vec2, vec3, vec4, viewportOpaqueMipTexture } from 'three/tsl';
 import { PhysicalLightingModel } from 'three/webgpu';
 import type { Node, NodeBuilder } from 'three/webgpu';
 
@@ -35,5 +35,19 @@ class ShellLighting extends PhysicalLightingModel {
 }
 /** Three's physical material, with the classic second layer when transmissive and seen from inside (see ShellLighting). */
 export class ShellMaterial extends THREE.MeshPhysicalNodeMaterial {
+  /**
+   * Optional highlight roll-off before fog and tone mapping: radiance whose brightest channel passes `knee` eases toward `knee +
+   * span`, scaled as a whole so its hue holds. Khronos PBR Neutral turns a blown-out colour toward white instead, which left
+   * the Mitoring's night hot spots peach-white; a uniform `knee` far above any radiance switches it off without a rebuild.
+   */
+  peak: { knee: Node<'float'>; span: number } | null = null;
+  copy(source: ShellMaterial): this { super.copy(source); this.peak = source.peak; return this; }
   setupLightingModel(): PhysicalLightingModel { return new ShellLighting(this.useClearcoat, this.useSheen, this.useIridescence, this.useAnisotropy, this.useTransmission, this.useDispersion); }
+  setupOutput(builder: NodeBuilder, outputNode: Node<'vec4'>): Node<'vec4'> {
+    if (this.peak) {
+      const { knee, span } = this.peak, top = max(outputNode.r, max(outputNode.g, outputNode.b)), eased = knee.add(float(span).mul(float(1).sub(exp(max(top.sub(knee), 0).div(-span)))));
+      outputNode = vec4(outputNode.rgb.mul(top.greaterThan(knee).select(eased.div(top), float(1))), outputNode.a) as unknown as Node<'vec4'>;
+    }
+    return super.setupOutput(builder, outputNode) as Node<'vec4'>;
+  }
 }

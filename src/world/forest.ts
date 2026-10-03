@@ -12,7 +12,8 @@ const REACH_STEP = 2;
 
 /**
  * A cell's foliage detail from its centre distance, or hidden once even its nearest tree surface (`nearest`, the distance to its
- * bounding sphere) lies at or beyond `reach`: the full-fog distance, where trees are entirely sky (render/aerial.ts).
+ * bounding sphere) lies at or beyond `reach`: the tier's tree reach (GraphicsProfile.forest), where the haze has faded most of a
+ * tree into what lies behind it (render/aerial.ts).
  */
 export function forestLod(distance: number, nearest: number, reach: number): 'full' | 'reduced' | 'hidden' {
   if (nearest >= reach) return 'hidden';
@@ -193,15 +194,15 @@ export class Forest extends THREE.Group {
   }
   /**
    * Returns whether near foliage switched detail; the far hide/show happens beyond any walking shadow box and is not reported.
-   * `reach` is the full-fog distance: trees are drawn while any part of them is nearer. `shadow` is the sun's shadow, whose
-   * frustum picks the shadow casters.
+   * `reach` is the tree reach (GraphicsProfile.forest, a little short of full fog): trees are drawn while any part of them is
+   * nearer. `shadow` is the sun's shadow, whose frustum picks the shadow casters.
    */
   update(camera: THREE.Camera, reach: number, mapView: boolean, shadow?: THREE.LightShadow): boolean {
     if (this.warm) return false;
     camera.updateMatrixWorld(); frustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     const origin = camera.position, sun = shadow?.getFrustum(); let casters = false, trunks = false, changed = 0;
     // The tree selection is redone every REACH_STEP metres against a reach grown by REACH_STEP, so it covers every camera
-    // position until the next pass; a tree may appear up to that much early, inside full fog.
+    // position until the next pass; a tree may appear up to that much early, deep in the haze.
     const moved = mapView || reach !== this.reach || origin.distanceTo(this.reachFrom) >= REACH_STEP;
     if (moved) { this.reachFrom.copy(origin); this.reach = reach; }
     const from = this.reachFrom, grown = reach + REACH_STEP;

@@ -13,7 +13,7 @@ import { Fn, abs, exp, float, length, materialReference, max, mix, mrt, normaliz
 import type { Node, NodeBuilder } from 'three/webgpu';
 import type { PostMode } from '../game/graphics';
 import { AO, ScreenSpace } from './post';
-import { aerialFactor, aerialSky } from './aerial';
+import { AERIAL_BEHIND, aerialFactor, aerialMix, aerialSky, aerialTarget, hazeLook, setAerialBehind } from './aerial';
 import { toneMapNode, untoneMapNode } from './tone';
 
 // @types/three r186 leaves these untyped; the casts only restore the shader types three itself infers.
@@ -69,6 +69,8 @@ export class OutputPipeline {
   private readonly post: ScreenSpace;
   // One output pass with occlusion (the walk camera) and one without (the map, gentle detail); both carry the bloom.
   private readonly pipelines = new Map<boolean, THREE.RenderPipeline>();
+  /** Copies the distant pass into AERIAL_BEHIND as the radiance this pipeline shows for it; none under dev-only ?haze=classic. */
+  private readonly behind: THREE.QuadMesh | null = null;
   private readonly size = new THREE.Vector2();
   constructor(private readonly renderer: THREE.WebGPURenderer, private readonly scene: THREE.Scene, post: PostMode, walkCamera: THREE.PerspectiveCamera) {
     // The scene renders at top level into its own half-float target, with an 8-bit `display` attachment. A pass() node would
@@ -79,6 +81,14 @@ export class OutputPipeline {
     // glass over a poster tone-maps its share. MRT outputs besides `output` would otherwise be written unblended.
     this.targets = mrt({ output, display: vec4(0, FOG, SOLID, output.a) }); this.targets.setBlendMode('display', new THREE.BlendMode(THREE.MaterialBlending));
     this.post = new ScreenSpace(post, { colour: this.target.textures[0], display: this.target.textures[1], depth: this.target.depthTexture! }, walkCamera, exposure);
+    if (hazeLook() === 'behind') {
+      // The distant pass as the output pass below shows it (tone-mapped, its mist mixed in after encoding; it has no paper and no
+      // occlusion), turned back into linear radiance: a town surface hazed into this colour displays as the ranges behind it.
+      const drawn = texture(this.target.textures[0]), shown = texture(this.target.textures[1]), material = new THREE.NodeMaterial();
+      const display = fromSRGB(mix(toSRGB(toneMapNode(drawn.rgb as unknown as Node<'vec3'>, exposure)), toSRGB(displayFog.color as unknown as Node<'vec3'>), shown.g) as unknown as Node<'vec3'>);
+      material.fragmentNode = vec4(untoneMapNode(display, exposure), 1); material.name = 'aerial.behind';
+      this.behind = new THREE.QuadMesh(material); this.behind.name = 'Aerial · behind';
+    }
   }
   /**
    * Occlusion follows the walk camera's depth and projection; the map's far view and gentle detail go without it. `distant`, when
@@ -92,8 +102,10 @@ export class OutputPipeline {
     if (distant) {
       const background = this.scene.background, clear = this.renderer.autoClearColor;
       this.renderer.render(distant.scene, distant.camera);
+      // The town's haze fades into what that pass drew (render/aerial.ts), copied out first: it cannot read its own target.
+      if (this.behind) { this.renderer.setMRT(null); this.renderer.setRenderTarget(AERIAL_BEHIND); this.behind.render(this.renderer); this.bind(); setAerialBehind(true); }
       this.scene.background = null; this.renderer.autoClearColor = false;
-      try { this.renderer.render(this.scene, camera); } finally { this.scene.background = background; this.renderer.autoClearColor = clear; }
+      try { this.renderer.render(this.scene, camera); } finally { this.scene.background = background; this.renderer.autoClearColor = clear; setAerialBehind(false); }
     } else this.renderer.render(this.scene, camera);
     this.unbind();
     const ao = occlusion && camera === this.post.camera && !!this.post.occlusion;
@@ -143,10 +155,12 @@ export class OutputPipeline {
     } finally { for (const material of twoPass.keys()) material.side = THREE.DoubleSide; this.unbind(); }
     // The output passes and their screen-space stages build their shaders on first use: build both now, not on the first map.
     for (const occlusion of [true, false]) { if (occlusion && this.post.occlusion) this.post.prepare(this.renderer); this.pipeline(occlusion && !!this.post.occlusion).render(); }
+    if (this.behind) { this.bind(); this.renderer.setMRT(null); this.renderer.setRenderTarget(AERIAL_BEHIND); this.behind.render(this.renderer); this.unbind(); }
   }
   private bind(): void {
     this.renderer.getDrawingBufferSize(this.size);
     if (this.target.width !== this.size.x || this.target.height !== this.size.y) this.target.setSize(this.size.x, this.size.y);
+    if (this.behind && (AERIAL_BEHIND.width !== this.size.x || AERIAL_BEHIND.height !== this.size.y)) AERIAL_BEHIND.setSize(this.size.x, this.size.y);
     this.renderer.setRenderTarget(this.target); this.renderer.setMRT(this.targets);
   }
   private unbind(): void { this.renderer.setRenderTarget(null); this.renderer.setMRT(null); }
@@ -160,7 +174,7 @@ class DisplayNodeMaterial extends THREE.MeshBasicNodeMaterial {
   // Its own type keeps its shaders apart from a plain basic material's with the same properties.
   static get type(): string { return 'DisplayNodeMaterial'; }
   setupFog(_builder: NodeBuilder, outputNode: Node<'vec4'>): Node<'vec4'> {
-    return vec4(mix(outputNode.rgb, toneMapNode(aerialSky, exposure), aerialFactor), outputNode.a) as unknown as Node<'vec4'>;
+    return vec4(aerialMix(outputNode.rgb, toneMapNode(aerialSky, exposure), toneMapNode(aerialTarget, exposure)), outputNode.a) as unknown as Node<'vec4'>;
   }
 }
 /** The former `toneMapped: false` MeshBasicMaterial: exact colours, untouched by tone mapping, fogged toward the displayed sky. */

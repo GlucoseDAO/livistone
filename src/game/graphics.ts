@@ -66,9 +66,9 @@ export type GraphicsTier = 'gpu' | 'mobile' | 'cpu';
 export type PostMode = 'off' | 'ao' | 'gi';
 export interface GraphicsProfile {
   tier: GraphicsTier; reduced: boolean; pixelRatio: number; shadows: boolean; skyDay: number; skyNight: number; plants: number;
-  /** Walking view: metres at which the fog is complete. The walk camera's far plane and the forest's tree culling both stop here. */
+  /** Walking view: metres at which the fog is complete. The walk camera's far plane and the grove's crown culling stop here. */
   fog: number;
-  /** Trees are drawn to this distance. gpu and mobile draw every tree short of full fog (forest = fog); cpu stops inside its linear fog. */
+  /** Trees are drawn while any part of them is nearer. gpu and mobile stop a little short of full fog (TREE_REACH); cpu stops inside its linear fog. */
   forest: number;
   lights: number; post: PostMode;
 }
@@ -76,11 +76,17 @@ export function graphicsTier(input: { coarse: boolean; caveatFailed?: boolean; r
   if (input.caveatFailed || (input.renderer && softwareRenderer(input.renderer))) return 'cpu';
   return input.coarse || input.integrated || (input.renderer && modestRenderer(input.renderer)) ? 'mobile' : 'gpu';
 }
-// gpu and mobile fade into the sky by 130 and 110 m (render/aerial.ts): 150 / 120 m cost about a fifth of the gpu frame rate in
-// headless tests (trees drawn until full fog). cpu keeps its 42–130 m linear fog and its trees: before sub-plan 21 its cells hid
-// at 72% of 80 m from their centres, which is about where 58 m to the nearest tree stops them now.
+/**
+ * gpu and mobile hide a tree once even its nearest part lies past this share of the full-fog distance. The haze there has faded
+ * about four fifths of it into what the distant pass drew behind (render/aerial.ts), so it leaves without a visible pop, while
+ * the outer ring it spares held a fifth of the forest's triangles: trees drawn until full fog had cost a third more per view.
+ */
+export const TREE_REACH = .9;
+// gpu and mobile fade into the distant pass by 130 and 110 m (render/aerial.ts): 150 / 120 m cost about a fifth of the gpu frame
+// rate in headless tests (trees drawn until full fog). cpu keeps its 42–130 m linear fog and its trees: before sub-plan 21 its
+// cells hid at 72% of 80 m from their centres, which is about where 58 m to the nearest tree stops them now.
 export function graphicsProfile(tier: GraphicsTier): GraphicsProfile {
   if (tier === 'cpu') return { tier, reduced: true, pixelRatio: .55, shadows: false, skyDay: 128, skyNight: 128, plants: 18, fog: 130, forest: 58, lights: 2, post: 'off' };
-  if (tier === 'mobile') return { tier, reduced: true, pixelRatio: 1, shadows: true, skyDay: 512, skyNight: 512, plants: 32, fog: 110, forest: 110, lights: 6, post: 'off' };
-  return { tier, reduced: false, pixelRatio: 1.5, shadows: true, skyDay: 1024, skyNight: 1024, plants: 38, fog: 130, forest: 130, lights: 10, post: 'ao' };
+  if (tier === 'mobile') return { tier, reduced: true, pixelRatio: 1, shadows: true, skyDay: 512, skyNight: 512, plants: 32, fog: 110, forest: 110 * TREE_REACH, lights: 6, post: 'off' };
+  return { tier, reduced: false, pixelRatio: 1.5, shadows: true, skyDay: 1024, skyNight: 1024, plants: 38, fog: 130, forest: 130 * TREE_REACH, lights: 10, post: 'ao' };
 }

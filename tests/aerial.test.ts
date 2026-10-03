@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { aerialFog, aerialParams, heightDensity } from '../src/render/aerial';
 import { graphicsProfile } from '../src/game/graphics';
+import { toneMapped, untoneMapped } from '../src/render/tone';
+import { HORIZON_HAZE, HORIZON_RADIANCE, SKY_EXPOSURE } from '../src/world/sky';
 
 const gpu = aerialParams('gpu'), mobile = aerialParams('mobile');
 
@@ -61,5 +63,23 @@ describe('aerial perspective', () => {
   it('hazes hillsides less than the valley floor at the same distance', () => {
     const floor = aerialFog(70, 1.8, 0, gpu)[1], hill = aerialFog(70, 1.8, 30, gpu)[1];
     expect(hill).toBeLessThan(floor * .85); expect(hill).toBeGreaterThan(0);
+  });
+});
+
+describe('fading into the distant pass', () => {
+  // The sRGB transfer pair, as render/output.ts applies it on the GPU.
+  const toSRGB = (v: number): number => v <= .0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - .055, fromSRGB = (v: number): number => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4;
+  it('turns what the distant pass drew back into a radiance the output pass shows as the same colour', () => {
+    // OutputPipeline's behind copy, on the CPU: the distant pixel tone-mapped and encoded, its valley mist mixed in after encoding,
+    // then decoded and untone-mapped. A town surface hazed entirely into that radiance must display as the ranges behind it.
+    for (const phase of ['day', 'night'] as const) {
+      const exposure = SKY_EXPOSURE[phase], haze = HORIZON_HAZE[phase].toArray().map(toSRGB);
+      // Forest and rock on the ranges, the sky above them and below the horizon, and a blue inscattered crest.
+      for (const radiance of [[.02, .035, .015], [.09, .085, .08], [.25, .45, .8], HORIZON_RADIANCE[phase].toArray(), [.12, .2, .38], [.003, .006, .014]]) for (const mist of [0, .3, .7, 1]) {
+        const shown = toneMapped(radiance, exposure).toArray().map(toSRGB).map((v, i) => v + (haze[i] - v) * mist);
+        const behind = untoneMapped(shown.map(fromSRGB), exposure), again = toneMapped(behind, exposure).toArray().map(toSRGB);
+        again.forEach((v, i) => expect(Math.abs(v - shown[i]) * 255, `${phase} ${radiance} ${mist}`).toBeLessThan(1));
+      }
+    }
   });
 });

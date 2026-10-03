@@ -5,7 +5,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Forest, SHADOW_LAYER, forestLod, swayingTreeMaterial } from '../src/world/forest';
 import { WIND_ROOT } from '../src/world/wind';
 import { aerialFog, aerialParams } from '../src/render/aerial';
-import { graphicsProfile } from '../src/game/graphics';
+import { TREE_REACH, graphicsProfile } from '../src/game/graphics';
 
 describe('forest distance detail', () => {
   it('keeps full cards nearby, thins them, then hides cells only once their nearest tree is in full fog', () => {
@@ -16,12 +16,13 @@ describe('forest distance detail', () => {
     expect(forestLod(180, 150, 150)).toBe('hidden');
   });
 
-  it('culls trees on gpu and mobile only where the walking fog is complete', () => {
+  it('culls trees on gpu and mobile a little short of full fog, once the haze has taken most of them', () => {
     for (const tier of ['gpu', 'mobile'] as const) {
       const profile = graphicsProfile(tier), reach = Math.min(profile.fog, profile.forest);
-      expect(reach).toBe(profile.fog);
-      // Whatever the heights of eye and tree, the fog is entire sky where trees stop.
-      for (const [eye, y] of [[1.8, 0], [1.8, 45], [32, 2], [-1, 60]]) for (const channel of aerialFog(reach, eye, y, aerialParams(tier))) expect(channel).toBeCloseTo(1, 9);
+      expect(reach).toBeCloseTo(profile.fog * TREE_REACH, 9); expect(reach).toBeLessThan(profile.fog);
+      // Whatever the heights of eye and tree, under a quarter of a tree's own colour is left where trees stop (at the nearest
+      // point of its bounds; the rest of it lies deeper in the haze), and that share fades toward what lies behind it.
+      for (const [eye, y] of [[1.8, 0], [1.8, 45], [32, 2], [-1, 60]]) for (const channel of aerialFog(reach, eye, y, aerialParams(tier))) expect(channel).toBeGreaterThan(.75);
     }
     // The cpu tier keeps its shorter forest inside its own linear fog.
     expect(graphicsProfile('cpu').forest).toBeLessThan(graphicsProfile('cpu').fog);

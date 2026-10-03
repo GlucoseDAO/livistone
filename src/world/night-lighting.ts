@@ -3,7 +3,7 @@ import { float, materialOpacity, materialReference, max, min, texture, vec3, vec
 import type { Node } from 'three/webgpu';
 import { graphicsProfile } from '../game/graphics';
 import { KEEP_DISPLAY, displayed, fromSRGB, toSRGB, untoneMapped } from '../render/output';
-import { aerialFactor } from '../render/aerial';
+import { aerialFactor, hazeLook } from '../render/aerial';
 import type { GraphicsTier } from '../game/graphics';
 
 let halo: THREE.DataTexture | undefined;
@@ -20,15 +20,18 @@ function haloTexture(): THREE.DataTexture {
 // Additive halos were blended after the classic renderer encoded sRGB, untouched by tone mapping: they added the sRGB colour
 // times the falloff to what was displayed. The output pass now tone-maps them, so each pixel reads what is drawn behind it
 // (copied once per frame, at the first halo) and adds the radiance that raises its displayed colour by that much: over the
-// lit amber as over the dark sky, where the tone curve's shoulder would otherwise swallow a fixed amount. One node for every
-// halo; colour and opacity stay per material.
+// lit amber as over the dark sky, where the tone curve's shoulder would otherwise swallow a fixed amount. That raise is a
+// screen blend, the same addition over the dark night but easing off toward white: over the Mitoring's amber, which Neutral
+// shows brighter than ACES did, a plain sum clipped red and lifted green into peach-white blots (dev-only ?haze=classic keeps
+// the sum). One node for every halo; colour and opacity stay per material.
 let haloNode: Node<'vec4'> | undefined;
 /** A depth-tested halo and a light location; the renderer shares a fixed pool of actual lights. */
 export function addGlow(parent: THREE.Object3D, position: THREE.Vector3, color: string, size: number, intensity = 0, distance = 12, opacity = .45): THREE.Sprite {
   if (!haloNode) {
     const behind = viewportSharedTexture().rgb as unknown as Node<'vec3'>, glow = toSRGB(materialReference('color', 'color') as unknown as Node<'vec3'>).mul(texture(haloTexture()).a.mul(materialOpacity));
+    const shown = displayed(behind), raised = hazeLook() === 'classic' ? shown.add(glow) : shown.add(glow.mul(vec3(1).sub(shown)));
     // Aerial perspective dims added light by the air's transmittance; fogging it toward the sky would add sky instead.
-    haloNode = vec4(max(untoneMapped(fromSRGB(min(displayed(behind).add(glow), vec3(1)))).sub(behind), vec3(0)).mul(vec3(1).sub(aerialFactor)), 1);
+    haloNode = vec4(max(untoneMapped(fromSRGB(min(raised, vec3(1)))).sub(behind), vec3(0)).mul(vec3(1).sub(aerialFactor)), 1);
   }
   const material = new THREE.SpriteNodeMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
   material.colorNode = haloNode; material.opacityNode = float(1); material.mrtNode = KEEP_DISPLAY;
@@ -68,7 +71,7 @@ export class NightLighting {
   }
   setNight(night: boolean): void {
     this.night = night; this.halos.forEach(halo => { halo.visible = night && this.tier !== 'cpu'; });
-    this.materials.forEach(material => { const value = material.userData[night ? 'nightEmission' : 'dayEmission']; material.emissive.set(value.color); material.emissiveIntensity = value.intensity; });
+    this.materials.forEach(material => { const value = material.userData[night ? 'nightEmission' : 'dayEmission']; material.emissive.set(value.color); material.emissiveIntensity = value.intensity; material.userData.onNight?.(night); });
     if (!night) this.lights.forEach(light => { light.intensity = 0; });
   }
   update(camera: THREE.Camera): void {

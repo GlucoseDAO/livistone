@@ -1,5 +1,6 @@
 import { graphicsProfile } from '../game/graphics';
 import type { GraphicsTier } from '../game/graphics';
+import { hazeLook } from '../render/aerial';
 import { createIntroduction } from './introduction';
 import { createEnhancementHill, createEnhancementPanel } from './enhancement';
 import { createEnhancementGallery } from './enhancement-gallery';
@@ -65,6 +66,7 @@ import type { Landmark } from '../game/content';
 export interface Interactive { id: string; object: THREE.Object3D; position: THREE.Vector3; }
 // Dev-only ?contact=off leaves out the contact-shadow decals and the baked ground shade, for sub-plan 16's before/after review.
 const CONTACT_OFF = import.meta.env.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).get('contact') === 'off';
+const HAZE_CLASSIC = hazeLook() === 'classic';
 const TAU = Math.PI * 2;
 function seeded(seed: number): () => number {
   return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -391,7 +393,7 @@ export class Town {
     this.rooms.push({ center: new THREE.Vector3(x, 0, z), parts: group.children.filter((child) => !(child as THREE.Light).isLight), shown: null });
   }
   /** Trees as a probe at `position` sees them, in every direction (the bake's per-site hook). */
-  surround(position: THREE.Vector3): void { this.forest.surround(position, graphicsProfile(this.tier).forest); }
+  surround(position: THREE.Vector3): void { const profile = graphicsProfile(this.tier); this.forest.surround(position, HAZE_CLASSIC && this.tier !== 'cpu' ? profile.fog : profile.forest); }
   /** Probe sites with the parts each serves (probes.ts); the cpu tier bakes none. */
   probeScopes(): ProbeScope[] {
     return PROBE_SITES.flatMap(site => { const parts = this.probeParts.get(site.id); return parts ? [{ site, ...parts }] : []; });
@@ -451,16 +453,18 @@ export class Town {
   }
   /**
    * Returns whether a shadow caster changed detail or visibility this frame. `fullFog` is where the view's fog is complete
-   * (GraphicsProfile.fog walking): trees and grove crowns are culled only beyond it, except on the cpu tier, which stops at its
-   * own forest range inside its linear fog.
+   * (GraphicsProfile.fog walking): grove crowns are culled only beyond it and trees a little short of it (TREE_REACH, where the
+   * haze has faded most of a tree into the distant pass), except on the cpu tier, which stops both at its own forest range
+   * inside its linear fog. Dev-only ?haze=classic draws trees until full fog again.
    */
   update(time: number, camera?: THREE.Camera, fullFog = 220, mapView = false, shadow?: THREE.LightShadow): boolean {
     this.water.userData.time.value = time; shoreTime.value = time; updateWind(time);
     if (!camera) return false;
-    const profile = graphicsProfile(this.tier);
-    const range = mapView ? fullFog : Math.min(fullFog, profile.forest), trees = this.forest.update(camera, range, mapView, shadow);
-    // Grove crowns follow the forest's range; their light silhouette matches, so a cached shadow map waits for its next re-bake.
-    this.gardens.updateDetail(camera, range, mapView);
+    const profile = graphicsProfile(this.tier), cpu = this.tier === 'cpu';
+    const crowns = mapView || !cpu ? fullFog : Math.min(fullFog, profile.forest), reach = mapView || (!cpu && HAZE_CLASSIC) ? fullFog : Math.min(fullFog, profile.forest);
+    const trees = this.forest.update(camera, reach, mapView, shadow);
+    // Their light silhouette matches, so a cached shadow map waits for its next re-bake.
+    this.gardens.updateDetail(camera, crowns, mapView);
     // Shrub batches toggle every couple of metres while walking; re-baking for them cost a shadow pass per ~2 m, so their shadows catch up at the next quarter-box re-bake.
     this.planting?.update(camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
     this.pebbles?.update(camera);

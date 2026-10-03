@@ -63,7 +63,8 @@ export function measure(group: Group, far = WALK_FAR): Report {
 
 /** The DOM-free groups for one tier; night halos are left out because they draw only after dark. */
 export function budgetGroups(tier: GraphicsTier): Group[] {
-  const mobile = tier !== 'gpu', profile = graphicsProfile(tier), range = Math.min(profile.fog, profile.forest);
+  // Grove crowns stop at the full-fog distance, as Town.update does on gpu and mobile; trees a little short of it (the forest group).
+  const mobile = tier !== 'gpu', profile = graphicsProfile(tier), range = profile.fog;
   const day = (object: THREE_TYPES.Object3D): boolean => !object.userData.nightGlow;
   const gardens = new LivingWaters(mobile) as InstanceType<typeof LivingWaters> & { updateDetail?: (camera: THREE_TYPES.Camera, range: number, mapView: boolean) => boolean };
   const glucose = new THREE.Group(), hill = new THREE.Group(), ground = new THREE.Group(), plants = new THREE.Group(), details = new THREE.Group(), colliders: ColliderSpec[] = [];

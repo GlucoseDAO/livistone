@@ -1,6 +1,18 @@
 import * as THREE from 'three';
+import { renderGroup, uniform } from 'three/tsl';
+import type { Node } from 'three/webgpu';
+import { hazeLook } from '../render/aerial';
 import { ShellMaterial } from '../render/shell';
 import { nightEmission } from './night-lighting';
+
+/**
+ * At night the hall's two front lamps stand under a metre from the amber, and the radiance there is many times what Neutral
+ * shows as white: it turned those spots peach-white where ACES had kept them orange. Past `knee` the amber's own radiance now
+ * eases toward knee + span (about 1.6, a tenth of the way to white under the night exposure) keeping its hue. By day the knee
+ * sits out of reach, so sunlit amber and its glints are untouched; dev-only ?haze=classic keeps the night hot spots too.
+ */
+const NIGHT_PEAK = { knee: .8, span: .8 }, OFF = 1e6;
+const knee = uniform(OFF).setGroup(renderGroup);
 
 /** A ShellMaterial: from inside the hall the rich amber shows the classic renderer's second amber layer. */
 export function mitoringAmberMaterial(mobile: boolean): ShellMaterial {
@@ -9,6 +21,8 @@ export function mitoringAmberMaterial(mobile: boolean): ShellMaterial {
     envMapIntensity: 1.25, clearcoatRoughness: .12, side: THREE.DoubleSide,
     emissive: '#b34c06', emissiveIntensity: .045 });
   material.name = 'Mitoring cloudy amber'; material.userData.mitoringAmber = material.userData.heroEnv = true;
+  material.peak = { knee: knee as unknown as Node<'float'>, span: NIGHT_PEAK.span };
+  material.userData.onNight = (night: boolean) => { knee.value = night && hazeLook() === 'behind' ? NIGHT_PEAK.knee : OFF; };
   nightEmission(material, '#e8a235', .24); setMitoringAmberQuality(material, mobile); return material;
 }
 

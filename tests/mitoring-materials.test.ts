@@ -23,3 +23,16 @@ describe('Mitoring amber quality', () => {
     amber.dispose();
   });
 });
+
+describe('Mitoring amber at night', () => {
+  it('eases its own highlights past a knee by night only, keeping their hue, and keeps the roll-off through copies', () => {
+    const amber = mitoringAmberMaterial(false), knee = amber.peak!.knee as unknown as { value: number };
+    amber.userData.onNight(false); expect(knee.value).toBeGreaterThan(1e5);
+    amber.userData.onNight(true); expect(knee.value).toBeLessThan(1); expect(amber.peak!.span).toBeGreaterThan(0);
+    // Neutral turns radiance whose brightest channel passes about 2 toward white: the eased peak stays well below that.
+    expect(knee.value + amber.peak!.span).toBeLessThan(2);
+    expect((amber.clone() as typeof amber).peak).toBe(amber.peak);
+    amber.userData.onNight(false); expect(knee.value).toBeGreaterThan(1e5);
+    amber.dispose();
+  });
+});
