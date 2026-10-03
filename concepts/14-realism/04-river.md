@@ -30,7 +30,7 @@ This record covers what was built and how it was reviewed. The owner has not yet
 - mobile: one channel-space layer (two fetches), with foam from that same sample.
 - cpu: opaque `MeshLambertMaterial`. Depth absorption is baked into vertex colours, from a wet olive bank to a sky-lifted teal body, on a 2 m-cell sheet of 11,442 triangles. `cpu-detail.ts` no longer simplifies that sheet, because simplifying would smear the bank gradient.
 
-## Variants (`?look=a|b`, dev only; builds use a)
+## Variants (`?look=a|b`, dev only; the owner chose b on 3 October 2026, so builds use b)
 
 - **a — clear shallow stream**: lighter absorption (0.55/0.30/0.34 per m), so the bed reads through most of the channel. Faster drift (0.55 m/s), full ripple strength, livelier foam.
 - **b — deeper green garden river**: about twice the absorption (1.2/0.62/0.78 per m), so the bed shows only near the banks. Slower drift (0.3 m/s), calmer and glassier surface, little foam.

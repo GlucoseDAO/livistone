@@ -3,10 +3,10 @@ import type { GraphicsTier } from '../game/graphics';
 
 /** Review variants (docs/realism/04-river-water.md): a = clear shallow stream, b = deeper green garden river. */
 export type WaterLook = 'a' | 'b';
-/** Dev-only `?look=a|b`; builds keep look a until the owner picks one. */
+/** The owner chose the deeper look b (3 Oct 2026); dev-only `?look=a` keeps the clear stream for re-review once the riverbed exists (sub-plan 14). */
 export function waterLook(): WaterLook {
-  if (!import.meta.env.DEV || typeof location === 'undefined') return 'a';
-  return new URLSearchParams(location.search).get('look') === 'b' ? 'b' : 'a';
+  if (!import.meta.env.DEV || typeof location === 'undefined') return 'b';
+  return new URLSearchParams(location.search).get('look') === 'a' ? 'a' : 'b';
 }
 
 interface Optics {
