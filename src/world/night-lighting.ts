@@ -29,7 +29,7 @@ let haloNode: Node<'vec4'> | undefined;
 export function addGlow(parent: THREE.Object3D, position: THREE.Vector3, color: string, size: number, intensity = 0, distance = 12, opacity = .45): THREE.Sprite {
   if (!haloNode) {
     const behind = viewportSharedTexture().rgb as unknown as Node<'vec3'>, glow = toSRGB(materialReference('color', 'color') as unknown as Node<'vec3'>).mul(texture(haloTexture()).a.mul(materialOpacity));
-    const shown = displayed(behind), raised = hazeLook() === 'classic' ? shown.add(glow) : shown.add(glow.mul(vec3(1).sub(shown)));
+    const shown = displayed(behind), raised = hazeLook() === 'classic' ? shown.add(glow) : vec3(1).sub(vec3(1).sub(shown).mul(vec3(1).sub(glow)));
     // Aerial perspective dims added light by the air's transmittance; fogging it toward the sky would add sky instead.
     haloNode = vec4(max(untoneMapped(fromSRGB(min(raised, vec3(1)))).sub(behind), vec3(0)).mul(vec3(1).sub(aerialFactor)), 1);
   }
