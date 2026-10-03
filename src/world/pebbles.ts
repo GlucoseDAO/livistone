@@ -12,8 +12,6 @@ import { GARDEN_BRIDGES, channelDistance, riverCenter, tributaryCenter, waterDis
 export const PEBBLE_COUNT: Record<GraphicsTier, number> = { gpu: 3200, mobile: 1100, cpu: 0 };
 /** The shore band in channel distance: from about 0.35 m deep at the bank to 0.9 m up the dry bank (the waterline is WATER_EDGE). */
 export const SHORE_BAND: readonly [number, number] = [WATER_EDGE - .45, .9];
-/** Beyond this distance from any channel the whole batch is hidden: the pebbles are sub-pixel there. */
-export const PEBBLE_RANGE = 60;
 export interface Pebble { x: number; y: number; z: number; size: number; flat: number; long: number; yaw: number; wet: boolean; normal: THREE.Vector3 }
 
 function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
@@ -76,18 +74,75 @@ export function pebbleGeometry(tier: GraphicsTier): THREE.BufferGeometry {
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geometry.computeVertexNormals(); return geometry;
 }
 
-/** All shore pebbles as one instanced draw that casts no shadow, or null on the cpu tier. */
-export function createPebbles(tier: GraphicsTier, rocks: readonly RockSite[]): THREE.InstancedMesh | null {
-  const sites = pebbleSites(tier, rocks); if (!sites.length) return null;
-  const mesh = new THREE.InstancedMesh(pebbleGeometry(tier), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .74 }), sites.length);
-  const palette = ['#7f817b', '#8f8d86', '#6f6a5f', '#8a806d', '#555a58', '#9c978a', '#7a7364', '#686b64'].map(c => new THREE.Color(c));
-  const rand = random(9203), matrix = new THREE.Matrix4(), tilt = new THREE.Quaternion(), turn = new THREE.Quaternion(), position = new THREE.Vector3(), scale = new THREE.Vector3(), tint = new THREE.Color();
-  sites.forEach((pebble, i) => {
-    // Lie on the bank slope, most of the underside sunk into it.
-    tilt.setFromUnitVectors(UP, pebble.normal).multiply(turn.setFromAxisAngle(UP, pebble.yaw));
-    position.set(pebble.x, pebble.y, pebble.z).addScaledVector(pebble.normal, pebble.size * pebble.flat * .15);
-    mesh.setMatrixAt(i, matrix.compose(position, tilt, scale.set(pebble.size, pebble.size * pebble.flat, pebble.size * pebble.long)));
-    tint.copy(palette[Math.floor(rand() * palette.length)]).multiplyScalar((.82 + rand() * .24) * (pebble.wet ? .72 : 1)); mesh.setColorAt(i, tint);
-  });
-  mesh.name = 'Shore pebbles'; mesh.castShadow = false; mesh.receiveShadow = true; mesh.computeBoundingSphere(); return mesh;
+/** The pebble's transform: lying on the bank slope with most of its underside sunk into it. */
+export function pebbleMatrix(pebble: Pebble, target = new THREE.Matrix4()): THREE.Matrix4 {
+  const tilt = new THREE.Quaternion().setFromUnitVectors(UP, pebble.normal).multiply(new THREE.Quaternion().setFromAxisAngle(UP, pebble.yaw));
+  const position = new THREE.Vector3(pebble.x, pebble.y, pebble.z).addScaledVector(pebble.normal, pebble.size * pebble.flat * .15);
+  return target.compose(position, tilt, new THREE.Vector3(pebble.size, pebble.size * pebble.flat, pebble.size * pebble.long));
+}
+
+/** Pebbles draw only from the 8 m cells within two cells of the camera's (20–28 m away at most): beyond that they are sub-pixel. */
+export const PEBBLE_CELL = 8, PEBBLE_RING = 2;
+const cellKey = (i: number, j: number): number => (i + 512) * 1024 + j + 512;
+interface PebbleCell { first: number; count: number; sphere: THREE.Sphere }
+
+/**
+ * Every shore pebble through one unshadowed instanced mesh. As with the forest and planting, the mesh is refilled with the
+ * pebbles of the cells around the camera, and only when the camera crosses into another cell.
+ */
+export class ShorePebbles {
+  readonly mesh: THREE.InstancedMesh;
+  readonly total: number;
+  private readonly cells = new Map<number, PebbleCell>();
+  private readonly matrices: Float32Array;
+  private readonly colors: Float32Array;
+  private centre = NaN;
+  private warm = false;
+  constructor(tier: GraphicsTier, sites: readonly Pebble[]) {
+    const byCell = new Map<number, Pebble[]>();
+    for (const pebble of sites) { const key = cellKey(Math.floor(pebble.x / PEBBLE_CELL), Math.floor(pebble.z / PEBBLE_CELL)), cell = byCell.get(key); if (cell) cell.push(pebble); else byCell.set(key, [pebble]); }
+    const palette = ['#7f817b', '#8f8d86', '#6f6a5f', '#8a806d', '#555a58', '#9c978a', '#7a7364', '#686b64'].map(c => new THREE.Color(c));
+    const rand = random(9203), matrix = new THREE.Matrix4(), tint = new THREE.Color();
+    this.total = sites.length; this.matrices = new Float32Array(sites.length * 16); this.colors = new Float32Array(sites.length * 3);
+    let next = 0;
+    for (const [key, members] of byCell) {
+      const cell: PebbleCell = { first: next, count: members.length, sphere: new THREE.Sphere().setFromPoints(members.map(p => new THREE.Vector3(p.x, p.y, p.z))) };
+      cell.sphere.radius += .2;
+      for (const pebble of members) {
+        pebbleMatrix(pebble, matrix).toArray(this.matrices, next * 16);
+        tint.copy(palette[Math.floor(rand() * palette.length)]).multiplyScalar((.82 + rand() * .24) * (pebble.wet ? .72 : 1)).toArray(this.colors, next * 3);
+        next++;
+      }
+      this.cells.set(key, cell);
+    }
+    this.mesh = new THREE.InstancedMesh(pebbleGeometry(tier), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .74 }), sites.length);
+    this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(sites.length * 3), 3);
+    this.mesh.name = 'Shore pebbles'; this.mesh.castShadow = false; this.mesh.receiveShadow = true; this.mesh.count = 0; this.mesh.visible = false;
+  }
+  /** Refill with the cells around the camera once it has moved into another cell. */
+  update(camera: THREE.Camera): void {
+    if (this.warm) return;
+    const i = Math.floor(camera.position.x / PEBBLE_CELL), j = Math.floor(camera.position.z / PEBBLE_CELL), key = cellKey(i, j);
+    if (key === this.centre) return;
+    this.centre = key; this.fill((ci, cj) => Math.abs(ci - i) <= PEBBLE_RING && Math.abs(cj - j) <= PEBBLE_RING);
+  }
+  /** Before the first frame: every pebble shown, so the precompile builds the shader; afterwards the next update picks the ring. */
+  warmUp(on: boolean): void { this.warm = on; this.centre = NaN; this.fill(() => on); }
+  private fill(shown: (i: number, j: number) => boolean): void {
+    const target = this.mesh.instanceMatrix.array as Float32Array, colors = this.mesh.instanceColor!.array as Float32Array, sphere = new THREE.Sphere(new THREE.Vector3(), -1);
+    let count = 0;
+    for (const [key, cell] of this.cells) {
+      if (!shown(Math.floor(key / 1024) - 512, key % 1024 - 512)) continue;
+      target.set(this.matrices.subarray(cell.first * 16, (cell.first + cell.count) * 16), count * 16);
+      colors.set(this.colors.subarray(cell.first * 3, (cell.first + cell.count) * 3), count * 3);
+      count += cell.count; if (sphere.radius < 0) sphere.copy(cell.sphere); else sphere.union(cell.sphere);
+    }
+    this.mesh.count = count; this.mesh.visible = count > 0; this.mesh.boundingSphere = count > 0 ? sphere : null;
+    this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor!.needsUpdate = true;
+  }
+}
+
+/** All shore pebbles, or null on the cpu tier. */
+export function createPebbles(tier: GraphicsTier, rocks: readonly RockSite[]): ShorePebbles | null {
+  const sites = pebbleSites(tier, rocks); return sites.length ? new ShorePebbles(tier, sites) : null;
 }

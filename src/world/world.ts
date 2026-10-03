@@ -22,7 +22,7 @@ import { TIME_TOWER } from './waterways';
 import { pathJoin } from './path-surface';
 import { Mountains } from './mountains';
 import { PlanarExhibition } from './planar-exhibition';
-import { GARDEN_BRIDGES, riverCenter, waterDistance } from './waterways';
+import { GARDEN_BRIDGES, riverCenter } from './waterways';
 import { createTimeTower } from './time-tower';
 import { createFutureHouse } from './future-house';
 import { cpuWaterColour, waterMaterial } from './water-material';
@@ -30,7 +30,8 @@ import { waterSurfaceGeometry } from './water-surface';
 import type { RockSite } from './water-surface';
 import { pavingMaterial, riverRockSites, rockMaterial } from './stone';
 import { createRiverRocks, rockColliders } from './river-rocks';
-import { PEBBLE_RANGE, createPebbles } from './pebbles';
+import { createPebbles } from './pebbles';
+import type { ShorePebbles } from './pebbles';
 import { createCityHallFacade, loadCityHallTextures } from './city-hall';
 import { mitoringAmberMaterial, loadMitoringAmberTextures, loadMitoringSilverTexture } from './mitoring-materials';
 import { CIVIC_LANDMARKS } from '../game/content';
@@ -108,7 +109,7 @@ export class Town {
   private readonly dark = new THREE.MeshStandardMaterial({ color: '#3e5550', roughness: 0.25, metalness: 0.35 });
   private readonly sphere = new THREE.SphereGeometry(1, 16, 12);
   private rocks: RockSite[] = [];
-  private pebbles: THREE.InstancedMesh | null = null;
+  private pebbles: ShorePebbles | null = null;
   private constructor(private mobile: boolean, private tier: GraphicsTier) { this.water = waterMaterial(tier); this.paving = pavingMaterial(mobile); }
   static async create(mobile: boolean, stage: (value: number, label: string) => Promise<void>, tier: GraphicsTier = mobile ? 'mobile' : 'gpu'): Promise<Town> {
     const town = new Town(mobile, tier); await town.build(stage); return town;
@@ -364,8 +365,8 @@ export class Town {
     this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter);
     // One instanced draw of blended boulder variants; one collider mesh sampled from the same shapes and transforms.
     this.root.add(createRiverRocks(this.rocks, rockMaterial(this.mobile), this.tier)); this.colliders.push(rockColliders(this.rocks));
-    // Shore pebbles live with the other near-ground details, so map mode hides them; cpu has none.
-    this.pebbles = createPebbles(this.tier, this.rocks); if (this.pebbles) this.details.add(this.pebbles);
+    // Shore pebbles live with the other near-ground details, so map mode hides them; cpu has none. Only nearby cells draw.
+    this.pebbles = createPebbles(this.tier, this.rocks); if (this.pebbles) this.details.add(this.pebbles.mesh);
     for (const x of [-6.5, 6.5]) for (const z of [5, 13, 39]) {
       const pole = mesh(new THREE.CylinderGeometry(0.045, 0.065, 2.8, 8), this.gold, this.root, x, 1.4, z);
       const globe = mesh(this.sphere, new THREE.MeshStandardMaterial({ color: '#f3e8c9', emissive: '#e4c881', emissiveIntensity: 0.35, roughness: 0.6 }), this.root, x, 2.8, z); globe.scale.setScalar(0.23); pole.castShadow = false;
@@ -381,7 +382,7 @@ export class Town {
     const trees = this.forest.update(camera, mapView ? fogFar : Math.min(fogFar, profile.forest), mapView, shadow);
     // Shrub batches toggle every couple of metres while walking; re-baking for them cost a shadow pass per ~2 m, so their shadows catch up at the next quarter-box re-bake.
     this.planting?.update(camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
-    if (this.pebbles) this.pebbles.visible = waterDistance(camera.position.x, camera.position.z) < PEBBLE_RANGE;
+    this.pebbles?.update(camera);
     if (this.tier === 'cpu') this.details.visible = false;
     return trees;
   }
@@ -393,7 +394,7 @@ export class Town {
    * now would only move their upload from first sight to loading.
    */
   warmUp(on: boolean): void {
-    this.forest.warmUp(on); this.planting?.warmUp(on);
+    this.forest.warmUp(on); this.planting?.warmUp(on); this.pebbles?.warmUp(on);
     this.root.traverse((object) => {
       const material = (object as THREE.Mesh).material;
       if (!Array.isArray(material) && material?.userData.display) return;

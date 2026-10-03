@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { PEBBLE_COUNT, SHORE_BAND, createPebbles, pebbleGeometry, pebbleSites } from '../src/world/pebbles';
+import { PEBBLE_CELL, PEBBLE_COUNT, PEBBLE_RING, SHORE_BAND, createPebbles, pebbleGeometry, pebbleMatrix, pebbleSites } from '../src/world/pebbles';
 import { riverRockSites } from '../src/world/stone';
 import { PATH_CURVES, PATH_WIDTH } from '../src/world/landscape';
 import { GARDEN_BRIDGES, waterDistance } from '../src/world/waterways';
@@ -42,9 +42,9 @@ describe('shore pebbles', () => {
     expect(violations).toBe(0);
   });
   it('lies each pebble on the walking ground, aligned with its slope and mostly sunk into it', () => {
-    const mesh = createPebbles('gpu', gpuRocks)!, matrix = new THREE.Matrix4(), position = new THREE.Vector3(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3();
+    const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3();
     for (let i = 0; i < gpu.length; i += 37) {
-      const p = gpu[i]; mesh.getMatrixAt(i, matrix); matrix.decompose(position, rotation, scale);
+      const p = gpu[i]; pebbleMatrix(p, matrix).decompose(position, rotation, scale);
       const normal = terrainSurfaceNormal(p.x, p.z), up = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation);
       expect(p.y).toBeCloseTo(terrainSurfaceHeight(p.x, p.z), 6); expect(up.dot(normal)).toBeGreaterThan(.9999);
       // The centre stands above the ground by less than half the pebble's own height, so its foot is buried.
@@ -53,15 +53,36 @@ describe('shore pebbles', () => {
       expect(scale.x).toBeCloseTo(p.size, 5); expect(scale.y).toBeLessThan(scale.x); expect(scale.z).toBeLessThanOrEqual(scale.x + 1e-6);
     }
   });
-  it('draws one unshadowed instanced batch with smooth low-poly pebbles and per-pebble colour', () => {
+  it('draws one unshadowed instanced mesh with smooth low-poly pebbles and per-pebble colour', () => {
     for (const tier of ['gpu', 'mobile'] as const) {
-      const mesh = createPebbles(tier, tier === 'gpu' ? gpuRocks : mobileRocks)!, geometry = pebbleGeometry(tier);
-      expect(mesh).toBeInstanceOf(THREE.InstancedMesh); expect(mesh.count).toBe(PEBBLE_COUNT[tier]);
+      const { mesh } = createPebbles(tier, tier === 'gpu' ? gpuRocks : mobileRocks)!, geometry = pebbleGeometry(tier);
+      expect(mesh).toBeInstanceOf(THREE.InstancedMesh); expect(mesh.instanceMatrix.count).toBe(PEBBLE_COUNT[tier]);
       expect(mesh.castShadow).toBe(false); expect(mesh.receiveShadow).toBe(true); expect(mesh.instanceColor).not.toBeNull();
       expect(mesh.material).toBeInstanceOf(THREE.MeshStandardMaterial); expect((mesh.material as THREE.MeshStandardMaterial).vertexColors).toBe(true);
       expect(mesh.geometry.index!.count / 3).toBe(tier === 'gpu' ? 32 : 20);
       expect(geometry.getAttribute('position').count).toBe(tier === 'gpu' ? 18 : 12);
       expect(geometry.getAttribute('color').count).toBe(geometry.getAttribute('position').count);
     }
+  });
+  it('refills its one mesh with the cells around the camera, only when the camera crosses a cell', () => {
+    const pebbles = createPebbles('gpu', gpuRocks)!, { mesh } = pebbles, camera = new THREE.PerspectiveCamera(), position = new THREE.Vector3(), matrix = new THREE.Matrix4();
+    // Before the first frame every pebble is shown, so the precompile builds the shader.
+    pebbles.warmUp(true); expect(mesh.count).toBe(PEBBLE_COUNT.gpu); expect(mesh.visible).toBe(true);
+    pebbles.warmUp(false); expect(mesh.count).toBe(0);
+    const near = (x: number, z: number): number => gpu.filter(p => Math.abs(Math.floor(p.x / PEBBLE_CELL) - Math.floor(x / PEBBLE_CELL)) <= PEBBLE_RING && Math.abs(Math.floor(p.z / PEBBLE_CELL) - Math.floor(z / PEBBLE_CELL)) <= PEBBLE_RING).length;
+    camera.position.set(14, 1.6, 36); pebbles.update(camera);
+    expect(mesh.count).toBe(near(14, 36)); expect(mesh.count).toBeGreaterThan(40); expect(mesh.count).toBeLessThan(PEBBLE_COUNT.gpu / 5);
+    for (let i = 0; i < mesh.count; i++) {
+      mesh.getMatrixAt(i, matrix); position.setFromMatrixPosition(matrix);
+      expect(Math.abs(Math.floor(position.x / PEBBLE_CELL) - Math.floor(14 / PEBBLE_CELL))).toBeLessThanOrEqual(PEBBLE_RING);
+      expect(Math.abs(Math.floor(position.z / PEBBLE_CELL) - Math.floor(36 / PEBBLE_CELL))).toBeLessThanOrEqual(PEBBLE_RING);
+    }
+    expect(mesh.boundingSphere!.containsPoint(position)).toBe(true);
+    // Walking within the cell leaves the buffers alone; crossing into the next one refills them.
+    const version = mesh.instanceMatrix.version;
+    camera.position.set(14.9, 1.6, 37.5); pebbles.update(camera); expect(mesh.instanceMatrix.version).toBe(version);
+    camera.position.set(18.5, 1.6, 37.5); pebbles.update(camera); expect(mesh.instanceMatrix.version).toBeGreaterThan(version); expect(mesh.count).toBe(near(18.5, 37.5));
+    // Far from any channel, nothing draws.
+    camera.position.set(-18, 1.6, -100); pebbles.update(camera); expect(mesh.count).toBe(0); expect(mesh.visible).toBe(false);
   });
 });
