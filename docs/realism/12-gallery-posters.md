@@ -52,3 +52,7 @@ See [README](README.md) for the shared workflow.
 - The jewel colours match the website photos.
 - The posters read as framed gallery prints.
 - Mobile GPU texture memory is measurably lower.
+
+## On WebGPU (round 2)
+
+Stage A replaces `toneMapped:false` with the `display` mask (`mrtNode`). Paper, photos and captions keep `display = 1`; the new lit frames do not.
