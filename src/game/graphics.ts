@@ -63,14 +63,20 @@ export function probeAdapter(info: AdapterInfo): ReturnType<typeof probeGraphics
 
 export type GraphicsTier = 'gpu' | 'mobile' | 'cpu';
 export interface GraphicsProfile {
-  tier: GraphicsTier; reduced: boolean; pixelRatio: number; shadows: boolean; skyDay: number; skyNight: number; plants: number; forest: number; lights: number;
+  tier: GraphicsTier; reduced: boolean; pixelRatio: number; shadows: boolean; skyDay: number; skyNight: number; plants: number;
+  /** Walking view: metres at which the fog is complete. The walk camera's far plane and the forest's tree culling both stop here. */
+  fog: number;
+  /** Trees are drawn to this distance. gpu and mobile draw every tree short of full fog (forest = fog); cpu stops inside its linear fog. */
+  forest: number;
+  lights: number;
 }
 export function graphicsTier(input: { coarse: boolean; caveatFailed?: boolean; renderer?: string; integrated?: boolean }): GraphicsTier {
   if (input.caveatFailed || (input.renderer && softwareRenderer(input.renderer))) return 'cpu';
   return input.coarse || input.integrated || (input.renderer && modestRenderer(input.renderer)) ? 'mobile' : 'gpu';
 }
+// gpu and mobile fade into the sky by 150 and 120 m (render/aerial.ts); cpu keeps its 42–130 m linear fog.
 export function graphicsProfile(tier: GraphicsTier): GraphicsProfile {
-  if (tier === 'cpu') return { tier, reduced: true, pixelRatio: .55, shadows: false, skyDay: 64, skyNight: 128, plants: 18, forest: 80, lights: 2 };
-  if (tier === 'mobile') return { tier, reduced: true, pixelRatio: 1, shadows: true, skyDay: 256, skyNight: 512, plants: 32, forest: 110, lights: 6 };
-  return { tier, reduced: false, pixelRatio: 1.5, shadows: true, skyDay: 512, skyNight: 1024, plants: 38, forest: 130, lights: 10 };
+  if (tier === 'cpu') return { tier, reduced: true, pixelRatio: .55, shadows: false, skyDay: 64, skyNight: 128, plants: 18, fog: 130, forest: 80, lights: 2 };
+  if (tier === 'mobile') return { tier, reduced: true, pixelRatio: 1, shadows: true, skyDay: 256, skyNight: 512, plants: 32, fog: 120, forest: 120, lights: 6 };
+  return { tier, reduced: false, pixelRatio: 1.5, shadows: true, skyDay: 512, skyNight: 1024, plants: 38, fog: 150, forest: 150, lights: 10 };
 }

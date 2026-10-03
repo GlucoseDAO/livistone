@@ -5,9 +5,15 @@ import { BUDGET_OFF } from '../game/render-budget';
 const NEAR = 36;
 /** Layer of the shadow-only tree meshes; the sun's shadow camera renders it (main.ts), the view cameras do not. */
 export const SHADOW_LAYER = 1;
+/** Per-tree culling is re-evaluated after the camera moves this far, against a reach grown by the same margin. */
+const REACH_STEP = 2;
 
-export function forestLod(distance: number, fogFar: number): 'full' | 'reduced' | 'hidden' {
-  if (distance >= fogFar * .72) return 'hidden';
+/**
+ * A cell's foliage detail from its centre distance, or hidden once even its nearest tree surface (`nearest`, the distance to its
+ * bounding sphere) lies at or beyond `reach`: the full-fog distance, where trees are entirely sky (render/aerial.ts).
+ */
+export function forestLod(distance: number, nearest: number, reach: number): 'full' | 'reduced' | 'hidden' {
+  if (nearest >= reach) return 'hidden';
   return distance < NEAR ? 'full' : 'reduced';
 }
 
@@ -62,8 +68,11 @@ export function dropTwigs(geo: THREE.BufferGeometry, size = 2): THREE.BufferGeom
 /** Whether distant views drop the twigs; ?budget=off (and the budget script's comparison) keep them. Read at load. */
 export const FOREST_DETAIL = { twigless: !BUDGET_OFF };
 
-/** A cell's trees: a slice of its species' instance arrays, and a sphere that bounds them all. */
-interface Cell { species: number; center: THREE.Vector3; first: number; count: number; sphere: THREE.Sphere; state: number; seen: boolean; lit: boolean }
+/**
+ * A cell's trees: a slice of its species' instance arrays, and a sphere that bounds them all. A cell that straddles the reach
+ * draws only the trees inside it (`inside`, a flag per tree).
+ */
+interface Cell { species: number; center: THREE.Vector3; first: number; count: number; sphere: THREE.Sphere; state: number; seen: boolean; lit: boolean; partial: boolean; inside: Uint8Array }
 /**
  * One model part of one species in one detail, drawn by a view mesh and, with shadows, a shadow-only mesh; `casts` picks the
  * shadow mesh's cells when they differ from the view's.
@@ -85,6 +94,10 @@ export class Forest extends THREE.Group {
   private cells: Cell[] = [];
   private parts: Part[] = [];
   private matrices: Float32Array[] = [];
+  /** Each tree's bounding sphere per species, packed as x, y, z, radius. */
+  private spheres: Float32Array[] = [];
+  private readonly reachFrom = new THREE.Vector3(Infinity, 0, 0);
+  private reach = Infinity;
   private warm = false;
   async load(mobile: boolean, shadows = true): Promise<void> {
     const loader = new GLTFLoader();
@@ -96,18 +109,19 @@ export class Forest extends THREE.Group {
       const sites = planned.filter((cell) => cell.species === species).map((cell) => cell.sites), total = sites.reduce((sum, cell) => sum + cell.length, 0);
       const geometries = parts.map((source) => source.geometry.clone().applyMatrix4(source.matrixWorld));
       const bounds = geometries.reduce((sphere, geo) => { geo.computeBoundingSphere(); return sphere.radius < 0 ? sphere.copy(geo.boundingSphere!) : sphere.union(geo.boundingSphere!); }, new THREE.Sphere(new THREE.Vector3(), -1));
-      const matrices = new Float32Array(total * 16), tints = parts.map(() => new Float32Array(total * 3));
+      const matrices = new Float32Array(total * 16), spheres = new Float32Array(total * 4), tints = parts.map(() => new Float32Array(total * 3));
       const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion(), color = new THREE.Color(), scaled = new THREE.Sphere();
       let next = 0;
       for (const cellSites of sites) {
         const center = new THREE.Vector3();
         for (const { p } of cellSites) center.add(p);
-        const cell: Cell = { species, center: center.multiplyScalar(1 / cellSites.length), first: next, count: cellSites.length, sphere: new THREE.Sphere(new THREE.Vector3(), -1), state: -1, seen: false, lit: false };
+        const cell: Cell = { species, center: center.multiplyScalar(1 / cellSites.length), first: next, count: cellSites.length, sphere: new THREE.Sphere(new THREE.Vector3(), -1), state: -1, seen: false, lit: false, partial: false, inside: new Uint8Array(cellSites.length) };
         for (const { p, index } of cellSites) {
           const scale = treeScale(index);
           quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), index * 2.399);
           matrix.compose(p, quaternion, new THREE.Vector3(scale, scale * (1 + (index % 3) * .035), scale)); matrix.toArray(matrices, next * 16);
           scaled.copy(bounds).applyMatrix4(matrix); if (cell.sphere.radius < 0) cell.sphere.copy(scaled); else cell.sphere.union(scaled);
+          scaled.center.toArray(spheres, next * 4); spheres[next * 4 + 3] = scaled.radius;
           // Spatial colour families read as woodland groves rather than alternating identical trees.
           const grove = .5 + .5 * Math.sin(p.x * .038 + Math.sin(p.z * .047) * 2);
           parts.forEach((source, i) => { color.setHSL(.19 + grove * .055, source.name === 'foliage' ? .18 + grove * .12 : .04, .67 + grove * .13 + (index % 3) * .025); color.toArray(tints[i], next * 3); });
@@ -115,7 +129,7 @@ export class Forest extends THREE.Group {
         }
         this.cells.push(cell);
       }
-      this.matrices[species] = matrices;
+      this.matrices[species] = matrices; this.spheres[species] = spheres;
       parts.forEach((source, i) => {
         const material = source.material as THREE.MeshStandardMaterial;
         material.envMapIntensity = .35;
@@ -142,21 +156,28 @@ export class Forest extends THREE.Group {
   }
   /**
    * Returns whether near foliage switched detail; the far hide/show happens beyond any walking shadow box and is not reported.
-   * `shadow` is the sun's shadow, whose frustum picks the shadow casters.
+   * `reach` is the full-fog distance: trees are drawn while any part of them is nearer. `shadow` is the sun's shadow, whose
+   * frustum picks the shadow casters.
    */
-  update(camera: THREE.Camera, fogFar: number, mapView: boolean, shadow?: THREE.LightShadow): boolean {
+  update(camera: THREE.Camera, reach: number, mapView: boolean, shadow?: THREE.LightShadow): boolean {
     if (this.warm) return false;
     camera.updateMatrixWorld(); frustum.setFromProjectionMatrix(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     const origin = camera.position, sun = shadow?.getFrustum(); let casters = false, trunks = false, changed = 0;
+    // The tree selection is redone every REACH_STEP metres against a reach grown by REACH_STEP, so it covers every camera
+    // position until the next pass; a tree may appear up to that much early, inside full fog.
+    const moved = mapView || reach !== this.reach || origin.distanceTo(this.reachFrom) >= REACH_STEP;
+    if (moved) { this.reachFrom.copy(origin); this.reach = reach; }
+    const from = this.reachFrom, grown = reach + REACH_STEP;
     for (const cell of this.cells) {
-      const lod = forestLod(origin.distanceTo(cell.center), fogFar);
+      const centre = from.distanceTo(cell.sphere.center), lod = forestLod(origin.distanceTo(cell.center), centre - cell.sphere.radius, grown);
       const state = mapView ? TRUNKS : lod === 'hidden' ? HIDDEN : lod === 'full' ? FULL : REDUCED, previous = cell.state;
       const seen = state !== HIDDEN && frustum.intersectsSphere(cell.sphere), lit = state !== HIDDEN && !!sun?.intersectsSphere(cell.sphere);
-      if (state === previous && seen === cell.seen && lit === cell.lit) continue;
+      const partial = !mapView && state !== HIDDEN && centre + cell.sphere.radius >= grown, reselected = partial && moved && this.select(cell, grown);
+      if (state === previous && seen === cell.seen && lit === cell.lit && partial === cell.partial && !reselected) continue;
       if (previous !== -1 && state !== previous && (state === FULL) !== (previous === FULL)) casters = true;
       if ((state >= TRUNKS) !== (previous >= TRUNKS)) trunks = true;
       // Casters entering the shadow frustum come with a moved shadow box, which re-bakes anyway.
-      cell.state = state; cell.seen = seen; cell.lit = lit; changed |= 1 << cell.species;
+      cell.state = state; cell.seen = seen; cell.lit = lit; cell.partial = partial; changed |= 1 << cell.species;
     }
     for (let species = 0; species < this.matrices.length; species++) if (changed & (1 << species)) this.refill(species);
     if (trunks) this.onCells?.(this.cells.map((cell) => cell.state >= TRUNKS));
@@ -170,7 +191,16 @@ export class Forest extends THREE.Group {
     this.warm = on;
     for (const { view, shadow } of this.parts) { view.frustumCulled = !on; if (shadow) shadow.frustumCulled = !on; }
     if (on) for (let species = 0; species < this.matrices.length; species++) this.refill(species, true);
-    else for (const cell of this.cells) cell.state = -1;
+    else { for (const cell of this.cells) cell.state = -1; this.reach = Infinity; }
+  }
+  /** Flag the straddling cell's trees that reach inside `reach` of the selection point; returns whether any flag changed. */
+  private select(cell: Cell, reach: number): boolean {
+    const spheres = this.spheres[cell.species], from = this.reachFrom; let changed = false;
+    for (let i = 0; i < cell.count; i++) {
+      const at = (cell.first + i) * 4, inside = Math.hypot(spheres[at] - from.x, spheres[at + 1] - from.y, spheres[at + 2] - from.z) - spheres[at + 3] < reach ? 1 : 0;
+      if (cell.inside[i] !== inside) { cell.inside[i] = inside; changed = true; }
+    }
+    return changed;
   }
   private refill(species: number, everything = false): void {
     for (const part of this.parts) {
@@ -184,9 +214,17 @@ export class Forest extends THREE.Group {
     let count = 0;
     for (const cell of this.cells) {
       if (cell.species !== part.species || !include(cell)) continue;
-      target.set(matrices.subarray(cell.first * 16, (cell.first + cell.count) * 16), count * 16);
-      colors.set(part.colors.subarray(cell.first * 3, (cell.first + cell.count) * 3), count * 3);
-      count += cell.count; if (sphere.radius < 0) sphere.copy(cell.sphere); else sphere.union(cell.sphere);
+      if (cell.partial && !this.warm) {
+        for (let i = 0; i < cell.count; i++) if (cell.inside[i]) {
+          target.set(matrices.subarray((cell.first + i) * 16, (cell.first + i + 1) * 16), count * 16);
+          colors.set(part.colors.subarray((cell.first + i) * 3, (cell.first + i + 1) * 3), count * 3); count++;
+        }
+      } else {
+        target.set(matrices.subarray(cell.first * 16, (cell.first + cell.count) * 16), count * 16);
+        colors.set(part.colors.subarray(cell.first * 3, (cell.first + cell.count) * 3), count * 3);
+        count += cell.count;
+      }
+      if (sphere.radius < 0) sphere.copy(cell.sphere); else sphere.union(cell.sphere);
     }
     mesh.count = count; mesh.visible = count > 0; mesh.boundingSphere = count > 0 ? sphere : null;
     mesh.instanceMatrix.clearUpdateRanges(); mesh.instanceMatrix.addUpdateRange(0, count * 16); mesh.instanceMatrix.needsUpdate = true;

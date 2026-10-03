@@ -34,13 +34,29 @@ import { TownLighting } from './render/lighting';
 import { RenderScale, SCALE_RULES } from './game/render-scale';
 import { BUDGET_OFF, trackDraws } from './game/render-budget';
 import type { DrawCost } from './game/render-budget';
+import { aerialFogNode, aerialParams, setAerial } from './render/aerial';
 
-const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 };
-// Dev-only ?look=a keeps the old hemisphere-heavy fill (sun and haze coherence only). b, the default, lets the baked sky
-// carry more of the ambient light and gives heroEnv materials their own reflection strength.
+// The map's range fog; walking, the cpu tier fogs linearly from CPU_FOG_NEAR to its full-fog distance (GraphicsProfile.fog).
+const MAP_FOG = { near: 240, far: 630 }, CPU_FOG_NEAR = 42;
+// Dev-only ?light=a keeps 02's old hemisphere-heavy fill (sun and haze coherence only). b, the default, lets the baked sky
+// carry the ambient light and gives heroEnv materials their own reflection strength.
 const LOOK = import.meta.env.DEV && new URLSearchParams(location.search).get('light') === 'a' ? 'a' : 'b';
-const FILL: Record<'a' | 'b', Record<SkyPhase, { environment: number; hemi: number }>> = {
-  a: { day: { environment: .5, hemi: 1.2 }, night: { environment: .2, hemi: .28 } }, b: { day: { environment: .9, hemi: .55 }, night: { environment: .3, hemi: .22 } } };
+// Dev-only ?contrast=a|b (sub-plan 21): a moderate and b strong sun against a weaker sky fill, so cast shadows read as shadows.
+// Horizontal sunlit ground keeps its old brightness while shade loses about a third (a) or a half (b): sunlit to shaded about
+// 2.8:1 or 4:1, from 1.8:1. Moonlight is rebalanced the same way at the same overall level; emissions are untouched.
+const CONTRAST: 'a' | 'b' = import.meta.env.DEV && new URLSearchParams(location.search).get('contrast') === 'b' ? 'b' : 'a';
+type Light = { sun: number; environment: number; hemi: number };
+const LIGHT: Record<'a' | 'b', Record<SkyPhase, Light>> = {
+  a: { day: { sun: 3.35, environment: .6, hemi: .36 }, night: { sun: .42, environment: .24, hemi: .17 } },
+  b: { day: { sun: 3.95, environment: .42, hemi: .24 }, night: { sun: .5, environment: .18, hemi: .13 } },
+};
+// The cpu tier has no environment light and no shadows: its hemisphere carries the fill, and the contrast shows in form shading.
+const CPU_LIGHT: Record<'a' | 'b', Record<SkyPhase, Light>> = {
+  a: { day: { sun: 2.75, environment: 0, hemi: .92 }, night: { sun: .38, environment: 0, hemi: .22 } },
+  b: { day: { sun: 3.1, environment: 0, hemi: .65 }, night: { sun: .44, environment: 0, hemi: .17 } },
+};
+// 02's look a, before the sky carried the fill.
+const LEGACY_LIGHT: Record<SkyPhase, Light> = { day: { sun: 2.4, environment: .5, hemi: 1.2 }, night: { sun: .32, environment: .2, hemi: .28 } };
 // The map shadow box stays on the town centre; walking boxes follow the player.
 const SHADOW_TARGET = new THREE.Vector3(0, 0, -60);
 // Far enough along the light that the ±160 m map box keeps every caster and receiver between near and far for suns above ~20°.
@@ -59,9 +75,9 @@ class Game {
   private nightLighting!: NightLighting;
   private timeOfDay: TimeOfDay = readTimeOfDay();
   private clockCheck = 0;
-  // Past the walking fog's far distance a surface shows only haze, so the walk camera stops there and follows the fog if it
-  // lengthens (sub-plan 25); ?budget=off keeps the earlier 150 m for review.
-  private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, BUDGET_OFF ? 150 : WALK_FOG.far);
+  // Past the walking fog's full distance (GraphicsProfile.fog) a surface is only sky, so the walk camera stops there and follows
+  // the fog if it lengthens (sub-plans 25 and 21); ?budget=off keeps the earlier 150 m for review. Set once the tier is known.
+  private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, 150);
   private readonly mapCamera = new THREE.PerspectiveCamera(44, 1, 0.2, 800);
   private readonly orbit: OrbitControls;
   private town!: Town;
@@ -120,6 +136,7 @@ class Game {
       const override = new URLSearchParams(location.search).get('graphics');
       if (override === 'cpu' || override === 'mobile' || override === 'gpu') Object.assign(this.graphics, graphicsProfile(override));
     }
+    this.walkCamera.far = BUDGET_OFF ? 150 : this.graphics.fog;
     // The night pool, hall and station lamps: room for the pool plus the fixed lamps (render/lighting.ts).
     this.renderer.lighting = new TownLighting({ maxPointLights: this.graphics.lights + 8 });
     this.renderScale = this.graphics.pixelRatio; this.scaler = new RenderScale(SCALE_RULES[this.graphics.tier], this.renderScale);
@@ -128,18 +145,20 @@ class Game {
     this.night = resolveNight(this.timeOfDay);
     this.renderer.setPixelRatio(this.pixelRatio());
     this.renderer.shadowMap.enabled = this.graphics.shadows; this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    // The output pass (render/output.ts) applies the classic ACES fit at this exposure, except to display materials.
+    // The output pass (render/output.ts) applies the active tone curve (render/tone.ts) at this exposure, except to display materials.
     this.renderer.toneMapping = THREE.NoToneMapping; this.renderer.toneMappingExposure = SKY_EXPOSURE[this.phase];
-    this.setFog(MAP_FOG);
-    this.hemi = new THREE.HemisphereLight(this.night ? '#8ea4c6' : '#e9f4f0', this.night ? '#121820' : '#73805c', this.fill.hemi);
+    this.hemi = new THREE.HemisphereLight(this.night ? '#8ea4c6' : '#e9f4f0', this.night ? '#121820' : '#73805c', this.light.hemi);
     this.scene.add(this.hemi);
-    this.sun = new THREE.DirectionalLight(this.night ? '#c9d6ee' : '#fff0ce', this.night ? .32 : 2.4); this.sun.castShadow = true;
+    this.sun = new THREE.DirectionalLight(this.night ? '#c9d6ee' : '#fff0ce', this.light.sun); this.sun.castShadow = true;
     this.sun.shadow.mapSize.setScalar(this.reduced ? 1024 : 2048); this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = SUN_DISTANCE * 2;
     // The shadow camera also draws the forest's shadow-only meshes, which the view cameras skip.
     this.sun.shadow.camera.layers.enable(SHADOW_LAYER);
     this.scene.add(this.sun, this.sun.target); installShadowFade(this.sun); this.aimSun();
     const sky = createSky(this.renderer, this.reduced, this.night, this.graphics.tier, LOOK === 'b'); this.skies.set(this.night, sky); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = this.graphics.tier === 'cpu' ? null : sky.environment;
-    this.scene.environmentIntensity = this.fill.environment;
+    this.scene.environmentIntensity = this.light.environment;
+    // Set once, before any shader is built: a different fog node would rebuild every material. Uniforms switch it per view.
+    if (this.graphics.tier !== 'cpu') (this.scene as THREE.Scene & { fogNode: unknown }).fogNode = aerialFogNode;
+    this.setFog();
     // The town and sun are static; refresh shadows only when scene visibility changes. WebGPU schedules shadows per light.
     this.sun.shadow.autoUpdate = false; this.sun.shadow.needsUpdate = true;
     this.output = new OutputPipeline(this.renderer, this.scene);
@@ -205,19 +224,25 @@ class Game {
     this.town.warmUp(true);
     await this.output.compile(this.walkCamera, [...this.town.root.children, ...this.scene.children.filter(child => child !== this.town.root && !(child as THREE.Light).isLight)]);
     if (this.graphics.shadows) { this.sun.shadow.needsUpdate = true; this.render(this.walkCamera); }
-    this.town.warmUp(false); this.town.update(this.elapsed, this.walkCamera, WALK_FOG.far, false, this.sun.shadow);
+    this.town.warmUp(false); this.town.update(this.elapsed, this.walkCamera, this.graphics.fog, false, this.sun.shadow);
     await loadingStage(100, 'Welcome to Livistone');
     this.lastTime = performance.now(); this.frameId = requestAnimationFrame(this.frame);
     this.ui.ready(); this.returnMode = 'walking'; this.setMode('walking'); this.updateWalking(0); this.findInteraction(); this.findLocation(); this.render(this.walkCamera);
   }
   private get phase(): SkyPhase { return this.night ? 'night' : 'day'; }
   private render(camera: THREE.Camera): void { this.view.beginFrame(); this.output.render(camera); }
-  /** The output pass fogs every surface toward the displayed horizon after tone mapping, as the classic renderer did. */
-  private setFog(range: { near: number; far: number }): void {
-    displayFog.color.value.copy(HORIZON_HAZE[this.phase]); displayFog.near.value = range.near; displayFog.far.value = range.far;
+  /**
+   * Walking on the gpu and mobile tiers, the aerial perspective (render/aerial.ts) fogs every surface in linear light toward the
+   * sky behind it, complete at GraphicsProfile.fog. The map, and the cpu tier while walking, keep a range fog that the output
+   * pass mixes toward the displayed horizon after tone mapping, as the classic renderer did.
+   */
+  private setFog(): void {
+    const aerial = !this.mapView && this.graphics.tier !== 'cpu', range = this.mapView ? MAP_FOG : { near: CPU_FOG_NEAR, far: this.graphics.fog };
+    setAerial(this.skies.get(this.night)!.haze, aerial ? aerialParams(this.graphics.tier) : null);
+    displayFog.amount.value = aerial ? 0 : 1; displayFog.color.value.copy(HORIZON_HAZE[this.phase]); displayFog.near.value = range.near; displayFog.far.value = range.far;
   }
-  // CPU has no PMREM environment to take over the fill, so its hemisphere keeps the full share.
-  private get fill(): { environment: number; hemi: number } { return FILL[this.graphics.tier === 'cpu' ? 'a' : LOOK][this.phase]; }
+  /** Sun (or moon), sky environment and hemisphere strengths for this phase. CPU has no PMREM environment: its hemisphere fills. */
+  private get light(): Light { return (this.graphics.tier === 'cpu' ? CPU_LIGHT[CONTRAST] : LOOK === 'a' ? LEGACY_LIGHT : LIGHT[CONTRAST])[this.phase]; }
   private get mapView(): boolean {
     return this.mode === 'map' || this.mode === 'welcome' || (['lore', 'journal', 'paused', 'gallery'].includes(this.mode) && this.returnMode === 'map');
   }
@@ -240,7 +265,7 @@ class Game {
   private setMode(mode: Mode): void {
     this.mode = mode; this.interaction = null; this.input.active = mode === 'walking'; this.input.clear(); this.accumulator = 0;
     this.orbit.enabled = mode === 'map';
-    this.scene.background = this.mapView ? HORIZON_RADIANCE[this.phase].clone() : this.skyBackground; this.setFog(this.mapView ? MAP_FOG : WALK_FOG);
+    this.scene.background = this.mapView ? HORIZON_RADIANCE[this.phase].clone() : this.skyBackground; this.setFog();
     this.ui.setMode(mode, this.mapView); this.town.setMapMode(this.mapView); this.frameShadow(true); this.resize();
     this.cursorDirty = true;
     if (mode === 'walking') this.ui.canvas.focus({ preventScroll: true });
@@ -365,12 +390,12 @@ class Game {
     const night = resolveNight(this.timeOfDay); if (night === this.night) return; this.night = night;
     let sky = this.skies.get(night); if (!sky) { sky = createSky(this.renderer, this.reduced, night, this.graphics.tier, LOOK === 'b'); this.skies.set(night, sky); }
     this.skyBackground = sky.background; this.scene.environment = this.graphics.tier === 'cpu' ? null : sky.environment;
-    this.pointReflections(sky); this.scene.environmentIntensity = this.fill.environment;
+    this.pointReflections(sky); this.scene.environmentIntensity = this.light.environment;
     this.renderer.toneMappingExposure = SKY_EXPOSURE[this.phase];
-    this.hemi.color.set(night ? '#8ea4c6' : '#e9f4f0'); this.hemi.groundColor.set(night ? '#121820' : '#73805c'); this.hemi.intensity = this.fill.hemi;
-    this.sun.color.set(night ? '#c9d6ee' : '#fff0ce'); this.sun.intensity = night ? .32 : 2.4;
+    this.hemi.color.set(night ? '#8ea4c6' : '#e9f4f0'); this.hemi.groundColor.set(night ? '#121820' : '#73805c'); this.hemi.intensity = this.light.hemi;
+    this.sun.color.set(night ? '#c9d6ee' : '#fff0ce'); this.sun.intensity = this.light.sun;
     this.aimSun();
-    this.scene.background = this.mapView ? HORIZON_RADIANCE[this.phase].clone() : this.skyBackground; this.setFog(this.mapView ? MAP_FOG : WALK_FOG);
+    this.scene.background = this.mapView ? HORIZON_RADIANCE[this.phase].clone() : this.skyBackground; this.setFog();
     this.nightLighting.setNight(night); this.sun.shadow.needsUpdate = true;
   }
   /** r186 gives any material without its own envMap scene.environmentIntensity instead of its envMapIntensity, so heroEnv
@@ -505,7 +530,7 @@ class Game {
     // The shadow box first: the forest picks its shadow casters from the frustum this frame bakes with.
     if (this.graphics.shadows) this.frameShadow();
     // Walking re-bakes when near shrubs or tree detail change, so their shadows appear with them; the map keeps its one bake.
-    if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : WALK_FOG.far, this.mapView, this.graphics.shadows ? this.sun.shadow : undefined) && !this.mapView && this.graphics.shadows) this.sun.shadow.needsUpdate = true;
+    if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : this.graphics.fog, this.mapView, this.graphics.shadows ? this.sun.shadow : undefined) && !this.mapView && this.graphics.shadows) this.sun.shadow.needsUpdate = true;
     this.updateExhibitionControls();
     this.clockCheck += rawDt; if (this.clockCheck > 30) { this.clockCheck = 0; if (this.timeOfDay === 'auto') this.applyTimeOfDay(); }
     this.nightLighting.update(camera); this.render(camera);

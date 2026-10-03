@@ -3,30 +3,27 @@ import { Fn, acos, atan, clamp, dot, exp, float, floor, fract, length, max, mix,
 import type { Node } from 'three/webgpu';
 import { graphicsProfile } from '../game/graphics';
 import type { GraphicsTier } from '../game/graphics';
+import { toneMapped } from '../render/tone';
+export { acesFilmic } from '../render/tone';
 
 export type SkyPhase = 'day' | 'night';
 /** Unit vectors toward the painted sun and moon; the directional light and its shadows come from the same place. */
 export const SUN_DIR = new THREE.Vector3(-35, 70, 35).normalize(), MOON_DIR = new THREE.Vector3(25, 38, -70).normalize();
-/** Tone-mapping exposure per phase; HORIZON_HAZE is pre-mapped against it. */
+/** Tone-mapping exposure per phase; HORIZON_HAZE is pre-mapped against it (render/tone.ts scales it per curve). */
 export const SKY_EXPOSURE: Record<SkyPhase, number> = { day: .96, night: .72 };
 // Linear radiance at the horizon: the gradient's base, the day haze band drawn over it, and the night base.
 const DAY_BASE = [.72, .82, .86], DAY_HAZE = [.74, .83, .87], HAZE_BAND = .38, NIGHT_BASE = [.02, .04, .08];
 const HORIZON = { day: DAY_BASE.map((v, i) => v * (1 - HAZE_BAND) + DAY_HAZE[i] * HAZE_BAND), night: NIGHT_BASE };
 
-/** Three's classic ACES filmic curve on the CPU, as the output pass (render/output.ts) applies it on the GPU. */
-export function acesFilmic(radiance: readonly number[], exposure: number): THREE.Color {
-  const fit = (v: number): number => (v * (v + .0245786) - .000090537) / (v * (.983729 * v + .432951) + .238081), unit = THREE.MathUtils.clamp;
-  const [r, g, b] = radiance.map(v => v * exposure / .6), x = fit(.59719 * r + .35458 * g + .04823 * b), y = fit(.076 * r + .90834 * g + .01566 * b), z = fit(.0284 * r + .13383 * g + .83777 * b);
-  return new THREE.Color().setRGB(unit(1.60475 * x - .53108 * y - .07367 * z, 0, 1), unit(-.10208 * x + 1.10813 * y - .00605 * z, 0, 1), unit(-.00327 * x - .07276 * y + 1.07602 * z, 0, 1), THREE.LinearSRGBColorSpace);
-}
 /** Map-background radiance per phase: the painted sky just above the horizon, before tone mapping, so the flat map background
  *  tone-maps to exactly the displayed horizon. */
 export const HORIZON_RADIANCE: Record<SkyPhase, THREE.Color> = {
   day: new THREE.Color().setRGB(HORIZON.day[0], HORIZON.day[1], HORIZON.day[2], THREE.LinearSRGBColorSpace),
   night: new THREE.Color().setRGB(HORIZON.night[0], HORIZON.night[1], HORIZON.night[2], THREE.LinearSRGBColorSpace),
 };
-/** That horizon as displayed (tone-mapped, linear): the output pass fogs every surface toward it after the mapping (render/output.ts). */
-export const HORIZON_HAZE: Record<SkyPhase, THREE.Color> = { day: acesFilmic(HORIZON.day, SKY_EXPOSURE.day), night: acesFilmic(HORIZON.night, SKY_EXPOSURE.night) };
+/** That horizon as displayed (tone-mapped, linear) under the active curve: the map's range fog and the cpu tier's linear fog mix
+ *  toward it after the mapping (render/output.ts). */
+export const HORIZON_HAZE: Record<SkyPhase, THREE.Color> = { day: toneMapped(HORIZON.day, SKY_EXPOSURE.day), night: toneMapped(HORIZON.night, SKY_EXPOSURE.night) };
 
 // Star and cloud hashes use sin() of large arguments, whose precision is driver-specific: their exact placement can differ
 // between GPUs and between the WebGPU and WebGL 2 backends.
@@ -45,26 +42,31 @@ const fbm = Fn(([start]: [V2]) => {
 
 const MOON_RIGHT = MOON_DIR.clone().cross(new THREE.Vector3(0, 1, 0)).normalize(), MOON_UP = MOON_RIGHT.clone().cross(MOON_DIR).normalize();
 
-// Each bake is either day or night, so only that half of the sky is built.
-const daySky = (darkGround: boolean) => Fn(() => {
-  const d = normalize(positionLocal).toVar(), elevation = max(d.y, 0), light = max(dot(d, vec3(SUN_DIR)), 0).toVar();
+// Each bake is either day or night, so only that half of the sky is built. The haze bake (aerial perspective's fog colour,
+// render/aerial.ts) looks at the horizon wherever a ray points below it, and leaves out the sun disc, moon disc and stars: tiny
+// and bright, they would blot a 64 px bake, and the air in front of a hill scatters none of them.
+const below = (haze: boolean): Node<'vec3'> => { const d = normalize(positionLocal); return haze ? normalize(vec3(d.x, max(d.y, 0), d.z).add(vec3(1e-4, 0, 0))) : d; };
+const daySky = (darkGround: boolean, haze = false) => Fn(() => {
+  const d = below(haze).toVar(), elevation = max(d.y, 0), light = max(dot(d, vec3(SUN_DIR)), 0).toVar();
   const day = mix(vec3(...DAY_BASE), vec3(.12, .33, .61), pow(elevation, .48)).toVar();
   day.addAssign(vec3(1, .78, .46).mul(pow(light, 18)).mul(.14));
-  day.addAssign(vec3(5, 4.4, 3.2).mul(smoothstep(.99955, .99985, light)));
+  if (!haze) day.addAssign(vec3(5, 4.4, 3.2).mul(smoothstep(.99955, .99985, light)));
   const p = d.xz.div(max(d.y, .015).add(.16)).mul(3.8).add(vec2(3.1, 8.4)).toVar();
   const density = fbm(p.add(fbm(p.mul(.65)).mul(1.8))).toVar();
   const banks = smoothstep(.32, .68, noise(p.mul(.37).add(vec2(11, 3))));
   const cloud = smoothstep(.47, .68, density).mul(mix(.3, 1, banks)).mul(smoothstep(.015, .16, d.y));
   const clouds = mix(vec3(.57, .66, .73), vec3(1.25, 1.24, 1.17), smoothstep(.48, .76, density));
   day.assign(mix(day, clouds, cloud.mul(.96)));
-  const haze = pow(float(1).sub(clamp(d.y, 0, 1)), 8);
-  day.assign(mix(day, vec3(...DAY_HAZE).add(vec3(.09, .04, 0).mul(pow(light, 6))), haze.mul(HAZE_BAND)));
+  const band = pow(float(1).sub(clamp(d.y, 0, 1)), 8);
+  day.assign(mix(day, vec3(...DAY_HAZE).add(vec3(.09, .04, 0).mul(pow(light, 6))), band.mul(HAZE_BAND)));
+  if (haze) return day;
   const ground = darkGround ? mix(vec3(.24, .31, .18), vec3(.08, .095, .06), smoothstep(0, .3, d.y.negate())) : vec3(.24, .31, .18);
   return mix(ground, day, smoothstep(-.18, .025, d.y));
 })();
-const nightSky = () => Fn(() => {
-  const d = normalize(positionLocal).toVar(), elevation = max(d.y, 0);
+const nightSky = (haze = false) => Fn(() => {
+  const d = below(haze).toVar(), elevation = max(d.y, 0);
   const dark = mix(vec3(...NIGHT_BASE), vec3(.05, .08, .16), pow(elevation, .55)).toVar();
+  if (haze) return dark.add(vec3(.42, .5, .68).mul(pow(max(dot(d, vec3(MOON_DIR)), 0), 22)).mul(.2));
   const skyUV = vec2(atan(d.z, d.x).div(6.2831853).add(.5), acos(clamp(d.y, -1, 1)).div(3.14159265));
   const grid = skyUV.mul(vec2(360, 180)).toVar(), cell = floor(grid).toVar(), offset = vec2(hash(cell.add(7.1)), hash(cell.add(19.7))).mul(.64).add(.18);
   const g = fract(grid).sub(offset), star = exp(dot(g, g).negate().mul(140)).mul(step(.967, hash(cell)));
@@ -81,16 +83,24 @@ const nightSky = () => Fn(() => {
 
 /** Bake the sky once: the background and the jewelry reflections see the same cubemap.
  *  darkGround shades the lower hemisphere, hidden behind terrain, like shaded surroundings: polished metal then shows a
- *  dark-below, bright-above horizon line instead of a flat sky tint, until reflection probes capture the real town. */
-export function createSky(renderer: THREE.WebGPURenderer, mobile: boolean, night = false, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', darkGround = false): { background: THREE.CubeTexture; environment: THREE.Texture } {
+ *  dark-below, bright-above horizon line instead of a flat sky tint, until reflection probes capture the real town.
+ *  `haze` is the aerial perspective's fog colour (render/aerial.ts): the same sky, 64 px a face with mipmaps, horizon below.
+ *  The cpu tier keeps linear fog and gets the background there instead. */
+export function createSky(renderer: THREE.WebGPURenderer, mobile: boolean, night = false, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', darkGround = false): { background: THREE.CubeTexture; environment: THREE.Texture; haze: THREE.CubeTexture } {
   const profile = graphicsProfile(tier), scene = new THREE.Scene();
   const material = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false, fog: false });
   material.colorNode = night ? nightSky() : daySky(darkGround);
-  const geometry = new THREE.SphereGeometry(10, 24, 16); scene.add(new THREE.Mesh(geometry, material));
-  const target = new THREE.CubeRenderTarget(night ? profile.skyNight : profile.skyDay, { type: tier === 'cpu' ? THREE.UnsignedByteType : THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
-  new THREE.CubeCamera(.1, 20, target).update(renderer, scene);
-  if (tier === 'cpu') { geometry.dispose(); material.dispose(); return { background: target.texture, environment: target.texture }; }
-  const pmrem = new THREE.PMREMGenerator(renderer), environment = pmrem.fromCubemap(target.texture).texture;
-  pmrem.dispose(); geometry.dispose(); material.dispose();
-  return { background: target.texture, environment };
+  const geometry = new THREE.SphereGeometry(10, 24, 16), sphere = new THREE.Mesh(geometry, material); scene.add(sphere);
+  const bake = (size: number, type: THREE.TextureDataType): THREE.CubeTexture => {
+    const target = new THREE.CubeRenderTarget(size, { type, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+    new THREE.CubeCamera(.1, 20, target).update(renderer, scene); return target.texture;
+  };
+  const background = bake(night ? profile.skyNight : profile.skyDay, tier === 'cpu' ? THREE.UnsignedByteType : THREE.HalfFloatType);
+  if (tier === 'cpu') { geometry.dispose(); material.dispose(); return { background, environment: background, haze: background }; }
+  const hazeMaterial = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false, fog: false });
+  hazeMaterial.colorNode = night ? nightSky(true) : daySky(darkGround, true); sphere.material = hazeMaterial;
+  const haze = bake(64, THREE.HalfFloatType);
+  const pmrem = new THREE.PMREMGenerator(renderer), environment = pmrem.fromCubemap(background).texture;
+  pmrem.dispose(); geometry.dispose(); material.dispose(); hazeMaterial.dispose();
+  return { background, environment, haze };
 }

@@ -35,8 +35,8 @@ export const VIEWS: [string, number, number, number, number?][] = [
   ['city-hall-gallery', -2.4, -24, -.23], ['energy-gallery', -31.4, -10.5, -.28], ['science-gallery', 26.6, -12.2, -.28], ['energy-inside', -29, -5, 0], ['science-inside', 29, -7, 0],
   ['catalogue-poster', 2.51, -18.21, -2.409], ['embryo-station-platform', 0, 73, Math.PI - 1.1],
 ];
-/** The walking fog's far distance, where main.ts now stops the walk camera; the forest's fog margin reads it too. */
-export const WALK_FAR = 130;
+/** The gpu tier's walking full-fog distance (GraphicsProfile.fog), where main.ts stops the walk camera and the forest and grove stop drawing. */
+export const WALK_FAR = graphicsProfile('gpu').fog;
 
 export function walkCamera(x: number, z: number, yaw: number, pitch = 0, far = WALK_FAR): THREE_TYPES.PerspectiveCamera {
   const camera = new THREE.PerspectiveCamera(66, 1280 / 800, .08, far);
@@ -63,7 +63,7 @@ export function measure(group: Group, far = WALK_FAR): Report {
 
 /** The DOM-free groups for one tier; night halos are left out because they draw only after dark. */
 export function budgetGroups(tier: GraphicsTier): Group[] {
-  const mobile = tier !== 'gpu', profile = graphicsProfile(tier), range = Math.min(WALK_FAR, profile.forest);
+  const mobile = tier !== 'gpu', profile = graphicsProfile(tier), range = Math.min(profile.fog, profile.forest);
   const day = (object: THREE_TYPES.Object3D): boolean => !object.userData.nightGlow;
   const gardens = new LivingWaters(mobile) as InstanceType<typeof LivingWaters> & { updateDetail?: (camera: THREE_TYPES.Camera, range: number, mapView: boolean) => boolean };
   const glucose = new THREE.Group(), hill = new THREE.Group(), ground = new THREE.Group(), plants = new THREE.Group(), details = new THREE.Group(), colliders: ColliderSpec[] = [];
@@ -83,7 +83,7 @@ export function budgetGroups(tier: GraphicsTier): Group[] {
 
 /** Bun only: the poster collections on a stub canvas, and the forest from the models on disk. */
 async function browserlessGroups(tier: GraphicsTier): Promise<Group[]> {
-  const mobile = tier !== 'gpu', profile = graphicsProfile(tier), range = Math.min(WALK_FAR, profile.forest), groups: Group[] = [];
+  const mobile = tier !== 'gpu', profile = graphicsProfile(tier), range = Math.min(profile.fog, profile.forest), groups: Group[] = [];
   const context = new Proxy({}, { get: (_, key) => key === 'measureText' ? (text: string) => ({ width: text.length * 14 }) : () => undefined });
   (globalThis as { document?: unknown }).document ??= { createElement: () => ({ width: 1, height: 1, style: {}, getContext: () => context }), createElementNS: () => ({ style: {}, addEventListener() {}, removeEventListener() {} }) };
   const { PlanarExhibition } = await import('../src/world/planar-exhibition'), { CIVIC_LANDMARKS } = await import('../src/game/content'), world = await import('../src/world/world');
@@ -127,12 +127,12 @@ async function browserlessGroups(tier: GraphicsTier): Promise<Group[]> {
 }
 
 if (import.meta.main) {
-  const json = process.argv.includes('--json'), farIndex = process.argv.indexOf('--far'), far = farIndex > 0 ? Number(process.argv[farIndex + 1]) : WALK_FAR;
+  const json = process.argv.includes('--json'), farIndex = process.argv.indexOf('--far'), far = (tier: 'gpu' | 'mobile'): number => farIndex > 0 ? Number(process.argv[farIndex + 1]) : graphicsProfile(tier).fog;
   const out: Record<string, Record<string, Report>> = {};
-  for (const tier of ['gpu', 'mobile'] as const) for (const group of [...budgetGroups(tier), ...await browserlessGroups(tier)]) (out[tier] ??= {})[group.name] = measure(group, far);
+  for (const tier of ['gpu', 'mobile'] as const) for (const group of [...budgetGroups(tier), ...await browserlessGroups(tier)]) (out[tier] ??= {})[group.name] = measure(group, far(tier));
   if (json) console.log(JSON.stringify(out, null, 2));
   else for (const [tier, groups] of Object.entries(out)) {
-    console.log(`\n${tier} · walk camera far plane ${far} m`);
+    console.log(`\n${tier} · walk camera far plane ${far(tier as 'gpu' | 'mobile')} m`);
     for (const [name, report] of Object.entries(groups)) for (const key of new Set([...Object.keys(report.static), ...Object.keys(report.perView)])) {
       const s = report.static[key] ?? { calls: 0, triangles: 0 }, v = report.perView[key] ?? { calls: 0, triangles: 0, views: 0, maxCalls: 0, maxTriangles: 0 };
       console.log(`  ${(name + ' · ' + key).padEnd(48)} built ${String(s.calls).padStart(4)} calls ${String(s.triangles).padStart(9)} tris | per view ${v.calls.toFixed(1).padStart(6)} calls ${Math.round(v.triangles).toString().padStart(9)} tris, drawn in ${v.views}/${VIEWS.length}, max ${v.maxCalls} / ${v.maxTriangles}`);

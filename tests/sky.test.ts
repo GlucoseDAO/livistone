@@ -6,6 +6,7 @@ import { gatewayMaterials } from '../src/world/gateway-materials';
 import { cityHallCrystalMaterial, createCityHallFacade } from '../src/world/city-hall';
 import { stationAmberMaterial } from '../src/world/station-amber';
 import { waterMaterial } from '../src/world/water-material';
+import { TONE, TONE_GAIN, toneMapped, untoneMapped } from '../src/render/tone';
 
 describe('sky coherence', () => {
   it('shares unit sun and moon directions above the horizon', () => {
@@ -30,6 +31,30 @@ describe('sky coherence', () => {
     }
     // Fogging toward the mapped haze as if it were radiance would tone-map it twice: the dark night hills (#000719).
     expect(acesFilmic(HORIZON_HAZE.night.toArray(), SKY_EXPOSURE.night).getHexString(THREE.SRGBColorSpace)).toBe('000719');
+  });
+
+  it('offers ACES, AgX and Neutral tone curves matched at middle grey, with ACES the default', () => {
+    expect(TONE).toBe('aces'); expect(TONE_GAIN.aces).toBe(1);
+    const grey = toneMapped([.18, .18, .18], SKY_EXPOSURE.day, 'aces').getHex();
+    for (const tone of ['aces', 'agx', 'neutral'] as const) {
+      expect(toneMapped([0, 0, 0], SKY_EXPOSURE.day, tone).getHex()).toBe(0);
+      // Within one 8-bit level of the ACES grey on screen.
+      const [a, b] = [grey, toneMapped([.18, .18, .18], SKY_EXPOSURE.day, tone).getHex()].map(hex => new THREE.Color(hex).convertLinearToSRGB().r * 255);
+      expect(Math.abs(a - b), tone).toBeLessThan(1);
+      let previous = -1;
+      for (let v = 0; v <= 8; v += .05) { const shown = toneMapped([v, v, v], 1, tone).g; expect(shown).toBeGreaterThanOrEqual(previous - 1e-9); expect(shown).toBeLessThanOrEqual(1); previous = shown; }
+    }
+    // The CPU ACES curve is the classic one the output pass applies.
+    expect(acesFilmic([.18, .18, .18], SKY_EXPOSURE.day).getHex()).toBe(grey);
+  });
+
+  it('inverts each tone curve, so additive halos raise the display by their own amount', () => {
+    for (const tone of ['aces', 'agx', 'neutral'] as const) for (const radiance of [[.01, .02, .05], [.2, .3, .1], [.6, .7, .8], [.002, .001, .004], [1.2, .9, .4]]) {
+      const shown = toneMapped(radiance, SKY_EXPOSURE.night, tone).toArray();
+      if (Math.max(...shown) > .98) continue;
+      const again = toneMapped(untoneMapped(shown, SKY_EXPOSURE.night, tone), SKY_EXPOSURE.night, tone).toArray();
+      again.forEach((v, i) => expect(Math.abs(v - shown[i]), `${tone} ${radiance}`).toBeLessThan(4e-3));
+    }
   });
 
   it('tags hero materials so they keep their own reflection strength', () => {
