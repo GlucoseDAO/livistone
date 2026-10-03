@@ -4,8 +4,9 @@ import type { Node } from 'three/webgpu';
 
 /**
  * The town's one wind clock, shared by every swaying plant: the near grass field, the forest, shrubs, flowers, meadow tufts
- * and reeds. It follows the game's own elapsed time, which `?capture=1` freezes, never TSL's global `time`, and stands still
- * under prefers-reduced-motion. In the render group, so all materials read one value per frame.
+ * and reeds; the mountain's waterfall, streams and mist run on it too (mountain-water.ts). It follows the game's own elapsed
+ * time, which `?capture=1` freezes, never TSL's global `time`, and stands still under prefers-reduced-motion. In the render
+ * group, so all materials read one value per frame.
  */
 export const windTime = uniform(0).setGroup(renderGroup);
 /** Prevailing wind, blowing toward +x+z (unit vector in the ground plane). */

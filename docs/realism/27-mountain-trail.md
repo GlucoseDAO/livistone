@@ -100,3 +100,37 @@ One trimesh collider on every tier: 333 blocks on the walking terrain, 42.6k tri
 - The waterfall's water is not on this branch; its slot is bare rock until it is.
 - The crags are one mesh, drawn whole wherever any of it is in view (113k triangles on gpu even from the town).
 - Not verified: physical devices, Safari, Firefox.
+
+## Round 2: mountain water (4 October 2026)
+
+**Owner request.** A waterfall in the gorge after the owner's photograph of a tall white fall in a limestone cirque, a mountain stream that runs out from under the old snow (the snow-gully and snow-bridge photographs) and the plateau's brook to the waterfall's lip. The photographs stay outside git (see above).
+
+**Module** (`src/world/mountain-water.ts`, branch `realism/27-mountain-water`). The builders take a world-space spec; `createGorgeWater` places them from the layout's exports on `terrainSurfaceHeight`. Nothing collides: the water is shallow and the terrain is its floor.
+- **Waterfall** (`createWaterfall(spec, tier)`; spec: lip, foot (its height is the pool's level), width, optional ledge for two tiers, spread, pool radius, facing, ground). One lit sheet whose foam is a function of launch time (`tau`, integrated from the water's accelerating speed), so the streaks fall at the water's speed and stretch as it falls; glassy dark water for the first metre, then foam that thins at the edges into strands and opens gaps lower down, a curtain that bows out in the middle and thickens toward edge-on views, splash where it lands. Behind it a dark, patchy film lies on the rock face itself, wider than the water, with a thin film of water trickling down it: the wet streak of the photograph, which also frames the white water against the pale limestone. A plunge pool floods only a hollow (a priority flood on its polar grid), stands as a shallow sheet over flat ground and thins to a film where the ground falls away; froth churns outward from the impact in rings. Sheet, wet rock and pool are one draw; mist is a second (camera-facing cards that rise and swell, lit like level ground, none on cpu). The sheet keeps 0.35 m above the rendered rock under it, giving way over the last 1.5 m above its pool; a point that stepping out cannot clear near the pool stays put (it is under the rising floor), which fixed a first version that flung the sheet's foot 8 m across the gorge.
+- **Streams** (`createStream(points, width, tier, options)`): a ribbon on the ground that bakes what the river's shader reads (`flow`, `along`, `across`, `depth`, `rock` as white water where the bed steepens), level across its middle and down to the ground at its edges, with a dark `wet` bank past them; the river's own shader serves it through `waterMaterial(tier, { stream: true, time })` (own ripple scale and waterline band, faster white water, ripples that tilt with the ribbon; the river's node graph is unchanged). Ends can fade in and out. Both streams merge into one draw and mirror 60% of the baked sky, which the gorge's walls mostly hide. cpu: opaque, nearly flat, baked colours.
+- **Snow cave** (`createSnowCave(spec, tier)`): where `GORGE_STREAM[0]` leaves the snow, a tongue of snow 1.5 m thick ends in a ragged steep face with meltwater runnels and layers, its top leaning out as a 0.7 m lip over a 1.4 × 0.8 m mouth; behind it an arched tube with a dark wet floor and a back wall. The terrain's own snow there is a 7 m wedge with no face, so the face is this mesh. It shares the ground snow's tones (fall-line dirt streaks and patches from the foam texture). One draw; it casts its shade on the stream. The face thins away 1.1 m short of the trail, so it needs no collider.
+- **Placement.** The brook starts where the crag's face lies back to the meadow (`PLATEAU_STREAM`'s first point stands 11 m up the crag), runs 0.45–0.8 m wide to the lip and falls 17.7 m (`WATERFALL`, 1.6 m wide at the lip, 3.5 m at the foot) onto a 1.7 m pool at the wall's foot, kept off the trail. The gorge's stream runs from a metre inside the cave, 0.6–1.2 m wide, down `GORGE_STREAM` and fades over its last 2 m among the boulders. The near grass keeps off the brook (`brookGround`, 0.8 m discs: the bake's 2 m lookup resolves no less, so a strip of bare turf about 1.5 m either side shows).
+- **Time.** All of it runs on `windTime`: `?capture=1` freezes it, reduced motion stills it as the lake stands still, `?wind=<seconds>` pins it for stills.
+
+**Budget** (day, WebGPU; before = `realism/27-jepii-mici-2` at edc50a8 on the same server). New draws: waterfall and pool, mist, streams, cave: four on gpu and mobile, three on cpu. Triangles: gpu 2.4k fall, 4.3k streams, 0.8k cave, 36 mist; mobile 1.0k, 1.8k, 0.8k, 18; cpu 0.4k, 0.6k, 0.4k.
+
+| View | Desktop calls / triangles | Changed | Touch calls / triangles | Software calls / triangles |
+| --- | --- | --- | --- | --- |
+| waterfall | 52 / 1.032M → 55 / 1.038M | 14.4% | 37 / 386k → 40 / 389k | 25 / 136k → 27 / 137k |
+| gorge-canyon | 52 / 1.626M → 56 / 1.634M | 12.6% | 37 / 712k → 41 / 715k | 25 / 268k → 28 / 269k |
+| snow-snout | 50 / 949k → 52 / 954k | 3.3% | 37 / 368k → 39 / 370k | 27 / 187k → 29 / 188k |
+| plateau-crags | 44 / 644k → 45 / 648k | 7.6% | 29 / 235k → 30 / 236k | 21 / 91k → 22 / 91k |
+| waterfall (night) | 52 / 1.032M → 55 / 1.038M | 5.8% | | |
+
+The change is local (a ribbon of water and a cave in wide gorge views), so no view reaches the 15% gate. Building it costs about 0.4 s of main thread on gpu (most of it the wet rock's and the sheet's searches against the terrain, at 18 µs a ground sample); interleaved time to ready on WebGPU, headless on a loaded machine, stayed within the noise of the layout branch (20.4–22.7 s against 19.8–23.7 s over four pairs).
+
+**Captures.** The `mountain` set's `waterfall`, `gorge-canyon` and `snow-snout`, plus `plateau-crags` for the brook, day on desktop, touch and software, and `waterfall` at night. Motion: the same three views with `?wind=12` and `?wind=12.35` (`review/27-mountain-water/motion/`, Difference mode). `tests/mountain-water.test.ts` covers the builders (ribbons follow their points at their widths, finite values, flow, white water from the slope, the fall clear of the rock, launch time increasing down the fall, flooding only a hollow) and the placement.
+
+**Review.** `review/27-mountain-water/` (before = edc50a8; `first-look` was taken on 714a1eb, before the wet rock).
+
+**Open.**
+- The fall is a brook's: 1.6–3.5 m wide and one tier, narrower than the photograph's; from the `waterfall` view, which sees it almost edge-on, it reads as a white ribbon. A front view from the gorge floor shows it best.
+- The cliff behind it is the 2 m terrain's smooth face; crag blocks set there must keep clear of the sheet.
+- The snow cave's face is cleaner and rounder than the photograph's dirty, scalloped lip.
+- The pool is shallow because the gorge floor at the foot is flat; a basin carved there would give it depth.
+- Physical-device performance is untested.
