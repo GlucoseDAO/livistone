@@ -4,7 +4,7 @@
 // and signs set the mask (displayMaterial), so cream paper stays #f4f0e5 by day and night. Ambient occlusion and bloom
 // (sub-plan 18) belong between the scene pass and this mix, and must leave display pixels alone.
 import * as THREE from 'three';
-import { Fn, float, mat3, max, min, mix, mrt, output, pass, positionView, sRGBTransferEOTF, sRGBTransferOETF, smoothstep, sqrt, toneMappingExposure, uniform, vec3, vec4 } from 'three/tsl';
+import { Fn, float, mat3, max, min, mix, mrt, output, positionView, sRGBTransferEOTF, sRGBTransferOETF, smoothstep, sqrt, texture, toneMappingExposure, uniform, vec3, vec4 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 
 // @types/three r186 leaves these untyped; the casts only restore the shader types three itself infers.
@@ -23,27 +23,44 @@ const acesFilmic = Fn(([radiance, exposure]: [Node<'vec3'>, Node<'float'>]) => {
 });
 
 export class OutputPipeline {
-  private readonly scenePass: ReturnType<typeof pass>;
+  private readonly target: THREE.RenderTarget;
+  private readonly targets: ReturnType<typeof mrt>;
   private readonly pipeline: THREE.RenderPipeline;
-  constructor(renderer: THREE.WebGPURenderer, scene: THREE.Scene, camera: THREE.Camera) {
+  private readonly size = new THREE.Vector2();
+  constructor(private readonly renderer: THREE.WebGPURenderer, private readonly scene: THREE.Scene) {
+    // The scene renders at top level into its own half-float target, with an 8-bit `display` attachment. A pass() node would
+    // render it nested inside the output quad, whose deeper render context keys every shader apart from compile()'s.
+    this.target = new THREE.RenderTarget(1, 1, { count: 2, type: renderer.getOutputBufferType(), samples: renderer.samples });
+    this.target.textures[0].name = 'output'; this.target.textures[1].name = 'display'; this.target.textures[1].type = THREE.UnsignedByteType;
     // Other surfaces write a zero mask with their own alpha, under their own blending: opaque ones clear it, glass over a poster
     // tone-maps its share, additive halos leave it alone. MRT outputs besides `output` would otherwise be written unblended.
-    const targets = mrt({ output, display: vec4(0, 0, 0, output.a) }); targets.setBlendMode('display', new THREE.BlendMode(THREE.MaterialBlending));
-    this.scenePass = pass(scene, camera); this.scenePass.setMRT(targets);
-    // Eight bits hold a 0–1 mask and halve its share of the bandwidth.
-    this.scenePass.getTexture('display').type = THREE.UnsignedByteType;
-    const colour = this.scenePass.getTextureNode('output'), display = this.scenePass.getTextureNode('display').r;
+    this.targets = mrt({ output, display: vec4(0, 0, 0, output.a) }); this.targets.setBlendMode('display', new THREE.BlendMode(THREE.MaterialBlending));
+    const colour = texture(this.target.textures[0]), display = texture(this.target.textures[1]).r;
     const shown = mix(acesFilmic(colour.rgb, exposure), colour.rgb, display);
     // Linear sRGB working space to the sRGB canvas: same primaries, so only the transfer curve applies.
     this.pipeline = new THREE.RenderPipeline(renderer, vec4(toSRGB(shown), 1));
     this.pipeline.outputColorTransform = false;
   }
-  render(camera: THREE.Camera): void { this.scenePass.camera = camera; this.pipeline.render(); }
-  /** Compile the scene for the pass's own target (MSAA, half float, MRT) before the first frame, as PassNode.setup would set it. */
-  async compile(renderer: THREE.WebGPURenderer, camera: THREE.Camera): Promise<void> {
-    const target = this.scenePass.renderTarget; target.samples = renderer.samples; target.texture.type = renderer.getOutputBufferType();
-    this.scenePass.camera = camera; await this.scenePass.compileAsync(renderer);
+  render(camera: THREE.Camera): void {
+    this.bind(); this.renderer.render(this.scene, camera); this.unbind();
+    this.pipeline.render();
   }
+  /**
+   * Compile `parts` (the scene's main groups) for this target before the first frame. r186's compileAsync builds one object at
+   * a time and waits for each pipeline in turn, so several parts compile side by side. Their node builds read the renderer's
+   * target and MRT as they go, so both stay set until every part is done; nothing else renders while the town loads.
+   */
+  async compile(camera: THREE.Camera, parts: THREE.Object3D[], parallel = 6): Promise<void> {
+    const queue = [...parts]; this.bind();
+    try { await Promise.all(Array.from({ length: parallel }, async () => { for (let part = queue.shift(); part; part = queue.shift()) await this.renderer.compileAsync(part, camera, this.scene); })); }
+    finally { this.unbind(); }
+  }
+  private bind(): void {
+    this.renderer.getDrawingBufferSize(this.size);
+    if (this.target.width !== this.size.x || this.target.height !== this.size.y) this.target.setSize(this.size.x, this.size.y);
+    this.renderer.setRenderTarget(this.target); this.renderer.setMRT(this.targets);
+  }
+  private unbind(): void { this.renderer.setRenderTarget(null); this.renderer.setMRT(null); }
 }
 
 /** Display-space fog for display materials; main.ts keeps it equal to scene.fog's range with the tone-mapped HORIZON_HAZE. */

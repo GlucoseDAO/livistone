@@ -22,12 +22,14 @@ import { graphicsProfile } from './game/graphics';
 import { parseTimeOfDay, readTimeOfDay, resolveNight, saveTimeOfDay } from './game/daylight';
 import type { TimeOfDay } from './game/daylight';
 import { NightLighting } from './world/night-lighting';
+import { SHADOW_LAYER } from './world/forest';
 import { shadowFrame } from './game/shadow-frame';
 import { installShadowFade, shadowFade } from './world/shadow-fade';
 import type { Physics } from './game/physics';
 import { createRenderer } from './render/renderer';
 import type { RenderView } from './render/renderer';
 import { OutputPipeline, displayFog } from './render/output';
+import { TownLighting } from './render/lighting';
 
 const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 };
 // Dev-only ?look=a keeps the old hemisphere-heavy fill (sun and haze coherence only). b, the default, lets the baked sky
@@ -110,24 +112,28 @@ class Game {
       const override = new URLSearchParams(location.search).get('graphics');
       if (override === 'cpu' || override === 'mobile' || override === 'gpu') Object.assign(this.graphics, graphicsProfile(override));
     }
+    // The night pool, hall and station lamps: room for the pool plus the fixed lamps (render/lighting.ts).
+    this.renderer.lighting = new TownLighting({ maxPointLights: this.graphics.lights + 8 });
     this.renderScale = this.graphics.pixelRatio;
     this.reduced = this.graphics.reduced; this.lowQuality = this.reduced;
     this.night = resolveNight(this.timeOfDay);
     this.renderer.setPixelRatio(this.pixelRatio());
     this.renderer.shadowMap.enabled = this.graphics.shadows; this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    // The output pass (render/output.ts) applies ACES at this exposure, except to display materials.
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = SKY_EXPOSURE[this.phase];
+    // The output pass (render/output.ts) applies the classic ACES fit at this exposure, except to display materials.
+    this.renderer.toneMapping = THREE.NoToneMapping; this.renderer.toneMappingExposure = SKY_EXPOSURE[this.phase];
     this.scene.fog = this.fog; this.setFog(MAP_FOG);
     this.hemi = new THREE.HemisphereLight(this.night ? '#8ea4c6' : '#e9f4f0', this.night ? '#121820' : '#73805c', this.fill.hemi);
     this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(this.night ? '#c9d6ee' : '#fff0ce', this.night ? .32 : 2.4); this.sun.castShadow = true;
     this.sun.shadow.mapSize.setScalar(this.reduced ? 1024 : 2048); this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = SUN_DISTANCE * 2;
+    // The shadow camera also draws the forest's shadow-only meshes, which the view cameras skip.
+    this.sun.shadow.camera.layers.enable(SHADOW_LAYER);
     this.scene.add(this.sun, this.sun.target); installShadowFade(this.sun); this.aimSun();
     const sky = createSky(this.renderer, this.reduced, this.night, this.graphics.tier, LOOK === 'b'); this.skies.set(this.night, sky); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = this.graphics.tier === 'cpu' ? null : sky.environment;
     this.scene.environmentIntensity = this.fill.environment;
     // The town and sun are static; refresh shadows only when scene visibility changes. WebGPU schedules shadows per light.
     this.sun.shadow.autoUpdate = false; this.sun.shadow.needsUpdate = true;
-    this.output = new OutputPipeline(this.renderer, this.scene, this.walkCamera);
+    this.output = new OutputPipeline(this.renderer, this.scene);
     this.mapCamera.position.set(62, 44, 69); this.mapCamera.lookAt(0, 2, -13);
     this.orbit = new OrbitControls(this.mapCamera, ui.canvas); this.orbit.target.set(0, 1, -12); this.orbit.enabled = false;
     this.orbit.enableDamping = true; this.orbit.dampingFactor = 0.08; this.orbit.minDistance = 30; this.orbit.maxDistance = 410;
@@ -175,10 +181,15 @@ class Game {
     this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced, this.graphics.tier); this.nightLighting.setNight(this.night);
     document.querySelector<HTMLElement>('#graphics-profile')!.textContent = 'Device profile: ' + ({ gpu: 'GPU', mobile: 'Mobile / integrated GPU', cpu: 'CPU software renderer' }[this.graphics.tier]) + ({ webgpu: ' · WebGPU', 'webgl2-fallback': ' · WebGL 2' }[this.view.backend]);
     await loadingStage(92, 'Preparing your first view…');
-    this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true);
     this.frameShadow(true);
+    this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true, this.sun.shadow);
     this.walkCamera.position.set(SPAWN.x, SPAWN.y + .78, SPAWN.z); this.walkCamera.rotation.set(0, SPAWN.yaw, 0, 'YXZ');
-    await this.output.compile(this.renderer, this.walkCamera);
+    // Build every shader now, culled or not, and the shadow pass with one rendered frame: on WebGPU each shader costs a
+    // synchronous node build, which would otherwise stall the first frames that show a new object.
+    this.town.warmUp(true);
+    await this.output.compile(this.walkCamera, [...this.town.root.children, ...this.scene.children.filter(child => child !== this.town.root && !(child as THREE.Light).isLight)]);
+    if (this.graphics.shadows) { this.sun.shadow.needsUpdate = true; this.render(this.walkCamera); }
+    this.town.warmUp(false); this.town.update(this.elapsed, this.walkCamera, WALK_FOG.far, false, this.sun.shadow);
     await loadingStage(100, 'Welcome to Livistone');
     this.lastTime = performance.now(); this.frameId = requestAnimationFrame(this.frame);
     this.ui.ready(); this.returnMode = 'walking'; this.setMode('walking'); this.updateWalking(0); this.findInteraction(); this.findLocation(); this.render(this.walkCamera);
@@ -373,6 +384,8 @@ class Game {
     this.sun.target.position.set(frame.target.x, frame.target.y, frame.target.z); this.sun.position.copy(this.sun.target.position).addScaledVector(this.sunDirection, SUN_DISTANCE);
     this.sun.shadow.normalBias = frame.texel * SHADOW.normalBias; this.sun.shadow.bias = -SHADOW.bias / (camera.far - camera.near);
     shadowFade.value.set(walking ? half * SHADOW.fade[0] : 0, walking ? half * SHADOW.fade[1] : 0);
+    // The forest culls its shadow casters against this frustum before the next bake.
+    this.sun.updateMatrixWorld(); this.sun.target.updateMatrixWorld(); this.sun.shadow.updateMatrices(this.sun);
     this.sun.shadow.needsUpdate = true;
   }
   private quality(low: boolean): void {
@@ -473,11 +486,12 @@ class Game {
     if (this.graphics.tier !== 'cpu') this.town.gardens.update(this.elapsed, this.mode === 'walking' && !this.capture ? dt : 0, matchMedia('(prefers-reduced-motion: reduce)').matches);
     if (this.mode === 'map') { this.orbit.update(); this.updateMarkers(); }
     const camera = this.mapView ? this.mapCamera : this.walkCamera;
+    // The shadow box first: the forest picks its shadow casters from the frustum this frame bakes with.
+    if (this.graphics.shadows) this.frameShadow();
     // Walking re-bakes when near shrubs or tree detail change, so their shadows appear with them; the map keeps its one bake.
-    if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : WALK_FOG.far, this.mapView) && !this.mapView && this.graphics.shadows) this.sun.shadow.needsUpdate = true;
+    if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : WALK_FOG.far, this.mapView, this.graphics.shadows ? this.sun.shadow : undefined) && !this.mapView && this.graphics.shadows) this.sun.shadow.needsUpdate = true;
     this.updateExhibitionControls();
     this.clockCheck += rawDt; if (this.clockCheck > 30) { this.clockCheck = 0; if (this.timeOfDay === 'auto') this.applyTimeOfDay(); }
-    if (this.graphics.shadows) this.frameShadow();
     this.nightLighting.update(camera); this.render(camera);
     if (this.cursorDirty) { this.cursorDirty = false; this.updateCursor(); }
     this.frames++; this.fpsFrames++; this.fpsTime += rawDt;

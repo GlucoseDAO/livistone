@@ -13,7 +13,8 @@ import { createBridge, createGardenBridge } from './bridge';
 import { createGateway } from './gateway';
 import { createGatewayPoster } from './gateway-poster';
 import { gatewayApproachWidth, gatewayClearing } from './gateway-layout';
-import { createPlanting, updatePlanting } from './planting';
+import { createPlanting } from './planting';
+import type { Planting } from './planting';
 import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from './landscape';
 import { pathKerbs } from './path-kerbs';
 import { GLUCOSE_PAVILION } from './glucose-layout';
@@ -38,6 +39,9 @@ import { terrainHeight, townTerrainGeometry } from './terrain';
 import { transformColliders } from './town-layout';
 import { createRailwayStructure, loadRailwayTextures } from './railway';
 import { createGlucosePavilion } from './glucose-pavilion';
+
+/** Culling flags saved while Town.warmUp() draws everything. */
+const warmCulled = new WeakMap<THREE.Object3D, boolean>();
 import type { Landmark } from '../game/content';
 
 export interface Interactive { id: string; object: THREE.Object3D; position: THREE.Vector3; }
@@ -99,7 +103,7 @@ export class Town {
   private readonly gold = new THREE.MeshStandardMaterial({ color: '#b99a55', roughness: 0.3, metalness: 0.7 });
   private readonly wood = new THREE.MeshStandardMaterial({ color: '#d1a37d', roughness: 0.8, map: texture('walnut') });
   private readonly paving: THREE.MeshStandardMaterial;
-  private plantBatches: THREE.InstancedMesh[] = [];
+  private planting?: Planting;
   private readonly dark = new THREE.MeshStandardMaterial({ color: '#3e5550', roughness: 0.25, metalness: 0.35 });
   private readonly sphere = new THREE.SphereGeometry(1, 16, 12);
   private rocks: RockSite[] = [];
@@ -342,7 +346,7 @@ export class Town {
     return true;
   }
   readonly forest = new Forest();
-  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.forest.load(this.mobile), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
+  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
     const rand = seeded(3974); const sites: THREE.Vector3[] = [];
     for (let i = 0; i < (this.mobile ? 2600 : 5400); i++) {
@@ -355,7 +359,7 @@ export class Town {
     this.forest.sites = sites; this.root.add(this.forest);
   }
   private createGardens(): void {
-    this.plantBatches = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter);
+    this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter);
     const matrix = new THREE.Matrix4(), q = new THREE.Quaternion();
     const stone = rockMaterial(this.mobile);
     const rocks = new THREE.InstancedMesh(rockGeometry(), stone, this.rocks.length);
@@ -373,15 +377,30 @@ export class Town {
     }
   }
   /** Returns whether a shadow caster changed detail or visibility this frame. */
-  update(time: number, camera?: THREE.Camera, fogFar = 220, mapView = false): boolean {
+  update(time: number, camera?: THREE.Camera, fogFar = 220, mapView = false, shadow?: THREE.LightShadow): boolean {
     this.water.userData.time.value = time;
     if (!camera) return false;
     const profile = graphicsProfile(this.tier);
-    const trees = this.forest.update(camera, mapView ? fogFar : Math.min(fogFar, profile.forest), mapView);
+    const trees = this.forest.update(camera, mapView ? fogFar : Math.min(fogFar, profile.forest), mapView, shadow);
     // Shrub batches toggle every couple of metres while walking; re-baking for them cost a shadow pass per ~2 m, so their shadows catch up at the next quarter-box re-bake.
-    updatePlanting(this.plantBatches, camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
+    this.planting?.update(camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
     if (this.tier === 'cpu') this.details.visible = false;
     return trees;
   }
   setMapMode(active: boolean): void { this.interiors.visible = !active; this.details.visible = !active; }
+  /**
+   * Before the first frame: every tree and plant instanced, and culling off, so the precompile and the first shadow pass build
+   * each shader during loading; on WebGPU a shader first built while walking would stall that frame. Photographs, captions and
+   * signs keep their culling: the view from the station already builds their two shaders, and uploading every canvas and photo
+   * now would only move their upload from first sight to loading.
+   */
+  warmUp(on: boolean): void {
+    this.forest.warmUp(on); this.planting?.warmUp(on);
+    this.root.traverse((object) => {
+      const material = (object as THREE.Mesh).material;
+      if (!Array.isArray(material) && material?.userData.display) return;
+      if (on) { warmCulled.set(object, object.frustumCulled); object.frustumCulled = false; }
+      else { const culled = warmCulled.get(object); if (culled !== undefined) object.frustumCulled = culled; }
+    });
+  }
 }

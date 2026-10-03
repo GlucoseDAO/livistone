@@ -82,28 +82,83 @@ function flowerGeometry(seed: number, mobile: boolean): THREE.BufferGeometry {
   }
   const merged = mergeGeometries(parts)!; parts.forEach((g) => g.dispose()); leaf.dispose(); petal.dispose(); center.dispose(); return merged;
 }
-function batches(parent: THREE.Group, name: string, sites: Site[], geometry: THREE.BufferGeometry, material: THREE.Material, shadow: boolean): THREE.InstancedMesh[] {
-  const result: THREE.InstancedMesh[] = [];
+/** A 24 m cell of one planting kind: a slice of the kind's instance arrays, its centre and a bounding sphere. */
+interface PlantCell { x: number; z: number; first: number; count: number; sphere: THREE.Sphere; shown: boolean }
+interface PlantKind { mesh: THREE.InstancedMesh; cells: PlantCell[]; matrices: Float32Array; colors: Float32Array }
+
+function kind(parent: THREE.Group, name: string, sites: Site[], geometry: THREE.BufferGeometry, material: THREE.Material, shadow: boolean): PlantKind {
   const cells = new Map<string, Site[]>();
   for (const site of sites) { const key = Math.floor(site.x / 24) + ':' + Math.floor(site.z / 24), cell = cells.get(key) ?? []; cell.push(site); cells.set(key, cell); }
-  const matrix = new THREE.Matrix4(), q = new THREE.Quaternion(), color = new THREE.Color();
-  for (const cell of cells.values()) {
-    const batch = new THREE.InstancedMesh(geometry, material, cell.length); batch.name = name;
-    cell.forEach((s, i) => {
-      matrix.compose(new THREE.Vector3(s.x, s.y, s.z), q.setFromAxisAngle(UP, s.angle), new THREE.Vector3(s.scale, s.scale, s.scale)); batch.setMatrixAt(i, matrix);
-      color.setHSL(.15, .08, .75 + (i % 5) * .035); batch.setColorAt(i, color);
+  const matrix = new THREE.Matrix4(), q = new THREE.Quaternion(), color = new THREE.Color(), scaled = new THREE.Sphere();
+  const matrices = new Float32Array(sites.length * 16), colors = new Float32Array(sites.length * 3), result: PlantCell[] = [];
+  geometry.computeBoundingSphere(); let next = 0;
+  for (const members of cells.values()) {
+    const cell: PlantCell = { x: members.reduce((sum, s) => sum + s.x, 0) / members.length, z: members.reduce((sum, s) => sum + s.z, 0) / members.length, first: next, count: members.length, sphere: new THREE.Sphere(new THREE.Vector3(), -1), shown: false };
+    members.forEach((s, i) => {
+      matrix.compose(new THREE.Vector3(s.x, s.y, s.z), q.setFromAxisAngle(UP, s.angle), new THREE.Vector3(s.scale, s.scale, s.scale)); matrix.toArray(matrices, next * 16);
+      color.setHSL(.15, .08, .75 + (i % 5) * .035); color.toArray(colors, next * 3);
+      scaled.copy(geometry.boundingSphere!).applyMatrix4(matrix); if (cell.sphere.radius < 0) cell.sphere.copy(scaled); else cell.sphere.union(scaled);
+      next++;
     });
-    batch.castShadow = shadow; batch.receiveShadow = true; batch.computeBoundingSphere();
-    batch.userData.plantLod = true;
-    batch.userData.lodX = cell.reduce((sum, s) => sum + s.x, 0) / cell.length;
-    batch.userData.lodZ = cell.reduce((sum, s) => sum + s.z, 0) / cell.length;
-    parent.add(batch); result.push(batch);
+    result.push(cell);
   }
-  return result;
+  const mesh = new THREE.InstancedMesh(geometry, material, sites.length); mesh.name = name;
+  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(sites.length * 3), 3);
+  mesh.count = 0; mesh.visible = false; mesh.castShadow = shadow; mesh.receiveShadow = true; parent.add(mesh);
+  return { mesh, cells: result, matrices, colors };
 }
 
-export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: boolean, height: (x: number, z: number) => number, river: (x: number) => number): THREE.InstancedMesh[] {
-  const result: THREE.InstancedMesh[] = [];
+/**
+ * Leafy shrubs, flower borders and meadow grass. Each kind is planted in 24 m cells shown within a walking range, and drawn
+ * through one instanced mesh: on WebGPU every instanced mesh costs its own shader build, so the cells only pick instances.
+ */
+export class Planting {
+  readonly meshes: THREE.InstancedMesh[] = [];
+  private warm = false;
+  constructor(private readonly kinds: PlantKind[]) { this.meshes = kinds.map(k => k.mesh); }
+  /** Returns whether a shadow-casting cell appeared or disappeared, so a cached shadow map can follow. */
+  update(camera: THREE.Camera, range: number): boolean {
+    if (this.warm) return false;
+    const origin = camera.position, range2 = range * range; let casters = false;
+    for (const kind of this.kinds) {
+      let changed = false;
+      for (const cell of kind.cells) {
+        const dx = origin.x - cell.x, dz = origin.z - cell.z, shown = dx * dx + dz * dz < range2;
+        if (shown !== cell.shown) { cell.shown = shown; changed = true; }
+      }
+      if (!changed) continue;
+      if (kind.mesh.castShadow) casters = true;
+      this.refill(kind);
+    }
+    return casters;
+  }
+  /** Before the first frame, show every plant with culling off so the precompile and first shadow pass build each shader. */
+  warmUp(on: boolean): void {
+    this.warm = on;
+    for (const kind of this.kinds) {
+      kind.mesh.frustumCulled = !on;
+      for (const cell of kind.cells) cell.shown = on;
+      this.refill(kind);
+      // Leave no cell marked shown, so the next update() refills from the camera.
+      if (!on) for (const cell of kind.cells) cell.shown = false;
+    }
+  }
+  private refill(kind: PlantKind): void {
+    const { mesh } = kind, target = mesh.instanceMatrix.array as Float32Array, colors = mesh.instanceColor!.array as Float32Array, sphere = new THREE.Sphere(new THREE.Vector3(), -1);
+    let count = 0;
+    for (const cell of kind.cells) {
+      if (!cell.shown) continue;
+      target.set(kind.matrices.subarray(cell.first * 16, (cell.first + cell.count) * 16), count * 16);
+      colors.set(kind.colors.subarray(cell.first * 3, (cell.first + cell.count) * 3), count * 3);
+      count += cell.count; if (sphere.radius < 0) sphere.copy(cell.sphere); else sphere.union(cell.sphere);
+    }
+    mesh.count = count; mesh.visible = count > 0; mesh.boundingSphere = count > 0 ? sphere : null;
+    mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor!.needsUpdate = true;
+  }
+}
+
+export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: boolean, height: (x: number, z: number) => number, river: (x: number) => number): Planting {
+  const result: PlantKind[] = [];
   const rand = random(58), shrubs: Site[][] = [[], [], []], grass: Site[] = [];
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .94, side: THREE.DoubleSide });
   for (let i = 0; i < 2600; i++) {
@@ -115,7 +170,7 @@ export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: 
     shrubs[i % 3].push({ x, y: height(x, z), z, scale, angle });
     if (shrubs.flat().length >= (mobile ? 200 : 320)) break;
   }
-  shrubs.forEach((sites, i) => result.push(...batches(root, 'Leafy shrubs', sites, shrubGeometry(191 + i, mobile, i > 0), material, true)));
+  shrubs.forEach((sites, i) => result.push(kind(root, 'Leafy shrubs', sites, shrubGeometry(191 + i, mobile, i > 0), material, true)));
   // Short, separated patches leave grass between flowers and keep the routes visually quiet.
   const flowers: Site[][] = [[], [], [], []];
   const plant = (x: number, z: number, palette: number): void => {
@@ -138,7 +193,7 @@ export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: 
     const x = (rand() - .5) * 125, z = river(x) + (i % 2 ? 1 : -1) * (8.1 + rand() * 3.7);
     plant(x, z, Math.floor((x + 65) / 7));
   }
-  flowers.forEach((sites, i) => result.push(...batches(root, 'Flower borders', sites, flowerGeometry(400 + i, mobile), material, false)));
+  flowers.forEach((sites, i) => result.push(kind(root, 'Flower borders', sites, flowerGeometry(400 + i, mobile), material, false)));
   for (let i = 0; i < (mobile ? 18000 : 52000); i++) {
     const x = (rand() - .5) * 155, z = (rand() - .5) * 132, scale = .55 + rand() * .75;
     // Open lawns alternate with denser meadow islands; keep the original maximum tuft footprint.
@@ -146,17 +201,6 @@ export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: 
     if (!plantingAllowed(x, z, .55 * scale) || Math.abs(z - river(x)) < 7.4) continue;
     grass.push({ x, y: height(x, z) + .012, z, scale, angle: rand() * TAU });
   }
-  result.push(...batches(details, 'Meadow grass', grass, grassGeometry(mobile), material, false));
-  return result;
-}
-
-/** Returns whether a shadow-casting batch appeared or disappeared, so a cached shadow map can follow. */
-export function updatePlanting(batches: THREE.InstancedMesh[], camera: THREE.Camera, range: number): boolean {
-  const origin = camera.position, range2 = range * range; let casters = false;
-  for (const batch of batches) {
-    const dx = origin.x - batch.userData.lodX, dz = origin.z - batch.userData.lodZ, visible = dx * dx + dz * dz < range2;
-    if (batch.castShadow && batch.visible !== visible) casters = true;
-    batch.visible = visible;
-  }
-  return casters;
+  result.push(kind(details, 'Meadow grass', grass, grassGeometry(mobile), material, false));
+  return new Planting(result);
 }
