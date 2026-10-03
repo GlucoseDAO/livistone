@@ -13,10 +13,10 @@ import type { GraphicsTier } from '../game/graphics';
 export type GroundLook = 'a' | 'b';
 export const GROUND_LAYERS = ['meadow', 'sparse', 'soil'] as const;
 
-/** Dev-only `?look=a|b` comparison switch; production keeps the restrained look. */
+/** Dev-only `?ground=a|b` comparison switch (separate from the river's `?look`); production keeps the restrained look until the owner picks. */
 export function groundLook(): GroundLook {
   if (!import.meta.env.DEV || typeof location === 'undefined') return 'a';
-  return new URLSearchParams(location.search).get('look') === 'b' ? 'b' : 'a';
+  return new URLSearchParams(location.search).get('ground') === 'b' ? 'b' : 'a';
 }
 
 /** Files under textures/ground/ for a tier: gpu 1024 px albedo + 512 px nrh; mobile 512 + 256; cpu albedo only. */

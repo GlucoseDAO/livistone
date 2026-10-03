@@ -43,6 +43,8 @@ const dir = `${outDir}/${profile}/${time}`; mkdirSync(dir, { recursive: true });
 const base = process.env.LIVISTONE_BENCHMARK_URL ?? 'http://127.0.0.1:5173';
 const url = new URL(base); url.searchParams.set('capture', '1');
 if (process.env.LIVISTONE_LOOK) url.searchParams.set('look', process.env.LIVISTONE_LOOK);
+// Several sub-plans keep their own dev switches (?ground=b, ?look=a…); LIVISTONE_PARAMS adds any of them.
+for (const [key, value] of new URLSearchParams(process.env.LIVISTONE_PARAMS ?? '')) url.searchParams.set(key, value);
 const software = profile === 'software', frameTimeout = software ? 240_000 : 60_000;
 const gpu = software ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : process.platform === 'win32' ? ['--use-angle=d3d11', '--ignore-gpu-blocklist'] : ['--use-gl=angle', '--use-angle=gl', '--ignore-gpu-blocklist'];
 const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', '--headless=new', ...gpu] });
