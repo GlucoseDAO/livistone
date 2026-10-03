@@ -11,6 +11,7 @@ import { STATION } from '../src/world/station-layout';
 import { WALKING_NETWORK } from '../src/world/landscape';
 import { kerbOpening, walkingSurface } from '../src/world/walking-surface';
 import type { Road } from '../src/world/path-network';
+import { TRAIL_HALF, TRAIL_SAMPLES, trailDistance } from '../src/world/mountain-layout';
 
 const point = (x: number, z: number): THREE.Vector3 => new THREE.Vector3(x, 0, z);
 const line = (a: THREE.Vector3, b: THREE.Vector3): THREE.LineCurve3 => new THREE.LineCurve3(a, b);
@@ -62,7 +63,9 @@ describe('town walking network', () => {
   it('brings the walking network to every map entrance and the Future House neck', () => {
     for (const l of LANDMARKS) {
       const p = point(l.entrance.x, l.entrance.z);
-      expect(pavedDestination(p) || samples.some(s => touches([p], s, PATH_WIDTH / 2)), `${l.name} has no paved arrival`).toBe(true);
+      // Jepii Mici arrives on its earth trail below the trailhead; the trail itself leaves the garden path at TRAIL_GATE.
+      const trail = l.id === 'jepii-mici' && trailDistance(p.x, p.z) < TRAIL_HALF && WALKING_NETWORK.clearance(TRAIL_SAMPLES[0].x, TRAIL_SAMPLES[0].z, 2) < 0;
+      expect(pavedDestination(p) || trail || samples.some(s => touches([p], s, PATH_WIDTH / 2)), `${l.name} has no paved arrival`).toBe(true);
     }
     const foot = FUTURE_NECK.getPoint(0);
     expect(samples.some(s => touches([foot], s, .1))).toBe(true);

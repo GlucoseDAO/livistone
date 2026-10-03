@@ -16,8 +16,9 @@ const stories: Record<string, NearbyStory> = {
   'future-house-story': { id: 'future-house-story', title: 'Camel Dalí · Future House', sentence: 'Livia’s copper, printed material and leather camel becomes a lakeside house you enter through its neck.' },
   'living-mycelium': { id: 'living-mycelium', title: 'Mycelium', sentence: 'The Mycelium ring’s curled silver folds and opal heart become this mushroom grove.' },
   'materialized-enhancements': { id: 'materialized-enhancements', title: 'Materialized Enhancements', sentence: 'This faceted hill grows out of Livia’s gene knowledgebase, character-building game and printable bioart project.' },
+  'jepii-mici': { id: 'jepii-mici', title: 'Jepii Mici', sentence: 'The pointer names a real Bucegi trail marked with a blue cross and closed in winter; this trailhead is Livistone fiction.' },
 };
-const placeStories: Record<LandmarkId, string> = { station: 'embryo-station', energy: 'mitoring', science: 'nanot', 'city-hall': 'nut', timeface: 'timeface', glucose: 'glucose-livia', 'living-waters': 'living-vittoria', 'future-house': 'future-house-story', 'mycelium-garden': 'living-mycelium', enhancement: 'materialized-enhancements' };
+const placeStories: Record<LandmarkId, string> = { station: 'embryo-station', energy: 'mitoring', science: 'nanot', 'city-hall': 'nut', timeface: 'timeface', glucose: 'glucose-livia', 'living-waters': 'living-vittoria', 'future-house': 'future-house-story', 'mycelium-garden': 'living-mycelium', enhancement: 'materialized-enhancements', 'jepii-mici': 'jepii-mici' };
 export function storyFor(id: string): NearbyStory | null {
   if (stories[id]) return stories[id];
   const discovery = DISCOVERIES.find(d => d.id === id); if (!discovery) return null;

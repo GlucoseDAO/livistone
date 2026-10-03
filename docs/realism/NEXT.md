@@ -62,6 +62,7 @@ Tasks that edit `main.ts` or `sky.ts` (21, 18, 05, 25) merge one after another; 
 
 ### After round 2 (owner request, 3 October 2026)
 
+- [27 Jepii Mici trail, rhododendrons and snow](27-mountain-trail.md): a blazed earth trail with Romanian trail signs up the north ridge, rhododendron drifts on its slope and old snow in the next summit's gully; view set `mountain`, switch `?mountain=off`.
 - [26 Physical sky and distant mountains](26-sky-mountains.md): a baked single-scattering sky with ray-marched cumulus, distant ranges in a second camera pass, eroded ridges and limestone strata. Edits `sky.ts`, `main.ts` and `render/output.ts`, so it merges in turn with 21, 18 and 05; 05 builds its golden sky on this atmosphere.
 
 ### Done or small
@@ -114,6 +115,6 @@ bun scripts/build-realism-comparison.ts <reviewDir> --title "…"
 LIVISTONE_BASE_URL=http://127.0.0.1:5181 npx playwright test tests/<spec>.spec.ts
 ```
 
-View sets: `quick`, `exteriors`, `ground`, `water`, `galleries`, `all`, `fixes` (the October 2026 owner reports, outside `all`) and `skyline` (sub-plan 26, outside `all`; a view's optional sixth element is the teleport height). Times: `day`, `golden` (after 05), `night`. Headless WebGPU on Linux needs `--enable-unsafe-webgpu --enable-features=Vulkan --use-webgpu-power-preference=force-low-power`; Stage A puts these in the harness and Playwright config.
+View sets: `quick`, `exteriors`, `ground`, `water`, `galleries`, `all`, `fixes` (the October 2026 owner reports, outside `all`), `skyline` (sub-plan 26, outside `all`; a view's optional sixth element is the teleport height) and `mountain` (sub-plan 27, outside `all`). Times: `day`, `golden` (after 05), `night`. Headless WebGPU on Linux needs `--enable-unsafe-webgpu --enable-features=Vulkan --use-webgpu-power-preference=force-low-power`; Stage A puts these in the harness and Playwright config.
 
 Review pages are served from `~/sources/livistone-realism/review/` with `python3 -m http.server 5199 --bind 127.0.0.1`; `combined-all/` and `baseline-76104be/` hold the round-1 result and the original look. These files live outside git.

@@ -41,6 +41,10 @@ const VIEWS: Record<string, View> = Object.fromEntries(([
   // Sub-plans 07/08: each building-piece's metal, stone and amber at arm's length, beside the existing front and side views.
   ['nanot-close', 36, -1, .611, .25], ['station-ring-close', 5, 52, 2.583, .3], ['time-tower-close', 24, -30, .661, .35],
   ['future-house-legs', -50, -96, Math.PI / 4, .3], ['gateway-gem', 3, 46, .477, .55],
+  // Sub-plan 27: the Jepii Mici trail off the north garden path, its trailhead in the woods, the plateau's flowers, the snow
+  // couloir between its two peaks seen from the climb, and the view back from the plateau.
+  ['trail-from-path', -4, -158, .27, .06], ['trailhead-signs', -11.8, -185.62, .24, .2], ['mountain-flowers', -3, -247, 1.2, -.05],
+  ['snow-gully', -22, -246, .98, .32], ['plateau-view', -12, -243, Math.PI, -.08],
 ] as View[]).map(view => [view[0], view]));
 const SETS: Record<string, string[]> = {
   quick: ['arrival-meadow', 'city-hall-front', 'energy-front', 'bridge-bank', 'east-tributary', 'meadow-ground', 'city-hall-gallery', 'vittoria-lake'],
@@ -54,10 +58,11 @@ const SETS: Record<string, string[]> = {
   // Sub-plan 08: front, side and close views of the five building-pieces (Science, Station, Time Tower, Future House, Gateway).
   materials: ['science-front', 'science-side', 'nanot-arch', 'nanot-close', 'science-inside', 'embryo-station-front', 'station-ring-close', 'embryo-station-platform', 'time-tower', 'time-tower-close', 'future-house-entry', 'future-house-legs', 'future-house-neck', 'gateway-front', 'gateway-side', 'gateway-gem'],
   station: ['station-entrance', 'station-bench', 'station-glazing', 'station-platform', 'station-amber-below', 'station-arrival', 'embryo-station-front'],
+  mountain: ['trail-from-path', 'trailhead-signs', 'mountain-flowers', 'snow-gully', 'plateau-view', 'ridge-north'],
   fixes: ['city-hall-far', 'city-hall-north', 'nanot-arch', 'future-house-entry', 'future-house-neck', 'junction-garden', 'junction-glucose', 'junction-station', 'enhancement-front', 'grove-floor', 'mycelium-grove', 'sky-up', 'ridge-northwest', 'railway-east-portal'],
 };
 // `all` keeps the 33 realism views; these sets are reviewed on their own.
-const REVIEWED_ALONE = ['fixes', 'skyline', 'lake', 'intersections', 'materials', 'station'];
+const REVIEWED_ALONE = ['fixes', 'skyline', 'lake', 'intersections', 'materials', 'station', 'mountain'];
 SETS.all = [...new Set(Object.entries(SETS).filter(([set]) => !REVIEWED_ALONE.includes(set)).flatMap(([, views]) => views))];
 
 const [outDir, profileArg = 'desktop', setArg = 'quick', time = 'day'] = process.argv.slice(2);

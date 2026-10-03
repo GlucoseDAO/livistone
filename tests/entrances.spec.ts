@@ -11,7 +11,7 @@ for (const mobile of [false, true]) test(`map labels arrive outside walkable ent
   try {
     const page = await context.newPage(), errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
     await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
-    for (const id of ['glucose', 'city-hall', 'energy', 'science', 'station', 'living-waters', 'mycelium-garden', 'city-hall']) {
+    for (const id of ['glucose', 'city-hall', 'energy', 'science', 'station', 'living-waters', 'mycelium-garden', 'jepii-mici', 'city-hall']) {
       const landmark = LANDMARKS.find((place) => place.id === id)!, arrival = landmark.entrance;
       const label = page.locator(!mobile && id === 'glucose' ? '#marker-glucose' : `.landmark-item[data-action="landmark:${id}"]`);
       if (mobile) await label.tap(); else await label.click();

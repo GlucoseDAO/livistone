@@ -9,10 +9,12 @@ import { PATH_CURVES } from '../src/world/landscape';
 import { LANDMARKS, SPAWN } from '../src/game/content';
 import { RAILWAY, STATION } from '../src/world/station-layout';
 
-// forestSites on main@47dc3b9: tier, count, first and last site (x, z).
+// forestSites on main@47dc3b9: tier, count, first and last site (x, z). Sub-plan 27 then took the trees standing on the Jepii Mici
+// trail, its plateau, the peaks and the couloir out after the draws, so every other site is unchanged, and appended a few round
+// the trailhead (the last site is one of them).
 const FOREST: [boolean, number, [number, number], [number, number]][] = [
-  [false, 905, [-27.918645669706166, -199.93845618027262], [111.25912150368094, -93.91858145059086]],
-  [true, 506, [-27.918645669706166, -199.93845618027262], [-170.7141700387001, -87.44361559324898]],
+  [false, 910, [-27.918645669706166, -199.93845618027262], [-22.31657310872749, -199.0044028444865]],
+  [true, 517, [-27.918645669706166, -199.93845618027262], [-18.43786784085531, -205.5658622716235]],
 ];
 
 describe('distant ranges (sub-plan 26)', () => {

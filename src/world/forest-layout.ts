@@ -4,6 +4,7 @@ import { gatewayClearing } from './gateway-layout';
 import { plantingAllowed } from './landscape';
 import { STATION } from './station-layout';
 import { terrainHeight, terrainHeightOf } from './terrain';
+import { mountainClearing, trailheadTreeSpots } from './mountain-layout';
 
 function seeded(seed: number): () => number {
   return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -29,5 +30,13 @@ export function forestSites(mobile: boolean): THREE.Vector3[] {
     if (height > 47 + rand() * 13 || slope > .95 || Math.hypot(x / 218, (z + 60) / 210) > .82 + rand() * .18 || !clearForTree(x, z) || sites.some((p) => Math.hypot(p.x - x, p.z - z) < (mobile ? 6 : 4.8))) continue;
     sites.push(new THREE.Vector3(x, terrainHeight(x, z), z));
   }
-  return sites;
+  // The Jepii Mici trail, its rhododendron meadow and the snow gully (sub-plan 27) take out the trees standing on them after the
+  // draws, so every other tree stays exactly where it was; then the trailhead's woods are thickened. Odd indices are ashes, whose
+  // crowns start higher, so they take the spots nearest the trail.
+  const kept = sites.filter((p) => !mountainClearing(p.x, p.z)), spots = trailheadTreeSpots(), near = spots.filter(s => s.near), far = spots.filter(s => !s.near);
+  while (near.length || far.length) {
+    const spot = (kept.length % 2 ? near : far).shift() ?? (kept.length % 2 ? far : near).shift()!;
+    if (kept.every((p) => Math.hypot(p.x - spot.x, p.z - spot.z) > 2.8)) kept.push(new THREE.Vector3(spot.x, terrainHeight(spot.x, spot.z), spot.z));
+  }
+  return kept;
 }

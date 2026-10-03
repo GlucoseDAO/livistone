@@ -189,6 +189,45 @@ const GROUND = {
   weights: property('vec3', 'groundWeights'), p: property('vec3', 'groundP'), dpx: property('vec3', 'groundPdx'), dpy: property('vec3', 'groundPdy'),
 };
 
+/**
+ * Sub-plan 27 on the ground, from the baked `groundPaint`: bright alpine turf round the rhododendrons and moss campion (with
+ * tiny yellow flowers; on cpu, which draws neither plant, patches of their colour), old avalanche snow with a lumpy edge, dirt
+ * streaks and debris over a dark wet rim, and meltwater. Colours are albedos: the vertex colour that multiplies the ground afterwards is divided out.
+ */
+function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean): void {
+  const marks = attribute<'vec4'>('groundPaint', 'vec4').xyz.toVar(), tint = max(attribute<'vec3'>('color', 'vec3'), vec3(.05)).toVar();
+  If(marks.x.greaterThan(.01), () => {
+    // Bright alpine turf between the plants, as in the owner's photos: the meadow's own grain and value, its hue and level pulled
+    // to a fresh green, with no rock or bare soil showing. Tiny yellow flowers dot it up close.
+    // Only on walkable ground: the crags and the climb's banks keep their rock.
+    const turf = smoothstep(.02, .45, marks.x).mul(smoothstep(.74, .88, up)).mul(.88).toVar(), value = clamp(dot(ground.mul(tint), LUMA).div(.13), .7, 1.35);
+    const alpine = mix(vec3(.07, .15, .026), vec3(.1, .19, .035), valueNoise(xz.div(5))).mul(value);
+    const yellow = smoothstep(.87, .91, valueNoise(xz.div(.07).add(11))).mul(float(1).sub(far)).mul(turf);
+    ground.assign(mix(mix(ground, alpine.div(tint), turf), vec3(.62, .45, .02).div(tint), yellow));
+    if (!plants) {
+      // The cpu tier draws no shrubs or moss campion; patches of their colour stand in for them.
+      const clump = valueNoise(xz.div(1.6)).mul(.6).add(valueNoise(xz.div(.4).add(7.7)).mul(.4));
+      ground.assign(mix(ground, mix(vec3(.05, .07, .03), vec3(.5, .03, .2), smoothstep(.55, .62, clump)).div(tint), smoothstep(.45, .55, clump).mul(turf)));
+    }
+    GROUND.rock.mulAssign(float(1).sub(turf)); GROUND.detail.mulAssign(float(1).sub(turf.mul(.3)));
+  });
+  // The plateau's crags and the peaks are pale grey limestone (the first flower photograph), paler than the ridges' rock.
+  const crags = float(1).sub(smoothstep(-240, -234, positionLocal.z)).mul(smoothstep(-80, -70, positionLocal.x)).mul(float(1).sub(smoothstep(14, 24, positionLocal.x))).mul(GROUND.rock);
+  ground.assign(mix(ground, vec3(dot(ground, LUMA)).mul(vec3(1.32, 1.3, 1.24)), crags.mul(.85)));
+  If(marks.y.greaterThan(.01), () => {
+    const edge = marks.y.add(valueNoise(xz.div(1.7)).sub(.5).mul(.36)).add(valueNoise(xz.div(.45)).sub(.5).mul(.12)).toVar();
+    const snow = smoothstep(.42, .5, edge).toVar(), rim = smoothstep(.18, .42, edge).mul(float(1).sub(snow)).toVar();
+    // Dirt runs down the fall line (the gully runs along z); rock debris lies scattered on the surface.
+    const streaks = valueNoise(vec2(xz.x.div(1.3), xz.y.div(9))), debris = smoothstep(.78, .86, valueNoise(xz.div(.35).add(3.3))).mul(float(1).sub(far));
+    const white = mix(vec3(.58, .59, .58).mul(streaks.mul(.26).add(.76)).mul(valueNoise(xz.div(4)).mul(.12).add(.9)), vec3(.13, .115, .1), debris.mul(.85));
+    ground.assign(mix(ground.mul(float(1).sub(rim.mul(.45))), white.div(tint), snow));
+    const lumps = noiseGradient(xz.div(1.4)).yz.div(1.4);
+    GROUND.rock.mulAssign(float(1).sub(snow)); GROUND.roughness.assign(mix(GROUND.roughness.sub(rim.mul(.3)), .66, snow));
+    GROUND.detail.mulAssign(float(1).sub(snow)); GROUND.relief.assign(mix(GROUND.relief, lumps.mul(.8), snow));
+  });
+  If(marks.z.greaterThan(.01), () => { ground.mulAssign(float(1).sub(marks.z.mul(.5))); GROUND.roughness.assign(mix(GROUND.roughness, .3, marks.z)); });
+}
+
 export interface GroundMaps { albedo: THREE.Texture[]; nrh: THREE.Texture[]; rock: THREE.Texture; rockNormal: THREE.Texture | null; shore?: ShoreMaps | null }
 /** The near grass field's lookup (grass-field.ts): alpha is how fully grass grows on its 2 m grid; radius in metres. */
 export interface GrassShade { mask: THREE.Texture; minX: number; minZ: number; width: number; depth: number; radius: number }
@@ -197,7 +236,8 @@ export interface GrassShade { mask: THREE.Texture; minX: number; minZ: number; w
  * Nodes for the vertex-coloured terrain: colour on every tier, roughness on gpu and mobile, detail normals on gpu. The cpu
  * tier uses the colour on a Lambert node material. Vertex colours still multiply the result, as they did the GLSL patch.
  */
-export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMaps, grassVertexColour: THREE.Color, grass?: GrassShade, limestone = true): { colorNode: V3; roughnessNode: F | null; normalNode: V3 | null } {
+/** `paint` reads sub-plan 27's baked `groundPaint` (x alpine turf, y old snow, z meltwater; w, the sun's visibility, is mountains.ts's). */
+export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMaps, grassVertexColour: THREE.Color, grass?: GrassShade, limestone = true, paint = false): { colorNode: V3; roughnessNode: F | null; normalNode: V3 | null } {
   const L = LOOKS[look], [meadowAlbedo, sparseAlbedo, soilAlbedo] = maps.albedo, [meadowNrh, sparseNrh, soilNrh] = maps.nrh;
   const colorNode = Fn(() => {
     const n = normalize(normalLocal).toVar(), xz = positionLocal.xz.toVar(), dx = dFdx(xz).toVar(), dy = dFdy(xz).toVar();
@@ -260,6 +300,7 @@ export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMa
       GROUND.rock.assign(heightWeights(vec3(float(1).sub(exposed), exposed, 0), vec3(height, clamp(dot(rock, LUMA).mul(2.2), 0, 1), -2), .2).y);
       ground.assign(mix(ground, rock.mul(1.8), GROUND.rock)); GROUND.roughness.assign(mix(GROUND.roughness, .9, GROUND.rock));
     });
+    if (paint) mountainPaint(ground, xz, far, n.y, tier !== 'cpu');
     // River shores (sub-plan 14): gravel, the wet band, the silt bed and caustics, only near the channels.
     shoreGround(tier, maps.shore ?? null, { ground, roughness: GROUND.roughness, detail: GROUND.detail, relief: GROUND.relief }, dx, dy, grassVertexColour);
     return ground;

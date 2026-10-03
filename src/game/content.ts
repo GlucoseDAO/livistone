@@ -8,8 +8,9 @@ import { GARDENS } from '../world/living-waters-layout';
 import type { ResearchFigure } from './research-art';
 import { TIME_TOWER } from '../world/waterways';
 import { NECK_ARRIVAL } from '../world/elevated-layout';
+import { TRAILHEAD, TRAIL_ARRIVAL } from '../world/mountain-layout';
 
-export type LandmarkId = 'city-hall' | 'energy' | 'science' | 'station' | 'glucose' | 'living-waters' | 'mycelium-garden' | 'timeface' | 'future-house' | 'enhancement';
+export type LandmarkId = 'city-hall' | 'energy' | 'science' | 'station' | 'glucose' | 'living-waters' | 'mycelium-garden' | 'timeface' | 'future-house' | 'enhancement' | 'jepii-mici';
 export interface Landmark {
   id: LandmarkId;
   zone?: 'town' | 'gardens';
@@ -35,6 +36,9 @@ export const LANDMARKS: Landmark[] = [
   { id: 'future-house', entrance: { x: NECK_ARRIVAL.x, y: 1.2, z: NECK_ARRIVAL.z, yaw: NECK_ARRIVAL.yaw }, name: 'Future House', artifact: 'Camel Dalí · a lakeside exhibition', x: -64, z: -110, color: '#c98c65', stretch: { x: 1.8, z: 2 }, description: 'A camel bends toward Vittoria Lake. Climb its copper neck into a dark printed cabin held by leather bands, with an exhibition of recent works and views over the water.' },
   { id: 'mycelium-garden', entrance: { x: GARDENS.x + 74, y: 1.05, z: GARDENS.z - 25, yaw: -2 }, name: 'Mycelium Rain Garden', artifact: 'Silver mushroom grove', x: GARDENS.x + 75, z: GARDENS.z, color: '#81a791', stretch: { x: 3, z: 4 }, description: 'At Living Waters, follow the eastern path into tall mushroom sculptures and lower ring-scale silver shrubs with curled gills and opal hearts, both following the Mycelium ring. Folded crowns collect rain above a dry loop; a visible silver rill links the opalescent basin to Vittoria Lake.' },
   { id: 'enhancement', entrance: { x: 100, y: 1.05, z: -154.617, yaw: .575 }, name: 'Materialized Enhancements', artifact: 'Voronoi hill · design your character', x: 82, z: -178, color: '#b95f3d', stretch: { x: 5, z: 4.5 }, description: 'Behind the mycelium grove, an original Voronoi crystal grows into a violet faceted hill. In front stand photo posters and six gene-category crystals grown by the project’s own pipeline; click any poster to open enhancement.bio. Follow marked facets or walk through the lit cave and internal ramp to a human monument with a Voronoi chest.' },
+  // Sub-plan 27: the mountain beyond the gardens. The trail is real; its trailhead here is Livistone's own.
+  { id: 'jepii-mici', entrance: TRAIL_ARRIVAL, name: 'Jepii Mici', artifact: 'Blue-cross mountain trail · Bucegi', x: TRAILHEAD.x, z: TRAILHEAD.z, color: '#2f5fae', stretch: { x: 1, z: 1 }, description: 'North of the lake gardens a worn earth trail leaves the garden path for the woods. Where the forested slope begins, a board roped between two trunks warns that it is closed and dangerous, and the pointer names Jepii Mici, a steep trail in Romania’s Bucegi Mountains marked with a blue cross. The climb ends on a plateau of rhododendrons and moss campion below limestone crags, looking up at old snow in a couloir between two peaks.' },
+
 ];
 export const CIVIC_LANDMARKS = LANDMARKS.filter((landmark) => ['city-hall', 'energy', 'science'].includes(landmark.id));
 export interface DiscoverySlide { title: string; body: string; figure?: ResearchFigure; image?: string; imageAlt?: string }
@@ -52,6 +56,7 @@ export const DISCOVERIES: Discovery[] = [
   { id: 'about-livistone', landmark: 'station', title: 'Livia & Livistone', category: 'MEET THE CREATOR', body: TOWN_INTRO.journey + '. ' + TOWN_INTRO.body + '\n\n' + TOWN_INTRO.music },
   { id: 'materialized-enhancements', landmark: 'enhancement', title: 'Materialized Enhancements', category: 'BIOART / PARTICIPATE', body: ENHANCEMENT_STORY, links: [{ label: 'Join here — create your character', url: ENHANCEMENT_URL }],
     slides: [{ title: 'A game. A knowledgebase. A bioart project.', body: ENHANCEMENT_STORY }, ...ENHANCEMENT_POSTERS.map(p => ({ title: p.title, body: `${p.body} ${p.credit}.`, image: enhancementImage(p.slug), imageAlt: p.alt }))] },
+  { id: 'jepii-mici', landmark: 'jepii-mici', title: 'Jepii Mici', category: 'MOUNTAIN TRAIL / REAL PLACE', body: 'The real Jepii Mici is a steep trail in the Bucegi Mountains of Romania, marked with a blue cross and closed in winter. Everything else here is Livistone fiction: this trailhead in the woods north of the lake gardens, its warning board roped between two trunks (trail closed, danger of death, forbidden), the arrow pointer and small boards, the blazed boulders, the plateau of rhododendrons and moss campion below the crags and the old avalanche snow in the couloir between two peaks.' },
   { id: 'future-house-story', landmark: 'future-house', title: 'Camel Dalí / Future House', category: 'MATERIALS AND IMAGINATION', body: 'Camel Dalí combines native copper, a PLA printed part and leather ties, as described by Livia. The original Instagram post introduces an organic form and 3D printing. Future House enlarges those materials into a drinking camel: copper legs and neck, a printed exhibition cabin and leather bindings. The building and walkable neck are new Livistone architecture.', links: [{ label: 'Camel Dalí — original Instagram post', url: 'https://www.instagram.com/p/DdDwLqDlcm2/' }] },
   ...RESEARCH_POSTERS,
   { id: 'living-vittoria', landmark: 'living-waters', title: 'Vittoria Amazonica at the lake', category: 'VITTORIA LAKE / TWO WORKS',

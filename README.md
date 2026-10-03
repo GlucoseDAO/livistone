@@ -10,7 +10,7 @@ You step off a train at a station roofed in amber, walk under a ring-shaped city
 
 **[▶ Visit Livistone](https://livistone.liviazaharia.com/)** (a recent browser is all you need) · [Run it locally](#run-it-locally) · [How it's made](#how-its-made) · [Technical guide](docs/technical-guide.md)
 
-## Ten stops, each from a real work
+## Eleven stops, each from a real work or place
 
 ![The civic centre at street level: the amber Ministry of Energy on the left, the walnut City Hall in the middle and the silver-lattice Ministry of Science on the right, with the spiral gallery of Timeface Tower behind it, among paved paths, flowers and grass](docs/images/livistone-centre.jpg)
 
@@ -28,8 +28,9 @@ Every building and garden starts from something Livia actually made: a ring, a p
 | 8 | **Future House** | Camel Dalí: copper, a 3D-printed part and leather | A copper camel drinking from the lake. Climb its neck into the exhibition cabin |
 | 9 | **Mycelium Rain Garden** | The Mycelium ring, whose silver folds let water drain off its opal | Tall silver mushrooms with opal hearts and a visible rain rill |
 | 10 | **Materialized Enhancements** | The [enhancement.bio](https://enhancement.bio/) bioart project | A violet Voronoi hill to climb, with gene-category crystals grown by the project itself |
+| 11 | **Jepii Mici** | A real, steep trail in Romania's Bucegi Mountains, marked with a blue cross and closed in winter | A forest trailhead with a roped warning board, a climb to a plateau of rhododendrons and moss campion, and old snow in a couloir between two peaks |
 
-The facts, photographs and research come from Livia's work and link to their sources. The powers the town gives its artifacts (the "Livia Lore") are fiction, and the game labels them that way.
+The facts, photographs and research come from Livia's work and link to their sources; the Jepii Mici trail is a real place, and everything Livistone builds round it is fiction. The powers the town gives its artifacts (the "Livia Lore") are fiction, and the game labels them that way.
 
 ![The aerial map: the town from above, with numbered labels from Embryo Station by the railway, across the river to the civic halls, Vittoria Lake, the mushroom grove and the violet hill, and a list of destinations on the right](docs/images/livistone-map.jpg)
 

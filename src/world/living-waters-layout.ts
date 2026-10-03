@@ -1,5 +1,6 @@
 import { PATH_WIDTH } from './path-surface';
 import { enhancementClearing } from './enhancement-layout';
+import { TRAIL_HALF, trailDistance } from './mountain-layout';
 import * as THREE from 'three';
 export const GARDENS = { x: 0, z: -110, radius: 44, pavilionX: -10, pavilionZ: 0 };
 export const GARDEN_PANELS = { vittoria: [-16, -52], dewdrop: [-13, -1.5], mycelium: [70, -23] } as const;
@@ -42,6 +43,8 @@ const pathSamples = GARDEN_PATHS.map((path) => path.getPoints(120));
 export function rainPlantAllowed(x: number, z: number, radius: number): boolean {
   if (enhancementClearing(x + GARDENS.x, z + GARDENS.z, radius)) return false;
   if (Math.hypot(x - 75, z) < 5 + radius) return false;
+  // The Jepii Mici trail leaves the north path through the reeds (sub-plan 27).
+  if (trailDistance(x + GARDENS.x, z + GARDENS.z) < TRAIL_HALF + .5 + radius) return false;
   return pathSamples.every((points) => points.every((point) => Math.hypot(point.x - x, point.z - z) > PATH_WIDTH / 2 + .4 + radius));
 }
 

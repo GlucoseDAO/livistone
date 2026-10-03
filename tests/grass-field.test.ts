@@ -13,12 +13,15 @@ import { riverRockSites } from '../src/world/stone';
 import { CIVIC_LANDMARKS } from '../src/game/content';
 import { GLUCOSE_PAVILION } from '../src/world/glucose-layout';
 import { STATION } from '../src/world/station-layout';
+import { TOWN_BOUNDS } from '../src/world/town-layout';
 
 const rocks = riverRockSites(false), bake = bakeGrassField({ rocks });
 function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
+// Random points over the town's walking area, as before sub-plan 27 extended the bake north over the Jepii Mici climb and plateau.
+const town = { minZ: 2 * Math.floor(TOWN_BOUNDS.minZ / 2), depth: Math.ceil(TOWN_BOUNDS.maxZ / 2) - Math.floor(TOWN_BOUNDS.minZ / 2) + 1 };
 const points = (seed: number, count: number): [number, number][] => {
   const rand = random(seed);
-  return Array.from({ length: count }, () => [bake.minX + rand() * (bake.width - 1) * 2, bake.minZ + rand() * (bake.depth - 1) * 2]);
+  return Array.from({ length: count }, () => [bake.minX + rand() * (bake.width - 1) * 2, town.minZ + rand() * (town.depth - 1) * 2]);
 };
 /** Whether the vertex shader grows any blade rooted here (grass-field.ts: the clearance ramp starts at BLADE_CLEARANCE). */
 const blades = (x: number, z: number): boolean => (sampleGrassField(bake, x, z)?.clearance ?? -1) >= BLADE_CLEARANCE;

@@ -6,6 +6,7 @@ import { GARDENS, gardenHeight } from './living-waters-layout';
 import { RAILWAY, railwayCorridor } from './station-layout';
 import { futureClearing } from './elevated-layout';
 import { FAR_RANGES, farRangeHeight, ridgeErosion } from './far-ranges';
+import { mountainShape } from './mountain-layout';
 
 /** Dev-only `?ridges=classic`: the rounds 1–2 landscape, flat beyond about 400 m, with no distant ranges or far pass (sub-plan 26). */
 export type RidgesLook = 'ranges' | 'classic';
@@ -29,6 +30,11 @@ const ridges = [
   [-242, 103, 125, 69, .3, 71], [238, 106, 137, 73, -.18, 65],
 ];
 export function landscapeHeightOf(x: number, z: number, ranges: boolean): number {
+  // Sub-plan 27 shapes the north ridge (the trailhead's slope, the benched climb, the plateau, the peaks and their couloir) with the
+  // eroded ridges only, so the forest's seeded draws, which read the classic heights, stay put.
+  return ranges ? mountainShape(x, z, ridgeHeightOf(x, z, ranges)) : ridgeHeightOf(x, z, ranges);
+}
+function ridgeHeightOf(x: number, z: number, ranges: boolean): number {
   // Past the near box only the distant ranges stand; the river's carved channel ends there, inside the valley mist.
   if (ranges && Math.max(Math.abs(x), Math.abs(z + 20)) > FAR_RANGES.rise[0]) return farRangeHeight(x, z);
   if (Math.hypot(x - GARDENS.x, z - GARDENS.z) < 48) return gardenHeight(x - GARDENS.x, z - GARDENS.z);

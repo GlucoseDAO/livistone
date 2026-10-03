@@ -49,6 +49,9 @@ import type { Surfaces } from './surfaces';
 import { BUDGET_OFF } from '../game/render-budget';
 import { PROBE_SITES } from './probes';
 import type { ProbeScope } from './probes';
+import { MOUNTAIN } from './mountain-layout';
+import { createAlpinePlants, createTrailSigns, paintTrailSigns, trailBoulders } from './mountain-trail';
+import type { ContactSite } from './contact-shadows';
 
 /** Culling flags saved while Town.warmUp() draws everything. */
 const warmCulled = new WeakMap<THREE.Object3D, boolean>();
@@ -112,6 +115,9 @@ export class Town {
   private readonly dark = new THREE.MeshStandardMaterial({ color: '#3e5550', roughness: 0.25, metalness: 0.35 });
   private readonly sphere = new THREE.SphereGeometry(1, 16, 12);
   private rocks: RockSite[] = [];
+  /** Sub-plan 27: the Jepii Mici trail's boulders (in the river rocks' collider) and its sign posts' contact patches. */
+  private boulders: RockSite[] = [];
+  private trailContacts: ContactSite[] = [];
   /** Hall interiors and enclosed collections, whose meshes (never their lights, which WebGPU builds into shaders) hide beyond ROOM_RANGE. */
   private readonly rooms: { center: THREE.Vector3; parts: THREE.Object3D[]; shown: boolean | null }[] = [];
   private contactShadows!: ContactShadows;
@@ -393,11 +399,24 @@ export class Town {
     // The near grass field (gpu and mobile) replaces the meadow tufts close to the camera; map mode hides it with the details.
     // The ground's baked crown and wall occlusion (sub-plan 16), shared by the terrain and the grass standing on it.
     this.groundOcclusion = CONTACT_OFF ? undefined : groundShadeField(treeShadeDiscs(this.forest.sites), TOWN_SHADE_FOOTPRINTS);
-    const grass = createGrassField(this.tier, { rocks: this.rocks, stems: this.gardens.stems, height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
+    const trail = MOUNTAIN ? trailBoulders(this.mobile) : [];
+    this.boulders = trail.map(boulder => boulder.site); const rocks = [...this.rocks, ...this.boulders];
+    const grass = createGrassField(this.tier, { rocks, stems: this.gardens.stems, height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
     if (grass) { this.details.add(grass.mesh); this.grassShade = grass.ground; }
     this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter, this.tier, grass?.ground.radius ?? 0, this.wind);
     // One instanced draw of blended boulder variants; one collider mesh sampled from the same shapes and transforms.
-    this.root.add(createRiverRocks(this.rocks, rockMaterial(this.mobile), this.tier)); this.colliders.push(rockColliders(this.rocks));
+    // The trail's boulders keep their own draw, so the river rocks' bounds stay on the river; both share one collider.
+    const stone = rockMaterial(this.mobile); this.root.add(createRiverRocks(this.rocks, stone, this.tier)); this.colliders.push(rockColliders(rocks));
+    if (MOUNTAIN) {
+      // Matte grey limestone, darker than the pale river stone, which read as a bright lens on the sunlit slope.
+      const limestone = rockMaterial(this.mobile); limestone.color.set('#cdc9bf');
+      const boulders = createRiverRocks(this.boulders, limestone, this.tier); boulders.name = 'Trail boulders'; this.root.add(boulders);
+      // The Jepii Mici trailhead (sub-plan 27): every sign, post, rope and blaze is one mesh on one painted atlas; the cushions one draw.
+      const signs = createTrailSigns(this.colliders, trail, this.forest.sites, this.mobile); this.root.add(signs.mesh); paintTrailSigns(signs, this.tier);
+      this.researchPanels.push(signs.mesh); this.interactives.push({ id: 'jepii-mici', object: signs.mesh, position: signs.position });
+      // The plateau's rhododendron shrubs and moss campion: two merged draws, none on cpu.
+      const plants = createAlpinePlants(this.tier, rocks); this.root.add(...plants.meshes); this.trailContacts = [...signs.contacts, ...plants.contacts];
+    }
     // Shore pebbles live with the other near-ground details, so map mode hides them; cpu has none. Only nearby cells draw.
     this.pebbles = createPebbles(this.tier, this.rocks); if (this.pebbles) this.details.add(this.pebbles.mesh);
     for (const [x, z] of LAMP_POSTS) {
@@ -410,7 +429,7 @@ export class Town {
   /** One multiply-blended draw grounds trunks, rocks, feet, posts and benches; tree patches follow the forest's own cells. */
   private createContactShadows(): void {
     const trees = forestCells(this.forest.sites).map(cell => cell.sites.flatMap(({ p, index }) => treeContactSites(p, index)));
-    this.contactShadows = createContactShadows([...objectContactSites(), ...rockContactSites(this.rocks)], trees);
+    this.contactShadows = createContactShadows([...objectContactSites(), ...rockContactSites([...this.rocks, ...this.boulders]), ...this.trailContacts], trees);
     if (!CONTACT_OFF) this.root.add(this.contactShadows.mesh);
     this.forest.onCells = this.contactShadows.showGroups;
   }
