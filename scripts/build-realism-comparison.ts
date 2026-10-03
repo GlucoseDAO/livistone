@@ -47,13 +47,13 @@ table{border-collapse:collapse;width:100%;margin:0 0 22px;font-size:13px}th,td{b
 <h1>${title}</h1><p class="meta" id="meta"></p>
 <div class="bar">
 <label>Compare with <select id="variant"></select></label><label>Profile <select id="profile"></select></label><label>Time <select id="time"></select></label>
-<span><button id="mode-slider" class="on">Slider</button> <button id="mode-side">Side by side</button> <button id="mode-flip">Flip</button> <button id="mode-diff">Difference</button></span>
-<span class="meta" style="margin:0">Drag across an image to move the split. Fps is headless and informational only.</span>
+<span><button id="mode-side" class="on">Side by side</button> <button id="mode-slider">Slider</button> <button id="mode-flip">Flip</button> <button id="mode-diff">Difference</button></span>
+<span class="meta" style="margin:0">In Slider mode, drag across an image to move the split. Fps is headless and informational only.</span>
 </div>
 <table id="summary"></table><div class="grid" id="views"></div>
 </main><script>
 const BASE=${JSON.stringify(base)}, DATA=${JSON.stringify(data)};
-const $=id=>document.getElementById(id); let mode='slider';
+const $=id=>document.getElementById(id); let mode='side'; // The owner reviews side by side first; the slider, flip and difference modes stay one click away.
 const keys=v=>Object.keys(DATA[v]||{}); const fmt=n=>n==null?'—':n.toLocaleString('en');
 function delta(a,b){if(a==null||b==null)return'';const d=b-a,p=a?d/a*100:0;if(!d)return'<span>±0</span>';return '<span class="'+(d>0?'bad':'good')+'">'+(d>0?'+':'')+fmt(d)+' ('+(d>0?'+':'')+p.toFixed(1)+'%)</span>'}
 function options(sel,values){const cur=sel.value;sel.innerHTML=values.map(v=>'<option>'+v+'</option>').join('');if(values.includes(cur))sel.value=cur}
