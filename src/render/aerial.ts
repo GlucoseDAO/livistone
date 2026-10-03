@@ -52,7 +52,7 @@ export function aerialFog(distance: number, eye: number, y: number, p: Aerial): 
 // Render-group uniforms, as three's own fog: shared by every material, refreshed once per frame, never a shader rebuild.
 const scalar = (value: number) => uniform(value).setGroup(renderGroup), triple = () => uniform(new THREE.Vector3(1, 1, 1)).setGroup(renderGroup);
 const params = {
-  on: scalar(0), start: scalar(20), density: scalar(.0007), falloff: scalar(24), floor: scalar(.3), tint: triple(), fadeTint: triple(), fade: scalar(72), full: scalar(150),
+  on: scalar(0), start: scalar(20), density: scalar(.0007), falloff: scalar(24), floor: scalar(.3), tint: triple(), fadeTint: triple(), fade: scalar(62), full: scalar(130),
 };
 /** Per-channel fog factor of the current fragment; zero when aerial perspective is off. */
 export const aerialFactor = Fn(() => {

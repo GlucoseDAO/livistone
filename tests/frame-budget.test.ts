@@ -14,10 +14,10 @@ import { budgetGroups, measure, walkCamera } from '../scripts/frame-budget';
 // Sub-plan 25, measured in memory on the realism capture poses with the walk camera's 130 m far plane. The bounds are loose
 // ceilings over the reduced counts (3 October 2026, per gpu view: grove 1.11M → 25k triangles; lake 86 → 17 calls; glucose
 // 28 → 7; terrain 352k → 113k triangles; flowers 3.5 → 0.9 calls). Sub-plan 21's lighter haze ends at the tier's full-fog
-// distance (150 / 120 m), and crowns now draw until it: about 82k (gpu) and 26k (mobile) grove triangles per view.
+// distance (130 / 110 m), and crowns now draw until it: about 65k (gpu) and 22k (mobile) grove triangles per view.
 const BOUNDS = {
-  gpu: { lakeBuilt: 40, lakeView: 22, groveView: 95_000, glucoseBuilt: 18, terrainCalls: 14, terrainView: 160_000 },
-  mobile: { lakeBuilt: 40, lakeView: 22, groveView: 32_000, glucoseBuilt: 18, terrainCalls: 14, terrainView: 130_000 },
+  gpu: { lakeBuilt: 40, lakeView: 22, groveView: 75_000, glucoseBuilt: 18, terrainCalls: 14, terrainView: 160_000 },
+  mobile: { lakeBuilt: 40, lakeView: 22, groveView: 26_000, glucoseBuilt: 18, terrainCalls: 14, terrainView: 130_000 },
 } as const;
 
 describe('frame budget, renderer-independent geometry', () => {
@@ -114,7 +114,7 @@ describe('frame budget, renderer-independent geometry', () => {
     const grove = lake.perView['mycelium grove'];
     expect(grove.triangles).toBeLessThanOrEqual(bounds.groveView);
     // Drawn until full fog, the grove shows in more views (sub-plan 21), still at most six draws in any.
-    expect(grove.calls).toBeLessThanOrEqual(2.5); expect(grove.maxCalls).toBeLessThanOrEqual(6);
+    expect(grove.calls).toBeLessThanOrEqual(2); expect(grove.maxCalls).toBeLessThanOrEqual(6);
     expect(glucose.static['structure and posters'].calls).toBeLessThanOrEqual(bounds.glucoseBuilt);
     expect(hill.static['climb markers'].calls).toBeLessThanOrEqual(2);
     expect(terrain.perView['meadow and ridges'].calls).toBeLessThanOrEqual(bounds.terrainCalls);

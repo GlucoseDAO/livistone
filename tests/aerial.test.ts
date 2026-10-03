@@ -29,9 +29,10 @@ describe('aerial perspective', () => {
       for (const channel of aerialFog(p.start, 1.8, 0, p)) expect(channel).toBe(0);
       expect(Math.max(...aerialFog(40, 1.8, 0, p))).toBeLessThan(.02);
     }
-    // Linear light: 6% of sky over a dark tree already reads as about a fifth of the way to the sky.
-    expect(Math.max(...aerialFog(80, 1.8, 0, gpu))).toBeLessThan(.06);
-    expect(aerialFog(100, 1.8, 0, gpu)[1]).toBeLessThan(.2);
+    // Linear light: 5% of sky over a dark tree already reads as about a fifth of the way to the sky.
+    expect(Math.max(...aerialFog(70, 1.8, 0, gpu))).toBeLessThan(.05);
+    // Where the old fog (42–130 m, mixed after encoding) was half way, this haze is still under a sixth.
+    expect(aerialFog(86, 1.8, 0, gpu)[1]).toBeLessThan(.15);
   });
 
   it('thickens steadily with distance and is entire sky at the full-fog distance', () => {

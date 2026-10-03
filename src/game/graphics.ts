@@ -74,9 +74,10 @@ export function graphicsTier(input: { coarse: boolean; caveatFailed?: boolean; r
   if (input.caveatFailed || (input.renderer && softwareRenderer(input.renderer))) return 'cpu';
   return input.coarse || input.integrated || (input.renderer && modestRenderer(input.renderer)) ? 'mobile' : 'gpu';
 }
-// gpu and mobile fade into the sky by 150 and 120 m (render/aerial.ts); cpu keeps its 42–130 m linear fog.
+// gpu and mobile fade into the sky by 130 and 110 m (render/aerial.ts): 150 / 120 m cost about a fifth of the gpu frame rate in
+// headless tests (trees drawn until full fog). cpu keeps its 42–130 m linear fog.
 export function graphicsProfile(tier: GraphicsTier): GraphicsProfile {
   if (tier === 'cpu') return { tier, reduced: true, pixelRatio: .55, shadows: false, skyDay: 64, skyNight: 128, plants: 18, fog: 130, forest: 80, lights: 2 };
-  if (tier === 'mobile') return { tier, reduced: true, pixelRatio: 1, shadows: true, skyDay: 256, skyNight: 512, plants: 32, fog: 120, forest: 120, lights: 6 };
-  return { tier, reduced: false, pixelRatio: 1.5, shadows: true, skyDay: 512, skyNight: 1024, plants: 38, fog: 150, forest: 150, lights: 10 };
+  if (tier === 'mobile') return { tier, reduced: true, pixelRatio: 1, shadows: true, skyDay: 256, skyNight: 512, plants: 32, fog: 110, forest: 110, lights: 6 };
+  return { tier, reduced: false, pixelRatio: 1.5, shadows: true, skyDay: 512, skyNight: 1024, plants: 38, fog: 130, forest: 130, lights: 10 };
 }
