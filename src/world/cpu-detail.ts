@@ -28,8 +28,9 @@ export async function prepareCpuDetail(root: THREE.Object3D, reflection: THREE.C
     mesh.material = Array.isArray(mesh.material) ? mesh.material.map(convert) : convert(mesh.material);
     const source = mesh.geometry, count = source.index?.count ?? source.getAttribute('position')?.count ?? 0;
     const instances = mesh instanceof THREE.InstancedMesh ? mesh.count : 1; before += count / 3 * instances;
-    // The river sheet keeps every vertex: its baked bank-to-deep colour gradient lives in them.
-    if (count > 3600 && !Array.isArray(mesh.material) && mesh.name !== 'Textured meadow and soil' && mesh.name !== 'River water' && !mesh.name.includes('walking network') && !mesh.name.includes('kerb') && !mesh.name.includes('path borders')) {
+    // The river sheet keeps every vertex: its baked bank-to-deep colour gradient lives in them. Meshes whose vertices must stay
+    // exact, such as contact-shadow patches lying on the ground triangles, opt out with userData.keepGeometry.
+    if (count > 3600 && !Array.isArray(mesh.material) && !mesh.userData.keepGeometry && mesh.name !== 'Textured meadow and soil' && mesh.name !== 'River water' && !mesh.name.includes('walking network') && !mesh.name.includes('kerb') && !mesh.name.includes('path borders')) {
       let geometry = geometries.get(source);
       if (!geometry) {
         const position = source.getAttribute('position');

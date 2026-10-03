@@ -1,6 +1,6 @@
 # 14 — Shore, riverbed and rocks
 
-**Needs:** 03 and 04. **Tiers:** all, graded. **Branch:** `realism/14-shore`.
+**Needs:** 03, 04 and 20 Phase B for the shader steps. **Tiers:** all, graded. **Branch:** `realism/14-shore`.
 See [README](README.md) for the shared workflow.
 
 ## Steps
@@ -30,3 +30,7 @@ See [README](README.md) for the shared workflow.
 - Banks read as natural shores rather than grass meeting paint.
 - Rocks look rounded and mossy.
 - The lake matches the river's look.
+
+## On WebGPU (round 2)
+
+Rock geometry, pebble placement and their colliders are renderer-independent and may be developed during Stage A, but merge after it. The wet band, riverbed, caustics and moss mask are TSL additions to the ported ground, water and rock materials.

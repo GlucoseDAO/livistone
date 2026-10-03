@@ -32,3 +32,35 @@ export function groundCover(x: number, z: number): { soil: number; shade: number
   const freshness = Math.min(1, broad * .75 + bank * .25);
   return { soil: Math.min(.55, .025 + wear * (.16 + patches * .17) + bank * .27 + Math.max(0, .4 - broad) * .3), shade: .82 + broad * .22 + patches * .09, freshness };
 }
+
+/** Radial falloff shared by the contact-shadow decals and the baked ground shade: full inside 45% of the radius, where an object
+ *  usually covers it, then a smooth fade that reaches exactly 0 at the rim. The visible ring just outside a footprint stays strong. */
+export function contactFalloff(rho: number): number { const t = Math.min(1, Math.max(0, (rho - .45) / .55)); return 1 - t * t * (3 - 2 * t); }
+
+/** A trunk or crown darkens a disc of ground; strength is the darkening at its centre. */
+export interface ShadeDisc { x: number; z: number; radius: number; strength: number }
+/** A building footprint: full strength beneath it, fading to nothing `reach` metres outside its walls. Yaw follows Object3D.rotation.y. */
+export interface ShadeFootprint { x: number; z: number; rx: number; rz: number; yaw?: number; box?: boolean; reach: number; strength: number }
+/** The darkest baked ground shade; stacked crowns never read as black holes. */
+export const GROUND_SHADE_MIN = .42;
+
+/** Baked ambient ground occlusion, 1 under open sky. It is stored per terrain vertex (`groundShade`), and the ground material
+ *  reads it as ambient occlusion; binning the discs keeps the bake to a handful of distance tests per vertex. */
+export function groundShadeField(discs: readonly ShadeDisc[], footprints: readonly ShadeFootprint[] = []): (x: number, z: number) => number {
+  const grid = new Map<string, ShadeDisc[]>();
+  for (const disc of discs) for (let x = Math.floor((disc.x - disc.radius) / CELL); x <= Math.floor((disc.x + disc.radius) / CELL); x++)
+    for (let z = Math.floor((disc.z - disc.radius) / CELL); z <= Math.floor((disc.z + disc.radius) / CELL); z++) {
+      const key = `${x},${z}`, bucket = grid.get(key); if (bucket) bucket.push(disc); else grid.set(key, [disc]);
+    }
+  return (x, z) => {
+    let shade = 1;
+    for (const disc of grid.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`) ?? []) shade *= 1 - disc.strength * contactFalloff(Math.hypot(x - disc.x, z - disc.z) / disc.radius);
+    for (const f of footprints) {
+      const c = Math.cos(f.yaw ?? 0), s = Math.sin(f.yaw ?? 0), dx = x - f.x, dz = z - f.z, lx = dx * c - dz * s, lz = dx * s + dz * c;
+      // Outside distance to the wall line; the ellipse uses its normalised radius, close enough for a soft falloff.
+      const outside = f.box ? Math.hypot(Math.max(0, Math.abs(lx) - f.rx), Math.max(0, Math.abs(lz) - f.rz)) : Math.max(0, Math.hypot(lx / f.rx, lz / f.rz) - 1) * Math.min(f.rx, f.rz);
+      if (outside < f.reach) { const t = 1 - outside / f.reach; shade *= 1 - f.strength * t * t; }
+    }
+    return Math.max(GROUND_SHADE_MIN, shade);
+  };
+}

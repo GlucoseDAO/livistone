@@ -3,7 +3,7 @@ import { createPlaceSign, paintPlaceSign } from './place-sign';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
 import { createMaglevTrain, createTrainCabinGraphics } from './train';
-import { RAILWAY_LOCAL as RAILWAY, STATION_LOCAL as STATION } from './station-layout';
+import { RAILWAY_LOCAL as RAILWAY, STATION_BENCHES, STATION_LOCAL as STATION } from './station-layout';
 import { stationRingGeometry, stationRingAnchor } from './station-ring';
 import { stationAmberGeometry, stationAmberMaterial, stationAmberPoint, stationAmberSoffit } from './station-amber';
 
@@ -158,10 +158,10 @@ export function createStationStructure(root: THREE.Group, colliders: ColliderSpe
   createMaglevTrain(station, colliders, mobile);
 
   const benches: THREE.BufferGeometry[] = [];
-  for (const x of [-25, 5, 19]) {
-    benches.push(box(x, .64, -70.2, 3, .16, .65), box(x, 1.12, -70.48, 3, .65, .12));
-    for (const dx of [-1.05, 1.05]) trim.push(box(x + dx, .4, -70.2, .1, .48, .5));
-    colliders.push({ type: 'box', position: [x, .81, -70.3], size: [1.5, .65, .42] });
+  for (const [x, z] of STATION_BENCHES) {
+    benches.push(box(x, .64, z, 3, .16, .65), box(x, 1.12, z - .28, 3, .65, .12));
+    for (const dx of [-1.05, 1.05]) trim.push(box(x + dx, .4, z, .1, .48, .5));
+    colliders.push({ type: 'box', position: [x, .81, z - .1], size: [1.5, .65, .42] });
   }
   add(station, merge(benches), new THREE.MeshStandardMaterial({ color: '#ad8051', roughness: .74 }), 'Waiting benches');
   add(station, merge(trim), brass, 'Brass platform and train details');

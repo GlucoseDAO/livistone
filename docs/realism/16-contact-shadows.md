@@ -26,3 +26,24 @@ See [README](README.md) for the shared workflow.
 
 - Objects look seated on the ground on every tier, including software.
 - One to two extra draw calls at most.
+
+## Status (3 October 2026): built on the WebGPU branch, awaiting captures
+
+Branch `realism/16-contact`, rebased onto Stage A (`realism/20-webgpu`).
+
+- `src/world/contact-shadows.ts` puts every decal into one multiply-blended `MeshBasicNodeMaterial` batch, adding one draw call and one pipeline. The shared texture is a 64 px `DataTexture`. The batch covers crown and trunk patches per tree, bank rocks, lamp posts, poster and stand feet, place signs, plinths and station benches. Timeface posters hang on brackets over the core and get none.
+- The multiply scales linear light before the output pass. Its `KEEP_DISPLAY` MRT writes zero to the `display` attachment, which multiply blending leaves unchanged, so the ground keeps its fog factor and far decals fade into the haze.
+- Flat quads fit badly: across the real tree sites a 4 m disc deviates from the tangent plane by 0.31 m at the median and 1.28 m at p90. Terrain patches therefore reuse the rendered 2 m grid and diagonal. A test checks that every decal triangle is a terrain triangle. The polygon offset (−1, −4) holds against it on WebGPU.
+- Tree patches are grouped by `forestCells`, which the consolidated `Forest` also plans its cells from. They stay out of the index until `Forest.onCells` reports their cell's trunks; the index is rewritten only when that changes.
+- The batch hides in map mode: the map hides foliage, so the patches read as dotted blots around bare trunks.
+- Counts: gpu 905 trees, 420 rocks and 86 object sites make 2,316 patches (42k vertices, 50.7k triangles). The mobile and cpu tiers have 506 trees and 230 rocks, giving 1,328 patches (28.6k triangles). Only nearby cells draw, about +7–13k triangles in walking views. The build takes 20–40 ms.
+- `ground-cover.ts` `groundShadeField` bakes the `groundShade` terrain attribute from crowns, trunks and building footprints. Values run from 0.42 to 1, and 7% of vertices are below 1. The bake adds about 20–75 ms. The ground material reads it as its `aoNode`, so it dims indirect light only, on the standard (gpu, mobile) and Lambert (cpu) node materials alike; direct sun stays with the shadow maps.
+- Strengths were retuned on WebGPU: crowns 0.3 and trunks 0.7, because the baked shade now covers crown-scale sky occlusion and tree shade sits in the tone curve's toe. Rocks are 0.85; feet, posts and plinths are unchanged.
+- `cpu-detail.ts` skips meshes with `userData.keepGeometry`, which keeps the patches exact on the cpu tier.
+- Dev switch: `?contact=off` leaves out both the decals and the baked shade.
+
+Still to do: the before/after captures on the merged `main`.
+
+## On WebGPU (round 2)
+
+On the gpu tier, try r186's screen-space shadow node (`sss` in `three/addons/tsl/display/SSSNode.js`, blurred) inside Stage A's output pipeline for fine contact shadows under small objects. Decals and the baked ground shade stay the mobile and cpu path, and the decals' material is a plain node material with multiply blending.

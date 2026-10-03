@@ -1,5 +1,9 @@
 # Livistone: browser game implementation plan
 
+## Contact shadows (realism 16, WIP) — 3 October 2026
+
+One multiply-blended decal batch, a single extra draw call, grounds trees (a crown-wide patch and a trunk contact), bank rocks, lamp posts, poster and stand feet, place signs, plinths and station benches. Terrain patches lie on the rendered 2 m terrain triangles; tree patches hide with their forest cell, and the batch hides in the map. The gpu tier builds 2,316 patches (50.7k triangles), the mobile and cpu tiers 1,328 (28.6k); only nearby forest cells are drawn. The terrain also bakes a `groundShade` attribute under crowns, beside trunks and along building walls, which the ground material applies as ambient occlusion to indirect light only. Checked in headless Chrome on WebGPU (and earlier on the classic renderer); the WebGL 2 fallback, review captures and physical-device performance are still to come.
+
 ## River water shading — 3 October 2026
 
 Realism sub-plan 04 replaces the opaque green river with transparent water: the river sheet bakes downstream flow, channel distance, depth and rock proximity per vertex from the shared channel field. GPU and mobile water use flow-map ripples that follow every bend and turn smoothly into the river at both confluences, depth absorption over the visible bank, a soft shoreline, Fresnel sky reflection, sun glints and waterline foam; mobile samples one ripple scale. CPU water stays opaque with depth colour baked into vertex colours. Draw calls are unchanged; the CPU sheet keeps about 2,600 more triangles than before. Two dev-only looks (clear stream, deeper garden river) await the owner's choice, see [concepts/14-realism/04-river.md](../concepts/14-realism/04-river.md). Physical-device cost is unmeasured.

@@ -8,14 +8,18 @@ import { addGlow, nightEmission } from './night-lighting';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
 import { mitoringCage, nanotCage, ENERGY_HALL } from './jewelry';
-import { Forest } from './forest';
+import { Forest, forestCells } from './forest';
+import { forestSites } from './forest-layout';
+import { createContactShadows, objectContactSites, rockContactSite, TOWN_SHADE_FOOTPRINTS, treeContactSites, treeShadeDiscs } from './contact-shadows';
+import type { ContactShadows } from './contact-shadows';
+import { groundShadeField } from './ground-cover';
 import { createBridge, createGardenBridge } from './bridge';
 import { createGateway } from './gateway';
 import { createGatewayPoster } from './gateway-poster';
-import { gatewayApproachWidth, gatewayClearing } from './gateway-layout';
+import { gatewayApproachWidth } from './gateway-layout';
 import { createPlanting } from './planting';
 import type { Planting } from './planting';
-import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from './landscape';
+import { PATH_CURVES, PATH_WIDTH } from './landscape';
 import { pathKerbs } from './path-kerbs';
 import { GLUCOSE_PAVILION } from './glucose-layout';
 import { TIME_TOWER } from './waterways';
@@ -36,7 +40,7 @@ import { createStation } from './station';
 import { STATION } from './station-layout';
 import { LivingWaters } from './living-waters';
 import { terrainHeight, townTerrainGeometry } from './terrain';
-import { transformColliders } from './town-layout';
+import { LAMP_POSTS, transformColliders } from './town-layout';
 import { createRailwayStructure, loadRailwayTextures } from './railway';
 import { createGlucosePavilion } from './glucose-pavilion';
 
@@ -45,6 +49,8 @@ const warmCulled = new WeakMap<THREE.Object3D, boolean>();
 import type { Landmark } from '../game/content';
 
 export interface Interactive { id: string; object: THREE.Object3D; position: THREE.Vector3; }
+// Dev-only ?contact=off leaves out the contact-shadow decals and the baked ground shade, for sub-plan 16's before/after review.
+const CONTACT_OFF = import.meta.env.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).get('contact') === 'off';
 const UP = new THREE.Vector3(0, 1, 0);
 const TAU = Math.PI * 2;
 function seeded(seed: number): () => number {
@@ -107,6 +113,7 @@ export class Town {
   private readonly dark = new THREE.MeshStandardMaterial({ color: '#3e5550', roughness: 0.25, metalness: 0.35 });
   private readonly sphere = new THREE.SphereGeometry(1, 16, 12);
   private rocks: RockSite[] = [];
+  private contactShadows!: ContactShadows;
   private constructor(private mobile: boolean, private tier: GraphicsTier) { this.water = waterMaterial(tier); this.paving = pavingMaterial(mobile); }
   static async create(mobile: boolean, stage: (value: number, label: string) => Promise<void>, tier: GraphicsTier = mobile ? 'mobile' : 'gpu'): Promise<Town> {
     const town = new Town(mobile, tier); await town.build(stage); return town;
@@ -153,14 +160,14 @@ export class Town {
     const research = createGlucosePavilion(this.root, this.colliders, mobile, this.paving); this.researchPanels.push(...research.panels); this.interactives.push(...research.interactives);
     this.researchReady = Promise.all([research.ready, enhancementGallery.ready, gatewayPoster.ready]).then(() => undefined);
     await stage(62, 'Planting the woodland and mountain slopes…');
-    this.createTrees(); this.createGardens();
+    this.createTrees(); this.createGardens(); this.createContactShadows();
     for (const landmark of CIVIC_LANDMARKS) {
       const color = landmark.id === 'energy' ? '#ffbf66' : landmark.id === 'science' ? '#99ded7' : '#ffe0a3';
       addGlow(this.root, new THREE.Vector3(landmark.x, 6, landmark.z), color, 25, 90, 24, .3);
       for (const side of [-1, 1]) addGlow(this.root, new THREE.Vector3(landmark.x + side * 5, 2.5, landmark.z + 7), color, 8, 65, 15, .24);
     }
     for (const x of [-20, 0, 20]) addGlow(arrival, new THREE.Vector3(x, 4.3, -68), '#ffd28a', 12, 70, 17, .3);
-    this.mountains = new Mountains(mobile, this.tier); this.root.add(this.mountains);
+    this.mountains = new Mountains(mobile, this.tier, CONTACT_OFF ? undefined : groundShadeField(treeShadeDiscs(this.forest.sites), TOWN_SHADE_FOOTPRINTS)); this.root.add(this.mountains);
   }
   private createTerrain(): void {
     const geo = townTerrainGeometry();
@@ -335,27 +342,11 @@ export class Town {
     const light = new THREE.PointLight(id === 'energy' ? '#ffc56d' : '#fff2d5', this.mobile ? 7 : 12, 18, 1.8); light.position.set(0, 5.5, 0); group.add(light);
     const lantern = mesh(new THREE.TorusGeometry(2.7, 0.025, 6, 50), new THREE.MeshBasicMaterial({ color: '#f4dfad' }), group, 0, 6, 0); lantern.rotation.x = Math.PI / 2;
   }
-  private clearForTree(x: number, z: number): boolean {
-    if (gatewayClearing(x, z, 6)) return false;
-    if (!plantingAllowed(x, z, 6.9)) return false;
-    if (Math.abs(x) < 6 && z > -13 && z < 49) return false;
-    if (Math.abs(x - 17) < 6 && z > -45 && z < -19) return false;
-    // Frame the station-to-bridge arrival with full tree crowns outside the sightline.
-    if (Math.abs(x) < 8 && z > 39 && z < STATION.front + 2) return false;
-    if (CIVIC_LANDMARKS.some((l) => Math.hypot((x - l.x) / l.stretch.x, (z - l.z) / Math.max(1, l.stretch.z)) < 14)) return false;
-    return true;
-  }
   readonly forest = new Forest();
   async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
-    const rand = seeded(3974); const sites: THREE.Vector3[] = [];
-    for (let i = 0; i < (this.mobile ? 2600 : 5400); i++) {
-      const x = (rand() - 0.5) * 410, z = (rand() - 0.5) * 385 - 62;
-      const height = terrainHeight(x, z), slope = Math.hypot(terrainHeight(x + 2, z) - height, terrainHeight(x, z + 2) - height) / 2;
-      if (height > 47 + rand() * 13 || slope > .95 || Math.hypot(x / 218, (z + 60) / 210) > .82 + rand() * .18 || !this.clearForTree(x, z) || sites.some((p) => Math.hypot(p.x - x, p.z - z) < (this.mobile ? 6 : 4.8))) continue;
-      sites.push(new THREE.Vector3(x, terrainHeight(x, z), z));
-      this.colliders.push({ type: 'box', position: [x, terrainHeight(x, z) + 2, z], size: [0.3, 2, 0.3] });
-    }
+    const sites = forestSites(this.mobile);
+    for (const { x, y, z } of sites) this.colliders.push({ type: 'box', position: [x, y + 2, z], size: [0.3, 2, 0.3] });
     this.forest.sites = sites; this.root.add(this.forest);
   }
   private createGardens(): void {
@@ -369,12 +360,19 @@ export class Town {
       this.colliders.push({ type: 'box', position: [x, y, z], size: [s * 1.1, s * .65, s * .85] });
     }
     rocks.count = placed; rocks.castShadow = true; rocks.receiveShadow = true; rocks.computeBoundingSphere(); this.root.add(rocks);
-    for (const x of [-6.5, 6.5]) for (const z of [5, 13, 39]) {
+    for (const [x, z] of LAMP_POSTS) {
       const pole = mesh(new THREE.CylinderGeometry(0.045, 0.065, 2.8, 8), this.gold, this.root, x, 1.4, z);
       const globe = mesh(this.sphere, new THREE.MeshStandardMaterial({ color: '#f3e8c9', emissive: '#e4c881', emissiveIntensity: 0.35, roughness: 0.6 }), this.root, x, 2.8, z); globe.scale.setScalar(0.23); pole.castShadow = false;
       nightEmission(globe.material as THREE.MeshStandardMaterial, '#ffcf79', 3);
       addGlow(this.root, new THREE.Vector3(x, 2.8, z), '#ffcf79', 4.5, 36, 10, .7);
     }
+  }
+  /** One multiply-blended draw grounds trunks, rocks, feet, posts and benches; tree patches follow the forest's own cells. */
+  private createContactShadows(): void {
+    const trees = forestCells(this.forest.sites).map(cell => cell.sites.flatMap(({ p, index }) => treeContactSites(p, index)));
+    this.contactShadows = createContactShadows([...objectContactSites(), ...this.rocks.map(rockContactSite)], trees);
+    if (!CONTACT_OFF) this.root.add(this.contactShadows.mesh);
+    this.forest.onCells = this.contactShadows.showGroups;
   }
   /** Returns whether a shadow caster changed detail or visibility this frame. */
   update(time: number, camera?: THREE.Camera, fogFar = 220, mapView = false, shadow?: THREE.LightShadow): boolean {
@@ -387,7 +385,7 @@ export class Town {
     if (this.tier === 'cpu') this.details.visible = false;
     return trees;
   }
-  setMapMode(active: boolean): void { this.interiors.visible = !active; this.details.visible = !active; }
+  setMapMode(active: boolean): void { this.interiors.visible = !active; this.details.visible = !active; this.contactShadows.mesh.visible = !active; }
   /**
    * Before the first frame: every tree and plant instanced, and culling off, so the precompile and the first shadow pass build
    * each shader during loading; on WebGPU a shader first built while walking would stall that frame. Photographs, captions and
