@@ -5,12 +5,13 @@ export { landscapeHeight as mountainHeight } from './terrain';
 import { landscapeHeight } from './terrain';
 import { groundCover } from './ground-cover';
 import { groundLook, groundNodes, groundTextureFiles } from './ground-material';
+import type { GrassShade } from './ground-material';
 import { attribute } from 'three/tsl';
 import { shoreTextureFiles } from './shore-nodes';
 import type { GraphicsTier } from '../game/graphics';
 
-/** Baseline meadow vertex colour; the ground shader divides it back out of its palette. */
-const GRASS = new THREE.Color('#c5c5a4');
+/** Baseline meadow vertex colour; the ground shader divides it back out of its palette. FRESH is the young-growth tint. */
+export const GRASS = new THREE.Color('#c5c5a4'), FRESH = new THREE.Color('#a1b894');
 
 /** Subtract the rail clearance from the actual hillside triangles, including both far exits. */
 function cutRailwayOpening(source: THREE.BufferGeometry): THREE.BufferGeometry {
@@ -48,7 +49,7 @@ export function mountainGeometry(mobile: boolean, shade: (x: number, z: number) 
       const values: number[] = []; for (let value = start; value <= end; value += value >= nearStart && value < nearEnd ? 2 : Math.abs(value) > 520 ? 32 : mobile ? 8 : 4) values.push(value); return values;
     };
     const xs = axis(-1400, 1400, -240, 240), zs = axis(-1280, 1280, -270, 150);
-    const positions: number[] = [], colors: number[] = [], soils: number[] = [], shades: number[] = [], indices: number[] = [], color = new THREE.Color(), grass = GRASS, fresh = new THREE.Color('#a1b894'), stone = new THREE.Color('#a6a294');
+    const positions: number[] = [], colors: number[] = [], soils: number[] = [], shades: number[] = [], indices: number[] = [], color = new THREE.Color(), grass = GRASS, fresh = FRESH, stone = new THREE.Color('#a6a294');
     for (let j = 0; j < zs.length; j++) for (let i = 0; i < xs.length; i++) {
       const x = xs[i], z = zs[j], y = landscapeHeight(x, z);
       positions.push(x, y, z);
@@ -95,7 +96,8 @@ export function terrainTiles(source: THREE.BufferGeometry): THREE.BufferGeometry
 
 export class Mountains extends THREE.Group {
   readonly ready: Promise<void>;
-  constructor(mobile: boolean, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', shade?: (x: number, z: number) => number) {
+  /** `grass` is the near grass field's lookup, so the ground shades the soil between its blades. */
+  constructor(mobile: boolean, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', shade?: (x: number, z: number) => number, grass?: GrassShade) {
     super(); this.name = 'Continuous valley and mountain ridges';
     const geo = mountainGeometry(mobile, shade);
     // The cpu tier lights everything with Lambert (cpu-detail.ts) and keeps only the ground colour, so it starts there.
@@ -116,7 +118,7 @@ export class Mountains extends THREE.Group {
     const shore = Promise.all(shoreFiles.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))).catch(() => []);
     this.ready = Promise.all([Promise.all(files.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))), load('textures/mountains/rock-color.jpg', true), tier === 'gpu' ? load('textures/mountains/rock-normal.jpg', false) : Promise.resolve(null), shore]).then(([ground, rock, rockNormal, gravel]) => {
       const albedo = ground.filter((_, i) => files[i].includes('-albedo-')), nrh = tier === 'cpu' ? albedo : ground.filter((_, i) => files[i].includes('-nrh-'));
-      const nodes = groundNodes(tier, look, { albedo, nrh, rock, rockNormal, shore: gravel.length === 2 ? { albedo: gravel[0], nrh: gravel[1] } : null }, GRASS);
+      const nodes = groundNodes(tier, look, { albedo, nrh, rock, rockNormal, shore: gravel.length === 2 ? { albedo: gravel[0], nrh: gravel[1] } : null }, GRASS, grass);
       material.colorNode = nodes.colorNode; material.normalNode = nodes.normalNode;
       if (material instanceof THREE.MeshStandardNodeMaterial) material.roughnessNode = nodes.roughnessNode;
       material.needsUpdate = true;

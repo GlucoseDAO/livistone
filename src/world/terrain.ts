@@ -65,8 +65,16 @@ export function terrainSurfaceNormal(x: number, z: number): THREE.Vector3 {
   const sx = upper ? terrainHeight(x0 + 2, z0 + 2) - h01 : h10 - terrainHeight(x0, z0), sz = upper ? terrainHeight(x0 + 2, z0 + 2) - h10 : h01 - terrainHeight(x0, z0);
   return new THREE.Vector3(-sx / 2, 1, -sz / 2).normalize();
 }
+/** The walking terrain's vertex lattice; the rendered ground near the town shares its 2 m vertices (mountains.ts). */
+export const TERRAIN_GRID = { minX: -240, minZ: -270, columns: 241, rows: 211, step: 2 } as const;
 export function townTerrainGeometry(): THREE.BufferGeometry {
-  const geometry = new THREE.PlaneGeometry(480, 420, 240, 210).rotateX(-Math.PI / 2).translate(0, 0, -60), p = geometry.getAttribute('position');
+  const { minX, minZ, columns, rows, step } = TERRAIN_GRID, width = (columns - 1) * step, depth = (rows - 1) * step;
+  const geometry = new THREE.PlaneGeometry(width, depth, columns - 1, rows - 1).rotateX(-Math.PI / 2).translate(minX + width / 2, 0, minZ + depth / 2), p = geometry.getAttribute('position');
   for (let i = 0; i < p.count; i++) p.setY(i, terrainHeight(p.getX(i), p.getZ(i)));
   geometry.computeVertexNormals(); return geometry;
+}
+/** Reads terrainHeight back from a townTerrainGeometry position array at one of its vertices, without recomputing it. */
+export function terrainVertexHeight(positions: ArrayLike<number>, x: number, z: number): number {
+  const i = Math.round((x - TERRAIN_GRID.minX) / TERRAIN_GRID.step), j = Math.round((z - TERRAIN_GRID.minZ) / TERRAIN_GRID.step);
+  return i >= 0 && j >= 0 && i < TERRAIN_GRID.columns && j < TERRAIN_GRID.rows ? positions[(j * TERRAIN_GRID.columns + i) * 3 + 1] : terrainHeight(x, z);
 }

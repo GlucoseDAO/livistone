@@ -66,7 +66,7 @@ const valueNoise = Fn(([p]: [V2]) => {
 }).setLayout({ name: 'groundValueNoise', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
 
 /** Macro patches at 30–80 m: x lush, y dry (one signed moisture field, so they never cancel), z clover, w value. */
-const macroField = Fn(([xz]: [V2]) => {
+export const macroField = Fn(([xz]: [V2]) => {
   const turned = rotate(xz, .8, .6).toVar();
   const moisture = valueNoise(xz.div(58).add(3.7)).mul(.65).add(valueNoise(turned.div(24).sub(11.2)).mul(.35)).toVar();
   const clover = valueNoise(turned.div(34).add(vec2(-23, 9))).mul(.7).add(valueNoise(xz.div(13).add(2)).mul(.3));
@@ -171,6 +171,18 @@ function reorient(surface: V3, detail: V3): V3 {
   return normalize(vec3(r.x, r.z, r.y));
 }
 
+/** The look's meadow colour for macro patches; the near grass field (grass-field.ts) grows in the same palette. */
+export function meadowPalette(look: GroundLook, macro: Node<'vec4'>): V3 {
+  const L = LOOKS[look], palette = mix(v3(L.meadow), v3(L.lush), macro.x.mul(r4(L.lushMix))).toVar();
+  palette.assign(mix(palette, v3(L.dry), macro.y.mul(r4(L.dryMix))));
+  return mix(palette, v3(L.clover), macro.z.mul(r4(L.cloverMix)).mul(float(1).sub(macro.y))).mul(macro.w.sub(.5).mul(r4(L.value * 2)).add(1));
+}
+/** Average meadow albedo once tussocks are too small to resolve: the palette in the even light between tops and hollows. */
+export function meadowAverage(look: GroundLook, macro: Node<'vec4'>): V3 {
+  const L = LOOKS[look];
+  return meadowPalette(look, macro).mul(mix(v3(L.hollow), vec3(r4(1 + L.clumpValue * .6)), .5));
+}
+
 // What the colour stage leaves for the roughness and normal stages; each terrain shader declares its own copies.
 const GROUND = {
   roughness: property('float', 'groundRoughness'), detail: property('vec2', 'groundDetail'), relief: property('vec2', 'groundRelief'), rock: property('float', 'groundRock'),
@@ -178,12 +190,14 @@ const GROUND = {
 };
 
 export interface GroundMaps { albedo: THREE.Texture[]; nrh: THREE.Texture[]; rock: THREE.Texture; rockNormal: THREE.Texture | null; shore?: ShoreMaps | null }
+/** The near grass field's lookup (grass-field.ts): alpha is how fully grass grows on its 2 m grid; radius in metres. */
+export interface GrassShade { mask: THREE.Texture; minX: number; minZ: number; width: number; depth: number; radius: number }
 
 /**
  * Nodes for the vertex-coloured terrain: colour on every tier, roughness on gpu and mobile, detail normals on gpu. The cpu
  * tier uses the colour on a Lambert node material. Vertex colours still multiply the result, as they did the GLSL patch.
  */
-export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMaps, grassVertexColour: THREE.Color): { colorNode: V3; roughnessNode: F | null; normalNode: V3 | null } {
+export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMaps, grassVertexColour: THREE.Color, grass?: GrassShade): { colorNode: V3; roughnessNode: F | null; normalNode: V3 | null } {
   const L = LOOKS[look], [meadowAlbedo, sparseAlbedo, soilAlbedo] = maps.albedo, [meadowNrh, sparseNrh, soilNrh] = maps.nrh;
   const colorNode = Fn(() => {
     const n = normalize(normalLocal).toVar(), xz = positionLocal.xz.toVar(), dx = dFdx(xz).toVar(), dy = dFdy(xz).toVar();
@@ -207,9 +221,7 @@ export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMa
     If(max(layerW.x, layerW.y).sub(soilW).lessThan(.73), () => { assignLayer(soilL, groundLayer(tier, soilAlbedo, soilNrh, xz, dx, dy, [2.1, 9, 4.2], far, luma(MEAN.soil), r4(ROUGH.soil))); });
     // Grass stands on the tussocks; worn soil and sparse grass collect in the hollows between them.
     const blendW = heightWeights(layerW, vec3(meadowL.height.add(clump.sub(.5).mul(.5)), sparseL.height, soilL.height.add(float(.5).sub(clump).mul(.3))), .18).toVar();
-    const palette = mix(v3(L.meadow), v3(L.lush), macro.x.mul(r4(L.lushMix))).toVar();
-    palette.assign(mix(palette, v3(L.dry), macro.y.mul(r4(L.dryMix))));
-    palette.assign(mix(palette, v3(L.clover), macro.z.mul(r4(L.cloverMix)).mul(float(1).sub(macro.y))).mul(macro.w.sub(.5).mul(r4(L.value * 2)).add(1)));
+    const palette = meadowPalette(look, macro).toVar();
     const ground = tint(meadowL.albedo, MEAN.meadow, palette, r4(L.hue), r4(L.contrast)).mul(blendW.x)
       .add(tint(sparseL.albedo, MEAN.sparse, v3(L.sparse).mul(macro.w.sub(.5).mul(.2).add(1)), .85, 1.15).mul(blendW.y))
       .add(soilL.albedo.mul(r4(L.soil)).mul(blendW.z)).toVar();
@@ -221,6 +233,15 @@ export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMa
     const height = dot(blendW, vec3(meadowL.height, sparseL.height, soilL.height)).toVar();
     // Damp hollows in worn soil and lush patches are a little glossier.
     GROUND.roughness.assign(mix(dot(blendW, vec3(meadowL.rough, sparseL.rough, soilL.rough)), 1, r4(L.roughFloor)).sub(soilW.mul(float(1).sub(soilL.height)).mul(blendW.z).mul(.25)).sub(macro.x.mul(.05)));
+    if (grass) {
+      // Under the near grass field the soil between blades lies in the canopy's shade; it fades with the blades. An explicit
+      // level keeps the lookup legal inside the branch.
+      const near = float(1).sub(smoothstep(r4(grass.radius * .35), r4(grass.radius * .9), positionView.length())).toVar();
+      If(near.greaterThan(0), () => {
+        const uv = xz.sub(vec2(grass.minX, grass.minZ)).div(2).add(.5).div(vec2(grass.width, grass.depth));
+        ground.mulAssign(float(1).sub(texture(grass.mask, uv).level(float(0)).a.mul(near).mul(.32)));
+      });
+    }
     const weights = pow(abs(n), vec3(4)).toVar(); weights.divAssign(max(dot(weights, vec3(1)), .001)); GROUND.weights.assign(weights);
     const exposed = clamp(smoothstep(.18, .65, float(1).sub(abs(n.y))).add(smoothstep(58, 105, positionLocal.y).mul(.5)), 0, 1).toVar();
     GROUND.rock.assign(0);

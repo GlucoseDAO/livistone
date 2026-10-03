@@ -6,6 +6,7 @@ import './style.css';
 import * as THREE from 'three';
 import { RAILWAY, railwayCorridor } from './world/station-layout';
 import { TOWN_BOUNDS } from './world/town-layout';
+import { terrainHeight } from './world/terrain';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createSky, HORIZON_HAZE, HORIZON_RADIANCE, MOON_DIR, SKY_EXPOSURE, SUN_DIR } from './world/sky';
 import type { SkyPhase } from './world/sky';
@@ -85,6 +86,9 @@ class Game {
   private readonly drawGroups = new WeakMap<THREE.Object3D, string>();
   // Dev-only ?capture=1: frozen animation time and render scale so before/after screenshots match.
   private readonly capture = import.meta.env.DEV && new URLSearchParams(location.search).has('capture');
+  // Dev-only ?eye=<metres>: camera height above the ground under the player, for low ground captures (realism 13). Measured
+  // from the terrain too, because a capture teleport can leave the capsule partly sunk into a meadow roll.
+  private readonly eye = ((value: number) => import.meta.env.DEV && Number.isFinite(value) ? value : null)(parseFloat(new URLSearchParams(location.search).get('eye') ?? ''));
   private frames = 0;
   private cpuGeometry = { before: 0, after: 0 };
   private readonly reduced: boolean;
@@ -199,7 +203,7 @@ class Game {
     await loadingStage(92, 'Preparing your first view…');
     this.frameShadow(true);
     this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true, this.sun.shadow);
-    this.walkCamera.position.set(SPAWN.x, SPAWN.y + .78, SPAWN.z); this.walkCamera.rotation.set(0, SPAWN.yaw, 0, 'YXZ');
+    this.walkCamera.position.set(SPAWN.x, this.eyeHeight(SPAWN), SPAWN.z); this.walkCamera.rotation.set(0, SPAWN.yaw, 0, 'YXZ');
     // Build every shader now, culled or not, and the shadow pass with one rendered frame: on WebGPU each shader costs a
     // synchronous node build, which would otherwise stall the first frames that show a new object.
     this.town.warmUp(true);
@@ -211,6 +215,8 @@ class Game {
     this.ui.ready(); this.returnMode = 'walking'; this.setMode('walking'); this.updateWalking(0); this.findInteraction(); this.findLocation(); this.render(this.walkCamera);
   }
   private get phase(): SkyPhase { return this.night ? 'night' : 'day'; }
+  /** The walking eye stands .78 m above the capsule's centre, which is .82 m above its feet. */
+  private eyeHeight(p: { x: number; y: number; z: number }): number { return this.eye === null ? p.y + .78 : Math.max(p.y - .82, terrainHeight(p.x, p.z)) + this.eye; }
   private render(camera: THREE.Camera): void { this.view.beginFrame(); this.output.render(camera); }
   /** The output pass fogs every surface toward the displayed horizon after tone mapping, as the classic renderer did. */
   private setFog(range: { near: number; far: number }): void {
@@ -438,7 +444,7 @@ class Game {
     if (pos.y < -.5 || ((pos.x < b.minX || pos.x > b.maxX || pos.z < b.minZ || pos.z > b.maxZ) && !railwayCorridor(pos.x, pos.z))) { this.physics.teleport(SPAWN); this.input.yaw = SPAWN.yaw; this.ui.toast('Back on the station garden path.'); }
     this.ambience.setGarden(pos.z < -60);
 
-    const current = this.physics.position(); this.walkCamera.position.set(current.x, current.y + 0.78, current.z); this.walkCamera.rotation.set(this.input.pitch, this.input.yaw, 0, 'YXZ');
+    const current = this.physics.position(); this.walkCamera.position.set(current.x, this.eyeHeight(current), current.z); this.walkCamera.rotation.set(this.input.pitch, this.input.yaw, 0, 'YXZ');
     this.updateClock += dt;
     if (this.updateClock > 0.12) { this.updateClock = 0; this.findInteraction(); this.findLocation(); this.cursorDirty = true; }
   }

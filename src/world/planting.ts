@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { attribute, mix, vec3 } from 'three/tsl';
+import { attribute, cameraPosition, distance, float, mix, positionLocal, smoothstep, vec3 } from 'three/tsl';
 import type { GraphicsTier } from '../game/graphics';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { terrainNoise } from './terrain';
@@ -167,7 +167,19 @@ export class Planting {
   }
 }
 
-export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: boolean, height: (x: number, z: number) => number, river: (x: number) => number, tier: GraphicsTier = mobile ? 'mobile' : 'gpu'): Planting {
+/**
+ * Meadow tufts for towns with a near grass field (grass-field.ts): inside its radius the field's blades replace them, so they
+ * sink into the ground as the camera comes near, over the band where the field's outer blades thin out.
+ */
+function tuftMaterial(radius: number): THREE.MeshStandardNodeMaterial {
+  const material = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: .94, side: THREE.DoubleSide });
+  // 1 - smoothstep(a, b) rather than reversed edges, which WGSL leaves undefined.
+  material.positionNode = positionLocal.sub(vec3(0, float(1).sub(smoothstep(radius * .6, radius * .95, distance(positionLocal.xz, cameraPosition.xz))).mul(.8), 0));
+  return material;
+}
+
+/** `grassRadius` is the near grass field's radius, or 0 where the tier draws none. */
+export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: boolean, height: (x: number, z: number) => number, river: (x: number) => number, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', grassRadius = 0): Planting {
   const result: PlantKind[] = [];
   const rand = random(58), shrubs: Site[][] = [[], [], []], grass: Site[] = [];
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .94, side: THREE.DoubleSide });
@@ -219,6 +231,6 @@ export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: 
     if (!plantingAllowed(x, z, .55 * scale) || Math.abs(z - river(x)) < 7.4) continue;
     grass.push({ x, y: height(x, z) + .012, z, scale, angle: rand() * TAU });
   }
-  result.push(kind(details, 'Meadow grass', grass, grassGeometry(mobile), material, false));
+  result.push(kind(details, 'Meadow grass', grass, grassGeometry(mobile), grassRadius > 0 ? tuftMaterial(grassRadius) : material, false));
   return new Planting(result);
 }

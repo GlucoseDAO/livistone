@@ -43,9 +43,19 @@ export function rainPlantAllowed(x: number, z: number, radius: number): boolean 
   return pathSamples.every((points) => points.every((point) => Math.hypot(point.x - x, point.z - z) > PATH_WIDTH / 2 + .4 + radius));
 }
 
+const panelSites = Object.values(GARDEN_PANELS);
+/** The district's panels, lake disc and mycelium grove, without its paths (the grass field measures those separately). */
+export function gardenFootprint(x: number, z: number, radius: number): boolean {
+  x -= GARDENS.x; z -= GARDENS.z;
+  return panelSites.some(([px, pz]) => Math.hypot(px - x, pz - z) < 2.4 + radius) || Math.hypot(x, z) < 47 + radius || (x > 51 - radius && x < 104 + radius && z > -35 - radius && z < 32 + radius);
+}
+/** Paths keep this much clear ground beyond their centreline, plus the plant's own radius. */
+export const GARDEN_PATH_CLEARANCE = PATH_WIDTH / 2 + .4;
+export function gardenPathNear(x: number, z: number, radius: number): boolean {
+  x -= GARDENS.x; z -= GARDENS.z;
+  return pathSamples.some(points => points.some(p => Math.hypot(p.x - x, p.z - z) < GARDEN_PATH_CLEARANCE + radius));
+}
 /** Living Waters is a district in the town, with shared ground and full-footprint planting reservations. */
 export function gardenClearing(x: number, z: number, radius: number): boolean {
-  x -= GARDENS.x; z -= GARDENS.z;
-  return Object.values(GARDEN_PANELS).some(([px, pz]) => Math.hypot(px - x, pz - z) < 2.4 + radius) || Math.hypot(x, z) < 47 + radius || (x > 51 - radius && x < 104 + radius && z > -35 - radius && z < 32 + radius)
-    || pathSamples.some(points => points.some(p => Math.hypot(p.x - x, p.z - z) < PATH_WIDTH / 2 + .4 + radius));
+  return gardenFootprint(x, z, radius) || gardenPathNear(x, z, radius);
 }

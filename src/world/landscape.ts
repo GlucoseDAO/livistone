@@ -6,7 +6,7 @@ import { GARDEN_BRIDGES, TIME_TOWER, waterDistance } from './waterways';
 import { stationClearing } from './station-layout';
 import { gatewayClearing } from './gateway-layout';
 import { glucoseClearing } from './glucose-layout';
-import { gardenClearing } from './living-waters-layout';
+import { gardenFootprint, gardenPathNear } from './living-waters-layout';
 import { futureClearing } from './elevated-layout';
 
 
@@ -44,23 +44,34 @@ function nearRoute(x: number, z: number, reach: number): boolean {
   for (let i = ci - k; i <= ci + k; i++) for (let j = cj - k; j <= cj + k; j++) for (const p of pathBins.get(pathKey(i, j)) ?? []) if (Math.hypot(p.x - x, p.z - z) < reach) return true;
   return false;
 }
+/** Routes keep this much clear ground beyond their centreline, plus the plant's own radius. */
+export const PATH_CLEARANCE = PATH_WIDTH / 2 + .3;
+/** Water keeps this much clear bank, plus the plant's own radius. */
+export const WATER_CLEARANCE = .35;
 
 /** Reserve the whole plant footprint, not just its stem, along the rendered routes. */
 export function plantingAllowed(x: number, z: number, radius: number): boolean {
-  return waterDistance(x, z) >= radius + .35 && layoutAllows(x, z, radius);
+  return waterDistance(x, z) >= radius + WATER_CLEARANCE && layoutAllows(x, z, radius);
 }
 /** Every authored clearance except the water itself: routes, bridges, the tower and the civic, station, gateway and garden grounds. In-stream rocks and shore pebbles bring their own water band. */
 export function layoutAllows(x: number, z: number, radius: number): boolean {
-  if (introductionClearing(x, z, radius)) return false;
-  if (futureClearing(x, z, radius) || enhancementClearing(x, z, radius)) return false;
-  if (Math.hypot(x - TIME_TOWER.x, z - TIME_TOWER.z) < TIME_TOWER.radius + radius) return false;
-  if (GARDEN_BRIDGES.some((b) => Math.abs(z - b.z) < 2 + radius && Math.abs(x - b.x) < 10 + radius)) return false;
-  if (gardenClearing(x, z, radius) || stationClearing(x, z, radius) || gatewayClearing(x, z, radius) || glucoseClearing(x, z, radius)) return false;
-  if (Math.abs(x) < 3.25 + radius && z > 11 - radius && z < 44 + radius) return false;
+  return !footprintReserved(x, z, radius) && !gardenPathNear(x, z, radius) && !nearRoute(x, z, PATH_CLEARANCE + radius);
+}
+/**
+ * Every authored footprint except the water and the walking routes: buildings, station, gateway, displays and the gardens'
+ * lake and grove. Cheap to test, unlike the path scans; the grass field (grass-field.ts) measures those separately.
+ */
+export function footprintReserved(x: number, z: number, radius: number): boolean {
+  if (introductionClearing(x, z, radius)) return true;
+  if (futureClearing(x, z, radius) || enhancementClearing(x, z, radius)) return true;
+  if (Math.hypot(x - TIME_TOWER.x, z - TIME_TOWER.z) < TIME_TOWER.radius + radius) return true;
+  if (GARDEN_BRIDGES.some((b) => Math.abs(z - b.z) < 2 + radius && Math.abs(x - b.x) < 10 + radius)) return true;
+  if (gardenFootprint(x, z, radius) || stationClearing(x, z, radius) || gatewayClearing(x, z, radius) || glucoseClearing(x, z, radius)) return true;
+  if (Math.abs(x) < 3.25 + radius && z > 11 - radius && z < 44 + radius) return true;
   for (const l of CIVIC_LANDMARKS) {
     const sx = 1 + (l.stretch.x - 1) * .85, sz = 1 + (l.stretch.z - 1) * .85;
-    if (Math.hypot((x - l.x) / sx, (z - l.z) / sz) < 10.8 + radius / Math.min(sx, sz)) return false;
-    if (Math.abs(x - l.x) < 3.3 + radius && z > l.z && z < l.z + 20 + radius) return false;
+    if (Math.hypot((x - l.x) / sx, (z - l.z) / sz) < 10.8 + radius / Math.min(sx, sz)) return true;
+    if (Math.abs(x - l.x) < 3.3 + radius && z > l.z && z < l.z + 20 + radius) return true;
   }
-  return !nearRoute(x, z, PATH_WIDTH / 2 + .3 + radius);
+  return false;
 }

@@ -18,6 +18,9 @@ import { createGateway } from './gateway';
 import { createGatewayPoster } from './gateway-poster';
 import { gatewayApproachWidth } from './gateway-layout';
 import { createPlanting } from './planting';
+import { createGrassField } from './grass-field';
+import type { GrassShade } from './ground-material';
+import { updateWind } from './wind';
 import type { Planting } from './planting';
 import { PATH_CURVES, PATH_WIDTH } from './landscape';
 import { pathKerbs } from './path-kerbs';
@@ -43,7 +46,7 @@ import { CIVIC_LANDMARKS } from '../game/content';
 import { createStation } from './station';
 import { STATION } from './station-layout';
 import { LivingWaters } from './living-waters';
-import { terrainHeight, townTerrainGeometry } from './terrain';
+import { terrainHeight, terrainVertexHeight, townTerrainGeometry } from './terrain';
 import { LAMP_POSTS, transformColliders } from './town-layout';
 import { createRailwayStructure, loadRailwayTextures } from './railway';
 import { createGlucosePavilion } from './glucose-pavilion';
@@ -129,6 +132,10 @@ export class Town {
   private readonly surfaces: Surfaces | null;
   private readonly masonry: THREE.Material;
   private readonly brass: THREE.Material;
+  /** The walking terrain's vertices (terrain.ts TERRAIN_GRID): the grass field reads its heights instead of recomputing them. */
+  private terrainVertices = new Float32Array(0);
+  private grassShade?: GrassShade;
+  private groundOcclusion?: (x: number, z: number) => number;
   private constructor(private mobile: boolean, private tier: GraphicsTier) {
     this.water = waterMaterial(tier); this.paving = pavingMaterial(mobile);
     this.surfaces = activateSurfaces(tier); this.masonry = this.surfaces?.masonry ?? this.white; this.brass = this.surfaces?.gold ?? this.gold;
@@ -198,11 +205,11 @@ export class Town {
       for (const side of [-1, 1]) addGlow(this.root, new THREE.Vector3(landmark.x + side * 5, 2.5, landmark.z + 7), color, 8, 65, 15, .24);
     }
     for (const x of [-20, 0, 20]) addGlow(arrival, new THREE.Vector3(x, 4.3, -68), '#ffd28a', 12, 70, 17, .3);
-    this.mountains = new Mountains(mobile, this.tier, CONTACT_OFF ? undefined : groundShadeField(treeShadeDiscs(this.forest.sites), TOWN_SHADE_FOOTPRINTS)); this.root.add(this.mountains);
+    this.mountains = new Mountains(mobile, this.tier, this.groundOcclusion, this.grassShade); this.root.add(this.mountains);
   }
   private createTerrain(): void {
-    const geo = townTerrainGeometry();
-    this.colliders.push({ type: 'mesh', vertices: new Float32Array(geo.getAttribute('position').array), indices: new Uint32Array(geo.index!.array) }); geo.dispose();
+    const geo = townTerrainGeometry(); this.terrainVertices = new Float32Array(geo.getAttribute('position').array);
+    this.colliders.push({ type: 'mesh', vertices: this.terrainVertices, indices: new Uint32Array(geo.index!.array) }); geo.dispose();
     // One clipped sheet carries flow, depth and rock proximity; CPU bakes its absorption colour instead of blending.
     this.rocks = riverRockSites(this.mobile);
     const cpu = this.tier === 'cpu', water = mesh(waterSurfaceGeometry(this.rocks, cpu ? cpuWaterColour() : undefined, cpu ? 2 : 1), this.water, this.root);
@@ -394,7 +401,12 @@ export class Town {
     this.forest.sites = sites; this.forest.name = 'Forest'; this.root.add(this.forest);
   }
   private createGardens(): void {
-    this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter, this.tier);
+    // The near grass field (gpu and mobile) replaces the meadow tufts close to the camera; map mode hides it with the details.
+    // The ground's baked crown and wall occlusion (sub-plan 16), shared by the terrain and the grass standing on it.
+    this.groundOcclusion = CONTACT_OFF ? undefined : groundShadeField(treeShadeDiscs(this.forest.sites), TOWN_SHADE_FOOTPRINTS);
+    const grass = createGrassField(this.tier, { rocks: this.rocks, height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
+    if (grass) { this.details.add(grass.mesh); this.grassShade = grass.ground; }
+    this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter, this.tier, grass?.ground.radius ?? 0);
     // One instanced draw of blended boulder variants; one collider mesh sampled from the same shapes and transforms.
     this.root.add(createRiverRocks(this.rocks, rockMaterial(this.mobile), this.tier)); this.colliders.push(rockColliders(this.rocks));
     // Shore pebbles live with the other near-ground details, so map mode hides them; cpu has none. Only nearby cells draw.
@@ -415,7 +427,7 @@ export class Town {
   }
   /** Returns whether a shadow caster changed detail or visibility this frame. */
   update(time: number, camera?: THREE.Camera, fogFar = 220, mapView = false, shadow?: THREE.LightShadow): boolean {
-    this.water.userData.time.value = time; shoreTime.value = time;
+    this.water.userData.time.value = time; shoreTime.value = time; updateWind(time);
     if (!camera) return false;
     const profile = graphicsProfile(this.tier);
     const range = mapView ? fogFar : Math.min(fogFar, profile.forest), trees = this.forest.update(camera, range, mapView, shadow);

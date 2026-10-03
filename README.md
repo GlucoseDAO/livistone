@@ -106,4 +106,6 @@ Mitoring's Ministry of Energy uses cloudy honey-coloured amber and rounded cast-
 
 Open grass areas have broad rolling contours, reaching roughly 1–2.5 metres where space allows, with a subdued spring-green palette. `meadow-relief.ts` bakes a clearance distance field once and tapers the contours around paths, buildings and other authored clearances, including a 2.5-metre interpolation margin. The existing terrain mesh and Rapier surface share these heights; plants follow the same field. Contours add no triangles or draw calls.
 
+Around the player, the GPU and mobile profiles grow a meadow of individual grass blades (22 m and 12 m across; none on the CPU profile) that stays off paths, water and buildings, sways gently in the wind and holds still when the system asks for reduced motion. It costs one draw call. Development builds accept `?grass=off` to compare without it.
+
 Players arrive outside the town-facing train door at Embryo Station, with a Livistone Station sign ahead. Space (or the touch Jump button) jumps; players can clear gallery rails and fall back to the ground without damage. The main navigation includes a labeled Mute sound / Enable sound button.

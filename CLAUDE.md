@@ -88,6 +88,8 @@ src/
     station-layout.ts Shared station, tunnel, railway planting and walking clearance
     railway.ts       Textured rail geometry, Dark Nut portals, lined bores and matching colliders
     planting.ts      Spatially batched leafy shrubs, blossoms, blade grass, distance cull
+    grass-field.ts   Near-player grass: one instanced draw of world-anchored blade patches over a baked 2 m lookup
+    wind.ts          Shared wind clock (game time, still under reduced motion) and plant sway
     bridge.ts        Solid arch bridge, deck, rails, and matching colliders
     gateway.ts       King's Chapel entrance arch, faceted tourmaline, raised lettering and colliders
     gateway-materials.ts Procedural silver, limestone and colour-zoned gem materials
@@ -144,6 +146,15 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   tuft radius, including flowers; keep civic doorway approaches and the bridge clear.
   Shrubs and grass are spatially instanced, with reduced mobile density. Bridge rail
   colliders follow the deck height; update their physics tests when changing the span.
+- **The near grass field shares the planting clearance.** `grass-field.ts` bakes, on the terrain's 2 m vertices, the rendered
+  height and a signed clearance equal to `plantingAllowed` at every point (`footprintReserved`, binned path samples, water);
+  blades start 0.25 m beyond it, on the terrain mesh's own triangles. New reserved ground belongs in `footprintReserved` or the
+  path and water clearances, never in `plantingAllowed` alone; `tests/grass-field.test.ts` checks the agreement. The field is
+  one draw (gpu 52k blades to 22 m, mobile 12k to 12 m, none on cpu), lives in the details group so map mode hides it, shades
+  the ground between its blades, takes the terrain's baked crown and wall occlusion (`groundShadeField`) as its own aoNode,
+  and sinks `planting.ts` tufts inside its radius. Animate plants only through `wind.ts`
+  (`windTime`: the game's elapsed time, frozen by `?capture=1`, still under reduced motion), never TSL's `time`. Dev switches:
+  `?grass=off`, and `?eye=<metres>` for low captures.
 - **The bridge gateway follows the approved King's Chapel ring concept.** Keep its paired
   inward-facing silver tips, fan-spoked bezel, long green tourmaline and raised LIVISTONE
   letters above the stone. `gateway-layout.ts` reserves the side abutments and paved approach;

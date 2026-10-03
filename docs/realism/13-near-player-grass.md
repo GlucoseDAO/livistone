@@ -3,6 +3,18 @@
 **Needs:** 03 and 20 Phase B (TSL). **Tiers:** gpu and mobile; cpu has none. **Branch:** `realism/13-grass`.
 See [README](README.md) for the shared workflow.
 
+## Status (3 October 2026)
+
+Built on `realism/13-grass`, on top of 20 Phase B; the before/after captures wait for Stage A to reach `main`.
+
+- **Field.** `src/world/grass-field.ts` draws one `InstancedBufferGeometry` of blade patches in three nested levels (1×, 2×, 4× cell size). gpu: 22 × 22 cells per level from 0.5 m, 36 blades each, radius 22 m, 52,272 blades. mobile: 16 × 16 from 0.375 m, 16 blades, radius 12 m, 12,288 blades. Each cell wraps to its copy nearest the camera, so every level re-centres on its own snapped world grid and blades never swim; a level thins out blade by blade before its tile edge.
+- **Bake** (about 35–70 ms at load, 0.6 MB of textures). On the terrain's own 2 m vertices: the rendered height (read back from the walking collider), a signed clearance that equals `plantingAllowed` at every point (`footprintReserved`, binned path samples, water), a density from soil wear and slope, and the ground's baked occlusion, in RGBA32F read with `textureLoad`; the ground's vertex tint and a grass amount in RGBA8. Blades stand on the same triangles the terrain tiles draw.
+- **Shader.** Blades stand on the terrain mesh's own triangles, start 0.25 m beyond reserved ground (paths, kerbs, water, halls, station, large rocks), thin over worn soil, banks and steep slopes, take the ground's macro palette and vertex tint and 16's baked crown and wall occlusion (as their aoNode), run dark-rooted to dry tips, and fade by distance into the meadow's average colour. Wind comes from the shared `src/world/wind.ts` clock (game time, frozen by `?capture=1`, still under reduced motion).
+- **Ground.** The soil between blades takes the canopy's shade from the bake's grass amount, fading with the field.
+- **Tufts.** Inside the field radius the sparse `planting.ts` tufts sank into the ground: next to real blades they read as sticks. Flowers, shrubs and the tuft islands beyond the radius stay.
+- **Switches.** `?grass=off` drops the field (and the ground shade); `?eye=<metres>` sets the camera height above the ground for low captures.
+- **Cost.** One draw call; gpu 261,360 triangles (366k vertices), mobile 36,864 (61k vertices), cpu none. Rocks under about 40 cm are below the 2 m grid, so a few short bank blades can still meet them.
+
 ## Why
 
 Close up, the ground is only a texture. A dense, continuous lawn of real blades near the camera hides the texture where it is most visible, while the 03 material handles mid and far range.
