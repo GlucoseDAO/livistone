@@ -18,5 +18,9 @@ export function isNightNow(date = new Date()): boolean {
 export type TimeOfDay = 'auto' | 'day' | 'night';
 export function parseTimeOfDay(value: unknown): TimeOfDay { return value === 'day' || value === 'night' ? value : 'auto'; }
 export function resolveNight(mode: TimeOfDay, date = new Date()): boolean { return mode === 'auto' ? isNightNow(date) : mode === 'night'; }
+/** The top-bar button's cycle: your time (the visitor's clock) → day → night → your time. */
+export function nextTimeOfDay(mode: TimeOfDay): TimeOfDay { return mode === 'auto' ? 'day' : mode === 'day' ? 'night' : 'auto'; }
+/** The button's name: the chosen mode and, for your time, what the clock gives now. */
+export function timeOfDayLabel(mode: TimeOfDay, night: boolean): string { return 'Time of day: ' + (mode === 'auto' ? `your time (${night ? 'night' : 'day'} now)` : mode); }
 export function readTimeOfDay(): TimeOfDay { try { return parseTimeOfDay(localStorage.getItem('livistone-time-of-day')); } catch { return 'auto'; } }
 export function saveTimeOfDay(mode: TimeOfDay): void { try { localStorage.setItem('livistone-time-of-day', mode); } catch { /* Lighting still works when storage is blocked. */ } }

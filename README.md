@@ -67,6 +67,7 @@ On the bridge approach, an introduction poster on the right tells how Livia went
 | Fold or expand the nearby description | Line / square icon on the place card | Line / square icon on the place card |
 | Fold or expand control hints | Line / square icon on the hint strip | Touch controls stay visible |
 | Toggle sound | Speaker button or menu | Speaker button or menu |
+| Your time, day or night | T or the clock / sun / moon button | Clock / sun / moon button |
 | Switch map / walking | M or the top-bar view button | The top-bar view button |
 | Move / zoom the map | Drag / scroll | Drag / pinch |
 | Menu | Escape or ☰ | ☰ |
@@ -75,7 +76,7 @@ Jump to clear gallery rails, wade across the river, and climb the copper ramp in
 
 ### Make yourself comfortable
 
-- **Day or night:** choose Auto, Day or Night in the menu. Day and Night work independently of the current time.
+- **Day or night:** the clock, sun and moon button in the top bar (or **T**) switches between your time, day and night; the menu offers the same choice. Your time follows your device's clock, day and night ignore it, and the choice is remembered on this device. A switch can take a moment, longest the first time, while the town prepares the new light; the button pulses until it is done.
 - **Music:** on by default. If your browser blocks autoplay, it starts after your first click, tap or keypress. Use the speaker button or **Livistone Radio** in the menu whenever you prefer silence.
 - **About the music:** these are informal phone recordings of Livia Zaharia playing kalimba, not professional studio recordings. The six included clips were reviewed and approved by Livia.
 - **Performance:** select **Gentle** visual detail if movement is slow. Initial loading can take longer on a phone or a slower connection. The game picks one of three graphics profiles automatically (GPU, mobile/integrated graphics, or CPU software rendering) and shows it in the menu. Resolution then adapts to the frame rate: the GPU profile aims for 50 FPS and the mobile profile for 28. Software rendering on the CPU still runs at only 2–4 FPS, so it is not yet playable.

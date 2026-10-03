@@ -24,7 +24,7 @@ import { Ambience } from './game/audio';
 import { LANDMARKS, DISCOVERIES, SPAWN, readProgress, writeProgress } from './game/content';
 import { graphicsProfile } from './game/graphics';
 import type { PostMode } from './game/graphics';
-import { parseTimeOfDay, readTimeOfDay, resolveNight, saveTimeOfDay } from './game/daylight';
+import { nextTimeOfDay, parseTimeOfDay, readTimeOfDay, resolveNight, saveTimeOfDay } from './game/daylight';
 import type { TimeOfDay } from './game/daylight';
 import { NightLighting } from './world/night-lighting';
 import { FOREST_DETAIL, SHADOW_LAYER } from './world/forest';
@@ -90,6 +90,8 @@ class Game {
   /** Stands at each probe while it bakes, so the night lamp pool lights that building. */
   private readonly probeEye = new THREE.PerspectiveCamera();
   private timeOfDay: TimeOfDay = readTimeOfDay();
+  /** A phase switch is under way (followTimeOfDay); it follows any later choice before it settles. */
+  private switching = false;
   private clockCheck = 0;
   // Past the walking fog's full distance (GraphicsProfile.fog) a surface is only sky, so the walk camera stops there and follows
   // the fog if it lengthens (sub-plans 25 and 21); ?budget=off keeps the earlier 150 m for review. Set once the tier is known.
@@ -204,7 +206,7 @@ class Game {
     document.addEventListener('pointerup', (e) => { if (this.hoverPointer && e.pointerType === 'mouse') { this.hoverPointer.buttons = e.buttons; this.cursorDirty = true; } });
     ui.setLookHint('Hold left mouse to look');
     ui.progress(this.progress); ui.setMode('welcome');
-    document.querySelector<HTMLSelectElement>('#time-of-day')!.value = this.timeOfDay;
+    ui.setTimeOfDay(this.timeOfDay, this.night);
     document.querySelector<HTMLSelectElement>('#quality')!.value = this.reduced ? 'low' : 'high';
     window.addEventListener('resize', () => this.resize());
     document.addEventListener('visibilitychange', () => {
@@ -352,6 +354,13 @@ class Game {
       if (this.mode === 'walking' || this.mode === 'map') this.returnMode = this.mode;
       this.loreFromJournal = false; this.setMode(next); return;
     }
+    if (action.startsWith('time-of-day:')) {
+      const value = action.split(':')[1], next = value === 'next';
+      this.timeOfDay = next ? nextTimeOfDay(this.timeOfDay) : parseTimeOfDay(value); saveTimeOfDay(this.timeOfDay);
+      // The menu's select switches within its change event, as it always has; the button and T paint their pending state first.
+      if (!next) this.applyTimeOfDay();
+      void this.followTimeOfDay(); return;
+    }
     if (action.startsWith('exhibit-key:') && this.mode === 'walking') {
       const p = this.physics.position(), landmark = LANDMARKS.find((l) => Math.hypot((p.x - l.x) / l.stretch.x, (p.z - l.z) / l.stretch.z) < 6.7);
       if (landmark) await this.exhibitionAction(`exhibit:${action.split(':')[1]}:${landmark.id}`); return;
@@ -391,8 +400,7 @@ class Game {
       this.input.requestJump();
     } else if (action === 'sound') {
       try { this.ui.setSound(await this.ambience.toggle()); } catch { this.ui.toast('Sound is unavailable in this browser.'); }
-    } else if (action.startsWith('time-of-day:')) { this.timeOfDay = parseTimeOfDay(action.split(':')[1]); saveTimeOfDay(this.timeOfDay); this.applyTimeOfDay(); }
-    else if (action.startsWith('quality:')) this.quality(action.split(':')[1] === 'low');
+    } else if (action.startsWith('quality:')) this.quality(action.split(':')[1] === 'low');
   }
   private visitLandmark(id: string): void {
     const landmark = LANDMARKS.find(place => place.id === id); if (!landmark || this.mode !== 'map') return;
@@ -452,6 +460,34 @@ class Game {
   private position(): { x: number; y: number; z: number } | undefined { return this.physics?.position(); }
   private resetMap(): void {
     this.mapCamera.position.set(160, 224, 192); this.orbit.target.set(0, 1, -53); this.orbit.update();
+  }
+  /**
+   * Brings the scene to the chosen time of day and shows the choice on the top-bar button and the menu's select. A switch holds
+   * the main thread and the GPU for seconds (the first one per phase bakes its sky and reflection probes), so the button shows
+   * it as pending: that state is painted before the switch blocks the main thread, and clears once a frame of the new phase has
+   * finished on the GPU, i.e. when it can be on screen.
+   */
+  private async followTimeOfDay(): Promise<void> {
+    if (this.switching) return;
+    this.switching = true;
+    try {
+      while (resolveNight(this.timeOfDay) !== this.night) {
+        this.ui.setTimeOfDay(this.timeOfDay, resolveNight(this.timeOfDay), true);
+        await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve)));
+        this.applyTimeOfDay(); await this.presented();
+      }
+    } finally { this.switching = false; this.ui.setTimeOfDay(this.timeOfDay, this.night); }
+  }
+  /** Resolves once a frame rendered after the call has finished on the GPU. */
+  private async presented(): Promise<void> {
+    const frame = this.frames; while (this.frames === frame) await new Promise(resolve => requestAnimationFrame(resolve));
+    const backend = this.renderer.backend as { device?: { queue: { onSubmittedWorkDone(): Promise<void> } }; gl?: WebGL2RenderingContext };
+    if (backend.device) { await backend.device.queue.onSubmittedWorkDone(); return; }
+    const gl = backend.gl; if (!gl) return;
+    const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); if (!sync) return;
+    // WebGL 2 updates a fence's status only between tasks, so it is polled rather than waited on.
+    gl.flush(); while (gl.getSyncParameter(sync, gl.SYNC_STATUS) !== gl.SIGNALED && !gl.isContextLost()) await new Promise(resolve => setTimeout(resolve, 16));
+    gl.deleteSync(sync);
   }
   private applyTimeOfDay(): void {
     const night = resolveNight(this.timeOfDay); if (night === this.night) return; this.night = night;
@@ -627,7 +663,7 @@ class Game {
     // Walking re-bakes when near shrubs or tree detail change, so their shadows appear with them; the map keeps its one bake.
     if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : this.graphics.fog, this.mapView, this.graphics.shadows ? this.sun.shadow : undefined) && !this.mapView && this.graphics.shadows) this.sun.shadow.needsUpdate = true;
     this.updateExhibitionControls();
-    this.clockCheck += rawDt; if (this.clockCheck > 30) { this.clockCheck = 0; if (this.timeOfDay === 'auto') this.applyTimeOfDay(); }
+    this.clockCheck += rawDt; if (this.clockCheck > 30) { this.clockCheck = 0; if (this.timeOfDay === 'auto') void this.followTimeOfDay(); }
     this.nightLighting.update(camera); this.render(camera);
     if (this.cursorDirty) { this.cursorDirty = false; this.updateCursor(); }
     this.frames++; this.fpsFrames++; this.fpsTime += rawDt;

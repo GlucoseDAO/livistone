@@ -17,12 +17,14 @@ export class Input {
     this.knob = joystick.querySelector<HTMLElement>('.stick-knob')!;
     window.addEventListener('keydown', (e) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return;
-      // Focused controls keep native Space/Enter activation and arrow-key behavior.
-      if (e.target instanceof Element && e.target.closest('button, a, [contenteditable="true"]') && !['KeyM', 'Escape'].includes(e.code)) return;
+      // Focused controls keep native Space/Enter activation and arrow-key behavior; M, T and Escape mean nothing to them.
+      if (e.target instanceof Element && e.target.closest('button, a, [contenteditable="true"]') && !['KeyM', 'KeyT', 'Escape'].includes(e.code)) return;
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code) && this.active) e.preventDefault();
       if (this.active) this.keys.add(e.code);
       if (!e.repeat && e.code === 'Space' && this.active) this.requestJump();
       if (!e.repeat && e.code === 'KeyM') this.onAction('map');
+      // Your time → day → night, from any panel; browser shortcuts such as Ctrl+T stay the browser's.
+      if (!e.repeat && e.code === 'KeyT' && !e.ctrlKey && !e.metaKey && !e.altKey) this.onAction('time-of-day:next');
       const exhibitKey = ({ Digit1: 'info', Digit2: 'browse', Digit3: 'photo', Digit4: 'lore', BracketLeft: 'left', BracketRight: 'right' } as Record<string, string>)[e.code];
       if (!e.repeat && this.active && exhibitKey) this.onAction('exhibit-key:' + exhibitKey);
       if (!e.repeat && e.code === 'KeyE' && this.active) this.onAction('interact');

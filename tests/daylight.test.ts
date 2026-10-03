@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nightFromDate, parseTimeOfDay, resolveNight } from '../src/game/daylight';
+import { nextTimeOfDay, nightFromDate, parseTimeOfDay, resolveNight, timeOfDayLabel } from '../src/game/daylight';
 import { DISCOVERIES } from '../src/game/content';
 import { RESEARCH_POSTERS } from '../src/game/research';
 
@@ -9,6 +9,11 @@ describe('local night and exhibition sources', () => {
     expect(resolveNight('night', new Date(2026, 8, 23, 12))).toBe(true);
     expect(resolveNight('auto', new Date(2026, 8, 23, 12))).toBe(false);
     expect(parseTimeOfDay('broken')).toBe('auto'); expect(parseTimeOfDay(null)).toBe('auto');
+  });
+  it('cycles the top-bar button through your time, day and night and names what your time gives now', () => {
+    expect(nextTimeOfDay('auto')).toBe('day'); expect(nextTimeOfDay('day')).toBe('night'); expect(nextTimeOfDay('night')).toBe('auto');
+    expect(timeOfDayLabel('auto', true)).toBe('Time of day: your time (night now)'); expect(timeOfDayLabel('auto', false)).toBe('Time of day: your time (day now)');
+    expect(timeOfDayLabel('day', true)).toBe('Time of day: day'); expect(timeOfDayLabel('night', false)).toBe('Time of day: night');
   });
   it('treats midsummer noon as day and winter midnight as night', () => {
     expect(nightFromDate(new Date(2026, 5, 21, 12, 0, 0))).toBe(false);

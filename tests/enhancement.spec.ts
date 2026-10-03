@@ -24,7 +24,7 @@ for(const mobile of [false,true])test(`hill participation and optional radio (${
   await sound.click();await expect(sound).toHaveAttribute('aria-pressed','true');
   await page.evaluate(()=>{const audio=(window as any).__radio as HTMLAudioElement;audio.currentTime=audio.duration-.2;});
   await expect.poll(()=>page.evaluate(()=>(window as any).__radio?.currentSrc),{timeout:15000}).toContain('kalimba-02.m4a');
-  await page.getByLabel('Time of day').selectOption('night');await page.getByRole('button',{name:'Continue exploring',exact:true}).click();
+  await page.getByRole('combobox',{name:'Time of day'}).selectOption('night');await page.getByRole('button',{name:'Continue exploring',exact:true}).click();
   await page.screenshot({path:`output/testing/extension/enhancement-${mobile?'touch':'desktop'}.png`});expect(errors).toEqual([]);
  }finally{await context.close();}
 });
