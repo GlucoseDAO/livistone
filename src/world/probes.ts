@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { mix, pmremTexture, texture, uniform } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import type { SkyPhase } from './sky';
+import { untoneMapped } from '../render/output';
 
 export type ProbeKind = 'exterior' | 'interior';
 /** Just past the walking full-fog distance (GraphicsProfile.fog, 130 m on gpu, 110 on mobile): beyond it a surface is all sky. */
@@ -137,9 +138,11 @@ export class ReflectionProbes {
     const old = this.baked.get(phase); old?.forEach(target => target.dispose());
     const results = new Map<string, THREE.RenderTarget>();
     const layout = source?.target ?? new THREE.RenderTarget(1, 1, { type: THREE.HalfFloatType }), own = !source;
-    // One face target, cube and copy per probe size; the walking fog, which the output pass mixes in after tone mapping, is
-    // mixed into the copy toward the horizon's radiance: unfogged, the distant ridges' bare rock tinted every silver they
-    // reached brown. The display attachment's green is each surface's fog factor.
+    // One face target, cube and copy per probe size. The town fogs itself (the walking aerial haze, render/aerial.ts, seen from
+    // the probe); the fog the output pass mixes in after tone mapping (the ranges' valley mist, the sky below the horizon; the
+    // display attachment's green) is mixed into the copy toward the horizon's radiance. Display pixels (red) hold colours as
+    // shown, outside tone mapping: the copy turns them back into the radiance the output pass shows as that colour, so a
+    // reflected cream panel keeps its brightness under the final tone mapping.
     const targets = new Map<number, { face: THREE.RenderTarget; cube: THREE.CubeRenderTarget; quad: THREE.QuadMesh }>();
     const sized = (size: number) => {
       let target = targets.get(size); if (target) return target;
@@ -147,7 +150,8 @@ export class ReflectionProbes {
       // MRT outputs find their attachment by texture name ('output', 'display').
       layout.textures.forEach((texture, i) => { face.textures[i].type = texture.type; face.textures[i].format = texture.format; face.textures[i].name = texture.name; });
       const display = face.textures.find(texture => texture.name === 'display'), copy = new THREE.MeshBasicNodeMaterial({ fog: false, depthTest: false, depthWrite: false });
-      copy.colorNode = display ? mix(texture(face.textures[0]).rgb, uniform(haze), texture(display).g) : texture(face.textures[0]);
+      const colour = texture(face.textures[0]).rgb as unknown as Node<'vec3'>, shown = texture(display ?? face.textures[0]);
+      copy.colorNode = display ? mix(mix(colour, untoneMapped(colour), shown.r), uniform(haze), shown.g) : colour;
       target = { face, cube: new THREE.CubeRenderTarget(size, { type: THREE.HalfFloatType, generateMipmaps: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }), quad: new THREE.QuadMesh(copy) };
       targets.set(size, target); return target;
     };

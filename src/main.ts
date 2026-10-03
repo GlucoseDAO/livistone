@@ -476,6 +476,8 @@ class Game {
       const shadow = this.graphics.shadows ? this.sun.shadow : undefined;
       // Loading already baked the map's shadow box; a later switch re-frames it over the whole town for the bake.
       const reframe = !!shadow && !this.mapView; if (reframe) this.frameShadow(true, true);
+      // A switch made from the map's menu would otherwise bake empty halls: the map hides interiors and contact shadows.
+      const map = this.mapView && this.mode !== 'welcome'; if (map) this.town.setMapMode(false);
       this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true, shadow); this.setFog(true);
       // The output pipeline's scene target and MRT (render/output.ts), so the bake reuses every compiled shader.
       const { target, targets } = this.output as unknown as { target?: THREE.RenderTarget; targets?: Parameters<THREE.WebGPURenderer['setMRT']>[0] };
@@ -483,7 +485,7 @@ class Game {
       this.probeTimes[phase] = probes.bake(this.renderer, this.scene, target ? { target, mrt: targets ?? null } : null, phase, sky, [this.town.details], HORIZON_RADIANCE[phase], position => { this.probeEye.position.copy(position); this.nightLighting.update(this.probeEye); this.town.surround(position); }, this.ranges ? { scene: this.distant, far: FAR_VIEW } : null);
       const device = (this.renderer.backend as { device?: { queue: { onSubmittedWorkDone(): Promise<void> } } }).device;
       if (import.meta.env.DEV && device) void device.queue.onSubmittedWorkDone().then(() => { this.probeTimes[phase + 'Gpu'] = Math.round(performance.now() - start); });
-      if (reframe) this.frameShadow(true); this.setFog();
+      if (reframe) this.frameShadow(true); if (map) this.town.setMapMode(true); this.setFog();
     }
     probes.show(this.phase, sky.environment); probes.setFill(this.light.environment);
   }

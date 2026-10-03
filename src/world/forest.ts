@@ -222,12 +222,13 @@ export class Forest extends THREE.Group {
   }
   /**
    * A reflection probe (probes.ts) looks every way at once: each cell takes the detail its distance from `origin` gives,
-   * unculled. The next update() restores the view's own cells.
+   * unculled and whole (a cell straddling `reach` keeps its outer trees, which the haze turns to sky). The next update()
+   * restores the view's own cells.
    */
-  surround(origin: THREE.Vector3, fogFar: number): void {
+  surround(origin: THREE.Vector3, reach: number): void {
     for (const cell of this.cells) {
-      const lod = forestLod(origin.distanceTo(cell.center), fogFar);
-      cell.state = lod === 'hidden' ? HIDDEN : lod === 'full' ? FULL : REDUCED; cell.seen = cell.state !== HIDDEN;
+      const lod = forestLod(origin.distanceTo(cell.center), origin.distanceTo(cell.sphere.center) - cell.sphere.radius, reach);
+      cell.state = lod === 'hidden' ? HIDDEN : lod === 'full' ? FULL : REDUCED; cell.seen = cell.state !== HIDDEN; cell.partial = false;
     }
     for (let species = 0; species < this.matrices.length; species++) this.refill(species);
   }
