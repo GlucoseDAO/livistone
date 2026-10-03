@@ -63,6 +63,36 @@ export function mountainGeometry(mobile: boolean, shade: (x: number, z: number) 
     return cutRailwayOpening(geo);
 }
 
+// Tile edges: a 3 × 3 town core of about 160 × 140 m inside the two-metre grid, then one ring to 520 m and one beyond.
+const TILE_X = [-1400, -520, -240, -80, 80, 240, 520, 1400], TILE_Z = [-1280, -520, -270, -130, 10, 150, 520, 1280];
+/** Tile of each (column, row) of those edges: the near ring keeps the town's columns and rows, the outer ring has eight sides. */
+const TILE_OF = Array.from({ length: 49 }, (_, n) => {
+  const i = n % 7, j = Math.floor(n / 7), ring = Math.min(i, j, 6 - i, 6 - j), side = (k: number): string => k < 1 + ring ? 'a' : k > 5 - ring ? 'b' : String(k);
+  return ring >= 2 ? `town ${i}${j}` : ring === 1 ? `near ${side(i)}${side(j)}` : `far ${i ? i < 6 ? 'c' : 'b' : 'a'}${j ? j < 6 ? 'c' : 'b' : 'a'}`;
+});
+/**
+ * The ground split into tiles by triangle centre: nine town tiles, sixteen around them out to 520 m and eight beyond. Each is
+ * culled on its own, so a walking view draws a few tiles near the player instead of every ridge out to 1.4 km.
+ */
+export function terrainTiles(source: THREE.BufferGeometry): THREE.BufferGeometry[] {
+  if (source.index) source = source.toNonIndexed();
+  const band = (edges: number[], value: number): number => { let i = 0; while (i < edges.length - 2 && value >= edges[i + 1]) i++; return i; };
+  const p = source.getAttribute('position').array as Float32Array, triangles = p.length / 9, tileOf = new Uint8Array(triangles), keys: string[] = [], counts: number[] = [];
+  for (let t = 0; t < triangles; t++) {
+    const v = t * 9, key = TILE_OF[band(TILE_Z, (p[v + 2] + p[v + 5] + p[v + 8]) / 3) * 7 + band(TILE_X, (p[v] + p[v + 3] + p[v + 6]) / 3)];
+    let id = keys.indexOf(key); if (id < 0) { id = keys.push(key) - 1; counts.push(0); }
+    tileOf[t] = id; counts[id]++;
+  }
+  const tiles = keys.map((key) => { const tile = new THREE.BufferGeometry(); tile.name = 'Terrain tile ' + key; return tile; });
+  for (const [name, attribute] of Object.entries(source.attributes)) {
+    const from = attribute.array as Float32Array, stride = attribute.itemSize * 3, targets = counts.map((count) => new Float32Array(count * stride)), offsets = counts.map(() => 0);
+    for (let t = 0; t < triangles; t++) { const id = tileOf[t], target = targets[id], base = t * stride; let o = offsets[id]; for (let k = 0; k < stride; k++) target[o++] = from[base + k]; offsets[id] = o; }
+    tiles.forEach((tile, id) => tile.setAttribute(name, new THREE.BufferAttribute(targets[id], attribute.itemSize)));
+  }
+  for (const tile of tiles) tile.computeBoundingSphere();
+  return tiles;
+}
+
 export class Mountains extends THREE.Group {
   readonly ready: Promise<void>;
   constructor(mobile: boolean, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', shade?: (x: number, z: number) => number) {
@@ -73,7 +103,9 @@ export class Mountains extends THREE.Group {
     // Baked crown, trunk and wall occlusion dims only indirect light (sky, hemisphere, environment), on Lambert and standard alike:
     // direct sun stays with the shadow maps, and the cpu tier, which has none, keeps its sunlit meadow.
     material.aoNode = attribute<'float'>('groundShade', 'float');
-    const landscape = new THREE.Mesh(geo, material); landscape.name = 'Textured meadow and soil'; landscape.receiveShadow = true; this.add(landscape);
+    // One material for every tile; cpu-detail.ts keeps each tile's vertices by this name.
+    for (const tile of terrainTiles(geo)) { const landscape = new THREE.Mesh(tile, material); landscape.name = 'Textured meadow and soil'; landscape.receiveShadow = true; this.add(landscape); }
+    geo.dispose();
     const loader = new THREE.TextureLoader(), base = import.meta.env.BASE_URL, look = groundLook();
     const load = (file: string, colour: boolean): Promise<THREE.Texture> => loader.loadAsync(base + file).then((texture) => {
       if (colour) texture.colorSpace = THREE.SRGBColorSpace;

@@ -49,9 +49,12 @@ import { createRailwayStructure, loadRailwayTextures } from './railway';
 import { createGlucosePavilion } from './glucose-pavilion';
 import { activateSurfaces, bakeMasonry } from './surfaces';
 import type { Surfaces } from './surfaces';
+import { BUDGET_OFF } from '../game/render-budget';
 
 /** Culling flags saved while Town.warmUp() draws everything. */
 const warmCulled = new WeakMap<THREE.Object3D, boolean>();
+/** Within this many metres of its centre an enclosed collection draws; farther, glazing and haze leave its posters faint specks. */
+export const ROOM_RANGE = 50;
 import type { Landmark } from '../game/content';
 
 export interface Interactive { id: string; object: THREE.Object3D; position: THREE.Vector3; }
@@ -118,6 +121,8 @@ export class Town {
   private readonly dark = new THREE.MeshStandardMaterial({ color: '#3e5550', roughness: 0.25, metalness: 0.35 });
   private readonly sphere = new THREE.SphereGeometry(1, 16, 12);
   private rocks: RockSite[] = [];
+  /** Hall interiors and enclosed collections, whose meshes (never their lights, which WebGPU builds into shaders) hide beyond ROOM_RANGE. */
+  private readonly rooms: { center: THREE.Vector3; parts: THREE.Object3D[]; shown: boolean | null }[] = [];
   private contactShadows!: ContactShadows;
   private pebbles: ShorePebbles | null = null;
   /** Sub-plan 24's mapped ashlar, terrazzo and brass; null with ?surfaces=off, which keeps the flat white and gold below. */
@@ -134,13 +139,19 @@ export class Town {
   private async build(stage: (value: number, label: string) => Promise<void>): Promise<void> {
     const mobile = this.mobile;
     await stage(20, 'Shaping the river, bridge and town entrance…');
-    this.root.name = 'Livistone'; this.root.add(this.interiors, this.details);
-    this.createTerrain(); this.createPaths(); createBridge(this.root, this.colliders, this.masonry, this.paving, this.brass);
-    createGateway(this.root, this.colliders, mobile, this.paving);
+    this.root.name = 'Livistone'; this.interiors.name = 'Hall interiors'; this.details.name = 'Meadow grass details'; this.root.add(this.interiors, this.details);
+    // Dev budget breakdown (snapshot().budget): each producer names its unnamed top-level objects.
+    let mark = this.root.children.length;
+    const label = (name: string): void => { for (const child of this.root.children.slice(mark)) if (!child.name) child.name = name; mark = this.root.children.length; };
+    this.createTerrain(); this.createPaths(); label('Paths and civic paving'); createBridge(this.root, this.colliders, this.masonry, this.paving, this.brass); label('Livistone bridge');
+    createGateway(this.root, this.colliders, mobile, this.paving); label('Gateway');
     const gatewayPoster = createGatewayPoster(this.root, this.colliders); this.researchPanels.push(...gatewayPoster.panels); this.interactives.push({ id: 'kings-chapel', object: gatewayPoster.panels[0], position: gatewayPoster.position });
+    label('Gateway poster');
     const introduction = createIntroduction(this.root, this.colliders); this.researchPanels.push(...introduction.panels); this.interactives.push({ id: 'about-livistone', object: introduction.panels[0], position: introduction.position });
+    label('Introduction sign');
     await stage(28, 'Turning jewellery into civic buildings…');
     for (const landmark of CIVIC_LANDMARKS) landmark.id === 'energy' ? this.createEnergyHall(landmark.x, landmark.z) : this.createLandmark(landmark.id, landmark.x, landmark.z);
+    label('Hall paving');
     await stage(38, 'Building Embryo Station and its train…');
     const arrival = new THREE.Group(), stationColliders: ColliderSpec[] = [], stationInteractions: Interactive[] = [];
     const station = createStation(arrival, stationColliders, mobile, this.paving);
@@ -152,28 +163,35 @@ export class Town {
     this.researchPanels.push(...station.posters);
     const gallery = new THREE.Group(); arrival.add(gallery);
     this.exhibitions.push(new PlanarExhibition('station', gallery, 0, 0, stationColliders, stationInteractions));
-    arrival.rotation.y = Math.PI; arrival.position.x = -16; arrival.updateMatrix(); this.root.add(arrival);
+    arrival.rotation.y = Math.PI; arrival.position.x = -16; arrival.updateMatrix(); arrival.name = 'Embryo Station and train'; this.root.add(arrival);
+    this.addRoom(this.exhibitions[this.exhibitions.length - 1], arrival.matrix);
     this.colliders.push(...transformColliders(stationColliders, arrival.matrix, Math.PI));
     this.interactives.push(...stationInteractions.map(item => ({ ...item, position: item.position.applyMatrix4(arrival.matrix) })));
     this.train = arrival.getObjectByName('Panoramic maglev')!;
-    this.railway = createRailwayStructure(this.root, this.colliders, mobile);
+    label('Embryo Station and train'); this.railway = createRailwayStructure(this.root, this.colliders, mobile); label('Mountain railway');
     await stage(46, 'Growing the lake gardens and elevated galleries…');
     this.gardens = new LivingWaters(mobile, this.paving); this.root.add(this.gardens.root);
     this.gardens.presentLakeJewelry();
     this.gardens.addInterpretation('living-mycelium', 'Mycelium Rain Garden', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
     this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
+    label('Living Waters · town gardens');
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.masonry, this.paving, this.brass, bridge);
-    createTimeTower(this.root, this.colliders, this.mobile);
-    createFutureHouse(this.root, this.colliders, this.mobile);
+    label('Garden bridges'); createTimeTower(this.root, this.colliders, this.mobile); label('Time tower');
+    createFutureHouse(this.root, this.colliders, this.mobile); label('Future House');
     await stage(54, 'Making room for science and bioart…');
     createEnhancementHill(this.root, this.colliders);
+    label('Enhancement hill');
     const enhancementSign = createEnhancementPanel(this.root, this.colliders); this.researchPanels.push(...enhancementSign.panels); this.interactives.push({ id: 'materialized-enhancements', object: enhancementSign.panels[0], position: enhancementSign.position });
     const enhancementGallery = createEnhancementGallery(this.root, this.colliders); this.researchPanels.push(...enhancementGallery.panels); this.interactives.push(...enhancementGallery.interactives);
-    for (const id of ['timeface', 'future-house']) this.exhibitions.push(new PlanarExhibition(id, this.root, 0, 0, this.colliders, this.interactives));
+    label('Enhancement gallery');
+    for (const id of ['timeface', 'future-house']) { this.exhibitions.push(new PlanarExhibition(id, this.root, 0, 0, this.colliders, this.interactives)); label('Posters · ' + id); }
+    // Timeface hangs its posters on the open gallery, seen across town; the Future House keeps its three inside the cabin.
+    this.addRoom(this.exhibitions[this.exhibitions.length - 1]);
+    label('Glucose Commons');
     const research = createGlucosePavilion(this.root, this.colliders, mobile, this.paving); this.researchPanels.push(...research.panels); this.interactives.push(...research.interactives);
     this.researchReady = Promise.all([research.ready, enhancementGallery.ready, gatewayPoster.ready]).then(() => undefined);
     await stage(62, 'Planting the woodland and mountain slopes…');
-    this.createTrees(); this.createGardens(); this.createContactShadows();
+    label('Glucose Commons'); this.createTrees(); this.createGardens(); this.createContactShadows(); label('River rocks and lamps');
     for (const landmark of CIVIC_LANDMARKS) {
       const color = landmark.id === 'energy' ? '#ffbf66' : landmark.id === 'science' ? '#99ded7' : '#ffe0a3';
       addGlow(this.root, new THREE.Vector3(landmark.x, 6, landmark.z), color, 25, 90, 24, .3);
@@ -244,7 +262,7 @@ export class Town {
     return mesh(geo, material, parent);
   }
   private createLandmark(id: string, x: number, z: number): void {
-    const exterior = new THREE.Group(); exterior.position.set(x, 0.16, z); this.root.add(exterior);
+    const exterior = new THREE.Group(); exterior.position.set(x, 0.16, z); exterior.name = 'Hall · ' + id; this.root.add(exterior);
     const inside = new THREE.Group(); inside.position.copy(exterior.position); this.interiors.add(inside);
     const radius = id === 'science' ? 8.5 : 10; const centerY = id === 'science' ? 6 : 5.7;
     const sx = 1, sz = 1;
@@ -301,7 +319,7 @@ export class Town {
   /** The Mitoring: an amber cup with a domed lid seated inside the bezel's silver basket, entered through the ring. */
   private createEnergyHall(x: number, z: number): void {
     const { a, b, wall, dome, doorPhi } = ENERGY_HALL;
-    const exterior = new THREE.Group(); exterior.position.set(x, 0.16, z); this.root.add(exterior);
+    const exterior = new THREE.Group(); exterior.position.set(x, 0.16, z); exterior.name = 'Hall · energy'; this.root.add(exterior);
     const inside = new THREE.Group(); inside.position.copy(exterior.position); this.interiors.add(inside);
     // A cabochon: the wall flares slightly up to the rim, then the dome closes over the hall.
     const profile: [number, number][] = [[0, 0.98], [3.7, 1], [wall, 1]];
@@ -366,16 +384,17 @@ export class Town {
     this.exhibitions.push(new PlanarExhibition(id, group, x, z, this.colliders, this.interactives));
     const light = new THREE.PointLight(id === 'energy' ? '#ffc56d' : '#fff2d5', this.mobile ? 7 : 12, 18, 1.8); light.position.set(0, 5.5, 0); group.add(light);
     const lantern = mesh(new THREE.TorusGeometry(2.7, 0.025, 6, 50), new THREE.MeshBasicMaterial({ color: '#f4dfad' }), group, 0, 6, 0); lantern.rotation.x = Math.PI / 2;
+    this.rooms.push({ center: new THREE.Vector3(x, 0, z), parts: group.children.filter((child) => !(child as THREE.Light).isLight), shown: null });
   }
   readonly forest = new Forest();
   async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
     const sites = forestSites(this.mobile);
     for (const { x, y, z } of sites) this.colliders.push({ type: 'box', position: [x, y + 2, z], size: [0.3, 2, 0.3] });
-    this.forest.sites = sites; this.root.add(this.forest);
+    this.forest.sites = sites; this.forest.name = 'Forest'; this.root.add(this.forest);
   }
   private createGardens(): void {
-    this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter);
+    this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter, this.tier);
     // One instanced draw of blended boulder variants; one collider mesh sampled from the same shapes and transforms.
     this.root.add(createRiverRocks(this.rocks, rockMaterial(this.mobile), this.tier)); this.colliders.push(rockColliders(this.rocks));
     // Shore pebbles live with the other near-ground details, so map mode hides them; cpu has none. Only nearby cells draw.
@@ -405,10 +424,19 @@ export class Town {
     // Shrub batches toggle every couple of metres while walking; re-baking for them cost a shadow pass per ~2 m, so their shadows catch up at the next quarter-box re-bake.
     this.planting?.update(camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
     this.pebbles?.update(camera);
+    for (const room of this.rooms) {
+      const shown = mapView || BUDGET_OFF || camera.position.distanceTo(room.center) < ROOM_RANGE;
+      if (shown !== room.shown) { room.shown = shown; for (const part of room.parts) part.visible = shown; }
+    }
     if (this.tier === 'cpu') this.details.visible = false;
     return trees;
   }
   setMapMode(active: boolean): void { this.interiors.visible = !active; this.details.visible = !active; this.contactShadows.mesh.visible = !active; }
+  /** An enclosed collection whose posters hide with distance; `matrix` places its parent in the town. */
+  private addRoom(exhibition: PlanarExhibition, matrix?: THREE.Matrix4): void {
+    const center = exhibition.center.clone(); if (matrix) center.applyMatrix4(matrix);
+    this.rooms.push({ center: center.setY(0), parts: exhibition.objects, shown: null });
+  }
   /**
    * Before the first frame: every tree and plant instanced, and culling off, so the precompile and the first shadow pass build
    * each shader during loading; on WebGPU a shader first built while walking would stall that frame. Photographs, captions and
@@ -417,6 +445,8 @@ export class Town {
    */
   warmUp(on: boolean): void {
     this.forest.warmUp(on); this.planting?.warmUp(on); this.pebbles?.warmUp(on); this.gardens.warmUp(on);
+    // Rooms draw during the warm-up, so their shaders build now; the next update() hides the distant ones again.
+    if (on) for (const room of this.rooms) { room.shown = null; for (const part of room.parts) part.visible = true; }
     this.root.traverse((object) => {
       const material = (object as THREE.Mesh).material;
       if (!Array.isArray(material) && material?.userData.display) return;

@@ -31,6 +31,9 @@ import { createRenderer } from './render/renderer';
 import type { RenderView } from './render/renderer';
 import { OutputPipeline, displayFog } from './render/output';
 import { TownLighting } from './render/lighting';
+import { RenderScale, SCALE_RULES } from './game/render-scale';
+import { BUDGET_OFF, trackDraws } from './game/render-budget';
+import type { DrawCost } from './game/render-budget';
 
 const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 };
 // Dev-only ?look=a keeps the old hemisphere-heavy fill (sun and haze coherence only). b, the default, lets the baked sky
@@ -56,7 +59,9 @@ class Game {
   private nightLighting!: NightLighting;
   private timeOfDay: TimeOfDay = readTimeOfDay();
   private clockCheck = 0;
-  private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, 150);
+  // Past the walking fog's far distance a surface shows only haze, so the walk camera stops there and follows the fog if it
+  // lengthens (sub-plan 25); ?budget=off keeps the earlier 150 m for review.
+  private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, BUDGET_OFF ? 150 : WALK_FOG.far);
   private readonly mapCamera = new THREE.PerspectiveCamera(44, 1, 0.2, 800);
   private readonly orbit: OrbitControls;
   private town!: Town;
@@ -74,6 +79,10 @@ class Game {
   private readonly point = new THREE.Vector3();
   private readonly graphics: RenderView['graphics'];
   private renderScale: number;
+  private scaler: RenderScale;
+  /** Dev-only: draws of the last frame by top-level town group, all passes (snapshot().budget). */
+  private drawBudget: (() => Record<string, DrawCost>) | null = null;
+  private readonly drawGroups = new WeakMap<THREE.Object3D, string>();
   // Dev-only ?capture=1: frozen animation time and render scale so before/after screenshots match.
   private readonly capture = import.meta.env.DEV && new URLSearchParams(location.search).has('capture');
   private frames = 0;
@@ -113,7 +122,8 @@ class Game {
     }
     // The night pool, hall and station lamps: room for the pool plus the fixed lamps (render/lighting.ts).
     this.renderer.lighting = new TownLighting({ maxPointLights: this.graphics.lights + 8 });
-    this.renderScale = this.graphics.pixelRatio;
+    this.renderScale = this.graphics.pixelRatio; this.scaler = new RenderScale(SCALE_RULES[this.graphics.tier], this.renderScale);
+    if (import.meta.env.DEV) this.drawBudget = trackDraws(this.renderer.info, (object) => this.drawGroup(object));
     this.reduced = this.graphics.reduced; this.lowQuality = this.reduced;
     this.night = resolveNight(this.timeOfDay);
     this.renderer.setPixelRatio(this.pixelRatio());
@@ -159,10 +169,17 @@ class Game {
     this.resize();
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend }),
+        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined }),
         teleport: (x: number, z: number, yaw = 0, y = 1.05, pitch = 0) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = pitch; this.accumulator = 0; },
       } });
     }
+  }
+  /** Dev-only: the top-level town group of a drawn object, or the frame's own passes outside the town. */
+  private drawGroup(object: THREE.Object3D): string {
+    let group = this.drawGroups.get(object); if (group) return group;
+    let top = object; while (top.parent && top.parent !== this.town?.root) top = top.parent;
+    group = top.parent ? top.name || object.name || 'Town · unnamed' : 'Frame · ' + (object.name || object.type);
+    this.drawGroups.set(object, group); return group;
   }
   async load(): Promise<void> {
     this.town = await Town.create(this.reduced, loadingStage, this.graphics.tier); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
@@ -387,7 +404,7 @@ class Game {
     this.sun.shadow.needsUpdate = true;
   }
   private quality(low: boolean): void {
-    this.lowQuality = low || this.graphics.tier === 'cpu'; this.renderScale = Math.min(low ? 1 : 1.5, this.graphics.pixelRatio); this.renderer.setPixelRatio(this.pixelRatio());
+    this.lowQuality = low || this.graphics.tier === 'cpu'; this.renderScale = Math.min(low ? 1 : 1.5, this.graphics.pixelRatio); this.scaler = new RenderScale(SCALE_RULES[this.graphics.tier], this.renderScale); this.renderer.setPixelRatio(this.pixelRatio());
     // WebGPU resizes the light's shadow target to mapSize on its next render; frameShadow requests that render.
     this.sun.shadow.mapSize.setScalar(low ? 1024 : 2048); this.frameShadow(true);
     this.scene.traverse((object) => {
@@ -495,7 +512,8 @@ class Game {
     if (this.cursorDirty) { this.cursorDirty = false; this.updateCursor(); }
     this.frames++; this.fpsFrames++; this.fpsTime += rawDt;
     if (this.fpsTime >= 1) { this.fps = Math.round(this.fpsFrames / this.fpsTime);
-      if (this.graphics.tier === 'cpu' && !this.capture && this.fps < 18 && this.renderScale > .3) { this.renderScale = Math.max(.3, this.renderScale - .05); this.renderer.setPixelRatio(this.pixelRatio()); }
+      // Adaptive resolution (render-scale.ts); ?capture=1 keeps the scale fixed so captures stay comparable.
+      if (!this.capture) { const scale = this.scaler.sample(this.fps, this.fpsTime); if (scale !== this.renderScale) { this.renderScale = scale; this.renderer.setPixelRatio(this.pixelRatio()); } }
       this.fpsFrames = 0; this.fpsTime = 0; }
   };
 }

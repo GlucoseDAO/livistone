@@ -95,6 +95,9 @@ try {
     await page.waitForLoadState('networkidle').catch(() => undefined); await still(software ? 2 : 4); await settle(software ? 2 : 6);
     await page.screenshot({ path: `${dir}/${name}.png` });
     captures.push({ name, view, snapshot: await page.evaluate(() => (window as unknown as { __livistone: Hook }).__livistone.snapshot()) });
+    // Sub-plan 25: the frame's draws by town group (all passes), heaviest first, so the budget reads off the log.
+    const budget = Object.entries((captures.at(-1)!.snapshot.budget ?? {}) as Record<string, { calls: number; triangles: number }>).sort((a, b) => b[1].triangles - a[1].triangles).slice(0, 5);
+    if (budget.length) console.log(`    ${captures.at(-1)!.snapshot.calls} calls, ${captures.at(-1)!.snapshot.triangles} triangles; ` + budget.map(([group, cost]) => `${group} ${cost.calls}/${Math.round(cost.triangles / 1000)}k`).join(' · '));
     console.log(`  ${profile}/${time}/${name}`);
   }
 } finally {

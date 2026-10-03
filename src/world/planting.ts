@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { attribute, mix, vec3 } from 'three/tsl';
+import type { GraphicsTier } from '../game/graphics';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { terrainNoise } from './terrain';
 import { CIVIC_LANDMARKS } from '../game/content';
@@ -6,7 +8,8 @@ import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from './landscape';
 
 const UP = new THREE.Vector3(0, 1, 0), TAU = Math.PI * 2;
 function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
-interface Site { x: number; y: number; z: number; scale: number; angle: number; }
+interface Site { x: number; y: number; z: number; scale: number; angle: number; petal?: THREE.Color }
+const PETALS = ['#f4dda0', '#efe9db', '#ca8ba7', '#9e91c9'];
 
 function leafGeometry(): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry();
@@ -14,10 +17,12 @@ function leafGeometry(): THREE.BufferGeometry {
   g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, -.28, .25, .025, -.36, .5, .025, -.24, .77, .01, 0, 1, 0, .24, .77, .01, .36, .5, .025, .28, .25, .025, 0, .47, .085], 3));
   g.setIndex(Array.from({ length: 8 }, (_, i) => [i, (i + 1) % 8, 8]).flat()); g.computeVertexNormals(); return g;
 }
-function colored(g: THREE.BufferGeometry, color: THREE.Color): THREE.BufferGeometry {
+function colored(g: THREE.BufferGeometry, color: THREE.Color, petal?: number): THREE.BufferGeometry {
   const count = g.getAttribute('position').count, colors: number[] = [];
   for (let i = 0; i < count; i++) colors.push(color.r, color.g, color.b);
-  g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); g.deleteAttribute('uv'); return g;
+  g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); g.deleteAttribute('uv');
+  if (petal !== undefined) g.setAttribute('petal', new THREE.Float32BufferAttribute(new Float32Array(count).fill(petal), 1));
+  return g;
 }
 function shrubGeometry(seed: number, mobile: boolean, flowering: boolean): THREE.BufferGeometry {
   const rand = random(seed), parts: THREE.BufferGeometry[] = [], leaf = leafGeometry(), color = new THREE.Color();
@@ -62,41 +67,43 @@ function grassGeometry(mobile: boolean): THREE.BufferGeometry {
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); g.setIndex(indices); g.computeVertexNormals(); return g;
 }
-function flowerGeometry(seed: number, mobile: boolean): THREE.BufferGeometry {
-  const rand = random(seed), parts: THREE.BufferGeometry[] = [], leaf = leafGeometry(), color = new THREE.Color();
-  const petal = new THREE.BufferGeometry(), center = new THREE.SphereGeometry(1, 4, 2), palette = ['#f4dda0', '#efe9db', '#ca8ba7', '#9e91c9'];
+/** With `instanced`, petals are white and flagged by a `petal` attribute, so one geometry takes each clump's colour per instance. */
+function flowerGeometry(seed: number, mobile: boolean, instanced = false): THREE.BufferGeometry {
+  const rand = random(seed), parts: THREE.BufferGeometry[] = [], leaf = leafGeometry(), color = new THREE.Color(), mask = (value: number): number | undefined => instanced ? value : undefined;
+  const petal = new THREE.BufferGeometry(), center = new THREE.SphereGeometry(1, 4, 2);
   petal.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, -.48, .08, .3, -.6, .2, .72, -.35, .3, 1, .35, .3, 1, .6, .2, .72, .48, .08, .3, 0, -.08, .48], 3));
   petal.setIndex(Array.from({ length: 7 }, (_, i) => [i, (i + 1) % 7, 7]).flat()); petal.computeVertexNormals();
   for (let stem = 0; stem < (mobile ? 4 : 7); stem++) {
     const a = stem * 2.399, r = Math.sqrt(rand()) * .38, x = Math.cos(a) * r, z = Math.sin(a) * r, h = .28 + rand() * .4;
-    parts.push(colored(new THREE.CylinderGeometry(.007, .013, h, 4).translate(x, h / 2, z), color.set('#526139')));
+    parts.push(colored(new THREE.CylinderGeometry(.007, .013, h, 4).translate(x, h / 2, z), color.set('#526139'), mask(0)));
     for (const side of [-1, 1]) {
       const g = leaf.clone(); g.scale(.15, .26, .15); g.rotateZ(side * .95); g.rotateY(a); g.translate(x, h * .3, z);
-      parts.push(colored(g, color.set('#657747')));
+      parts.push(colored(g, color.set('#657747'), mask(0)));
     }
     for (let j = 0; j < 6; j++) {
       const angle = j / 6 * TAU, g = petal.clone(); g.scale(.075, .08, .115); g.rotateX((rand() - .5) * .4); g.rotateY(angle);
-      g.translate(x + Math.sin(angle) * .018, h, z + Math.cos(angle) * .018); parts.push(colored(g, color.set(palette[seed % 4])));
+      g.translate(x + Math.sin(angle) * .018, h, z + Math.cos(angle) * .018); parts.push(colored(g, color.set(instanced ? '#ffffff' : PETALS[seed % 4]), mask(1)));
     }
-    parts.push(colored(center.clone().scale(.027, .021, .027).translate(x, h + .008, z), color.set('#b79843')));
+    parts.push(colored(center.clone().scale(.027, .021, .027).translate(x, h + .008, z), color.set('#b79843'), mask(0)));
   }
   const merged = mergeGeometries(parts)!; parts.forEach((g) => g.dispose()); leaf.dispose(); petal.dispose(); center.dispose(); return merged;
 }
 /** A 24 m cell of one planting kind: a slice of the kind's instance arrays, its centre and a bounding sphere. */
 interface PlantCell { x: number; z: number; first: number; count: number; sphere: THREE.Sphere; shown: boolean }
-interface PlantKind { mesh: THREE.InstancedMesh; cells: PlantCell[]; matrices: Float32Array; colors: Float32Array }
+interface PlantKind { mesh: THREE.InstancedMesh; cells: PlantCell[]; matrices: Float32Array; colors: Float32Array; petals: Float32Array | null }
 
 function kind(parent: THREE.Group, name: string, sites: Site[], geometry: THREE.BufferGeometry, material: THREE.Material, shadow: boolean): PlantKind {
   const cells = new Map<string, Site[]>();
   for (const site of sites) { const key = Math.floor(site.x / 24) + ':' + Math.floor(site.z / 24), cell = cells.get(key) ?? []; cell.push(site); cells.set(key, cell); }
   const matrix = new THREE.Matrix4(), q = new THREE.Quaternion(), color = new THREE.Color(), scaled = new THREE.Sphere();
   const matrices = new Float32Array(sites.length * 16), colors = new Float32Array(sites.length * 3), result: PlantCell[] = [];
+  const petals = sites.some((site) => site.petal) ? new Float32Array(sites.length * 3) : null;
   geometry.computeBoundingSphere(); let next = 0;
   for (const members of cells.values()) {
     const cell: PlantCell = { x: members.reduce((sum, s) => sum + s.x, 0) / members.length, z: members.reduce((sum, s) => sum + s.z, 0) / members.length, first: next, count: members.length, sphere: new THREE.Sphere(new THREE.Vector3(), -1), shown: false };
     members.forEach((s, i) => {
       matrix.compose(new THREE.Vector3(s.x, s.y, s.z), q.setFromAxisAngle(UP, s.angle), new THREE.Vector3(s.scale, s.scale, s.scale)); matrix.toArray(matrices, next * 16);
-      color.setHSL(.15, .08, .75 + (i % 5) * .035); color.toArray(colors, next * 3);
+      color.setHSL(.15, .08, .75 + (i % 5) * .035); color.toArray(colors, next * 3); if (petals) s.petal!.toArray(petals, next * 3);
       scaled.copy(geometry.boundingSphere!).applyMatrix4(matrix); if (cell.sphere.radius < 0) cell.sphere.copy(scaled); else cell.sphere.union(scaled);
       next++;
     });
@@ -105,7 +112,8 @@ function kind(parent: THREE.Group, name: string, sites: Site[], geometry: THREE.
   const mesh = new THREE.InstancedMesh(geometry, material, sites.length); mesh.name = name;
   mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(sites.length * 3), 3);
   mesh.count = 0; mesh.visible = false; mesh.castShadow = shadow; mesh.receiveShadow = true; parent.add(mesh);
-  return { mesh, cells: result, matrices, colors };
+  if (petals) geometry.setAttribute('petalColor', new THREE.InstancedBufferAttribute(new Float32Array(sites.length * 3), 3));
+  return { mesh, cells: result, matrices, colors, petals };
 }
 
 /**
@@ -145,19 +153,21 @@ export class Planting {
   }
   private refill(kind: PlantKind): void {
     const { mesh } = kind, target = mesh.instanceMatrix.array as Float32Array, colors = mesh.instanceColor!.array as Float32Array, sphere = new THREE.Sphere(new THREE.Vector3(), -1);
+    const petals = kind.petals ? mesh.geometry.getAttribute('petalColor') as THREE.InstancedBufferAttribute : null;
     let count = 0;
     for (const cell of kind.cells) {
       if (!cell.shown) continue;
       target.set(kind.matrices.subarray(cell.first * 16, (cell.first + cell.count) * 16), count * 16);
       colors.set(kind.colors.subarray(cell.first * 3, (cell.first + cell.count) * 3), count * 3);
+      if (petals) (petals.array as Float32Array).set(kind.petals!.subarray(cell.first * 3, (cell.first + cell.count) * 3), count * 3);
       count += cell.count; if (sphere.radius < 0) sphere.copy(cell.sphere); else sphere.union(cell.sphere);
     }
     mesh.count = count; mesh.visible = count > 0; mesh.boundingSphere = count > 0 ? sphere : null;
-    mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor!.needsUpdate = true;
+    mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor!.needsUpdate = true; if (petals) petals.needsUpdate = true;
   }
 }
 
-export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: boolean, height: (x: number, z: number) => number, river: (x: number) => number): Planting {
+export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: boolean, height: (x: number, z: number) => number, river: (x: number) => number, tier: GraphicsTier = mobile ? 'mobile' : 'gpu'): Planting {
   const result: PlantKind[] = [];
   const rand = random(58), shrubs: Site[][] = [[], [], []], grass: Site[] = [];
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .94, side: THREE.DoubleSide });
@@ -193,7 +203,15 @@ export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: 
     const x = (rand() - .5) * 125, z = river(x) + (i % 2 ? 1 : -1) * (8.1 + rand() * 3.7);
     plant(x, z, Math.floor((x + 65) / 7));
   }
-  flowers.forEach((sites, i) => result.push(kind(root, 'Flower borders', sites, flowerGeometry(400 + i, mobile), material, false)));
+  if (tier === 'cpu') flowers.forEach((sites, i) => result.push(kind(root, 'Flower borders', sites, flowerGeometry(400 + i, mobile), material, false)));
+  else {
+    // One clump shape for every palette, coloured per instance: a single mesh and shader build instead of four. The cpu tier keeps
+    // four vertex-coloured kinds, as its Lambert copies (cpu-detail.ts) carry no colour node.
+    const petal = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: .94, side: THREE.DoubleSide });
+    petal.colorNode = mix(vec3(1), attribute('petalColor', 'vec3'), attribute('petal', 'float'));
+    const palette = PETALS.map((hex) => new THREE.Color(hex));
+    result.push(kind(root, 'Flower borders', flowers.flatMap((sites, i) => sites.map((site) => ({ ...site, petal: palette[i] }))), flowerGeometry(400, mobile, true), petal, false));
+  }
   for (let i = 0; i < (mobile ? 18000 : 52000); i++) {
     const x = (rand() - .5) * 155, z = (rand() - .5) * 132, scale = .55 + rand() * .75;
     // Open lawns alternate with denser meadow islands; keep the original maximum tuft footprint.

@@ -8,7 +8,7 @@ import { forestSites } from '../src/world/forest-layout';
 import { gatewayApproachWidth } from '../src/world/gateway-layout';
 import { contactFalloff, GROUND_SHADE_MIN, groundShadeField } from '../src/world/ground-cover';
 import { PATH_CURVES, PATH_WIDTH } from '../src/world/landscape';
-import { mountainGeometry } from '../src/world/mountains';
+import { mountainGeometry, terrainTiles } from '../src/world/mountains';
 import { riverRockSites } from '../src/world/stone';
 import { landscapeHeight } from '../src/world/terrain';
 import { waterDistance } from '../src/world/waterways';
@@ -26,9 +26,14 @@ describe('contact shadows', () => {
   const gpu = town(false), mobile = town(true);
 
   it('lies exactly on the rendered terrain triangles, facing up', () => {
-    const terrain = mountainGeometry(false), p = terrain.getAttribute('position'), key = (x: number, y: number, z: number): string => `${x},${y},${z}`;
+    const terrain = mountainGeometry(false), key = (x: number, y: number, z: number): string => `${x},${y},${z}`;
     const triangles = new Set<string>();
-    for (let i = 0; i < p.count; i += 3) triangles.add([0, 1, 2].map(k => key(p.getX(i + k), p.getY(i + k), p.getZ(i + k))).sort().join('|'));
+    // The ground draws as culled tiles of these triangles (sub-plan 25), so read them from the tiles.
+    for (const tile of terrainTiles(terrain)) {
+      const p = tile.getAttribute('position');
+      for (let i = 0; i < p.count; i += 3) triangles.add([0, 1, 2].map(k => key(p.getX(i + k), p.getY(i + k), p.getZ(i + k))).sort().join('|'));
+      tile.dispose();
+    }
     terrain.dispose();
     const ground = [...gpu.objects.filter(site => site.floor === undefined), ...gpu.bankRocks, ...gpu.groups.flat()];
     const { mesh } = createContactShadows(ground), position = mesh.geometry.getAttribute('position'), index = mesh.geometry.index!;

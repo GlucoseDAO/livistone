@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { BUDGET_OFF } from '../game/render-budget';
 
 const NEAR = 36;
 /** Layer of the shadow-only tree meshes; the sun's shadow camera renders it (main.ts), the view cameras do not. */
@@ -39,10 +40,35 @@ export function forestCells(sites: readonly THREE.Vector3[]): ForestCell[] {
   return cells;
 }
 
+/**
+ * Branches without their twigs: tube pieces whose extent is under `size` metres, mostly hidden by foliage and under a pixel
+ * wide beyond NEAR. The trunk and limbs keep every triangle, so the silhouette and its shadow stay.
+ */
+export function dropTwigs(geo: THREE.BufferGeometry, size = 2): THREE.BufferGeometry {
+  const copy = geo.clone(), index = copy.index, position = copy.getAttribute('position');
+  if (!index) return copy;
+  const parent = Int32Array.from({ length: position.count }, (_, i) => i), find = (a: number): number => { while (parent[a] !== a) a = parent[a] = parent[parent[a]]; return a; };
+  // Tube seams repeat positions, so weld before joining triangles into pieces.
+  const welded = new Map<string, number>();
+  for (let i = 0; i < position.count; i++) { const key = `${position.getX(i).toFixed(4)},${position.getY(i).toFixed(4)},${position.getZ(i).toFixed(4)}`, j = welded.get(key); if (j === undefined) welded.set(key, i); else parent[find(i)] = find(j); }
+  for (let i = 0; i < index.count; i += 3) { const a = find(index.getX(i)); parent[find(index.getX(i + 1))] = a; parent[find(index.getX(i + 2))] = a; }
+  const boxes = new Map<number, THREE.Box3>(), point = new THREE.Vector3();
+  for (let i = 0; i < position.count; i++) { const root = find(i), box = boxes.get(root) ?? new THREE.Box3(); box.expandByPoint(point.fromBufferAttribute(position, i)); boxes.set(root, box); }
+  const kept: number[] = [];
+  for (let i = 0; i < index.count; i += 3) if (boxes.get(find(index.getX(i)))!.getSize(point).length() >= size) kept.push(index.getX(i), index.getX(i + 1), index.getX(i + 2));
+  copy.setIndex(kept); return copy;
+}
+
+/** Whether distant views drop the twigs; ?budget=off (and the budget script's comparison) keep them. Read at load. */
+export const FOREST_DETAIL = { twigless: !BUDGET_OFF };
+
 /** A cell's trees: a slice of its species' instance arrays, and a sphere that bounds them all. */
 interface Cell { species: number; center: THREE.Vector3; first: number; count: number; sphere: THREE.Sphere; state: number; seen: boolean; lit: boolean }
-/** One model part of one species in one foliage detail, drawn by a view mesh and, with shadows, a shadow-only mesh. */
-interface Part { species: number; view: THREE.InstancedMesh; shadow: THREE.InstancedMesh | null; colors: Float32Array; shows: (state: number) => boolean }
+/**
+ * One model part of one species in one detail, drawn by a view mesh and, with shadows, a shadow-only mesh; `casts` picks the
+ * shadow mesh's cells when they differ from the view's.
+ */
+interface Part { species: number; view: THREE.InstancedMesh; shadow: THREE.InstancedMesh | null; colors: Float32Array; shows: (state: number) => boolean; casts?: (state: number) => boolean }
 // Cell states: hidden, trunks only (map), trunks with reduced foliage, trunks with full foliage.
 const HIDDEN = 0, TRUNKS = 1, REDUCED = 2, FULL = 3;
 const frustum = new THREE.Frustum(), viewProjection = new THREE.Matrix4();
@@ -95,10 +121,13 @@ export class Forest extends THREE.Group {
         material.envMapIntensity = .35;
         if (material.map) material.map.anisotropy = 4;
         const foliage = source.name === 'foliage', reduced = foliage ? thinFoliage(geometries[i]) : null;
-        // Mobile always draws the thinned foliage; desktop thins it beyond NEAR metres.
-        const details: [THREE.BufferGeometry, (state: number) => boolean][] = !foliage ? [[geometries[i], (state) => state >= TRUNKS]]
-          : [[mobile ? reduced! : geometries[i], (state) => state === FULL], [reduced!, (state) => state === REDUCED]];
-        for (const [geometry, shows] of details) {
+        // Mobile always draws the thinned foliage; desktop thins it beyond NEAR metres. Distant views drop the twigs (sub-plan 25)
+        // through one extra view-only mesh; the map's bare trunks and every shadow keep them.
+        const twigless = !foliage && FOREST_DETAIL.twigless;
+        const details: [THREE.BufferGeometry, (state: number) => boolean, boolean, ((state: number) => boolean)?][] = !foliage
+          ? twigless ? [[geometries[i], (state) => state === FULL || state === TRUNKS, true, (state) => state >= TRUNKS], [dropTwigs(geometries[i]), (state) => state === REDUCED, false]] : [[geometries[i], (state) => state >= TRUNKS, true]]
+          : [[mobile ? reduced! : geometries[i], (state) => state === FULL, true], [reduced!, (state) => state === REDUCED, true]];
+        for (const [geometry, shows, casts, castShows] of details) {
           const instanced = (castShadow: boolean): THREE.InstancedMesh => {
             const mesh = new THREE.InstancedMesh(geometry, material, total);
             mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(total * 3), 3);
@@ -106,7 +135,7 @@ export class Forest extends THREE.Group {
             if (castShadow) mesh.layers.set(SHADOW_LAYER);
             return mesh;
           };
-          this.parts.push({ species, view: instanced(false), shadow: shadows ? instanced(true) : null, colors: tints[i], shows });
+          this.parts.push({ species, view: instanced(false), shadow: shadows && casts ? instanced(true) : null, colors: tints[i], shows, casts: castShows });
         }
       });
     }
@@ -147,7 +176,7 @@ export class Forest extends THREE.Group {
     for (const part of this.parts) {
       if (part.species !== species) continue;
       this.fill(part, part.view, (cell) => everything || (cell.seen && part.shows(cell.state)));
-      if (part.shadow) this.fill(part, part.shadow, (cell) => everything || (cell.lit && part.shows(cell.state)));
+      if (part.shadow) this.fill(part, part.shadow, (cell) => everything || (cell.lit && (part.casts ?? part.shows)(cell.state)));
     }
   }
   private fill(part: Part, mesh: THREE.InstancedMesh, include: (cell: Cell) => boolean): void {

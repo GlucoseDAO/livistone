@@ -39,7 +39,7 @@ current build is generated in code at load time; binary assets are two tree GLBs
 | Mitoring comparisons | `node scripts/screenshot-mitoring.mjs [outDir] [desktop\|touch\|software]` | Fixed daylight/cameras; real SwiftShader is separate from touch emulation |
 | Surface maps | `python3 scripts/build-surface-textures.py [previewDir]` | Pillow + numpy, seeded and procedural; ashlar, terrazzo and brass albedo + nrh WebPs into `public/textures/surfaces/` |
 | Enhancement assets | `python3 scripts/build-enhancement.py [photoDir]` | Pillow; WebP posters + compact crystal meshes. Regrow crystals with `scripts/generate-enhancement-crystals.py` inside a materialized-enhancements checkout |
-| Frame budget | `bun scripts/frame-budget.ts [--json]` | No browser: draw calls and triangles of Living Waters, Glucose Commons and the Enhancement hill per tier over the capture poses (main pass only, not device timings) |
+| Frame budget | `bun scripts/frame-budget.ts [--json] [--far 150]` | No browser: main-pass draw calls and triangles per producer (Living Waters, glucose, Enhancement, terrain, planting; posters and forest under Bun) over the capture poses. Not device timings |
 
 `bun run test` uses Vitest; `bun test` would invoke Bun's own runner and fail. Playwright
 reuses an already-running dev server, so leave one up while iterating.
@@ -66,7 +66,8 @@ src/
     research-art.ts  Drawn figures for non-research garden stories; research uses source images
     piece-stories.ts Artist and exhibition stories overlaid on the jewellery catalogue
     enhancement.ts   Materialized Enhancements poster captions and gene-category facts
-    render-budget.ts GPU-free draw-call and triangle estimate for one camera (budget script and tests)
+    render-budget.ts GPU-free draw estimate per camera, the dev snapshot().budget tracker, ?budget=off
+    render-scale.ts  Adaptive resolution: per-tier frame-rate targets with hysteresis
     jewelry-catalogue.json Generated source-hashed catalogue and image manifest
   world/
     world.ts         Town: terrain, river, paths, bridges, landmarks, interiors, tower,
@@ -291,6 +292,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 - **Sky, sun and haze share one source.** `sky.ts` exports `SUN_DIR` / `MOON_DIR` (the light sits at its target + direction × `SUN_DISTANCE`, kept in `Game.sunDirection`), `SKY_EXPOSURE` and the pre-tone-mapped `HORIZON_HAZE` used for fog and map backgrounds; do not hard-code fog colours. In r186 a material without its own `envMap` gets `scene.environmentIntensity` instead of its `envMapIntensity`, so tag materials whose reflection strength matters with `userData.heroEnv = true`; `main.ts` points them at the current sky after load and on day/night switches (CPU keeps its Lambert re-pointing).
 - **Graphics has three device profiles.** `graphics.ts` selects GPU, mobile/typical integrated graphics, or CPU software WebGL. Profiles cover raster and sky resolution, foliage range, lighting and architecture. CPU uses `cpu-detail.ts` to reduce visual geometry with locked boundaries and batch static opaque architecture, preserving collision geometry and parent visibility. CPU disables shadows and rain, retaining night emission and a bounded light pool. Test profile overrides do not prove actual device performance.
 - **Plain architecture wears generated maps.** `surfaces.ts` puts the ashlar on the town white (bridges, hall rims, the Science arch) and gateway abutments, terrazzo on the hall floor insets, and brass on the town gold, poster stands and place-sign frames (tarnish only). Each albedo averages the flat colour it replaces and the material colour is that colour over the set's mean (`SURFACE_SETS`, kept equal to `sources.json` by `tests/surfaces.test.ts`), so the palette holds. Masonry uses an object-space triplanar with v up on every side face (three's `triplanarTexture` would stand courses on end); any new mesh with the masonry material needs `bakeMasonry()`, which adds the cpu UVs and the `surfaceClearance` that drives the weathering. gpu reads albedo, normal and roughness, mobile albedo and roughness, cpu only the stone albedo through the Lambert copy. Share these materials rather than making variants; dev-only `?surfaces=off` restores the flat colours.
+- **Frame budget (sub-plan 25).** `render-scale.ts` adapts resolution once a second: gpu holds 50 fps between scales 1 and 1.5, mobile 28 fps between .75 and 1, falling after 2 s short and recovering .05 every 4 s with 15% headroom; a scale that failed stays out of reach until headroom triples. The cpu tier keeps its .05-per-second fall to .3. `?capture=1` freezes the scale. The walk camera's far plane is the walking fog's far distance, so lengthening the fog lengthens the view. `terrainTiles` splits the ground into 33 culled tiles that keep every vertex attribute (soil, `groundShade`), the one ground material with its `aoNode` and shore layer, and the name `cpu-detail.ts` skips. Hall interiors and the station and Future House collections hide their meshes beyond `ROOM_RANGE` (never their lights, which WebGPU builds into shaders) and show during `Town.warmUp`. Poster frames and feet merge per collection without touching display materials. Distant trees draw branches without twigs through one view-only mesh; shadows and the map keep every branch. Flowers are one geometry coloured per instance by a `petal` mask, except on cpu. `?budget=off` restores the 150 m far plane, interiors and twigs for review; `snapshot().budget` (dev only) lists the last frame's draws by top-level town group.
 - **Mobile is a first-class target, not a later port.** `Town` takes a `mobile` flag
   (coarse pointer, software GL, or a typical laptop iGPU — not a discrete card) and
   materials/foliage are already reduced for it. Walking hides far vegetation and thins
@@ -309,7 +311,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   driven headlessly through Rapier (`tests/physics.test.ts` walks a capsule into a wall).
 - Playwright drives the real game in Chrome through `window.__livistone`, which exposes
   `snapshot()` (mode, position, yaw, fps, draw calls, triangles, progress,
-  `reducedGraphics`) and `teleport(x, z, yaw)`. **That hook is test infrastructure —
+  `reducedGraphics`, and `budget`, the last frame's draws by town group) and `teleport(x, z, yaw)`. **That hook is test infrastructure —
   keep it working and keep its shape stable**, including the mobile-viewport run with
   touch emulation.
 - Browser tests launch headless Chrome with GPU flags and fall back to whatever Chrome
