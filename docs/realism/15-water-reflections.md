@@ -20,3 +20,7 @@ See [README](README.md) for the shared workflow.
 
 - The bridge and the trees on the bank are visibly reflected.
 - When the owner has not approved it, the branch is discarded.
+
+## On WebGPU (round 2)
+
+Prefer r186's `ssr()` (`three/addons/tsl/display/SSRNode.js`) in Stage A's pipeline on the gpu tier, blended by the water's Fresnel. Fall back to a planar pass only if screen-space reflection misses what matters, such as the bridge when it leaves the screen.

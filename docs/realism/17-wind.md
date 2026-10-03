@@ -35,3 +35,9 @@ See [README](README.md) for the shared workflow.
 - Gentle, believable motion.
 - No change on cpu.
 - Reduced motion is respected.
+
+## On WebGPU (round 2)
+
+- Sway through `positionNode` on the foliage, shrub, grass and reed node materials. Take the per-instance phase from the instance matrix, and time from the game's wind uniform, never TSL's global `time`.
+- `alphaToCoverage` needs MSAA, which `antialias` enables on fine pointers.
+- Temporal AA (`TRAANode`) would smooth leaf edges further; consider it only if 25 leaves headroom.

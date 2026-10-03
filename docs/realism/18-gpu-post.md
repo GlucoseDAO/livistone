@@ -1,6 +1,6 @@
-# 18 — GPU-only post-processing (experiment)
+# 18 — Ambient occlusion and restrained bloom
 
-**Needs:** 01 and 02. **Tiers:** gpu only. **Branch:** `realism/18-post`.
+**Needs:** 20 Phase B (its output pipeline and `display` mask). **Tiers:** gpu; mobile at reduced resolution only if 25's measurements allow. **Branch:** `realism/18-post`.
 See [README](README.md) for the shared workflow.
 
 ## Idea
@@ -27,3 +27,13 @@ See [README](README.md) for the shared workflow.
 - Visible grounding in corners and under eaves.
 - The paper looks unchanged.
 - When the owner has not approved it, the branch is discarded.
+
+## Round 2 update (WebGPU)
+
+Promoted from experiment: flat ambient light is the most visible stylized cue left after round 1. The tone-mapping blocker above is solved by Stage A: paper and signs carry the `display` mask, and AO and bloom skip those pixels.
+
+- **AO:** `ao()` from `three/addons/tsl/display/GTAONode.js` at half resolution on the scene pass's depth and normals, denoised, multiplied into the lit colour before tone mapping.
+- **Variant `?post=gi`:** `ssgi()` (`SSGINode.js`) for one-bounce screen-space light, if the frame time allows.
+- **Bloom:** `bloom()` with a threshold above 1, so only night halos, neon and sun glints bloom.
+- **Dev switch:** `?post=off|ao|gi`.
+- Record frame time (headless, informational) and draw calls before and after.

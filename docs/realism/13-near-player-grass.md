@@ -1,6 +1,6 @@
 # 13 — Near-player grass field
 
-**Needs:** 03. **Tiers:** gpu and mobile; cpu has none. **Branch:** `realism/13-grass`.
+**Needs:** 03 and 20 Phase B (TSL). **Tiers:** gpu and mobile; cpu has none. **Branch:** `realism/13-grass`.
 See [README](README.md) for the shared workflow.
 
 ## Why
@@ -36,3 +36,9 @@ Close up, the ground is only a texture. A dense, continuous lawn of real blades 
 - No bare texture is visible within the field radius.
 - No blades on paths or in water.
 - The cost per tier is recorded in `docs/3d-game-plan.md` (one extra draw call).
+
+## On WebGPU (round 2)
+
+- Write the blade material in TSL: an instanced node material whose `positionNode` samples the baked height and mask textures and whose colour matches `ground-material.ts` macro variation.
+- It must run on the WebGL 2 fallback, so do not depend on compute shaders. A compute culling path for WebGPU devices is optional and must be measured against the plain instanced draw.
+- Wind time comes from the game's own uniform, shared with 17, so `?capture=1` freezes it.
