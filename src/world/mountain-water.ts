@@ -431,7 +431,7 @@ export function streamWhite(slope: number, steepening: number): number {
 }
 /** cpu: opaque, so the stream's clear water and white water are baked into colour: a wet dark bed, a sky-lit body, white foam. */
 function cpuStreamColour(depth: number, white: number, deepest: number): THREE.Color {
-  return new THREE.Color('#3d4a42').lerp(new THREE.Color('#5f7f80'), THREE.MathUtils.smoothstep(depth / deepest, .15, .8)).lerp(new THREE.Color('#dde4e1'), white * .85);
+  return new THREE.Color('#454a3a').lerp(new THREE.Color('#566c68'), THREE.MathUtils.smoothstep(depth / deepest, .15, .8)).lerp(new THREE.Color('#d3dad6'), white * .85);
 }
 
 /**
@@ -467,7 +467,8 @@ export function streamGeometry(points: readonly (Point3 | THREE.Vector3)[], widt
     for (const [j, a] of across.entries()) {
       const x = centre.x - fz * a, z = centre.z + fx * a, floor = ground ? ground(x, z) : bed[k], u = Math.min(Math.abs(a) / half, 1);
       // Level across the middle, down to the ground at the edges; never more than `depth` over ground that falls away to one side.
-      const y = Math.max(floor, Math.min(level, floor + depth * (1 - u ** 4))), wet = Math.abs(a) <= half + 1e-6 ? 1 : 1 - THREE.MathUtils.smoothstep(Math.abs(a) - half, 0, bank[bank.length - 1] * ragged);
+      // cpu draws it opaque: a raised lens there reads as a pipe, so it lies nearly flat.
+      const y = Math.max(floor, Math.min(level, floor + depth * (1 - u ** 4) * (tier === 'cpu' ? .3 : 1))), wet = Math.abs(a) <= half + 1e-6 ? 1 : 1 - THREE.MathUtils.smoothstep(Math.abs(a) - half, 0, bank[bank.length - 1] * ragged);
       const sunk = Math.max(0, Math.min(y - floor, depth)) * (1 - u * u);
       positions.push(x, y + .015, z); flows.push(fx, fz); alongs.push(along); acrosses.push(a); depths.push(sunk); wets.push(wet);
       // White water churns mid-stream; the edges stay clear, so they fade into the bank.
