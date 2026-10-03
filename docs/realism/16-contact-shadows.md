@@ -44,6 +44,15 @@ Branch `realism/16-contact`, rebased onto Stage A (`realism/20-webgpu`).
 
 Still to do: the before/after captures on the merged `main`.
 
+### Software-tier review (3 October 2026, unfinished)
+
+The software captures changed almost nowhere. A black-decal diagnostic on the WebGL 2 fallback and on WebGPU found:
+
+- Tree patches do render on the cpu tier. `Forest.onCells` reports there and the index updates reach the GPU. In `arrival-meadow` the nearest tree stands just behind the meadow crest, which hides its pool. The quick views simply have few trees inside the cpu tier's 58 m forest range.
+- The patches under the bank rocks are not a cpu bug: on every tier they lie entirely under the rocks. Their radius is capped at the rock's planting clearance (s × 1.45 + 0.25 m), while the rock's silhouette reaches about 1.57 × s.
+
+Fix still to make: widen the rock patches beyond the silhouette, and fade each vertex's strength to zero toward the water (`waterDistance`) so no patch darkens the river. Then reconcile with `rockContactSites` on `realism/round-2`, and consider a stronger crown patch on the cpu tier, which has no sun shadows.
+
 ## On WebGPU (round 2)
 
 On the gpu tier, try r186's screen-space shadow node (`sss` in `three/addons/tsl/display/SSSNode.js`, blurred) inside Stage A's output pipeline for fine contact shadows under small objects. Decals and the baked ground shade stay the mobile and cpu path, and the decals' material is a plain node material with multiply blending.
