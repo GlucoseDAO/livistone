@@ -430,6 +430,16 @@ export function mountainClearing(x: number, z: number): boolean {
   const g = gorgeCoords(x, z); return !!g && g.d < gorgeHalf(g.s) + wallRun(g.s) + 4.5;
 }
 
+/** The HUD's place name along the trail, by stage (null off it): the woods, the gorge, the snow gully, the plateau. */
+export function mountainPlace(x: number, z: number): string | null {
+  if (!MOUNTAIN || z > -180) return null;
+  if (plateauInside(x, z) > -2) return 'Jepii Mici · Rhododendron Plateau';
+  const g = gorgeCoords(x, z);
+  if (g && g.d < gorgeHalf(g.s) + 4) return g.s >= STAGE.snout - 1 ? 'Jepii Mici · Snow Gully' : g.s >= STAGE.mouth - 2 ? 'Jepii Mici · Rocky Gorge' : 'Jepii Mici · Forest Trail';
+  const near = trailNearest(x, z);
+  return near && near.s >= TRAILHEAD.index - 8 && near.d < 8 ? 'Jepii Mici · Forest Trail' : null;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // The meadow's plants (alpine-plants.ts) and its turf
 

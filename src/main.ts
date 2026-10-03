@@ -6,7 +6,7 @@ import './style.css';
 import * as THREE from 'three';
 import { RAILWAY, railwayCorridor } from './world/station-layout';
 import { TOWN_BOUNDS, FALL_FLOOR } from './world/town-layout';
-import { trailCorridor } from './world/mountain-layout';
+import { mountainPlace, trailCorridor } from './world/mountain-layout';
 import { ridgesLook, terrainHeight } from './world/terrain';
 import { FAR_LAYER, FAR_VIEW, setDistantPhase } from './world/far-landscape';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -606,7 +606,8 @@ class Game {
     if (inside) {
       this.ui.setLocation(inside.name);
       if (!this.progress.visited.includes(inside.id)) { this.progress.visited.push(inside.id); writeProgress(this.progress); this.ui.toast('Welcome to ' + inside.name + '.'); }
-    } else if (p.z < -60) this.ui.setLocation('Living Waters · Town Gardens');
+    } else if (mountainPlace(p.x, p.z)) this.ui.setLocation(mountainPlace(p.x, p.z)!);
+    else if (p.z < -60) this.ui.setLocation('Living Waters · Town Gardens');
     else this.ui.setLocation(railwayCorridor(p.x, p.z) && Math.abs(p.x) > RAILWAY.portalX ? 'Dark Nut Mountain Passage' : p.z > 33 ? 'Riverside Gardens' : p.z > 16 ? 'The White Bridge' : 'The Civic Gardens');
   }
   private findInteraction(): void {
