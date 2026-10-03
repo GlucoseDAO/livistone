@@ -239,6 +239,9 @@ export class Town {
       this.surface(.29, TAU - .58, doorwayTheta, maxTheta - doorwayTheta, radius, centerY, glass, exterior, sx, sz);
     }
     const floor = mesh(new THREE.CylinderGeometry(floorR, floorR + 0.3, 0.3, 64), this.paving, exterior, 0, -0.03); floor.scale.set(sx, 1, sz);
+    // World UVs tile the paving at its 4 m scale; the default cap UVs stretched one tile over the whole floor.
+    const floorPosition = floor.geometry.getAttribute('position'), floorUV = floor.geometry.getAttribute('uv');
+    for (let i = 0; i < floorPosition.count; i++) floorUV.setXY(i, (x + floorPosition.getX(i) * sx) / 4, (z + floorPosition.getZ(i) * sz) / 4);
     const rim = mesh(new THREE.TorusGeometry(floorR + 0.15, 0.2, 8, 72), this.white, exterior, 0, 0.08); rim.rotation.x = Math.PI / 2; rim.scale.set(sx, sz, 1);
     this.colliders.push({ type: 'box', position: [x, 0.08, z], size: [floorR * sx * 0.75, 0.08, floorR * sz * 0.75] });
     this.wallRing(exterior, x, z, floorR * sx, floorR * sz, 0.32);
@@ -295,6 +298,8 @@ export class Town {
     mesh(shell, amberShell, exterior).name = 'Mitoring amber cup';
     const silver = mitoringCage(exterior, this.mobile); this.jewelryReady.push(loadMitoringSilverTexture(silver, this.mobile));
     const floor = mesh(new THREE.CylinderGeometry(a, a + 0.3, 0.3, 72), this.paving, exterior, 0, -0.03); floor.scale.z = b / a;
+    const floorPosition = floor.geometry.getAttribute('position'), floorUV = floor.geometry.getAttribute('uv');
+    for (let i = 0; i < floorPosition.count; i++) floorUV.setXY(i, (x + floorPosition.getX(i)) / 4, (z + floorPosition.getZ(i) * b / a) / 4);
     const rim = mesh(new THREE.TorusGeometry(a + 0.15, 0.2, 8, 96), silver, exterior, 0, 0.08); rim.rotation.x = Math.PI / 2; rim.scale.y = b / a;
     this.colliders.push({ type: 'box', position: [x, 0.08, z], size: [a * 0.75, 0.08, b * 0.75] });
     this.wallRing(exterior, x, z, a, b, doorPhi + 0.06);
