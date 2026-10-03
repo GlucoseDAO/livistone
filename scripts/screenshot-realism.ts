@@ -10,7 +10,7 @@ import { execSync } from 'node:child_process';
 
 type View = readonly [name: string, x: number, z: number, yaw: number, pitch?: number];
 type Profile = 'desktop' | 'touch' | 'software';
-interface Hook { snapshot(): Record<string, unknown> & { ready: boolean; mode: string; frames: number; capture: boolean }; teleport(x: number, z: number, yaw?: number, y?: number, pitch?: number): void }
+interface Hook { snapshot(): Record<string, unknown> & { ready: boolean; mode: string; frames: number; capture: boolean }; teleport(x: number, z: number, yaw?: number, y?: number, pitch?: number): void; standingHeight?(x: number, z: number): number | null }
 
 // Coordinates follow scripts/screenshot-landmarks.mjs; pitch is radians, positive looks up.
 const VIEWS: Record<string, View> = Object.fromEntries(([
@@ -86,7 +86,7 @@ const still = async (frames: number) => {
     return s.frames - w.__still.since >= n;
   }, frames, { timeout: frameTimeout, polling: 100 });
 };
-let readyMs: number | null = null;
+let readyMs: number | null = null, standing = false;
 try {
   const loadStart = performance.now();
   await page.goto(url.href, { timeout: 120_000 });
@@ -94,9 +94,14 @@ try {
   readyMs = Math.round(performance.now() - loadStart);
   if (!(await page.evaluate(() => (window as unknown as { __livistone: Hook }).__livistone.snapshot().capture))) errors.push('Server ignored ?capture=1; captures are not frozen (is this a dev server with the 00 harness?).');
   await page.addStyleTag({ content: '#app > :not(canvas) { visibility: hidden !important; }' });
+  // Each view stands on whatever lies under it (ground, bridge deck or floor) through the hook's standingHeight. The fixed
+  // y = 1.05 of earlier captures sank the capsule into raised meadow (north-meadow's eye stood about 1.1 m up); a server
+  // without the hook still gets that fixed height, and captures.json records which one ran.
+  standing = await page.evaluate(() => typeof (window as unknown as { __livistone: Hook }).__livistone.standingHeight === 'function');
   for (const name of names) {
     const view = VIEWS[name]!; const [, x, z, yaw, pitch = 0] = view;
-    await page.evaluate(([x, z, yaw, pitch]) => (window as unknown as { __livistone: Hook }).__livistone.teleport(x, z, yaw, 1.05, pitch), [x, z, yaw, pitch] as const);
+    const y = await page.evaluate(([x, z]) => (window as unknown as { __livistone: Hook }).__livistone.standingHeight?.(x, z) ?? 1.05, [x, z] as const);
+    await page.evaluate(([x, z, yaw, y, pitch]) => (window as unknown as { __livistone: Hook }).__livistone.teleport(x, z, yaw, y, pitch), [x, z, yaw, y, pitch] as const);
     await settle(software ? 3 : 8);
     // Thumbnails and lazily built galleries finish asynchronously; give the network a moment, then settle again.
     await page.waitForLoadState('networkidle').catch(() => undefined); await still(software ? 2 : 4); await settle(software ? 2 : 6);
@@ -108,7 +113,7 @@ try {
     console.log(`  ${profile}/${time}/${name}`);
   }
 } finally {
-  writeFileSync(`${dir}/captures.json`, JSON.stringify({ profile, time, set: setArg, url: url.href, commit, backend: captures[0]?.snapshot.backend ?? null, webgpuFlags: !!webgpu.length, readyMs, browser: browser.version(), viewport: { width: 1280, height: 800 }, capturedAt: new Date().toISOString(), errors, captures }, null, 2) + '\n');
+  writeFileSync(`${dir}/captures.json`, JSON.stringify({ profile, time, set: setArg, url: url.href, commit, backend: captures[0]?.snapshot.backend ?? null, webgpuFlags: !!webgpu.length, readyMs, teleport: standing ? 'standing' : 'fixed y 1.05', browser: browser.version(), viewport: { width: 1280, height: 800 }, capturedAt: new Date().toISOString(), errors, captures }, null, 2) + '\n');
   await browser.close();
 }
 console.log(`${dir}: ${captures.length}/${names.length} captures; errors: ${errors.length ? JSON.stringify(errors) : 'none'}`);

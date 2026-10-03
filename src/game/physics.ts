@@ -57,6 +57,12 @@ export class Physics {
     if (this.grounded || (vertical > 0 && move.y < vertical * dt - .001)) this.verticalVelocity = -0.3;
   }
   position(): { x: number; y: number; z: number } { return this.body.translation(); }
+  /** Dev captures: a teleport height just above where the capsule rests (its 2.5 cm skin plus 2.5 cm to settle) when dropped
+   *  from (x, fromY, z), or null over nothing. The capsule itself is cast, so a kerb or step under its rim holds it as walking does. */
+  standingHeight(x: number, z: number, fromY: number): number | null {
+    const hit = this.world.castShape({ x, y: fromY, z }, { x: 0, y: 0, z: 0, w: 1 }, { x: 0, y: -1, z: 0 }, this.collider.shape, 0, 100, false, undefined, undefined, this.collider, this.body);
+    return hit ? fromY - hit.time_of_impact + .05 : null;
+  }
   teleport(position: { x: number; y: number; z: number } = SPAWN): void {
     const next = { x: position.x, y: position.y, z: position.z };
     this.body.setTranslation(next, true);

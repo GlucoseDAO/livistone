@@ -331,7 +331,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   driven headlessly through Rapier (`tests/physics.test.ts` walks a capsule into a wall).
 - Playwright drives the real game in Chrome through `window.__livistone`, which exposes
   `snapshot()` (mode, position, yaw, fps, draw calls, triangles, progress,
-  `reducedGraphics`, `backend`: `webgpu` or `webgl2-fallback`, and `budget`, the last frame's draws by town group) and `teleport(x, z, yaw)`. **That hook is test infrastructure —
+  `reducedGraphics`, `backend`: `webgpu` or `webgl2-fallback`, and `budget`, the last frame's draws by town group) and `teleport(x, z, yaw)`; the realism captures also call the additive dev-only `standingHeight(x, z)` (a capsule cast onto whatever lies under the view: ground, deck or floor) instead of a fixed y. **That hook is test infrastructure —
   keep it working and keep its shape stable**, including the mobile-viewport run with
   touch emulation.
 - Browser tests launch headless Chrome with GPU flags and fall back to whatever Chrome

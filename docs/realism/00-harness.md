@@ -31,6 +31,7 @@ See [README](README.md) for the shared workflow. This sub-plan creates the tools
      - `water`: bridge-bank, east-tributary, a shore close-up at about 1 m above the water, west-tributary, Vittoria Lake, mycelium-grove
      - `all`
    - For each view: teleport through `window.__livistone.teleport`, set the pitch the way `screenshot-landmarks.mjs` does, wait for two frames, then save the screenshot.
+     October 2026 (`fix/round-2-known-issues`): the teleport height is no longer a fixed y = 1.05. The harness asks the dev hook's `standingHeight(x, z)`, which casts the player capsule down from 2.2 m above the terrain, so every view stands on its ground, bridge deck or floor; `captures.json` records `teleport: 'standing'` (or `'fixed y 1.05'` against a server without the hook). The fixed height had sunk the capsule into raised meadow, so `north-meadow` is now a standing view, not a low one; low-eye ground captures use `LIVISTONE_PARAMS=eye=<metres>`, as 13's low-eye review did. See [round-2-leftovers.md](round-2-leftovers.md), section 2, item 7, for the views whose earlier baselines are not comparable.
    - Record `__livistone.snapshot()` per view: draw calls, triangles, fps, graphics tier and `reducedGraphics`. Write `captures.json` with the view list, git commit (`git rev-parse --short HEAD`), profile, time and Chrome version.
    - Collect page errors into the JSON. Treat any error as a failed capture.
 2. **Reproducibility flag.** Add a dev/test-only URL flag, for example `?capture=1`, read only when `import.meta.env.DEV`. It:

@@ -25,6 +25,27 @@ describe('walking physics', () => {
     } finally { physics.dispose(); }
   });
 
+  it('finds the standing height on the ground, a raised meadow or a floor below a point, never on the player', async () => {
+    // Dev captures teleport onto whatever lies under a view (main.ts standingHeight): a fixed height sank into raised ground.
+    const physics = await Physics.create([floor, { type: 'box', position: [6, .35, 0], size: [2, .35, 2] }, { type: 'box', position: [-6, 2.1, 0], size: [2, .1, 2] }]);
+    try {
+      physics.teleport({ x: 0, y: 1, z: 0 }); for (let i = 0; i < 30; i++) physics.step(0, 0);
+      // Rest height above a surface; each teleport starts a couple of centimetres above it and settles.
+      const standing = physics.position().y, above = (ground: number, height: number | null): void => { expect(height! - ground - standing).toBeGreaterThan(.01); expect(height! - ground - standing).toBeLessThan(.04); };
+      // The player's own capsule is not a floor: from above it the ray reaches the ground beneath.
+      above(0, physics.standingHeight(0, 0, 3)); above(.7, physics.standingHeight(6, 0, 3.5));
+      // A floor above the capsule's start is ignored; below it, the floor is found.
+      above(0, physics.standingHeight(-6, 0, 1.1)); above(2.2, physics.standingHeight(-6, 0, 3.5));
+      // A raised edge under the capsule's rim holds it on its rounded foot, as walking would, rather than letting it sink beside the edge.
+      expect(physics.standingHeight(3.8, 0, 3)! - standing).toBeGreaterThan(.6);
+      expect(physics.standingHeight(40, 0, 3)).toBeNull();
+      for (const [x, ground] of [[6, .7], [-6, 2.2]]) {
+        physics.teleport({ x, y: physics.standingHeight(x, 0, 3.5)!, z: 0 }); for (let i = 0; i < 30; i++) physics.step(0, 0);
+        expect(physics.position().y).toBeCloseTo(ground + standing, 2);
+      }
+    } finally { physics.dispose(); }
+  });
+
   it('stops at solid walls while remaining on the ground', async () => {
     const physics = await Physics.create([floor, { type: 'box', position: [0, 2, -2], size: [5, 2, 0.2] }]);
     physics.teleport({ x: 0, y: 1, z: 2 });
