@@ -40,7 +40,8 @@ import { RenderScale, SCALE_RULES } from './game/render-scale';
 import { BUDGET_OFF, trackDraws } from './game/render-budget';
 import type { DrawCost } from './game/render-budget';
 import { aerialFogNode, aerialParams, setAerial } from './render/aerial';
-import { ReflectionProbes, probesEnabled } from './world/probes';
+import { ProbeEnvironment, ReflectionProbes, probesEnabled, refreshEnvironment } from './world/probes';
+import type { ProbeBake } from './world/probes';
 
 // The map's range fog; walking, the cpu tier fogs linearly from CPU_FOG_NEAR to its full-fog distance (GraphicsProfile.fog).
 const MAP_FOG = { near: 240, far: 630 }, CPU_FOG_NEAR = 42;
@@ -86,7 +87,14 @@ class Game {
   private nightLighting!: NightLighting;
   /** Sub-plan 07's reflection probes; none on the cpu tier or with dev-only ?probes=off. */
   private probes: ReflectionProbes | null = null;
-  /** Dev-only: the probe bakes' main-thread and GPU-complete milliseconds per phase (snapshot().probes). */
+  /** The environment every lit surface samples on gpu and mobile: the phase's sky, or a building's probe once baked. */
+  private environment: ProbeEnvironment | null = null;
+  /** The probe bake in progress, a face per frame after the town is ready; frames to wait before its first step. */
+  private bake: ProbeBake | null = null;
+  private bakeWait = 0;
+  /** The loading map's view, from which the bakes see the town (planting and grove detail follow a camera). */
+  private readonly bakeCamera = new THREE.PerspectiveCamera(44, 1, 0.2, 800);
+  /** Dev-only: when each phase's bake started, finished and was drawn by the GPU, in page milliseconds (snapshot().probes). */
   private readonly probeTimes: Record<string, number> = {};
   /** Dev-only: when each loading step finished, in page milliseconds (snapshot().load); `…Gpu` when the GPU had finished its work. */
   private readonly loadTimes: Record<string, number> = {};
@@ -118,6 +126,9 @@ class Game {
   private readonly shadowAim = new THREE.Vector3();
   private readonly shadowCenter = new THREE.Vector3(Infinity, 0, 0);
   private shadowHalf = 0;
+  /** The light direction and map size the shadow map was last framed for. */
+  private readonly shadowLight = new THREE.Vector3();
+  private shadowSize = 0;
   private readonly progress = readProgress();
   private readonly raycaster = new THREE.Raycaster();
   private readonly direction = new THREE.Vector3();
@@ -190,7 +201,13 @@ class Game {
     // The shadow camera also draws the forest's shadow-only meshes, which the view cameras skip.
     this.sun.shadow.camera.layers.enable(SHADOW_LAYER);
     this.scene.add(this.sun, this.sun.target); installShadowFade(this.sun); this.aimSun();
-    const sky = createSky(this.renderer, this.reduced, this.night, this.graphics.tier, LOOK === 'b'); this.skies.set(this.night, sky); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = this.graphics.tier === 'cpu' ? null : sky.environment;
+    const sky = createSky(this.renderer, this.reduced, this.night, this.graphics.tier, LOOK === 'b'); this.skies.set(this.night, sky); this.skyBackground = sky.background; this.scene.background = sky.background;
+    // One environment node for the whole session (sub-plan 07): a phase switch swaps its textures, where a new scene.environment
+    // texture would have rebuilt every lit material's shader, and the probes bake later with nothing to build.
+    if (this.graphics.tier !== 'cpu') {
+      this.environment = new ProbeEnvironment(sky.environment);
+      for (const scene of [this.scene, this.distant]) (scene as THREE.Scene & { environmentNode: unknown }).environmentNode = this.environment;
+    }
     this.scene.environmentIntensity = this.light.environment; this.syncDistant();
     // Set once, before any shader is built: a different fog node would rebuild every material. Uniforms switch it per view.
     if (this.graphics.tier !== 'cpu') (this.scene as THREE.Scene & { fogNode: unknown }).fogNode = aerialFogNode;
@@ -224,7 +241,7 @@ class Game {
     this.resize();
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, post: this.post, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined, probes: this.probes ? { ...this.probeTimes, materials: this.probes.materials.size } : null, load: { ...this.loadTimes }, shaders: view.shaders() }),
+        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, post: this.post, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined, probes: this.probes ? { ...this.probeTimes, ...Object.fromEntries(Object.entries(this.probes.timings).flatMap(([phase, time]) => [[phase, time.ms], [phase + 'Steps', time.steps]])), materials: this.probes.materials.size, baking: this.bake?.phase ?? null } : null, load: { ...this.loadTimes }, shaders: view.shaders() }),
         teleport: (x: number, z: number, yaw = 0, y = 1.05, pitch = 0) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = pitch; this.accumulator = 0; },
         // The capture harness stands on whatever lies under a view, ground, deck or floor, looking from 2.2 m above the terrain.
         standingHeight: (x: number, z: number) => this.physics?.standingHeight(x, z, terrainHeight(x, z) + 2.2) ?? null,
@@ -270,9 +287,8 @@ class Game {
       await loadingStage(86, 'Preparing the CPU graphics profile…');
       const { prepareCpuDetail } = await import('./world/cpu-detail'); this.cpuGeometry = await prepareCpuDetail(this.town.root, this.skyBackground);
     }
-    // Probe materials (and the per-building copies of shared ones) exist before the night lighting collects its emissive
-    // materials and before the precompile, so neither a phase switch nor the first frame rebuilds a shader for them.
-    if (this.graphics.tier !== 'cpu' && probesEnabled()) this.probes = new ReflectionProbes(this.town.probeScopes(), this.town.root, this.skies.get(this.night)!.environment, this.graphics.tier === 'gpu' ? 256 : 128);
+    // Probe surfaces take the environment node before the precompile, so their shaders build once, with every other one.
+    if (this.environment && probesEnabled()) this.probes = new ReflectionProbes(this.town.probeScopes(), this.town.root, this.environment, this.graphics.tier === 'gpu' ? 256 : 128);
     this.pointReflections(this.skies.get(this.night)!);
     this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced, this.graphics.tier); this.nightLighting.setNight(this.night);
     // The distant pass draws its own copies of the ranges, which the map sees in the town (FAR_LAYER).
@@ -290,7 +306,9 @@ class Game {
     if (this.ranges) await this.output.compile(this.syncFar(), [...this.distant.children], 6, this.distant);
     if (this.graphics.shadows) { this.sun.shadow.needsUpdate = true; this.render(this.walkCamera); }
     this.mark('shadowed', true);
-    this.town.warmUp(false); this.bakeProbes(); this.town.update(this.elapsed, this.walkCamera, this.graphics.fog, false, this.sun.shadow);
+    this.town.warmUp(false); this.town.update(this.elapsed, this.walkCamera, this.graphics.fog, false, this.sun.shadow);
+    // The probes bake once the town is walkable, from the loading map's view and under the shadow box rendered just now.
+    this.bakeCamera.copy(this.mapCamera); this.startBake();
     this.mark('baked', true);
     await loadingStage(100, 'Welcome to Livistone');
     this.lastTime = performance.now(); this.frameId = requestAnimationFrame(this.frame);
@@ -305,7 +323,7 @@ class Game {
   /** The distant scene follows the phase: its sky, reflections and the town's sun or moon and sky light. */
   private syncDistant(): void {
     if (!this.ranges) return;
-    this.distant.background = this.skyBackground; this.distant.environment = this.scene.environment; this.distant.environmentIntensity = this.scene.environmentIntensity;
+    this.distant.background = this.skyBackground; this.distant.environmentIntensity = this.scene.environmentIntensity;
     this.distantSun.color.copy(this.sun.color); this.distantSun.intensity = this.sun.intensity; this.distantSun.position.copy(this.sunDirection).multiplyScalar(100);
     this.distantHemi.color.copy(this.hemi.color); this.distantHemi.groundColor.copy(this.hemi.groundColor); this.distantHemi.intensity = this.hemi.intensity;
   }
@@ -321,7 +339,7 @@ class Game {
    * the sky behind it, complete at GraphicsProfile.fog. The map, and the cpu tier while walking, keep a range fog that the output
    * pass mixes toward the displayed horizon after tone mapping, as the classic renderer did. Walking, the distant ranges keep
    * sub-plan 26's valley mist and haze in the output pass; at their distance the town's own fog is complete. `walking` forces
-   * the walking fog for the probe bake, which also runs while the loading map is up.
+   * the walking fog for a probe bake step, which also runs while the map is up.
    */
   private setFog(walking = !this.mapView): void {
     const aerial = walking && this.graphics.tier !== 'cpu', range = walking ? { near: CPU_FOG_NEAR, far: this.graphics.fog } : MAP_FOG;
@@ -514,66 +532,95 @@ class Game {
   private applyTimeOfDay(): void {
     const night = resolveNight(this.timeOfDay); if (night === this.night) return; this.night = night;
     let sky = this.skies.get(night); if (!sky) { sky = createSky(this.renderer, this.reduced, night, this.graphics.tier, LOOK === 'b'); this.skies.set(night, sky); }
-    this.skyBackground = sky.background; this.scene.environment = this.graphics.tier === 'cpu' ? null : sky.environment;
-    this.pointReflections(sky); this.scene.environmentIntensity = this.light.environment;
+    this.skyBackground = sky.background; this.pointReflections(sky); this.scene.environmentIntensity = this.light.environment;
+    // A bake of the other phase stops; this phase bakes now if it has no probes yet, before the sun re-frames its shadow box.
+    if (this.bake && this.bake.phase !== this.phase) { this.bake.cancel(); this.bake = null; }
+    this.showProbes(); this.startBake();
+    if (this.environment) { refreshEnvironment(this.scene, this.phase); refreshEnvironment(this.distant, this.phase); }
     this.renderer.toneMappingExposure = SKY_EXPOSURE[this.phase];
     this.hemi.color.set(night ? '#8ea4c6' : '#e9f4f0'); this.hemi.groundColor.set(night ? '#121820' : '#73805c'); this.hemi.intensity = this.light.hemi;
     this.sun.color.set(night ? '#c9d6ee' : '#fff0ce'); this.sun.intensity = this.light.sun;
     this.aimSun();
     this.scene.background = this.mapView ? HORIZON_RADIANCE[this.phase].clone() : this.skyBackground; this.setFog();
-    this.nightLighting.setNight(night); this.sun.shadow.needsUpdate = true; setDistantPhase(night); this.syncDistant(); this.bakeProbes();
+    this.nightLighting.setNight(night); this.sun.shadow.needsUpdate = true; setDistantPhase(night); this.syncDistant();
+  }
+  /** Every surface reflects the phase's sky, and each building its own probe once that phase's probe exists. */
+  private showProbes(): void {
+    if (!this.environment) return;
+    const probes = this.probes?.has(this.phase) ? this.probes.probes(this.phase) : this.bake?.phase === this.phase ? this.bake.finished() : new Map<string, THREE.Texture>();
+    this.environment.view = { sky: this.skies.get(this.night)!.environment, probes };
+  }
+  /** Bake the current phase's probes after the next frames, if it has none (the starting phase after loading, the other on its first switch). */
+  private startBake(): void {
+    if (!this.probes || this.probes.has(this.phase) || this.bake) return;
+    this.bake = this.probes.bake(this.phase, this.skies.get(this.night)!, HORIZON_RADIANCE[this.phase]); this.bakeWait = 2;
+    if (import.meta.env.DEV) this.probeTimes[this.phase + 'Start'] = Math.round(performance.now());
   }
   /**
-   * Show the current phase's reflection probes, baking them first if this phase has none yet (at load, and lazily on the first
-   * switch to the other phase). Bakes see the town as the map does, every forest cell and room drawn under the map's
-   * whole-town shadow box, then hand the next frame back to the walking state.
+   * One face of the probe bake, after the frame has rendered. The bake sees the town as the loading map did: every forest cell
+   * and room drawn, under the whole-town shadow box that frameShadow holds meanwhile, with the walking fog, the near details
+   * hidden, and the sky in every other building's reflection. The next frame's town update hands it back to the walking view.
    */
-  private bakeProbes(): void {
-    const probes = this.probes; if (!probes) return;
-    const sky = this.skies.get(this.night)!;
-    if (!probes.has(this.phase)) {
-      const shadow = this.graphics.shadows ? this.sun.shadow : undefined;
-      // Loading already baked the map's shadow box; a later switch re-frames it over the whole town for the bake.
-      const reframe = !!shadow && !this.mapView; if (reframe) this.frameShadow(true, true);
-      // A switch made from the map's menu would otherwise bake empty halls: the map hides interiors and contact shadows.
-      const map = this.mapView && this.mode !== 'welcome'; if (map) this.town.setMapMode(false);
-      this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true, shadow); this.setFog(true);
-      // The output pipeline's scene target and MRT (render/output.ts), so the bake reuses every compiled shader.
-      const { target, targets } = this.output as unknown as { target?: THREE.RenderTarget; targets?: Parameters<THREE.WebGPURenderer['setMRT']>[0] };
-      const phase = this.phase, start = performance.now();
-      this.probeTimes[phase] = probes.bake(this.renderer, this.scene, target ? { target, mrt: targets ?? null } : null, phase, sky, [this.town.details], HORIZON_RADIANCE[phase], position => { this.probeEye.position.copy(position); this.nightLighting.update(this.probeEye); this.town.surround(position); }, this.ranges ? { scene: this.distant, far: FAR_VIEW } : null);
-      const device = (this.renderer.backend as { device?: { queue: { onSubmittedWorkDone(): Promise<void> } } }).device;
-      if (import.meta.env.DEV && device) void device.queue.onSubmittedWorkDone().then(() => { this.probeTimes[phase + 'Gpu'] = Math.round(performance.now() - start); });
-      if (reframe) this.frameShadow(true); if (map) this.town.setMapMode(true); this.setFog();
+  private bakeStep(): void {
+    const bake = this.bake!; if (this.bakeWait > 0) { this.bakeWait--; return; }
+    const environment = this.environment!, view = environment.view, fade = shadowFade.value.clone();
+    // A bake seen from the map's menu would otherwise draw empty halls: the map hides interiors and contact shadows.
+    const map = this.mapView; if (map) this.town.setMapMode(false);
+    // Game time 0, as loading saw it: the trees' sway and the water's ripples then match from one bake to the next.
+    this.town.update(0, this.bakeCamera, MAP_FOG.far, true, this.graphics.shadows ? this.sun.shadow : undefined); this.setFog(true);
+    shadowFade.value.set(0, 0); environment.view = bake.view;
+    // The output pipeline's scene target and MRT (render/output.ts), so the bake reuses every compiled shader.
+    const { target, targets } = this.output as unknown as { target?: THREE.RenderTarget; targets?: Parameters<THREE.WebGPURenderer['setMRT']>[0] };
+    try {
+      bake.step({ renderer: this.renderer, scene: this.scene, source: target ? { target, mrt: targets ?? null } : null, hidden: [this.town.details], distant: this.ranges ? { scene: this.distant, far: FAR_VIEW } : null,
+        visit: position => { this.probeEye.position.copy(position); this.nightLighting.update(this.probeEye); this.town.surround(position); } });
+    } finally { environment.view = view; shadowFade.value.copy(fade); this.setFog(); if (map) this.town.setMapMode(true); }
+    if (!bake.done) { if (bake.finished().size !== view.probes.size) this.showProbes(); return; }
+    this.bake = null; this.showProbes(); this.frameShadow(true);
+    if (import.meta.env.DEV) {
+      const phase = bake.phase, device = (this.renderer.backend as { device?: { queue: { onSubmittedWorkDone(): Promise<void> } } }).device;
+      this.probeTimes[phase + 'End'] = Math.round(performance.now());
+      if (device) void device.queue.onSubmittedWorkDone().then(() => { this.probeTimes[phase + 'Gpu'] = Math.round(performance.now()); });
     }
-    probes.show(this.phase, sky.environment); probes.setFill(this.light.environment);
+    // Both phases baked: the bake's targets and generators go.
+    if (this.probes!.has('day') && this.probes!.has('night')) this.probes!.release();
   }
   /** r186 gives any material without its own envMap scene.environmentIntensity instead of its envMapIntensity, so heroEnv
-   *  materials carry the sky explicitly (look b). CPU Lambert metals sample the plain cube instead; no PMREM exists there. */
+   *  materials keep an envMap for their own strength (look b) and sample the environment node, which follows the phase without
+   *  a rebuild. CPU Lambert metals sample the plain cube instead; no PMREM exists there. */
   private pointReflections(sky: ReturnType<typeof createSky>): void {
-    const cpu = this.graphics.tier === 'cpu'; if (!cpu && LOOK === 'a') return;
+    const cpu = this.graphics.tier === 'cpu'; if (!cpu && (LOOK === 'a' || !this.environment)) return;
+    const environment = this.environment as unknown as THREE.Node;
     this.scene.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
       for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
         if (cpu) { if (material instanceof THREE.MeshLambertMaterial && material.envMap) material.envMap = sky.background; }
-        else if (material.userData.heroEnv && !material.userData.probe && (material instanceof THREE.MeshStandardMaterial || (material as THREE.MeshStandardNodeMaterial).isMeshStandardNodeMaterial)) (material as THREE.MeshStandardMaterial).envMap = sky.environment;
+        else if (material.userData.heroEnv && (material instanceof THREE.MeshStandardMaterial || (material as THREE.MeshStandardNodeMaterial).isMeshStandardNodeMaterial)) {
+          const standard = material as THREE.MeshStandardMaterial & { envNode?: THREE.Node | null };
+          if (standard.envNode !== environment) { standard.envNode = environment; standard.envMap ??= sky.environment; standard.needsUpdate = true; }
+        }
       }
     });
   }
   private aimSun(): void { this.sunDirection.copy(this.night ? MOON_DIR : SUN_DIR); this.frameShadow(true); }
   /** Fit the sun's shadow box to the view and re-bake only when forced or after the box centre drifts a quarter box, so standing still costs no shadow pass. */
   private frameShadow(force = false, map = this.mapView): void {
-    const camera = this.sun.shadow.camera, size = this.sun.shadow.mapSize.x;
-    const walking = !map && !!this.physics, half = walking ? (size >= 2048 ? SHADOW.walk : SHADOW.walkReduced) : SHADOW.map;
-    if (walking) { const p = this.physics!.position(), lead = half * SHADOW.lead; this.shadowAim.set(p.x - Math.sin(this.input.yaw) * lead, p.y, p.z - Math.cos(this.input.yaw) * lead); }
+    const camera = this.sun.shadow.camera, size = this.sun.shadow.mapSize.x, walkHalf = size >= 2048 ? SHADOW.walk : SHADOW.walkReduced;
+    // While probes bake (sub-plan 07) the map's whole-town box stays: the bake's faces need every building's shadow, which the
+    // walking box would leave out. Walking frames take it with their own fade; it renders again only for a new light direction
+    // or map size, so each probe sees the shadows the first one did.
+    const held = !!this.bake, walking = !map && !!this.physics, half = walking && !held ? walkHalf : SHADOW.map;
+    if (walking && !held) { const p = this.physics!.position(), lead = half * SHADOW.lead; this.shadowAim.set(p.x - Math.sin(this.input.yaw) * lead, p.y, p.z - Math.cos(this.input.yaw) * lead); }
     else this.shadowAim.copy(SHADOW_TARGET);
-    if (!force && half === this.shadowHalf && this.shadowAim.distanceTo(this.shadowCenter) < half / 4) return;
-    this.shadowCenter.copy(this.shadowAim); this.shadowHalf = half;
+    if (held) shadowFade.value.set(walking ? walkHalf * SHADOW.fade[0] : 0, walking ? walkHalf * SHADOW.fade[1] : 0);
+    const kept = half === this.shadowHalf && this.shadowAim.distanceTo(this.shadowCenter) < half / 4;
+    if (kept && (!force || (held && this.shadowLight.equals(this.sunDirection) && this.shadowSize === size))) return;
+    this.shadowCenter.copy(this.shadowAim); this.shadowHalf = half; this.shadowLight.copy(this.sunDirection); this.shadowSize = size;
     const frame = shadowFrame(this.shadowAim, half, size, this.sunDirection);
     camera.left = frame.left; camera.right = frame.right; camera.top = frame.top; camera.bottom = frame.bottom; camera.updateProjectionMatrix();
     this.sun.target.position.set(frame.target.x, frame.target.y, frame.target.z); this.sun.position.copy(this.sun.target.position).addScaledVector(this.sunDirection, SUN_DISTANCE);
     this.sun.shadow.normalBias = frame.texel * SHADOW.normalBias; this.sun.shadow.bias = -SHADOW.bias / (camera.far - camera.near);
-    shadowFade.value.set(walking ? half * SHADOW.fade[0] : 0, walking ? half * SHADOW.fade[1] : 0);
+    shadowFade.value.set(walking ? walkHalf * SHADOW.fade[0] : 0, walking ? walkHalf * SHADOW.fade[1] : 0);
     // The forest culls its shadow casters against this frustum before the next bake.
     this.sun.updateMatrixWorld(); this.sun.target.updateMatrixWorld(); this.sun.shadow.updateMatrices(this.sun);
     this.sun.shadow.needsUpdate = true;
@@ -684,11 +731,13 @@ class Game {
     const camera = this.mapView ? this.mapCamera : this.walkCamera;
     // The shadow box first: the forest picks its shadow casters from the frustum this frame bakes with.
     if (this.graphics.shadows) this.frameShadow();
-    // Walking re-bakes when near shrubs or tree detail change, so their shadows appear with them; the map keeps its one bake.
-    if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : this.graphics.fog, this.mapView, this.graphics.shadows ? this.sun.shadow : undefined) && !this.mapView && this.graphics.shadows) this.sun.shadow.needsUpdate = true;
+    // Walking re-bakes when near shrubs or tree detail change, so their shadows appear with them; the map keeps its one bake, and
+    // so does a probe bake, whose whole-town box already holds every tree.
+    if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : this.graphics.fog, this.mapView, this.graphics.shadows ? this.sun.shadow : undefined) && !this.mapView && this.graphics.shadows && !this.bake) this.sun.shadow.needsUpdate = true;
     this.updateExhibitionControls();
     this.clockCheck += rawDt; if (this.clockCheck > 30) { this.clockCheck = 0; if (this.timeOfDay === 'auto') void this.followTimeOfDay(); }
     this.nightLighting.update(camera); this.render(camera);
+    if (this.bake) this.bakeStep();
     if (this.cursorDirty) { this.cursorDirty = false; this.updateCursor(); }
     this.frames++; this.fpsFrames++; this.fpsTime += rawDt;
     if (this.fpsTime >= 1) { this.fps = Math.round(this.fpsFrames / this.fpsTime);

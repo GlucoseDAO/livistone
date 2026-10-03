@@ -126,12 +126,15 @@ const still = async (frames: number) => {
     return s.frames - w.__still.since >= n;
   }, frames, { timeout: frameTimeout, polling: 100 });
 };
-let readyMs: number | null = null, standing = false;
+let readyMs: number | null = null, probesMs: number | null = null, standing = false;
 try {
   const loadStart = performance.now();
   await page.goto(url.href, { timeout: 120_000 });
   await page.waitForFunction(() => { const hook = (window as unknown as { __livistone?: Hook }).__livistone; return !!hook && hook.snapshot().ready && hook.snapshot().mode === 'walking'; }, null, { timeout: software ? 600_000 : 180_000 });
   readyMs = Math.round(performance.now() - loadStart);
+  // Sub-plan 07 bakes the reflection probes after ready, a face per frame: wait for the bake, so every view shows the final look.
+  await page.waitForFunction(() => !((window as unknown as { __livistone: Hook }).__livistone.snapshot().probes as { baking?: string | null } | null)?.baking, null, { timeout: software ? 600_000 : 240_000, polling: 200 });
+  probesMs = Math.round(performance.now() - loadStart);
   if (!(await page.evaluate(() => (window as unknown as { __livistone: Hook }).__livistone.snapshot().capture))) errors.push('Server ignored ?capture=1; captures are not frozen (is this a dev server with the 00 harness?).');
   await page.addStyleTag({ content: '#app > :not(canvas) { visibility: hidden !important; }' });
   // Each view stands on whatever lies under it (ground, bridge deck or floor) through the hook's standingHeight. The fixed
@@ -154,7 +157,7 @@ try {
     console.log(`  ${profile}/${time}/${name}`);
   }
 } finally {
-  writeFileSync(`${dir}/captures.json`, JSON.stringify({ profile, time, set: setArg, url: url.href, commit, backend: captures[0]?.snapshot.backend ?? null, webgpuFlags: !!webgpu.length, readyMs, teleport: standing ? 'standing' : 'fixed y 1.05', browser: browser.version(), viewport: { width: 1280, height: 800 }, capturedAt: new Date().toISOString(), errors, captures }, null, 2) + '\n');
+  writeFileSync(`${dir}/captures.json`, JSON.stringify({ profile, time, set: setArg, url: url.href, commit, backend: captures[0]?.snapshot.backend ?? null, webgpuFlags: !!webgpu.length, readyMs, probesMs, teleport: standing ? 'standing' : 'fixed y 1.05', browser: browser.version(), viewport: { width: 1280, height: 800 }, capturedAt: new Date().toISOString(), errors, captures }, null, 2) + '\n');
   await browser.close();
 }
 console.log(`${dir}: ${captures.length}/${names.length} captures; errors: ${errors.length ? JSON.stringify(errors) : 'none'}`);
