@@ -3,7 +3,9 @@
 **Needs:** 02. **Tiers:** gpu and mobile; cpu has none. **Branch:** `realism/07-probes`.
 See [README](README.md) for the shared workflow.
 
-> **Status, 3 October 2026:** implemented on `realism/07-probes` (`src/world/probes.ts`, `tests/probes.test.ts`, dev switch `?probes=off`); measured load time and memory are in [docs/3d-game-plan.md](../3d-game-plan.md#reflection-probes-realism-07--3-october-2026). Exterior and interior probes as below; the river probes (step 1, third item) are not done. Interiors are 128 px on gpu and 64 on mobile. Review page: `review/07-probes`.
+> **Status, 3 October 2026: approved by the owner.** Rebased onto `main` with the physical sky, distant ranges (exterior probes draw them, as the walking view's distant pass does), ambient occlusion and bloom (never run inside a bake). Review on today's `main`: `review/07-final` (the `materials` view set, desktop day and night, touch day). Load time grew by about 2.3–3.9 s here, over the 300 ms target; see the measurements linked below.
+>
+> Implemented on `realism/07-probes` (`src/world/probes.ts`, `tests/probes.test.ts`, dev switch `?probes=off`); measured load time and memory are in [docs/3d-game-plan.md](../3d-game-plan.md#reflection-probes-realism-07--3-october-2026). Exterior and interior probes as below; the river probes (step 1, third item) are not done. Interiors are 128 px on gpu and 64 on mobile. Review page: `review/07-probes`.
 
 ## Why
 

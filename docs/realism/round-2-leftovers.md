@@ -67,7 +67,7 @@ In order of expected visible change:
 1. **18 Ambient occlusion and restrained bloom.** Merged into `main` (`b41c688`, `619a902`).
 2. **17 Wind and foliage.** Merged into `main`: trees, shrubs, flowers, tufts and reeds sway on the shared wind clock; leaf cards use alpha-to-coverage. See [17-wind.md](17-wind.md#outcome-round-2-realism17-wind-3-october-2026).
 3. **05 Golden hour.** A TSL sky preset; `HORIZON_HAZE.golden` and `HORIZON_RADIANCE.golden`.
-4. **07 Reflection probes → 08 building materials.** 08 uses the local reference photos.
+4. **07 Reflection probes → 08 building materials.** 08 uses the local reference photos. *07 approved by the owner on 3 October 2026 and rebased onto `main` (branch `realism/07-probes`, review `review/07-final`); its load-time cost is in [docs/3d-game-plan.md](../3d-game-plan.md#reflection-probes-realism-07--3-october-2026).*
 5. **12 Gallery posters.** Real paper colour, frames, residency.
 6. **15 Water reflections.** The `ssr()` node first.
 
