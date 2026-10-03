@@ -31,7 +31,7 @@ import { cpuWaterColour, waterMaterial } from './water-material';
 import { waterSurfaceGeometry } from './water-surface';
 import type { RockSite } from './water-surface';
 import { pavingMaterial, riverRockSites, rockMaterial } from './stone';
-import { createRiverRocks, rockColliders, rockReach } from './river-rocks';
+import { createRiverRocks, rockColliders } from './river-rocks';
 import { createPebbles } from './pebbles';
 import { shoreTime } from './shore-nodes';
 import type { ShorePebbles } from './pebbles';
@@ -52,7 +52,7 @@ import type { ProbeScope } from './probes';
 import { MOUNTAIN, snowCover } from './mountain-layout';
 import { createTrailSigns, paintTrailSigns, trailBoulders } from './mountain-trail';
 import { createAlpinePlants } from './alpine-plants';
-import { CRAGS, CRAG_REGION, cragSites, createCrags, useCragMaps } from './crags';
+import { CRAGS, CragGround, cragObstacles, cragSites, createCrags, useCragMaps } from './crags';
 import type { Crags } from './crags';
 import type { ContactSite } from './contact-shadows';
 
@@ -412,9 +412,10 @@ export class Town {
     if (CRAGS) {
       // Sub-plan 27 round 2: limestone crags wherever the mountain is steep, clear of trunks and the trail's boulders; one draw,
       // and one collider on every tier.
-      const near = (p: { x: number; z: number }): boolean => p.x > CRAG_REGION.minX - 12 && p.x < CRAG_REGION.maxX + 12 && p.z > CRAG_REGION.minZ - 12 && p.z < CRAG_REGION.maxZ + 12;
-      const obstacles = [...this.forest.sites.filter(near).map(t => ({ x: t.x, z: t.z, radius: .8 })), ...this.boulders.filter(near).map(b => ({ x: b.x, z: b.z, radius: rockReach(b.s) + .2 }))];
-      this.crags = createCrags(this.tier, cragSites({ obstacles })); this.root.add(this.crags.mesh); this.colliders.push(this.crags.collider);
+      const obstacles = cragObstacles(this.forest.sites, this.boulders);
+      // The ground under them comes from the collider grid's heights, already computed.
+      const ground = new CragGround((x, z) => terrainVertexHeight(this.terrainVertices, x, z));
+      this.crags = createCrags(this.tier, cragSites({ obstacles, ground }), ground); this.root.add(this.crags.mesh); this.colliders.push(this.crags.collider);
     }
     const grass = createGrassField(this.tier, { rocks, stems: [...this.gardens.stems, ...this.crags?.discs ?? []], height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
     if (grass) { this.details.add(grass.mesh); this.grassShade = grass.ground; }

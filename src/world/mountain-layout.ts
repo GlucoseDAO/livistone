@@ -486,8 +486,18 @@ export function cragFloorClear(x: number, z: number, boulder: boolean): boolean 
   if (g.side === PASSAGE_CABLE.side && g.s >= PASSAGE_CABLE.from - 1 && g.s <= PASSAGE_CABLE.to + 1) limit = Math.max(limit, PASSAGE_CABLE.offset(g.s) + .05);
   return g.d >= (boulder ? Math.min(limit, TRAIL_HALF + 1) : limit);
 }
-/** Ground no crag block stands on: the old snow and the plateau's meadow. */
-export function cragKeepsOff(x: number, z: number): boolean { return snowCover(x, z) > .2 || plateauInside(x, z) > 0; }
+/** Distance from the gorge's axis to the top of its walls at trail sample `s`: the floor's half-width and the wall's steep run. */
+export function gorgeRim(s: number): number { return gorgeHalf(s) + wallRun(s); }
+/** Old snow, where no crag block stands. */
+export function cragOnSnow(x: number, z: number): boolean { return snowCover(x, z) > .2; }
+/**
+ * The plateau's meadow, where no crag block stands: inside its outline, but past the gorge's north wall, whose cut (gorgeShape) is
+ * rock to the wall's top though the outline reaches over it. (Steep ground at the crags' foot inside it is crags.ts's to judge.)
+ */
+export function cragOnMeadow(x: number, z: number): number {
+  const inside = plateauInside(x, z); if (inside <= 0) return 0;
+  const g = gorgeCoords(x, z); return g && g.d < gorgeRim(g.s) ? 0 : inside;
+}
 
 // ---------------------------------------------------------------------------------------------------------------------
 // The meadow's plants (alpine-plants.ts) and its turf

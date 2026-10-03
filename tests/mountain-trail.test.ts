@@ -10,6 +10,7 @@ import { terrainHeight, terrainSurfaceHeight, townTerrainGeometry } from '../src
 import { FALL_FLOOR, TOWN_BOUNDS } from '../src/world/town-layout';
 import { PLATEAU, STAGE, TRAILHEAD, TRAIL_ARRIVAL, TRAIL_BARRIER, TRAIL_ENTRY, TRAIL_HALF, TRAIL_SAMPLES, TRAIL_TOP, gorgeCoords, gorgeHalf, plateauInside, plateauRadius, snowCover, snowDepth, trailCorridor, trailDistance, trailLevel } from '../src/world/mountain-layout';
 import { createTrailSigns, trailBoulders } from '../src/world/mountain-trail';
+import { cragColliders, cragObstacles, cragSites } from '../src/world/crags';
 import { MAT_EDGE, campionSites, matGrid, matStats, turfFlowers } from '../src/world/alpine-plants';
 
 const walkable = TRAIL_SAMPLES.slice(0, TRAIL_BARRIER.index);
@@ -105,6 +106,8 @@ describe('the Jepii Mici trail (sub-plan 27, round 2)', () => {
     ground.dispose();
     const boulders = trailBoulders(false), trees = forestSites(false), signs = createTrailSigns(colliders, boulders, trees);
     colliders.push(rockColliders([...riverRockSites(false), ...boulders.map(b => b.site)]));
+    // Round 2's crags line the gorge and close in its passage: the walk must get through them (crags.ts).
+    colliders.push(cragColliders(cragSites({ obstacles: cragObstacles(trees, boulders.map(b => b.site)) })));
     for (const { x, y, z } of trees) colliders.push({ type: 'box', position: [x, y + 2, z], size: [.3, 2, .3] });
     // The board hangs with its lower edge above the capsule's head.
     expect(signs.position.y - .45 - terrainSurfaceHeight(TRAILHEAD.x, TRAILHEAD.z)).toBeGreaterThan(1.95);

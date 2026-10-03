@@ -25,8 +25,8 @@ export const ROCK_SCALE = .065;
 const BROAD = .27;
 /** Mean linear luma of rock-color.jpg, so the scan's value can be re-centred on the limestone's. */
 const SCAN_LUMA = .16;
-/** Limestone albedo (linear): the photographs' light grey. Green is held back a little, as the sky's and meadow's fill tints it. */
-const PALE = [.28, .266, .272] as const;
+/** Limestone albedo (linear): the photographs' light, faintly warm grey; the sky's and the meadow's fill already tint it cool and green. */
+const PALE = [.3, .28, .262] as const;
 /** Bedding: about .45 beds per metre of height on average. Joints: Voronoi cells about 5.5 m across in plan. */
 const BED = .45, JOINT = 5.5;
 const LUMA = vec3(.2126, .7152, .0722);
@@ -122,7 +122,7 @@ export function limestoneColour(tier: GraphicsTier, rock: THREE.Texture, at: Lim
   const near = triplanar(rock, at, ROCK_SCALE), scan = (tier === 'cpu' ? near : mix(near, triplanar(rock, at, ROCK_SCALE * BROAD), .45)).toVar();
   const luma = max(dot(scan, LUMA), 1e-3).toVar(), value = luma.div(SCAN_LUMA).toVar();
   // The scan's brown is turned to grey; a trace of its hue keeps some blocks warmer, and its value, steepened, carries the grain.
-  const albedo = vec3(...PALE).mul(mix(vec3(1), scan.div(luma).mul(vec3(.62, 1.02, 1.6)), .14)).mul(pow(value, 1.3)).toVar();
+  const albedo = vec3(...PALE).mul(mix(vec3(1), scan.div(luma), .12)).mul(pow(value, 1.35)).toVar();
   albedo.mulAssign(bricks.shade.add(1)); albedo.mulAssign(float(1).sub(bricks.crack.mul(.62))); albedo.mulAssign(float(1).sub(bricks.groove.mul(.2)));
   const p = at.p, steep = float(1).sub(smoothstep(.3, .78, at.normal.y.abs())).toVar();
   if (tier !== 'cpu') {
@@ -134,7 +134,7 @@ export function limestoneColour(tier: GraphicsTier, rock: THREE.Texture, at: Lim
   albedo.mulAssign(valueNoise(p.xz.div(7.5).add(p.y.mul(.13))).mul(.3).add(.85));
   const lichen = valueNoise(p.xz.mul(1.9).add(p.y.mul(1.3))).mul(.55).add(valueNoise(p.xz.mul(6.1).sub(p.y.mul(4.3))).mul(.45)).toVar();
   albedo.assign(mix(albedo, albedo.mul(.58), smoothstep(.66, .76, lichen).mul(smoothstep(.4, .6, valueNoise(p.xz.mul(.31).add(p.y.mul(.2)))))));
-  albedo.assign(mix(albedo, vec3(.44, .43, .36), float(1).sub(smoothstep(.18, .27, lichen)).mul(.5)));
+  albedo.assign(mix(albedo, vec3(.44, .42, .38), float(1).sub(smoothstep(.18, .27, lichen)).mul(.45)));
   if (moss !== 0) {
     const ledge = smoothstep(.55, .85, at.normal.y).mul(moss).mul(smoothstep(.38, .62, valueNoise(p.xz.mul(.7).add(4.1))));
     albedo.assign(mix(albedo, vec3(.05, .085, .025).mul(valueNoise(p.xz.mul(1.9)).mul(.6).add(.7)), ledge));

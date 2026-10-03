@@ -330,19 +330,19 @@ export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMa
         ground.mulAssign(float(1).sub(texture(grass.mask, uv).level(float(0)).a.mul(near).mul(.32)));
       });
     }
-    // Jointed rock projects the scan by each triangle's own normal: smoothed vertex normals lean toward the sky across the two-metre
-    // grid's folds, and the top-down projection then streaked the scan down the faces. (Derivatives here, outside any branch.)
-    const facet = jointed ? normalize(cross(dFdx(positionLocal), dFdy(positionLocal))).toVar() : n;
-    if (jointed) facet.mulAssign(select(dot(facet, n).lessThan(0), float(-1), float(1)));
+    // Smoothed vertex normals lean toward the sky across the two-metre grid's folds, and the top-down projection then streaked the
+    // scan down steep faces. Jointed rock drops that projection wherever the triangle itself is steep; the side projections keep the
+    // smooth normal's balance, as the triangle's own normal would seam them at every edge. (Derivatives here, outside any branch.)
+    const facet = jointed ? normalize(cross(dFdx(positionLocal), dFdy(positionLocal))) : n;
     const pixel = max(length(GROUND.dpx), length(GROUND.dpy)).div(ROCK_SCALE).toVar();
-    const weights = pow(abs(facet), vec3(4)).toVar(); weights.divAssign(max(dot(weights, vec3(1)), .001)); GROUND.weights.assign(weights);
+    const weights = pow(abs(jointed ? vec3(n.x, n.y.mul(smoothstep(.55, .85, abs(facet.y))), n.z) : n), vec3(4)).toVar(); weights.divAssign(max(dot(weights, vec3(1)), .001)); GROUND.weights.assign(weights);
     const exposed = clamp(smoothstep(.18, .65, float(1).sub(abs(n.y))).add(smoothstep(58, 105, positionLocal.y).mul(.5)), 0, 1).toVar();
     GROUND.rock.assign(0); if (jointed) GROUND.facet.assign(vec3(0));
     // Flat garden ground skips the rock taps; cliffs keep their triplanar detail.
     if (jointed) If(exposed.greaterThan(.01), () => {
       // Sub-plan 27 round 2: the crags' limestone, cut into blocks by bedding planes and joints; the vertex colour's stone is
       // divided out so the rock lands on the blocks' albedo.
-      const at: Limestone = { p: positionLocal, dpx: GROUND.dpx.div(ROCK_SCALE), dpy: GROUND.dpy.div(ROCK_SCALE), weights, normal: facet, pixel }, bricks = limestoneBricks(positionLocal, pixel, tier !== 'cpu');
+      const at: Limestone = { p: positionLocal, dpx: GROUND.dpx.div(ROCK_SCALE), dpy: GROUND.dpy.div(ROCK_SCALE), weights, normal: n, pixel }, bricks = limestoneBricks(positionLocal, pixel, tier !== 'cpu');
       const stone = limestoneColour(tier, maps.rock, at, bricks);
       GROUND.rock.assign(heightWeights(vec3(float(1).sub(exposed), exposed, 0), vec3(height, stone.relief, -2), .2).y);
       ground.assign(mix(ground, stone.albedo.div(vec3(STONE.r, STONE.g, STONE.b)), GROUND.rock)); GROUND.roughness.assign(mix(GROUND.roughness, .9, GROUND.rock));
