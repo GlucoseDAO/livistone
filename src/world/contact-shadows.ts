@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { attribute, smoothstep } from 'three/tsl';
+import { attribute, mix, smoothstep, vec3, vec4 } from 'three/tsl';
 import { CIVIC_LANDMARKS } from '../game/content';
 import { COLLECTION } from '../game/exhibits';
 import { FUTURE_HOUSE, TOWER_WALK } from './elevated-layout';
@@ -17,6 +17,8 @@ import { PLACE_SIGN } from './place-sign';
 import { posterLayout } from './poster-layout';
 import { KEEP_DISPLAY } from '../render/output';
 import { ROCK_STRETCH, rockReach } from './river-rocks';
+import { aerialFactor } from '../render/aerial';
+import type { Node, NodeBuilder } from 'three/webgpu';
 import { STATION, STATION_BENCHES, stationPoint } from './station-layout';
 import { landscapeHeight } from './terrain';
 import { LAMP_POSTS } from './town-layout';
@@ -51,11 +53,20 @@ export function contactShadowTexture(): THREE.DataTexture {
   // No mipmaps: the profile is smooth, and clamping to the clear rim keeps each patch's square corners invisible at any distance.
   texture.minFilter = texture.magFilter = THREE.LinearFilter; texture.needsUpdate = true; return texture;
 }
+/**
+ * The aerial perspective (render/aerial.ts) has already fogged the ground this decal multiplies, so its shade fades toward
+ * white by the same factor: dst × (1 − α + α·mix(shade, 1, fog)). Far patches vanish into the haze instead of darkening it.
+ */
+class ContactShadowMaterial extends THREE.MeshBasicNodeMaterial {
+  // Its own type keeps its shaders apart from a plain basic material's with the same properties.
+  static get type(): string { return 'ContactShadowMaterial'; }
+  setupFog(_builder: NodeBuilder, outputNode: Node<'vec4'>): Node<'vec4'> { return vec4(mix(outputNode.rgb, vec3(1), aerialFactor), outputNode.a) as unknown as Node<'vec4'>; }
+}
 export function contactShadowMaterial(): THREE.MeshBasicNodeMaterial {
   // Multiply scales the ground's own linear light before the output pass tone-maps it: dst × (1 − α + α·shade). The decal keeps
-  // the ground's display mask and fog factor (a zero `display` leaves them unchanged under this blend), so the output pass fogs
-  // the shaded ground exactly as before and far decals fade into the haze. Polygon offset wins against the coplanar ground.
-  const material = new THREE.MeshBasicNodeMaterial({ name: 'Contact shadows', map: contactShadowTexture(), vertexColors: true, transparent: true, premultipliedAlpha: true, blending: THREE.MultiplyBlending, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+  // the ground's display mask and range-fog factor (a zero `display` leaves them unchanged under this blend), so on the map and
+  // the cpu tier the output pass fogs the shaded ground exactly as before. Polygon offset wins against the coplanar ground.
+  const material = new ContactShadowMaterial({ name: 'Contact shadows', map: contactShadowTexture(), vertexColors: true, transparent: true, premultipliedAlpha: true, blending: THREE.MultiplyBlending, depthWrite: false, fog: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
   material.mrtNode = KEEP_DISPLAY;
   // Each vertex carries its waterDistance, which is linear across a 2 m bank cell; the fade itself is per fragment.
   material.opacityNode = smoothstep(CONTACT_WATER_FADE[0], CONTACT_WATER_FADE[1], attribute<'float'>('water', 'float'));

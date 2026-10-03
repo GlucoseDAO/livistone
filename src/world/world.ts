@@ -391,12 +391,16 @@ export class Town {
     if (!CONTACT_OFF) this.root.add(this.contactShadows.mesh);
     this.forest.onCells = this.contactShadows.showGroups;
   }
-  /** Returns whether a shadow caster changed detail or visibility this frame. */
-  update(time: number, camera?: THREE.Camera, fogFar = 220, mapView = false, shadow?: THREE.LightShadow): boolean {
+  /**
+   * Returns whether a shadow caster changed detail or visibility this frame. `fullFog` is where the view's fog is complete
+   * (GraphicsProfile.fog walking): trees and grove crowns are culled only beyond it, except on the cpu tier, which stops at its
+   * own forest range inside its linear fog.
+   */
+  update(time: number, camera?: THREE.Camera, fullFog = 220, mapView = false, shadow?: THREE.LightShadow): boolean {
     this.water.userData.time.value = time; shoreTime.value = time; updateWind(time);
     if (!camera) return false;
     const profile = graphicsProfile(this.tier);
-    const range = mapView ? fogFar : Math.min(fogFar, profile.forest), trees = this.forest.update(camera, range, mapView, shadow);
+    const range = mapView ? fullFog : Math.min(fullFog, profile.forest), trees = this.forest.update(camera, range, mapView, shadow);
     // Grove crowns follow the forest's range; their light silhouette matches, so a cached shadow map waits for its next re-bake.
     this.gardens.updateDetail(camera, range, mapView);
     // Shrub batches toggle every couple of metres while walking; re-baking for them cost a shadow pass per ~2 m, so their shadows catch up at the next quarter-box re-bake.

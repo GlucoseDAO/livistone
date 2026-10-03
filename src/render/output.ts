@@ -1,43 +1,39 @@
 // The frame's single output pass. WebGPURenderer ignores `material.toneMapped` and mixes fog in linear light before its own
 // output pass, so the game renders through a RenderPipeline instead. The scene writes an 8-bit `display` attachment next to
-// its colour: red is a mask for paper, photographs, captions and signs (displayMaterial), green each surface's fog factor, blue
-// how far ambient occlusion reaches the pixel (opaque surfaces 1, display and transparent ones 0, blended by their coverage).
-// The output tone-maps all but the masked pixels, encodes sRGB, then mixes in the fog toward the displayed horizon, as the
-// classic renderer fogged after encoding; cream paper stays #f4f0e5 by day and night. Ambient occlusion and bloom (sub-plan
-// 18, render/post.ts) act on the linear radiance before tone mapping and leave display pixels alone.
+// its colour: red is a mask for paper, photographs, captions and signs (displayMaterial), green each surface's range-fog factor,
+// blue how far ambient occlusion reaches the pixel (opaque surfaces 1, display and transparent ones 0, blended by their coverage).
+// The output tone-maps all but the masked pixels (Khronos PBR Neutral, render/tone.ts), encodes sRGB, then mixes in the range fog
+// toward the displayed horizon, as the classic renderer fogged after encoding: the map's fog, the cpu tier's linear fog and the
+// distant ranges' valley mist. Walking on the gpu and mobile tiers, the aerial perspective (render/aerial.ts) fogs the town in
+// linear light before this pass instead, display materials fog themselves toward the displayed sky, and occlusion fades with
+// that haze; cream paper stays #f4f0e5 up close by day and night. Ambient occlusion and bloom (sub-plan 18, render/post.ts) act
+// on the linear radiance before tone mapping and leave display pixels alone.
 import * as THREE from 'three';
-import { Fn, abs, exp, float, length, mat3, materialReference, max, min, mix, mrt, normalize, output, positionLocal, positionView, positionWorld, renderGroup, sRGBTransferEOTF, sRGBTransferOETF, smoothstep, sqrt, texture, toneMappingExposure, uniform, vec3, vec4 } from 'three/tsl';
+import { Fn, abs, exp, float, length, materialReference, max, mix, mrt, normalize, output, positionLocal, positionView, positionWorld, renderGroup, sRGBTransferEOTF, sRGBTransferOETF, smoothstep, texture, toneMappingExposure, uniform, vec3, vec4 } from 'three/tsl';
 import type { Node, NodeBuilder } from 'three/webgpu';
 import type { PostMode } from '../game/graphics';
 import { AO, ScreenSpace } from './post';
+import { aerialFactor, aerialSky } from './aerial';
+import { toneMapNode, untoneMapNode } from './tone';
 
 // @types/three r186 leaves these untyped; the casts only restore the shader types three itself infers.
 const exposure = toneMappingExposure as unknown as Node<'float'>;
 /** The sRGB transfer curve and its inverse, for colours the classic renderer mixed after encoding. */
 export const toSRGB = (c: Node<'vec3'>): Node<'vec3'> => sRGBTransferOETF(c) as unknown as Node<'vec3'>, fromSRGB = (c: Node<'vec3'>): Node<'vec3'> => sRGBTransferEOTF(c) as unknown as Node<'vec3'>;
 
-// The classic renderer's ACES filmic fit, as sky.ts's acesFilmic() computes it on the CPU. three's TSL copy multiplies the
-// linear denominator term by .983729 as well (about .4% brighter mid-tones); the classic form keeps HORIZON_HAZE exact.
-// Matrix3.set takes rows, as TSL's mat3 of nine numbers does.
-const ACES_IN = new THREE.Matrix3().set(.59719, .35458, .04823, .076, .90834, .01566, .0284, .13383, .83777);
-const ACES_OUT = new THREE.Matrix3().set(1.60475, -.53108, -.07367, -.10208, 1.10813, -.00605, -.00327, -.07276, 1.07602);
-const acesFilmic = Fn(([radiance, exposure]: [Node<'vec3'>, Node<'float'>]) => {
-  const v = mat3(ACES_IN).mul(radiance.mul(exposure).div(.6)).toVar();
-  return mat3(ACES_OUT).mul(v.mul(v.add(.0245786)).sub(.000090537).div(v.mul(v.mul(.983729).add(.432951)).add(.238081))).clamp(0, 1);
-});
+/** The colour the output pass shows for a linear radiance, before range fog: the active tone curve at the exposure, sRGB-encoded. */
+export const displayed = (radiance: Node<'vec3'>): Node<'vec3'> => toSRGB(toneMapNode(radiance, exposure));
 
-/** The colour the output pass shows for a linear radiance, before fog: the classic ACES fit at the exposure, sRGB-encoded. */
-export const displayed = (radiance: Node<'vec3'>): Node<'vec3'> => toSRGB(acesFilmic(radiance, exposure) as unknown as Node<'vec3'>);
-
-/** The fog: main.ts keeps it at the walking or map range, toward the displayed horizon (HORIZON_HAZE). */
+/** The range fog: main.ts keeps it at the map range, or the cpu tier's walking range, toward the displayed horizon (HORIZON_HAZE). */
 // In the render group, as three's own fog: between frames a material without node properties refreshes only the shared
 // groups, so an object-group uniform reaching it through the MRT keeps its first value (the map range the town loads in).
-// `mist` and `aerial` shape only the distant ranges (DISTANT_DISPLAY).
+// `mist` and `aerial` shape only the distant ranges (DISTANT_DISPLAY); `amount` is 0 while the aerial perspective fogs the
+// walking town instead.
 export const displayFog = {
   color: uniform(new THREE.Color()).setGroup(renderGroup), near: uniform(0).setGroup(renderGroup), far: uniform(1).setGroup(renderGroup),
-  mist: uniform(new THREE.Vector2(1e6, 2e6)).setGroup(renderGroup), aerial: uniform(0).setGroup(renderGroup),
+  mist: uniform(new THREE.Vector2(1e6, 2e6)).setGroup(renderGroup), aerial: uniform(0).setGroup(renderGroup), amount: uniform(1).setGroup(renderGroup),
 };
-const RANGE = smoothstep(displayFog.near, displayFog.far, positionView.z.negate());
+const DEPTH = smoothstep(displayFog.near, displayFog.far, positionView.z.negate()), RANGE = DEPTH.mul(displayFog.amount);
 // Each surface's range-fog factor, or none for the background and other unfogged materials (decided per material at build). The
 // sky counts as fully fogged at and below the horizon, where it already shows the haze: a multisampled pixel at the walking far
 // plane, half fogged ground and half sky, then resolves to haze rather than a dark seam.
@@ -48,20 +44,23 @@ const FOG = Fn((builder: NodeBuilder) => {
 })();
 // Occlusion is found on the depth buffer, which water, glass and other transparent surfaces leave to what lies behind them;
 // they write 0 and so keep their own light from that surface's occlusion in proportion to their opacity. A material's
-// `userData.occlusion` (0–1) lowers it where screen-space occlusion overstates thin geometry.
+// `userData.occlusion` (0–1) lowers it where screen-space occlusion overstates thin geometry. Surfaces in the aerial haze keep
+// only the clear share of it, as range-fogged ones do in the output pass, so the haze is not darkened.
 const SOLID = Fn((builder: NodeBuilder) => {
-  const material = builder.material as { transparent?: boolean; userData?: { occlusion?: number } } | null;
-  return float(!material || material.transparent ? 0 : material.userData?.occlusion ?? 1);
+  const material = builder.material as { transparent?: boolean; fog?: boolean; userData?: { occlusion?: number } } | null;
+  const solid = float(!material || material.transparent ? 0 : material.userData?.occlusion ?? 1);
+  return material?.fog === false ? solid : solid.mul(aerialFactor.g.oneMinus());
 })();
 const DISPLAY = mrt({ display: vec4(1, RANGE, 0, 1) });
 /**
  * The distant ranges' fog (sub-plan 26), walking: a valley mist, full below `mist.x` metres of altitude and gone above `mist.y`,
  * so their feet meet the town's haze while the crests rise out of it, times aerial haze per metre of distance. The map sets
- * mist everywhere and no aerial haze, which is exactly the range fog of every other surface.
+ * mist everywhere and no aerial haze, which is exactly the range fog of every other surface. The ranges lie beyond the town's
+ * full-fog distance and draw in their own pass without the aerial perspective, so they keep this fog while walking.
  */
 export const DISTANT_DISPLAY = mrt({ display: vec4(0, Fn(() => {
   const mist = float(1).sub(smoothstep(displayFog.mist.x, displayFog.mist.y, positionWorld.y));
-  return float(1).sub(float(1).sub(RANGE.mul(mist)).mul(exp(displayFog.aerial.mul(max(length(positionView).sub(displayFog.near), 0)).negate())));
+  return float(1).sub(float(1).sub(DEPTH.mul(mist)).mul(exp(displayFog.aerial.mul(max(length(positionView).sub(displayFog.near), 0)).negate())));
 })(), 0, 1) });
 
 export class OutputPipeline {
@@ -112,7 +111,7 @@ export class OutputPipeline {
       if (this.post.bounce) radiance = radiance.add(this.post.bounce.mul(reach));
     }
     if (this.post.glow) radiance = radiance.add(this.post.glow.rgb.mul(open).div(exposure));
-    const shown = mix(acesFilmic(radiance, exposure), colour.rgb, display.r);
+    const shown = mix(toneMapNode(radiance, exposure), colour.rgb, display.r);
     // Linear sRGB working space to the sRGB canvas: same primaries, so only the transfer curve applies; fog mixes after it.
     pipeline = new THREE.RenderPipeline(this.renderer, vec4(mix(toSRGB(shown as unknown as Node<'vec3'>), toSRGB(displayFog.color as unknown as Node<'vec3'>), display.g), 1));
     pipeline.outputColorTransform = false; this.pipelines.set(occlusion, pipeline);
@@ -153,9 +152,20 @@ export class OutputPipeline {
   private unbind(): void { this.renderer.setRenderTarget(null); this.renderer.setMRT(null); }
 }
 
-/** The former `toneMapped: false` MeshBasicMaterial: exact colours, untouched by tone mapping, fogged in the output pass. */
+/**
+ * Paper, photographs, captions and signs: exact colours, untouched by tone mapping. In the aerial walking view they fog
+ * themselves toward the sky as displayed (the aerial factor is zero elsewhere); the map and the cpu tier fog them in the output pass.
+ */
+class DisplayNodeMaterial extends THREE.MeshBasicNodeMaterial {
+  // Its own type keeps its shaders apart from a plain basic material's with the same properties.
+  static get type(): string { return 'DisplayNodeMaterial'; }
+  setupFog(_builder: NodeBuilder, outputNode: Node<'vec4'>): Node<'vec4'> {
+    return vec4(mix(outputNode.rgb, toneMapNode(aerialSky, exposure), aerialFactor), outputNode.a) as unknown as Node<'vec4'>;
+  }
+}
+/** The former `toneMapped: false` MeshBasicMaterial: exact colours, untouched by tone mapping, fogged toward the displayed sky. */
 export function displayMaterial(parameters: THREE.MeshBasicMaterialParameters = {}): THREE.MeshBasicNodeMaterial {
-  const material = new THREE.MeshBasicNodeMaterial({ ...parameters, fog: false });
+  const material = new DisplayNodeMaterial({ ...parameters, fog: true });
   material.mrtNode = DISPLAY; material.userData.display = true;
   return material;
 }
@@ -179,17 +189,8 @@ export function paperPhotoMaterial(map: THREE.Texture): THREE.MeshBasicNodeMater
 /** For additive sprites: no mask and no fog of their own, so the surface behind them keeps both. */
 export const KEEP_DISPLAY = mrt({ display: vec4(0) });
 
-const ACES_IN_INVERSE = ACES_IN.clone().invert(), ACES_OUT_INVERSE = ACES_OUT.clone().invert();
-// The fit maps this small radiance (per channel, after the input matrix) to zero; subtracting it keeps black at zero.
-const ACES_ZERO = (Math.sqrt(.0245786 ** 2 + 4 * .000090537) - .0245786) / 2;
 /**
  * The linear radiance that the output pass maps to `display` (linear, 0–1) over a black background. Additive night halos
  * were blended after encoding in the classic renderer; adding this instead shows the same halo over the dark night scene.
  */
-export const untoneMapped = Fn(([display]: [Node<'vec3'>]) => {
-  const v = mat3(ACES_OUT_INVERSE).mul(min(display, vec3(.985))).clamp(0, 1.01).toVar();
-  // (1 - .983729 v) x² + (.0245786 - .432951 v) x - (.000090537 + .238081 v) = 0, positive root.
-  const a = float(1).sub(v.mul(.983729)), b = float(.0245786).sub(v.mul(.432951)), c = float(.000090537).add(v.mul(.238081));
-  const x = b.negate().add(sqrt(b.mul(b).add(a.mul(c).mul(4)))).div(a.mul(2));
-  return max(mat3(ACES_IN_INVERSE).mul(x).sub(ACES_ZERO), vec3(0)).mul(.6).div(exposure);
-});
+export const untoneMapped = (display: Node<'vec3'>): Node<'vec3'> => untoneMapNode(display, exposure);

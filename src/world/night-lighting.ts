@@ -3,6 +3,7 @@ import { float, materialOpacity, materialReference, max, min, texture, vec3, vec
 import type { Node } from 'three/webgpu';
 import { graphicsProfile } from '../game/graphics';
 import { KEEP_DISPLAY, displayed, fromSRGB, toSRGB, untoneMapped } from '../render/output';
+import { aerialFactor } from '../render/aerial';
 import type { GraphicsTier } from '../game/graphics';
 
 let halo: THREE.DataTexture | undefined;
@@ -26,9 +27,10 @@ let haloNode: Node<'vec4'> | undefined;
 export function addGlow(parent: THREE.Object3D, position: THREE.Vector3, color: string, size: number, intensity = 0, distance = 12, opacity = .45): THREE.Sprite {
   if (!haloNode) {
     const behind = viewportSharedTexture().rgb as unknown as Node<'vec3'>, glow = toSRGB(materialReference('color', 'color') as unknown as Node<'vec3'>).mul(texture(haloTexture()).a.mul(materialOpacity));
-    haloNode = vec4(max(untoneMapped(fromSRGB(min(displayed(behind).add(glow), vec3(1)))).sub(behind), vec3(0)), 1);
+    // Aerial perspective dims added light by the air's transmittance; fogging it toward the sky would add sky instead.
+    haloNode = vec4(max(untoneMapped(fromSRGB(min(displayed(behind).add(glow), vec3(1)))).sub(behind), vec3(0)).mul(vec3(1).sub(aerialFactor)), 1);
   }
-  const material = new THREE.SpriteNodeMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false });
+  const material = new THREE.SpriteNodeMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
   material.colorNode = haloNode; material.opacityNode = float(1); material.mrtNode = KEEP_DISPLAY;
   const glow = new THREE.Sprite(material); glow.position.copy(position); glow.scale.setScalar(size); glow.name = 'Night halo';
   glow.userData.nightGlow = true; glow.userData.lightSource = { color, intensity, distance }; parent.add(glow); return glow;

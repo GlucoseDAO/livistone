@@ -66,9 +66,15 @@ export interface GroveInstance { center: THREE.Vector3; scale: number; crown: TH
 /** Within this many metres per unit of crown scale a crown keeps every sample: about 36 m for a tall crown, 13 m for a ring-scale shrub. */
 export const GROVE_FULL_DETAIL = 36;
 export type GroveDetail = 'full' | 'light' | 'hidden';
-/** The forest's fog margin hides a crown; its own size picks the detail, so small shrubs switch to full only up close. */
+/** The tallest stem below a crown centre (living-waters.ts places crowns 3.6–6.4 m up). */
+const TALLEST_STEM = 6.4;
+/**
+ * As the forest does, a mushroom hides only once even its nearest part lies beyond `range`, the full-fog distance (its crown
+ * reaches MYCELIUM_RADIUS × scale around the centre and its stem below it); its own size picks the detail, so small shrubs
+ * switch to full only up close.
+ */
 export function groveDetail(distance: number, scale: number, range: number, mapView = false): GroveDetail {
-  if (!mapView && forestLod(distance, range) === 'hidden') return 'hidden';
+  if (!mapView && forestLod(distance, distance - Math.hypot(MYCELIUM_RADIUS * scale, TALLEST_STEM), range) === 'hidden') return 'hidden';
   return distance < GROVE_FULL_DETAIL * scale ? 'full' : 'light';
 }
 const PARTS = ['crown', 'stem', 'opal'] as const, LEVELS: GroveDetail[] = ['hidden', 'light', 'full'];
@@ -96,7 +102,7 @@ export class MyceliumGrove {
     // Until the first camera update every crown is full, as the grove was built before detail levels existed.
     this.pack(() => 'full');
   }
-  /** `range` is the forest's fog-limited walking range; the map view never hides a crown. Returns whether the batches were repacked. */
+  /** `range` is the forest's walking range, the full-fog distance; the map view never hides a crown. Returns whether the batches were repacked. */
   update(camera: THREE.Camera, range: number, mapView = false, pinned?: 'full' | 'light' | null): boolean {
     if (this.warm) return false;
     const origin = camera.position;

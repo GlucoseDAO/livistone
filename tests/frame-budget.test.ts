@@ -13,10 +13,11 @@ import { budgetGroups, measure, walkCamera } from '../scripts/frame-budget';
 
 // Sub-plan 25, measured in memory on the realism capture poses with the walk camera's 130 m far plane. The bounds are loose
 // ceilings over the reduced counts (3 October 2026, per gpu view: grove 1.11M → 25k triangles; lake 86 → 17 calls; glucose
-// 28 → 7; terrain 352k → 113k triangles; flowers 3.5 → 0.9 calls).
+// 28 → 7; terrain 352k → 113k triangles; flowers 3.5 → 0.9 calls). Sub-plan 21's lighter haze ends at the tier's full-fog
+// distance (130 / 110 m), and crowns now draw until it: about 65k (gpu) and 22k (mobile) grove triangles per view.
 const BOUNDS = {
-  gpu: { lakeBuilt: 40, lakeView: 22, groveView: 40_000, glucoseBuilt: 18, terrainCalls: 14, terrainView: 160_000 },
-  mobile: { lakeBuilt: 40, lakeView: 22, groveView: 15_000, glucoseBuilt: 18, terrainCalls: 14, terrainView: 130_000 },
+  gpu: { lakeBuilt: 40, lakeView: 22, groveView: 75_000, glucoseBuilt: 18, terrainCalls: 14, terrainView: 160_000 },
+  mobile: { lakeBuilt: 40, lakeView: 22, groveView: 26_000, glucoseBuilt: 18, terrainCalls: 14, terrainView: 130_000 },
 } as const;
 
 describe('frame budget, renderer-independent geometry', () => {
@@ -32,17 +33,18 @@ describe('frame budget, renderer-independent geometry', () => {
       full.dispose(); light.dispose();
     }
   });
-  it('picks crown detail from distance and crown size, and hides crowns in the fog as the forest does', () => {
+  it('picks crown detail from distance and crown size, and hides crowns in full fog as the forest does', () => {
     expect(groveDetail(GROVE_FULL_DETAIL - 1, 1, 130)).toBe('full');
     expect(groveDetail(GROVE_FULL_DETAIL + 1, 1, 130)).toBe('light');
-    expect(groveDetail(93, 1, 130)).toBe('light');
-    expect(groveDetail(94, 1, 130)).toBe('hidden');
+    // Hidden only once the nearest part of crown and stem (about 7 m from the crown centre) is past the full-fog distance.
+    expect(groveDetail(136, 1, 130)).toBe('light');
+    expect(groveDetail(137.5, 1, 130)).toBe('hidden');
     expect(groveDetail(400, 1, 630, true)).toBe('light');
     // A ring-scale shrub keeps the full folds only up close.
     expect(groveDetail(10, .3, 130)).toBe('full');
     expect(groveDetail(12, .3, 130)).toBe('light');
   });
-  it('packs the visible grove into at most six draws and none from across the lake', () => {
+  it('packs the visible grove into at most six draws, light across the lake and none from the station', () => {
     const gardens = new LivingWaters(false), grove = gardens.grove.meshes, range = 130;
     try {
       const drawn = (): number => grove.filter(mesh => mesh.visible).length;
@@ -51,8 +53,9 @@ describe('frame budget, renderer-independent geometry', () => {
       gardens.updateDetail(walkCamera(74, -138, Math.PI, .18), range, false);
       expect(drawn()).toBe(6); expect(crowns()).toBe(70); expect(opals()).toBe(70);
       expect(grove.find(mesh => mesh.name === 'Mycelium · curled open silver gills')!.count).toBeLessThan(30);
+      // Across the lake the grove is in light haze, not full fog, so its crowns draw, all at light detail.
       gardens.updateDetail(walkCamera(-18, -64, 0, .08), range, false);
-      expect(crowns()).toBeLessThan(10);
+      expect(crowns()).toBeGreaterThan(0); expect(grove.find(mesh => mesh.name === 'Mycelium · curled open silver gills')!.visible).toBe(false);
       gardens.updateDetail(walkCamera(0, 52, 0), range, false);
       expect(drawn()).toBe(0);
       // The map keeps the whole grove at light detail.
@@ -112,7 +115,8 @@ describe('frame budget, renderer-independent geometry', () => {
     expect(lake.perView['lake, paths, pavilion'].calls).toBeLessThanOrEqual(bounds.lakeView);
     const grove = lake.perView['mycelium grove'];
     expect(grove.triangles).toBeLessThanOrEqual(bounds.groveView);
-    expect(grove.calls).toBeLessThanOrEqual(1.5); expect(grove.maxCalls).toBeLessThanOrEqual(6);
+    // Drawn until full fog, the grove shows in more views (sub-plan 21), still at most six draws in any.
+    expect(grove.calls).toBeLessThanOrEqual(2); expect(grove.maxCalls).toBeLessThanOrEqual(6);
     expect(glucose.static['structure and posters'].calls).toBeLessThanOrEqual(bounds.glucoseBuilt);
     expect(hill.static['climb markers'].calls).toBeLessThanOrEqual(2);
     expect(terrain.perView['meadow and ridges'].calls).toBeLessThanOrEqual(bounds.terrainCalls);

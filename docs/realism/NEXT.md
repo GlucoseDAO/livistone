@@ -77,7 +77,7 @@ Tasks that edit `main.ts` or `sky.ts` (21, 18, 05, 25) merge one after another; 
 
 1. **Ground look** a (default) or b: both survive the port as uniforms; pick on `review/combined-04-03`.
 2. **River look**: re-check a against b after 14.
-3. **Tone mapping** (21): ACES (today), AgX or Neutral, offered as variants.
+3. **Tone mapping** (21): decided 3 October 2026, Neutral with contrast a; built on `realism/21-on-round-2`, see [21](21-contrast-aerial.md#owner-decision-and-rebase-onto-main-3-october-2026).
 4. **Classic fallback**: Stage A deletes classic WebGL. Revisit only if the WebGL 2 fallback measures clearly worse than classic on touch or software.
 
 ## Rules for agents (binding)

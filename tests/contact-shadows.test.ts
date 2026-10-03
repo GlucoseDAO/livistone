@@ -141,8 +141,9 @@ describe('contact shadows', () => {
     const material = gpu.shadows.mesh.material, texture = material.map as THREE.DataTexture, { data, width, height } = texture.image as { data: Uint8Array; width: number; height: number };
     expect(material.blending).toBe(THREE.MultiplyBlending); expect(material.premultipliedAlpha).toBe(true);
     expect(material.depthWrite).toBe(false); expect(material.polygonOffset).toBe(true); expect(material.vertexColors).toBe(true);
-    // A zero display output leaves the ground's paper mask and fog factor unchanged under multiply blending.
-    expect(material.mrtNode).toBe(KEEP_DISPLAY); expect(material.fog).toBe(false); expect(gpu.shadows.mesh.userData.keepGeometry).toBe(true);
+    // A zero display output leaves the ground's paper mask and range-fog factor unchanged under multiply blending; its own fog
+    // (the aerial perspective) fades the shade toward white rather than mixing in the sky.
+    expect(material.mrtNode).toBe(KEEP_DISPLAY); expect(material.fog).toBe(true); expect(material.type).toBe('ContactShadowMaterial'); expect(gpu.shadows.mesh.userData.keepGeometry).toBe(true);
     expect(width).toBe(64); expect(height).toBe(64);
     for (let i = 0; i < width; i++) for (const j of [0, height - 1]) { expect(data[(j * width + i) * 4 + 3]).toBe(0); expect(data[(i * width + j) * 4 + 3]).toBe(0); }
     expect(data[(32 * width + 32) * 4 + 3]).toBe(255);
