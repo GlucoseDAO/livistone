@@ -6,9 +6,10 @@ import './style.css';
 import * as THREE from 'three';
 import { RAILWAY, railwayCorridor } from './world/station-layout';
 import { TOWN_BOUNDS, FALL_FLOOR } from './world/town-layout';
-import { terrainHeight } from './world/terrain';
+import { ridgesLook, terrainHeight } from './world/terrain';
+import { FAR_LAYER, FAR_VIEW, setDistantPhase } from './world/far-landscape';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createSky, HORIZON_HAZE, HORIZON_RADIANCE, MOON_DIR, SKY_EXPOSURE, SUN_DIR } from './world/sky';
+import { createSky, HORIZON_HAZE, HORIZON_RADIANCE, MOON_DIR, SKY_EXPOSURE, SUN_DIR, skyLook } from './world/sky';
 import type { SkyPhase } from './world/sky';
 import { setGatewayQuality } from './world/gateway-materials';
 import { setMitoringAmberQuality } from './world/mitoring-materials';
@@ -38,6 +39,8 @@ import { BUDGET_OFF, trackDraws } from './game/render-budget';
 import type { DrawCost } from './game/render-budget';
 
 const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 };
+// Walking with the distant ranges (sub-plan 26): the valley mist's altitude band on them in metres, and their haze per metre.
+const MIST = { low: 25, high: 150, aerial: 1.2e-4 };
 // On the cpu tier the eye sits this far ahead of the capsule axis. Standing exactly over a terrain grid vertex (map arrivals
 // and teleports use whole-metre positions) put that vertex on the camera plane, and SwiftShader then smeared its attributes
 // over the adjoining near triangles as one flat colour, in classic as in WebGPU. Two millimetres keep it clipped; hardware
@@ -48,6 +51,9 @@ const EYE_LEAD = .002;
 const LOOK = import.meta.env.DEV && new URLSearchParams(location.search).get('light') === 'a' ? 'a' : 'b';
 // Dev-only ?post=off|ao|gi overrides the tier's screen-space stages (sub-plan 18): none, occlusion with bloom, or the SSGI experiment.
 const POST = ((value: string | null) => import.meta.env.DEV && (value === 'off' || value === 'ao' || value === 'gi') ? value : null)(new URLSearchParams(location.search).get('post'));
+// The physical day sky (sub-plan 26) lights about a quarter less than the painted one, its zenith being a deeper blue: this
+// keeps the town's shade as bright as before (arrival-meadow and meadow-ground matched within one grey level).
+const PHYSICAL_DAY_FILL = 1.35;
 const FILL: Record<'a' | 'b', Record<SkyPhase, { environment: number; hemi: number }>> = {
   a: { day: { environment: .5, hemi: 1.2 }, night: { environment: .2, hemi: .28 } }, b: { day: { environment: .9, hemi: .55 }, night: { environment: .3, hemi: .22 } } };
 // The map shadow box stays on the town centre; walking boxes follow the player.
@@ -72,6 +78,14 @@ class Game {
   // lengthens (sub-plan 25); ?budget=off keeps the earlier 150 m for review.
   private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, BUDGET_OFF ? 150 : WALK_FOG.far);
   private readonly mapCamera = new THREE.PerspectiveCamera(44, 1, 0.2, 800);
+  /** The distant pass (render/output.ts): the sky and the ranges, from just inside the walking far plane to the ranges' end. */
+  private readonly farCamera = new THREE.PerspectiveCamera(66, 1, this.walkCamera.far * .9, FAR_VIEW);
+  private readonly distant = new THREE.Scene();
+  // The distant pass's own sun (or moon) and sky light, kept in step with the town's; the ranges cast and take no shadows.
+  private readonly distantSun = new THREE.DirectionalLight();
+  private readonly distantHemi = new THREE.HemisphereLight();
+  /** The distant ranges and their pass: gpu and mobile, unless ?ridges=classic (world/far-landscape.ts). */
+  private ranges = false;
   private readonly orbit: OrbitControls;
   private town!: Town;
   private readonly input: Input;
@@ -138,7 +152,9 @@ class Game {
     this.renderScale = this.graphics.pixelRatio; this.scaler = new RenderScale(SCALE_RULES[this.graphics.tier], this.renderScale);
     if (import.meta.env.DEV) this.drawBudget = trackDraws(this.renderer.info, (object) => this.drawGroup(object));
     this.reduced = this.graphics.reduced; this.lowQuality = this.reduced;
-    this.night = resolveNight(this.timeOfDay);
+    this.ranges = this.graphics.tier !== 'cpu' && ridgesLook() === 'ranges'; if (this.ranges) this.mapCamera.layers.enable(FAR_LAYER);
+    this.distant.add(this.distantSun, this.distantHemi);
+    this.night = resolveNight(this.timeOfDay); setDistantPhase(this.night);
     this.renderer.setPixelRatio(this.pixelRatio());
     this.renderer.shadowMap.enabled = this.graphics.shadows; this.renderer.shadowMap.type = THREE.PCFShadowMap;
     // The output pass (render/output.ts) applies the classic ACES fit at this exposure, except to display materials.
@@ -152,7 +168,7 @@ class Game {
     this.sun.shadow.camera.layers.enable(SHADOW_LAYER);
     this.scene.add(this.sun, this.sun.target); installShadowFade(this.sun); this.aimSun();
     const sky = createSky(this.renderer, this.reduced, this.night, this.graphics.tier, LOOK === 'b'); this.skies.set(this.night, sky); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = this.graphics.tier === 'cpu' ? null : sky.environment;
-    this.scene.environmentIntensity = this.fill.environment;
+    this.scene.environmentIntensity = this.fill.environment; this.syncDistant();
     // The town and sun are static; refresh shadows only when scene visibility changes. WebGPU schedules shadows per light.
     this.sun.shadow.autoUpdate = false; this.sun.shadow.needsUpdate = true;
     this.post = POST ?? this.graphics.post; this.output = new OutputPipeline(this.renderer, this.scene, this.post, this.walkCamera);
@@ -213,6 +229,8 @@ class Game {
     }
     this.pointReflections(this.skies.get(this.night)!);
     this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced, this.graphics.tier); this.nightLighting.setNight(this.night);
+    // The distant pass draws its own copies of the ranges, which the map sees in the town (FAR_LAYER).
+    if (this.ranges) for (const mesh of this.town.root.getObjectsByProperty('name', 'Distant ranges') as THREE.Mesh[]) { const copy = new THREE.Mesh(mesh.geometry, mesh.material); copy.name = mesh.name; this.distant.add(copy); }
     document.querySelector<HTMLElement>('#graphics-profile')!.textContent = 'Device profile: ' + ({ gpu: 'GPU', mobile: 'Mobile / integrated GPU', cpu: 'CPU software renderer' }[this.graphics.tier]) + ({ webgpu: ' · WebGPU', 'webgl2-fallback': ' · WebGL 2' }[this.view.backend]);
     await loadingStage(92, 'Preparing your first view…');
     this.frameShadow(true);
@@ -222,6 +240,7 @@ class Game {
     // synchronous node build, which would otherwise stall the first frames that show a new object.
     this.town.warmUp(true);
     await this.output.compile(this.walkCamera, [...this.town.root.children, ...this.scene.children.filter(child => child !== this.town.root && !(child as THREE.Light).isLight)]);
+    if (this.ranges) await this.output.compile(this.syncFar(), [...this.distant.children], 6, this.distant);
     if (this.graphics.shadows) { this.sun.shadow.needsUpdate = true; this.render(this.walkCamera); }
     this.town.warmUp(false); this.town.update(this.elapsed, this.walkCamera, WALK_FOG.far, false, this.sun.shadow);
     await loadingStage(100, 'Welcome to Livistone');
@@ -232,13 +251,31 @@ class Game {
   /** The walking eye stands .78 m above the capsule's centre, which is .82 m above its feet. */
   private eyeHeight(p: { x: number; y: number; z: number }): number { return this.eye === null ? p.y + .78 : Math.max(p.y - .82, terrainHeight(p.x, p.z)) + this.eye; }
   // Gentle visual detail goes without ambient occlusion; bloom stays so night looks the same at either setting.
-  private render(camera: THREE.Camera): void { this.view.beginFrame(); this.output.render(camera, !this.lowQuality); }
+  private render(camera: THREE.Camera): void { this.view.beginFrame(); this.output.render(camera, !this.lowQuality, this.ranges && camera === this.walkCamera ? { scene: this.distant, camera: this.syncFar() } : undefined); }
+  /** The distant scene follows the phase: its sky, reflections and the town's sun or moon and sky light. */
+  private syncDistant(): void {
+    if (!this.ranges) return;
+    this.distant.background = this.skyBackground; this.distant.environment = this.scene.environment; this.distant.environmentIntensity = this.scene.environmentIntensity;
+    this.distantSun.color.copy(this.sun.color); this.distantSun.intensity = this.sun.intensity; this.distantSun.position.copy(this.sunDirection).multiplyScalar(100);
+    this.distantHemi.color.copy(this.hemi.color); this.distantHemi.groundColor.copy(this.hemi.groundColor); this.distantHemi.intensity = this.hemi.intensity;
+  }
+  /** The distant pass looks where the walking eye looks. */
+  private syncFar(): THREE.PerspectiveCamera {
+    const far = this.farCamera, walk = this.walkCamera;
+    far.position.copy(walk.position); far.quaternion.copy(walk.quaternion);
+    if (far.aspect !== walk.aspect || far.fov !== walk.fov) { far.aspect = walk.aspect; far.fov = walk.fov; far.updateProjectionMatrix(); }
+    return far;
+  }
   /** The output pass fogs every surface toward the displayed horizon after tone mapping, as the classic renderer did. */
   private setFog(range: { near: number; far: number }): void {
     displayFog.color.value.copy(HORIZON_HAZE[this.phase]); displayFog.near.value = range.near; displayFog.far.value = range.far;
+    const mist = this.ranges && range === WALK_FOG; displayFog.mist.value.set(mist ? MIST.low : 1e6, mist ? MIST.high : 2e6); displayFog.aerial.value = mist ? MIST.aerial : 0;
   }
   // CPU has no PMREM environment to take over the fill, so its hemisphere keeps the full share.
-  private get fill(): { environment: number; hemi: number } { return FILL[this.graphics.tier === 'cpu' ? 'a' : LOOK][this.phase]; }
+  private get fill(): { environment: number; hemi: number } {
+    const fill = FILL[this.graphics.tier === 'cpu' ? 'a' : LOOK][this.phase];
+    return this.night || skyLook() === 'classic' ? fill : { ...fill, environment: fill.environment * PHYSICAL_DAY_FILL };
+  }
   private get mapView(): boolean {
     return this.mode === 'map' || this.mode === 'welcome' || (['lore', 'journal', 'paused', 'gallery'].includes(this.mode) && this.returnMode === 'map');
   }
@@ -392,7 +429,7 @@ class Game {
     this.sun.color.set(night ? '#c9d6ee' : '#fff0ce'); this.sun.intensity = night ? .32 : 2.4;
     this.aimSun();
     this.scene.background = this.mapView ? HORIZON_RADIANCE[this.phase].clone() : this.skyBackground; this.setFog(this.mapView ? MAP_FOG : WALK_FOG);
-    this.nightLighting.setNight(night); this.sun.shadow.needsUpdate = true;
+    this.nightLighting.setNight(night); this.sun.shadow.needsUpdate = true; setDistantPhase(night); this.syncDistant();
   }
   /** r186 gives any material without its own envMap scene.environmentIntensity instead of its envMapIntensity, so heroEnv
    *  materials carry the sky explicitly (look b). CPU Lambert metals sample the plain cube instead; no PMREM exists there. */

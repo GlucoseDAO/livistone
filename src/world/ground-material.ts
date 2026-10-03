@@ -197,7 +197,7 @@ export interface GrassShade { mask: THREE.Texture; minX: number; minZ: number; w
  * Nodes for the vertex-coloured terrain: colour on every tier, roughness on gpu and mobile, detail normals on gpu. The cpu
  * tier uses the colour on a Lambert node material. Vertex colours still multiply the result, as they did the GLSL patch.
  */
-export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMaps, grassVertexColour: THREE.Color, grass?: GrassShade): { colorNode: V3; roughnessNode: F | null; normalNode: V3 | null } {
+export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMaps, grassVertexColour: THREE.Color, grass?: GrassShade, limestone = true): { colorNode: V3; roughnessNode: F | null; normalNode: V3 | null } {
   const L = LOOKS[look], [meadowAlbedo, sparseAlbedo, soilAlbedo] = maps.albedo, [meadowNrh, sparseNrh, soilNrh] = maps.nrh;
   const colorNode = Fn(() => {
     const n = normalize(normalLocal).toVar(), xz = positionLocal.xz.toVar(), dx = dFdx(xz).toVar(), dy = dFdy(xz).toVar();
@@ -248,6 +248,15 @@ export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMa
     // Flat garden ground skips the rock taps; cliffs keep their triplanar detail.
     If(exposed.greaterThan(.01), () => {
       const rock = texture(maps.rock, p.yz).grad(GROUND.dpx.yz, GROUND.dpy.yz).rgb.mul(weights.x).add(texture(maps.rock, p.xz).grad(GROUND.dpx.xz, GROUND.dpy.xz).rgb.mul(weights.y)).add(texture(maps.rock, p.xy).grad(GROUND.dpx.xy, GROUND.dpy.xy).rgb.mul(weights.z)).toVar();
+      if (limestone) {
+        // Sub-plan 26: a second copy four times larger breaks the 15 m repeat on big faces; the photographed rock turns toward grey
+        // limestone, with bedding planes every few metres of altitude that wander with the slope and darker scree between bands.
+        const q = p.mul(.27), dq = [GROUND.dpx.mul(.27), GROUND.dpy.mul(.27)];
+        const broad = texture(maps.rock, q.yz).grad(dq[0].yz, dq[1].yz).rgb.mul(weights.x).add(texture(maps.rock, q.xz).grad(dq[0].xz, dq[1].xz).rgb.mul(weights.y)).add(texture(maps.rock, q.xy).grad(dq[0].xy, dq[1].xy).rgb.mul(weights.z));
+        rock.assign(mix(rock, broad, .45)); rock.assign(mix(vec3(dot(rock, LUMA)), rock, .45).mul(vec3(1.02, 1, .95)));
+        const bedding = sin(positionLocal.y.mul(valueNoise(positionLocal.xz.div(60)).mul(.9).add(1.1)).add(valueNoise(positionLocal.xz.div(23)).mul(5)).add(valueNoise(positionLocal.xz.div(7)).mul(.8))).mul(.5).add(.5);
+        rock.mulAssign(float(1).sub(smoothstep(.88, .985, bedding).mul(.2)).mul(valueNoise(positionLocal.xz.div(41).add(positionLocal.y.mul(.05))).mul(.24).add(.88)));
+      }
       GROUND.rock.assign(heightWeights(vec3(float(1).sub(exposed), exposed, 0), vec3(height, clamp(dot(rock, LUMA).mul(2.2), 0, 1), -2), .2).y);
       ground.assign(mix(ground, rock.mul(1.8), GROUND.rock)); GROUND.roughness.assign(mix(GROUND.roughness, .9, GROUND.rock));
     });

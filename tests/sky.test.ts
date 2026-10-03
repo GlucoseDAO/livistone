@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { acesFilmic, HORIZON_HAZE, HORIZON_RADIANCE, MOON_DIR, SKY_EXPOSURE, SUN_DIR } from '../src/world/sky';
+import { acesFilmic, HORIZON_HAZE, HORIZON_RADIANCE, MOON_DIR, SKY_EXPOSURE, SKY_GAIN, SUN_DIR } from '../src/world/sky';
+import { horizonMean, skyRadiance, transmittance } from '../src/world/atmosphere';
 import { mitoringAmberMaterial, mitoringSilverMaterial } from '../src/world/mitoring-materials';
 import { gatewayMaterials } from '../src/world/gateway-materials';
 import { cityHallCrystalMaterial, createCityHallFacade } from '../src/world/city-hall';
@@ -38,5 +39,17 @@ describe('sky coherence', () => {
     const heroes = [mitoringAmberMaterial(true), mitoringSilverMaterial(), gateway.silver, gateway.gem, cityHallCrystalMaterial(true), stationAmberMaterial(true), waterMaterial('gpu'), ...hall];
     for (const material of heroes) expect(material.userData.heroEnv, material.name).toBe(true);
     expect(gateway.limestone.userData.heroEnv).toBeUndefined();
+  });
+
+  it('calibrates the physical sky so its horizon meets the fog, and reddens a low sun by itself (sub-plan 26)', () => {
+    const luma = (c: readonly number[]): number => c[0] * .2126 + c[1] * .7152 + c[2] * .0722;
+    expect(luma(horizonMean(SUN_DIR)) * SKY_GAIN).toBeCloseTo(luma(HORIZON_RADIANCE.day.toArray()), 6);
+    expect(SKY_GAIN).toBeGreaterThan(.7); expect(SKY_GAIN).toBeLessThan(1.4);
+    // The zenith is a deeper, bluer sky than the horizon haze.
+    const zenith = skyRadiance(new THREE.Vector3(0, 1, 0), SUN_DIR), horizon = horizonMean(SUN_DIR);
+    expect(zenith[2] / zenith[0]).toBeGreaterThan(horizon[2] / horizon[0]); expect(luma(zenith)).toBeLessThan(luma(horizon));
+    // Golden hour (05) needs only a sun direction: at 8° the sunlight is redder and dimmer than at today's 54°.
+    const high = transmittance(0, SUN_DIR.y), low = transmittance(0, Math.sin(8 * Math.PI / 180));
+    expect(low[0] / low[2]).toBeGreaterThan(high[0] / high[2] * 1.5); expect(low[1]).toBeLessThan(high[1]);
   });
 });

@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { RAILWAY, STATION } from './station-layout';
 
 export { landscapeHeight as mountainHeight } from './terrain';
-import { landscapeHeight } from './terrain';
+import { landscapeHeight, ridgesLook } from './terrain';
+import { FAR_LAYER, farLandscapeGeometry, farLandscapeMaterial } from './far-landscape';
 import { groundCover } from './ground-cover';
 import { groundLook, groundNodes, groundTextureFiles } from './ground-material';
 import type { GrassShade } from './ground-material';
@@ -42,13 +43,30 @@ function cutRailwayOpening(source: THREE.BufferGeometry): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3)); g.setAttribute('groundSoil', new THREE.Float32BufferAttribute(soils, 1)); g.setAttribute('groundShade', new THREE.Float32BufferAttribute(shades, 1)); g.normalizeNormals(); source.dispose(); return g;
 }
 
+/**
+ * The tiles' vertex columns and rows: two-metre cells over the walking terrain, then 4 m (mobile 8 m) to 520 m. `wide` continues
+ * with 32 m cells to 1.4 km, the rounds 1–2 extent that the cpu tier and ?ridges=classic keep; otherwise the distant ranges
+ * (far-landscape.ts) take over at 520 m.
+ */
+function terrainAxes(mobile: boolean, wide: boolean): { xs: number[]; zs: number[] } {
+  const axis = (start: number, end: number, nearStart: number, nearEnd: number): number[] => {
+    const values: number[] = []; for (let value = start; value <= end; value += value >= nearStart && value < nearEnd ? 2 : Math.abs(value) > 520 ? 32 : mobile ? 8 : 4) values.push(value); return values;
+  };
+  return wide ? { xs: axis(-1400, 1400, -240, 240), zs: axis(-1280, 1280, -270, 150) } : { xs: axis(-520, 520, -240, 240), zs: axis(-520, 520, -270, 150) };
+}
+/** The tiles' outer edge, ordered by angle around its centre: where the distant ranges' first ring starts. */
+export function terrainEdge(mobile: boolean): { x: number; z: number }[] {
+  const { xs, zs } = terrainAxes(mobile, false), edge: { x: number; z: number }[] = [];
+  for (const x of xs) edge.push({ x, z: zs[0] }, { x, z: zs[zs.length - 1] });
+  for (const z of zs.slice(1, -1)) edge.push({ x: xs[0], z }, { x: xs[xs.length - 1], z });
+  const cx = (xs[0] + xs[xs.length - 1]) / 2, cz = (zs[0] + zs[zs.length - 1]) / 2, angle = (p: { x: number; z: number }): number => { const a = Math.atan2(p.z - cz, p.x - cx); return a < 0 ? a + Math.PI * 2 : a; };
+  return edge.sort((a, b) => angle(a) - angle(b));
+}
+
 /** `shade` bakes ambient ground occlusion into the `groundShade` attribute (1 = open sky), the ground material's aoNode. */
-export function mountainGeometry(mobile: boolean, shade: (x: number, z: number) => number = () => 1): THREE.BufferGeometry {
+export function mountainGeometry(mobile: boolean, shade: (x: number, z: number) => number = () => 1, wide = ridgesLook() === 'classic'): THREE.BufferGeometry {
     // Two-metre cells match the walking terrain; distant ridges use wider cells in both quality tiers.
-    const axis = (start: number, end: number, nearStart: number, nearEnd: number): number[] => {
-      const values: number[] = []; for (let value = start; value <= end; value += value >= nearStart && value < nearEnd ? 2 : Math.abs(value) > 520 ? 32 : mobile ? 8 : 4) values.push(value); return values;
-    };
-    const xs = axis(-1400, 1400, -240, 240), zs = axis(-1280, 1280, -270, 150);
+    const { xs, zs } = terrainAxes(mobile, wide);
     const positions: number[] = [], colors: number[] = [], soils: number[] = [], shades: number[] = [], indices: number[] = [], color = new THREE.Color(), grass = GRASS, fresh = FRESH, stone = new THREE.Color('#a6a294');
     for (let j = 0; j < zs.length; j++) for (let i = 0; i < xs.length; i++) {
       const x = xs[i], z = zs[j], y = landscapeHeight(x, z);
@@ -99,7 +117,8 @@ export class Mountains extends THREE.Group {
   /** `grass` is the near grass field's lookup, so the ground shades the soil between its blades. */
   constructor(mobile: boolean, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', shade?: (x: number, z: number) => number, grass?: GrassShade) {
     super(); this.name = 'Continuous valley and mountain ridges';
-    const geo = mountainGeometry(mobile, shade);
+    // The distant ranges and the walking view's distant pass (main.ts): gpu and mobile, unless ?ridges=classic.
+    const far = tier !== 'cpu' && ridgesLook() === 'ranges', geo = mountainGeometry(mobile, shade, !far);
     // The cpu tier lights everything with Lambert (cpu-detail.ts) and keeps only the ground colour, so it starts there.
     const material = tier === 'cpu' ? new THREE.MeshLambertNodeMaterial({ vertexColors: true }) : new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: .96 });
     // Baked crown, trunk and wall occlusion dims only indirect light (sky, hemisphere, environment), on Lambert and standard alike:
@@ -108,6 +127,9 @@ export class Mountains extends THREE.Group {
     // One material for every tile; cpu-detail.ts keeps each tile's vertices by this name.
     for (const tile of terrainTiles(geo)) { const landscape = new THREE.Mesh(tile, material); landscape.name = 'Textured meadow and soil'; landscape.receiveShadow = true; this.add(landscape); }
     geo.dispose();
+    const plain = far ? farLandscapeMaterial(tier, null, null) : null, ranges = plain ? farLandscapeGeometry(mobile, terrainEdge(mobile)).map((sector) => {
+      const mesh = new THREE.Mesh(sector, plain); mesh.name = 'Distant ranges'; mesh.layers.set(FAR_LAYER); this.add(mesh); return mesh;
+    }) : [];
     const loader = new THREE.TextureLoader(), base = import.meta.env.BASE_URL, look = groundLook();
     const load = (file: string, colour: boolean): Promise<THREE.Texture> => loader.loadAsync(base + file).then((texture) => {
       if (colour) texture.colorSpace = THREE.SRGBColorSpace;
@@ -118,8 +140,9 @@ export class Mountains extends THREE.Group {
     const shore = Promise.all(shoreFiles.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))).catch(() => []);
     this.ready = Promise.all([Promise.all(files.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))), load('textures/mountains/rock-color.jpg', true), tier === 'gpu' ? load('textures/mountains/rock-normal.jpg', false) : Promise.resolve(null), shore]).then(([ground, rock, rockNormal, gravel]) => {
       const albedo = ground.filter((_, i) => files[i].includes('-albedo-')), nrh = tier === 'cpu' ? albedo : ground.filter((_, i) => files[i].includes('-nrh-'));
-      const nodes = groundNodes(tier, look, { albedo, nrh, rock, rockNormal, shore: gravel.length === 2 ? { albedo: gravel[0], nrh: gravel[1] } : null }, GRASS, grass);
+      const nodes = groundNodes(tier, look, { albedo, nrh, rock, rockNormal, shore: gravel.length === 2 ? { albedo: gravel[0], nrh: gravel[1] } : null }, GRASS, grass, ridgesLook() === 'ranges');
       material.colorNode = nodes.colorNode; material.normalNode = nodes.normalNode;
+      if (plain) { const ridge = farLandscapeMaterial(tier, rock, rockNormal); plain.dispose(); for (const mesh of ranges) mesh.material = ridge; }
       if (material instanceof THREE.MeshStandardNodeMaterial) material.roughnessNode = nodes.roughnessNode;
       material.needsUpdate = true;
     }).catch(() => { material.color.set('#587448'); /* Playable vertex-coloured terrain if local images fail. */ });

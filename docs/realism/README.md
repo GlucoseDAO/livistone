@@ -9,6 +9,7 @@ Planned on 3 October 2026 against commit `5a95bfd`. Line numbers refer to that c
 Round 1: 00–04 are merged into `main` (`a16ad0d`). Round 2 (20 WebGPU, 13, 14, 16, 24, 25) is merged into `main` (`ce434dd`); **continue from [round-2-leftovers.md](round-2-leftovers.md)**, and read [NEXT.md](NEXT.md) for the owner's direction and the binding agent rules.
 
 - The owner approved the WebGPU migration ([20 Phase B](20-webgpu-spike.md)); it runs first and alone on the rendering code. Later shader work is TSL only.
+- New after round 2: [26 physical sky and distant mountains](26-sky-mountains.md) (owner request, 3 October 2026).
 - New in round 2: [21 contrast and aerial perspective](21-contrast-aerial.md), [22 iGPU tier detection](22-igpu-detection.md) (done), [23 flaky Living Waters spec](23-flaky-living-waters-spec.md) (done), [24 architectural surfaces](24-architecture-surfaces.md), [25 frame budget and adaptive resolution](25-frame-budget.md).
 - Parked until Livia sends exports: 09, 10, 11, 19.
 
@@ -103,5 +104,6 @@ New scripts are TypeScript, run with `bun scripts/<name>.ts`. Bun runs TypeScrip
 | 23 ✅ | [Flaky Living Waters spec](23-flaky-living-waters-spec.md) | — | test | `tests/living-waters.spec.ts` |
 | 24 | [Architectural surfaces](24-architecture-surfaces.md) | 20 B | all (graded) | new `scripts/build-surface-textures.py`, `bridge.ts`, `gateway.ts`, `world.ts`, `station.ts` |
 | 25 | [Frame budget and adaptive resolution](25-frame-budget.md) | 20 B | all | `forest.ts`, `planting.ts`, `cpu-detail.ts`, new `game/render-scale.ts` |
+| 26 | [Physical sky and distant mountains](26-sky-mountains.md) | 20 B | all (graded) | `sky.ts`, new `world/atmosphere.ts`, `world/cloud-noise.ts`, `world/far-ranges.ts`, `world/far-landscape.ts`, `render/output.ts`, `main.ts`, `terrain.ts`, `ground-material.ts` |
 
 Round 2: 20 Phase B runs alone on the render path. After it, 21, 18, 05 and 25 edit `main.ts` and merge one after another; 13, 14, 16, 17, 24 and 12 touch separate files and can run in parallel worktrees. Shader code is TSL only.

@@ -6,7 +6,7 @@
 // classic renderer fogged after encoding; cream paper stays #f4f0e5 by day and night. Ambient occlusion and bloom (sub-plan
 // 18, render/post.ts) act on the linear radiance before tone mapping and leave display pixels alone.
 import * as THREE from 'three';
-import { Fn, abs, float, mat3, materialReference, max, min, mix, mrt, output, positionView, renderGroup, sRGBTransferEOTF, sRGBTransferOETF, smoothstep, sqrt, texture, toneMappingExposure, uniform, vec3, vec4 } from 'three/tsl';
+import { Fn, abs, exp, float, length, mat3, materialReference, max, min, mix, mrt, normalize, output, positionLocal, positionView, positionWorld, renderGroup, sRGBTransferEOTF, sRGBTransferOETF, smoothstep, sqrt, texture, toneMappingExposure, uniform, vec3, vec4 } from 'three/tsl';
 import type { Node, NodeBuilder } from 'three/webgpu';
 import type { PostMode } from '../game/graphics';
 import { AO, ScreenSpace } from './post';
@@ -32,9 +32,20 @@ export const displayed = (radiance: Node<'vec3'>): Node<'vec3'> => toSRGB(acesFi
 /** The fog: main.ts keeps it at the walking or map range, toward the displayed horizon (HORIZON_HAZE). */
 // In the render group, as three's own fog: between frames a material without node properties refreshes only the shared
 // groups, so an object-group uniform reaching it through the MRT keeps its first value (the map range the town loads in).
-export const displayFog = { color: uniform(new THREE.Color()).setGroup(renderGroup), near: uniform(0).setGroup(renderGroup), far: uniform(1).setGroup(renderGroup) };
-// Each surface's range-fog factor, or none for the background and other unfogged materials (decided per material at build).
-const FOG = Fn((builder: NodeBuilder) => (builder.material as { fog?: boolean } | null)?.fog === false ? float(0) : smoothstep(displayFog.near, displayFog.far, positionView.z.negate()))();
+// `mist` and `aerial` shape only the distant ranges (DISTANT_DISPLAY).
+export const displayFog = {
+  color: uniform(new THREE.Color()).setGroup(renderGroup), near: uniform(0).setGroup(renderGroup), far: uniform(1).setGroup(renderGroup),
+  mist: uniform(new THREE.Vector2(1e6, 2e6)).setGroup(renderGroup), aerial: uniform(0).setGroup(renderGroup),
+};
+const RANGE = smoothstep(displayFog.near, displayFog.far, positionView.z.negate());
+// Each surface's range-fog factor, or none for the background and other unfogged materials (decided per material at build). The
+// sky counts as fully fogged at and below the horizon, where it already shows the haze: a multisampled pixel at the walking far
+// plane, half fogged ground and half sky, then resolves to haze rather than a dark seam.
+const FOG = Fn((builder: NodeBuilder) => {
+  const material = builder.material as { fog?: boolean; name?: string } | null;
+  if (material?.name === 'Background.material') return float(1).sub(smoothstep(0, .04, normalize(positionLocal).y));
+  return material?.fog === false ? float(0) : RANGE;
+})();
 // Occlusion is found on the depth buffer, which water, glass and other transparent surfaces leave to what lies behind them;
 // they write 0 and so keep their own light from that surface's occlusion in proportion to their opacity. A material's
 // `userData.occlusion` (0–1) lowers it where screen-space occlusion overstates thin geometry.
@@ -42,7 +53,16 @@ const SOLID = Fn((builder: NodeBuilder) => {
   const material = builder.material as { transparent?: boolean; userData?: { occlusion?: number } } | null;
   return float(!material || material.transparent ? 0 : material.userData?.occlusion ?? 1);
 })();
-const DISPLAY = mrt({ display: vec4(1, smoothstep(displayFog.near, displayFog.far, positionView.z.negate()), 0, 1) });
+const DISPLAY = mrt({ display: vec4(1, RANGE, 0, 1) });
+/**
+ * The distant ranges' fog (sub-plan 26), walking: a valley mist, full below `mist.x` metres of altitude and gone above `mist.y`,
+ * so their feet meet the town's haze while the crests rise out of it, times aerial haze per metre of distance. The map sets
+ * mist everywhere and no aerial haze, which is exactly the range fog of every other surface.
+ */
+export const DISTANT_DISPLAY = mrt({ display: vec4(0, Fn(() => {
+  const mist = float(1).sub(smoothstep(displayFog.mist.x, displayFog.mist.y, positionWorld.y));
+  return float(1).sub(float(1).sub(RANGE.mul(mist)).mul(exp(displayFog.aerial.mul(max(length(positionView).sub(displayFog.near), 0)).negate())));
+})(), 0, 1) });
 
 export class OutputPipeline {
   private readonly target: THREE.RenderTarget;
@@ -61,9 +81,22 @@ export class OutputPipeline {
     this.targets = mrt({ output, display: vec4(0, FOG, SOLID, output.a) }); this.targets.setBlendMode('display', new THREE.BlendMode(THREE.MaterialBlending));
     this.post = new ScreenSpace(post, { colour: this.target.textures[0], display: this.target.textures[1], depth: this.target.depthTexture! }, walkCamera, exposure);
   }
-  /** Occlusion follows the walk camera's depth and projection; the map's far view and gentle detail go without it. */
-  render(camera: THREE.Camera, occlusion = true): void {
-    this.bind(); this.renderer.render(this.scene, camera); this.unbind();
+  /**
+   * Occlusion follows the walk camera's depth and projection; the map's far view and gentle detail go without it. `distant`, when
+   * walking with the distant ranges: a small scene of the sky and the ranges, drawn first by a camera that reaches past the
+   * walking far plane. Its own scene keeps that pass from walking and updating the whole town graph a second time. The town then
+   * draws over it with only the depth cleared, so everything near stays in front, and the ranges' cleared depth and zero
+   * occlusion reach keep ambient occlusion off them.
+   */
+  render(camera: THREE.Camera, occlusion = true, distant?: { scene: THREE.Scene; camera: THREE.Camera }): void {
+    this.bind();
+    if (distant) {
+      const background = this.scene.background, clear = this.renderer.autoClearColor;
+      this.renderer.render(distant.scene, distant.camera);
+      this.scene.background = null; this.renderer.autoClearColor = false;
+      try { this.renderer.render(this.scene, camera); } finally { this.scene.background = background; this.renderer.autoClearColor = clear; }
+    } else this.renderer.render(this.scene, camera);
+    this.unbind();
     const ao = occlusion && camera === this.post.camera && !!this.post.occlusion;
     if (ao) this.post.prepare(this.renderer);
     this.pipeline(ao).render();
@@ -90,7 +123,7 @@ export class OutputPipeline {
    * a time and waits for each pipeline in turn, so several parts compile side by side. Their node builds read the renderer's
    * target and MRT as they go, so both stay set until every part is done; nothing else renders while the town loads.
    */
-  async compile(camera: THREE.Camera, parts: THREE.Object3D[], parallel = 6): Promise<void> {
+  async compile(camera: THREE.Camera, parts: THREE.Object3D[], parallel = 6, scene = this.scene): Promise<void> {
     // A double-sided transmissive material renders a back pass and then a front pass. compileAsync sets each side while it
     // collects the two passes but builds them after restoring DoubleSide, so both would keep a double-sided shader and
     // pipeline (the hall glass drawn four layers deep). Compile them one side at a time instead: the cache keys hold the side.
@@ -105,9 +138,9 @@ export class OutputPipeline {
     const queue = [...parts]; this.bind();
     try {
       for (const material of twoPass.keys()) material.side = THREE.FrontSide;
-      await Promise.all(Array.from({ length: parallel }, async () => { for (let part = queue.shift(); part; part = queue.shift()) await this.renderer.compileAsync(part, camera, this.scene); }));
+      await Promise.all(Array.from({ length: parallel }, async () => { for (let part = queue.shift(); part; part = queue.shift()) await this.renderer.compileAsync(part, camera, scene); }));
       for (const material of twoPass.keys()) material.side = THREE.BackSide;
-      for (const mesh of new Set([...twoPass.values()].flat())) await this.renderer.compileAsync(mesh, camera, this.scene);
+      for (const mesh of new Set([...twoPass.values()].flat())) await this.renderer.compileAsync(mesh, camera, scene);
     } finally { for (const material of twoPass.keys()) material.side = THREE.DoubleSide; this.unbind(); }
     // The output passes and their screen-space stages build their shaders on first use: build both now, not on the first map.
     for (const occlusion of [true, false]) { if (occlusion && this.post.occlusion) this.post.prepare(this.renderer); this.pipeline(occlusion && !!this.post.occlusion).render(); }

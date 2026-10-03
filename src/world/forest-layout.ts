@@ -3,7 +3,7 @@ import { CIVIC_LANDMARKS } from '../game/content';
 import { gatewayClearing } from './gateway-layout';
 import { plantingAllowed } from './landscape';
 import { STATION } from './station-layout';
-import { terrainHeight } from './terrain';
+import { terrainHeight, terrainHeightOf } from './terrain';
 
 function seeded(seed: number): () => number {
   return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -23,7 +23,9 @@ export function forestSites(mobile: boolean): THREE.Vector3[] {
   const rand = seeded(3974); const sites: THREE.Vector3[] = [];
   for (let i = 0; i < (mobile ? 2600 : 5400); i++) {
     const x = (rand() - 0.5) * 410, z = (rand() - 0.5) * 385 - 62;
-    const height = terrainHeight(x, z), slope = Math.hypot(terrainHeight(x + 2, z) - height, terrainHeight(x, z + 2) - height) / 2;
+    // The tests read the uneroded ridges (sub-plan 26): how many draws each candidate takes depends on them, so eroding a ridge
+    // would reshuffle every later tree, the town's included. Trees then stand on the eroded ground.
+    const height = terrainHeightOf(x, z, false), slope = Math.hypot(terrainHeightOf(x + 2, z, false) - height, terrainHeightOf(x, z + 2, false) - height) / 2;
     if (height > 47 + rand() * 13 || slope > .95 || Math.hypot(x / 218, (z + 60) / 210) > .82 + rand() * .18 || !clearForTree(x, z) || sites.some((p) => Math.hypot(p.x - x, p.z - z) < (mobile ? 6 : 4.8))) continue;
     sites.push(new THREE.Vector3(x, terrainHeight(x, z), z));
   }

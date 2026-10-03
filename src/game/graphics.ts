@@ -72,7 +72,7 @@ export function graphicsTier(input: { coarse: boolean; caveatFailed?: boolean; r
   return input.coarse || input.integrated || (input.renderer && modestRenderer(input.renderer)) ? 'mobile' : 'gpu';
 }
 export function graphicsProfile(tier: GraphicsTier): GraphicsProfile {
-  if (tier === 'cpu') return { tier, reduced: true, pixelRatio: .55, shadows: false, skyDay: 64, skyNight: 128, plants: 18, forest: 80, lights: 2, post: 'off' };
-  if (tier === 'mobile') return { tier, reduced: true, pixelRatio: 1, shadows: true, skyDay: 256, skyNight: 512, plants: 32, forest: 110, lights: 6, post: 'off' };
-  return { tier, reduced: false, pixelRatio: 1.5, shadows: true, skyDay: 512, skyNight: 1024, plants: 38, forest: 130, lights: 10, post: 'ao' };
+  if (tier === 'cpu') return { tier, reduced: true, pixelRatio: .55, shadows: false, skyDay: 128, skyNight: 128, plants: 18, forest: 80, lights: 2, post: 'off' };
+  if (tier === 'mobile') return { tier, reduced: true, pixelRatio: 1, shadows: true, skyDay: 512, skyNight: 512, plants: 32, forest: 110, lights: 6, post: 'off' };
+  return { tier, reduced: false, pixelRatio: 1.5, shadows: true, skyDay: 1024, skyNight: 1024, plants: 38, forest: 130, lights: 10, post: 'ao' };
 }

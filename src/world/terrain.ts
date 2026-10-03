@@ -5,6 +5,17 @@ import { waterDistance } from './waterways';
 import { GARDENS, gardenHeight } from './living-waters-layout';
 import { RAILWAY, railwayCorridor } from './station-layout';
 import { futureClearing } from './elevated-layout';
+import { FAR_RANGES, farRangeHeight, ridgeErosion } from './far-ranges';
+
+/** Dev-only `?ridges=classic`: the rounds 1–2 landscape, flat beyond about 400 m, with no distant ranges or far pass (sub-plan 26). */
+export type RidgesLook = 'ranges' | 'classic';
+export function ridgesLook(): RidgesLook {
+  if (!import.meta.env?.DEV || typeof location === 'undefined') return 'ranges';
+  return new URLSearchParams(location.search).get('ridges') === 'classic' ? 'classic' : 'ranges';
+}
+const RANGES = ridgesLook() === 'ranges';
+/** The landscape height (shared with physics and planting); landscapeHeightOf(x, z, false) is the classic one, for tests. */
+export function landscapeHeight(x: number, z: number): number { return landscapeHeightOf(x, z, RANGES); }
 
 function hash(x: number, z: number): number { const n = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return n - Math.floor(n); }
 export function terrainNoise(x: number, z: number): number {
@@ -17,7 +28,9 @@ const ridges = [
   [-231, -48, 175, 69, 1.2, 64], [218, -28, 151, 74, 1.45, 76],
   [-242, 103, 125, 69, .3, 71], [238, 106, 137, 73, -.18, 65],
 ];
-export function landscapeHeight(x: number, z: number): number {
+export function landscapeHeightOf(x: number, z: number, ranges: boolean): number {
+  // Past the near box only the distant ranges stand; the river's carved channel ends there, inside the valley mist.
+  if (ranges && Math.max(Math.abs(x), Math.abs(z + 20)) > FAR_RANGES.rise[0]) return farRangeHeight(x, z);
   if (Math.hypot(x - GARDENS.x, z - GARDENS.z) < 48) return gardenHeight(x - GARDENS.x, z - GARDENS.z);
   if (futureClearing(x, z, 5) || enhancementClearing(x, z, 2)) return 0;
   const distance = waterDistance(x, z);
@@ -34,7 +47,11 @@ export function landscapeHeight(x: number, z: number): number {
   }
   const warp = terrainNoise(x * .009, z * .009) * 2;
   const fold = 1 - Math.abs(terrainNoise(x * .033 + warp, z * .033) * 2 - 1);
-  const relief = mass * (.7 + .36 * fold * fold + .08 * terrainNoise(x * .12, z * .12));
+  // Where a ridge stands more than about 10 m high it carries eroded gullies and spurs (sub-plan 26); foothills, paths, the
+  // ground over the railway bores and the hills that frame the Dark Nut portals keep their smooth heights.
+  const portal = Math.min(Math.abs(Math.abs(x) - RAILWAY.portalX), Math.abs(Math.abs(x) - RAILWAY.exitX)) / 70 + Math.abs(z - RAILWAY.centerZ) / 70;
+  const rugged = ranges ? THREE.MathUtils.smoothstep(mass * foothills, 10, 40) * THREE.MathUtils.smoothstep(Math.abs(z - RAILWAY.centerZ), 14, 40) * THREE.MathUtils.smoothstep(portal, .6, 1.1) : 0;
+  const relief = mass * (.7 + .36 * fold * fold + .08 * terrainNoise(x * .12, z * .12) + (rugged && .55 * rugged * ridgeErosion(x, z)));
   const riverValley = THREE.MathUtils.smoothstep(distance, 0, 25);
   // Grade the approaches and far exits into the same hillside that the tunnel bores cut through.
   const railShoulder = 1 - THREE.MathUtils.smoothstep(Math.abs(z - RAILWAY.centerZ), 9, 30);
@@ -43,9 +60,11 @@ export function landscapeHeight(x: number, z: number): number {
   const hillMargin = THREE.MathUtils.smoothstep(Math.max(Math.abs(x - ENHANCEMENT.x) / 50, Math.abs(z - ENHANCEMENT.z) / 46), 1, 1.3);
   return meadowRelief(x, z) * (1 - foothills) + hillMargin * relief * foothills * riverValley * (1 - railShoulder * Math.max(approach, exit));
 }
-export function terrainHeight(x: number, z: number): number {
+export function terrainHeight(x: number, z: number): number { return terrainHeightOf(x, z, RANGES); }
+/** terrainHeight with or without the distant ranges and the ridges' erosion. */
+export function terrainHeightOf(x: number, z: number, ranges: boolean): number {
   // The walkable floor follows the rail foundation under the visually open mountain bore.
-  return railwayCorridor(x, z) ? 0 : landscapeHeight(x, z);
+  return railwayCorridor(x, z) ? 0 : landscapeHeightOf(x, z, ranges);
 }
 /**
  * Height of the triangulated two-metre town ground at (x, z): the collider below and the near grid of `mountainGeometry` share

@@ -8,7 +8,7 @@ import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
-type View = readonly [name: string, x: number, z: number, yaw: number, pitch?: number];
+type View = readonly [name: string, x: number, z: number, yaw: number, pitch?: number, y?: number];
 type Profile = 'desktop' | 'touch' | 'software';
 interface Hook { snapshot(): Record<string, unknown> & { ready: boolean; mode: string; frames: number; capture: boolean }; teleport(x: number, z: number, yaw?: number, y?: number, pitch?: number): void; standingHeight?(x: number, z: number): number | null }
 
@@ -28,6 +28,8 @@ const VIEWS: Record<string, View> = Object.fromEntries(([
   ['future-house-entry', -30, -105, Math.PI / 2, .1], ['future-house-neck', -36, -105.25, 1.3258, .15],
   ['junction-garden', 6, 12, .876, -.5], ['junction-glucose', 22, -30, -.876, -.5], ['junction-station', 6, 53, .98, -.5],
   ['enhancement-front', 100, -154.6, .575, .05], ['grove-floor', 78, -118, Math.PI, -.3], ['sky-up', 0, 58, .5, .6], ['ridge-northwest', -30, -105, Math.PI / 4, .12],
+  // Sub-plan 26: the skyline down the river valley, from the Enhancement summit (dropped from 24 m onto the hill) and below the north ridges.
+  ['valley-east', 16, 42, -Math.PI / 2, .06], ['summit-northwest', 80, -174, 1, .02, 24], ['summit-southwest', 80, -174, 2.4, -.05, 24], ['ridge-north', 0, -150, 0, .1],
 ] as View[]).map(view => [view[0], view]));
 const SETS: Record<string, string[]> = {
   quick: ['arrival-meadow', 'city-hall-front', 'energy-front', 'bridge-bank', 'east-tributary', 'meadow-ground', 'city-hall-gallery', 'vittoria-lake'],
@@ -35,10 +37,11 @@ const SETS: Record<string, string[]> = {
   ground: ['arrival-meadow', 'north-meadow', 'meadow-ground', 'path-edge', 'garden-path', 'woodland-edge'],
   water: ['bridge-bank', 'shore-closeup', 'east-tributary', 'west-tributary', 'vittoria-lake', 'mycelium-grove'],
   galleries: ['city-hall-gallery', 'energy-gallery', 'science-gallery', 'energy-inside', 'science-inside', 'catalogue-poster', 'embryo-station-platform'],
+  skyline: ['valley-east', 'summit-northwest', 'summit-southwest', 'ridge-north'],
   fixes: ['city-hall-far', 'city-hall-north', 'nanot-arch', 'future-house-entry', 'future-house-neck', 'junction-garden', 'junction-glucose', 'junction-station', 'enhancement-front', 'grove-floor', 'mycelium-grove', 'sky-up', 'ridge-northwest', 'railway-east-portal'],
 };
-// `all` keeps the 33 realism views; `fixes` is reviewed on its own.
-SETS.all = [...new Set(Object.entries(SETS).filter(([set]) => set !== 'fixes').flatMap(([, views]) => views))];
+// `all` keeps the 33 realism views; `fixes` and `skyline` are reviewed on their own.
+SETS.all = [...new Set(Object.entries(SETS).filter(([set]) => set !== 'fixes' && set !== 'skyline').flatMap(([, views]) => views))];
 
 const [outDir, profileArg = 'desktop', setArg = 'quick', time = 'day'] = process.argv.slice(2);
 if (!outDir) throw new Error('Usage: bun scripts/screenshot-realism.ts <outDir> <desktop|touch|software> [viewSet] [day|golden|night]');
@@ -99,8 +102,9 @@ try {
   // without the hook still gets that fixed height, and captures.json records which one ran.
   standing = await page.evaluate(() => typeof (window as unknown as { __livistone: Hook }).__livistone.standingHeight === 'function');
   for (const name of names) {
-    const view = VIEWS[name]!; const [, x, z, yaw, pitch = 0] = view;
-    const y = await page.evaluate(([x, z]) => (window as unknown as { __livistone: Hook }).__livistone.standingHeight?.(x, z) ?? 1.05, [x, z] as const);
+    // A view with its own height (the Enhancement summit) drops from there; the others stand on what lies under them.
+    const view = VIEWS[name]!; const [, x, z, yaw, pitch = 0, height] = view;
+    const y = height ?? await page.evaluate(([x, z]) => (window as unknown as { __livistone: Hook }).__livistone.standingHeight?.(x, z) ?? 1.05, [x, z] as const);
     await page.evaluate(([x, z, yaw, y, pitch]) => (window as unknown as { __livistone: Hook }).__livistone.teleport(x, z, yaw, y, pitch), [x, z, yaw, y, pitch] as const);
     await settle(software ? 3 : 8);
     // Thumbnails and lazily built galleries finish asynchronously; give the network a moment, then settle again.

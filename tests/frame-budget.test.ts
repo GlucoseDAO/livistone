@@ -66,7 +66,9 @@ describe('frame budget, renderer-independent geometry', () => {
   });
   it('tiles the terrain without losing or moving a triangle', () => {
     const ground = mountainGeometry(true), tiles = terrainTiles(ground), position = ground.getAttribute('position');
-    expect(tiles).toHaveLength(33);
+    // Nine town tiles and sixteen to 520 m; past them the distant ranges (sub-plan 26). The classic extent adds eight to 1.4 km.
+    expect(tiles).toHaveLength(25);
+    expect(terrainTiles(mountainGeometry(true, undefined, true))).toHaveLength(33);
     expect(tiles.reduce((sum, tile) => sum + tile.getAttribute('position').count, 0)).toBe(position.count);
     for (const tile of tiles) expect(Object.keys(tile.attributes).sort()).toEqual(Object.keys(ground.attributes).sort());
     const box = (geometries: THREE.BufferGeometry[]): THREE.Box3 => geometries.reduce((all, g) => { g.computeBoundingBox(); return all.union(g.boundingBox!); }, new THREE.Box3());
