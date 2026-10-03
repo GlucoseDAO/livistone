@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { PROBE_SITES, ProbeEnvironment, ReflectionProbes, reflective, refreshEnvironment } from '../src/world/probes';
+import { PROBE_SITES, ProbeEnvironment, ReflectionProbes, litMaterials, reflective, refreshEnvironment } from '../src/world/probes';
 import { CIVIC_LANDMARKS, LANDMARKS } from '../src/game/content';
 import { CITY_HALL } from '../src/world/city-hall';
 import { ENERGY_HALL } from '../src/world/jewelry';
@@ -71,8 +71,9 @@ describe('reflection probes', () => {
   it('refreshes every lit material once per phase without rotating its reflections', () => {
     const root = new THREE.Group(), materials = [new THREE.MeshStandardMaterial(), new THREE.MeshPhysicalMaterial()];
     for (const material of materials) root.add(new THREE.Mesh(new THREE.BoxGeometry(), material));
-    refreshEnvironment(root, 'night'); const night = materials.map(material => material.envMapRotation.order);
-    refreshEnvironment(root, 'day'); const day = materials.map(material => material.envMapRotation.order);
+    const lit = litMaterials(root); expect(lit).toHaveLength(2);
+    refreshEnvironment(lit, 'night'); const night = materials.map(material => material.envMapRotation.order);
+    refreshEnvironment(lit, 'day'); const day = materials.map(material => material.envMapRotation.order);
     expect(new Set(night).size).toBe(1); expect(new Set(day).size).toBe(1); expect(night[0]).not.toBe(day[0]);
     for (const material of materials) expect([material.envMapRotation.x, material.envMapRotation.y, material.envMapRotation.z]).toEqual([0, 0, 0]);
   });

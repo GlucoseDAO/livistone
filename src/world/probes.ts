@@ -75,17 +75,22 @@ export class ProbeEnvironment extends THREE.PMREMNode {
   }
 }
 
+/** Every lit material under `roots`, which refreshEnvironment() reaches on each phase change. */
+export function litMaterials(...roots: THREE.Object3D[]): THREE.Material[] {
+  const found = new Set<THREE.Material>();
+  for (const root of roots) root.traverse(object => { const material = (object as THREE.Mesh).material; if (material) for (const one of Array.isArray(material) ? material : [material]) if (pbr(one)) found.add(one); });
+  return [...found];
+}
+
 /**
  * A phase change reaches every material: three re-uploads an object's own uniforms (the environment's texture and size, the
- * scene's environment intensity) only when its material has node properties or a watched property changed. The rotation's
- * order is watched; with zero angles it rotates nothing, so each phase gets its own order and every material refreshes once.
+ * scene's environment intensity) only when its material has node properties or a watched property changed. The environment
+ * rotation's order is watched; with zero angles it rotates nothing, so each phase gets its own order and every material
+ * refreshes once.
  */
-export function refreshEnvironment(root: THREE.Object3D, phase: SkyPhase): void {
+export function refreshEnvironment(materials: readonly THREE.Material[], phase: SkyPhase): void {
   const order = phase === 'night' ? 'YXZ' : 'XYZ';
-  root.traverse(object => {
-    const material = (object as THREE.Mesh).material; if (!material) return;
-    for (const one of Array.isArray(material) ? material : [material]) if (pbr(one) && one.envMapRotation.order !== order) one.envMapRotation.order = order;
-  });
+  for (const material of materials) if (pbr(material) && material.envMapRotation.order !== order) material.envMapRotation.order = order;
 }
 
 /** The output pipeline's scene target and MRT, whose layout the probe faces copy. */
@@ -98,8 +103,12 @@ export interface BakeContext {
   hidden: THREE.Object3D[];
   /** Runs before a face renders: the night lamp pool and the trees as the probe sees them. */
   visit: (position: THREE.Vector3) => void;
-  /** The walking view's distant ranges (sub-plan 26), which exterior faces draw first. */
-  distant: { scene: THREE.Scene; far: number } | null;
+  /**
+   * The walking view's distant pass (sub-plan 26): its sky, and the ranges, which exterior faces draw too. Every face draws it
+   * first, so the town never draws a background of its own in a bake: a background with the other phase's sky would build its
+   * shader again on every step of a background bake.
+   */
+  distant: { scene: THREE.Scene; far: number; ranges: THREE.Object3D[] };
 }
 
 /** One face target, cube and copy per probe size, kept for every bake of the session. */
@@ -143,8 +152,8 @@ export class ReflectionProbes {
   probes(phase: SkyPhase): ReadonlyMap<string, THREE.Texture> {
     return new Map([...this.baked.get(phase) ?? []].map(([id, target]) => [id, target.texture]));
   }
-  /** Start baking `phase`; `sky` is that phase's sky, `haze` its horizon radiance (HORIZON_RADIANCE). */
-  bake(phase: SkyPhase, sky: { background: THREE.Texture; environment: THREE.Texture }, haze: THREE.Color): ProbeBake {
+  /** Start baking `phase`; `sky` is that phase's sky (the distant pass shows its background), `haze` its horizon radiance (HORIZON_RADIANCE). */
+  bake(phase: SkyPhase, sky: { environment: THREE.Texture }, haze: THREE.Color): ProbeBake {
     return new ProbeBake(this, phase, sky, haze);
   }
   /** @internal ProbeBake's finished phase. */
@@ -162,33 +171,30 @@ export class ReflectionProbes {
    * would build each town shader again, seconds on an integrated GPU. A quad then copies the face into the cube. Without a
    * source the faces get a plain half-float target: correct, but every shader then builds again for it. `hidden` (the
    * near-ground details), the site's envelope and `extra` (photographs, captions, signs and night halos) vanish meanwhile.
-   * Exterior faces draw the distant ranges' scene first, as the output pipeline's distant pass does, so silver facing the
-   * valley reflects the crests above the haze rather than bare sky.
+   * Every face draws the distant pass first, as the output pipeline does, then the town over it with only the depth cleared:
+   * exterior faces with the ranges, so silver facing the valley reflects the crests above the haze rather than bare sky,
+   * interior faces with the sky alone.
    * @internal
    */
-  renderFace(context: BakeContext, scope: ProbeScope, index: number, sky: THREE.Texture, haze: THREE.Color, extra: THREE.Object3D[]): void {
-    const { renderer, scene, source } = context, { site } = scope, exterior = site.kind === 'exterior';
+  renderFace(context: BakeContext, scope: ProbeScope, index: number, haze: THREE.Color, extra: THREE.Object3D[]): void {
+    const { renderer, scene, source, distant } = context, { site } = scope, exterior = site.kind === 'exterior';
     const { face, cube, quad } = this.sized(context, exterior ? this.size : this.size / 2);
     const cameras = this.cameras, camera = cameras.children[index] as THREE.PerspectiveCamera;
     if (cameras.coordinateSystem !== renderer.coordinateSystem) { cameras.coordinateSystem = renderer.coordinateSystem; cameras.updateCoordinateSystem(); }
     cameras.position.set(...site.position); cameras.updateMatrixWorld(true);
     camera.near = exterior ? .3 : .1; camera.updateProjectionMatrix();
     // The distant pass's cube: from just inside the town faces' far plane to the ranges' end, as main.ts's far camera.
-    const ranges = exterior && context.distant ? context.distant : null;
-    if (ranges && !this.far) { this.far = new THREE.CubeCamera(FAR * .9, ranges.far, cameras.renderTarget); this.far.coordinateSystem = renderer.coordinateSystem; this.far.updateCoordinateSystem(); }
-    if (ranges) { this.far!.position.copy(cameras.position); this.far!.updateMatrixWorld(true); }
+    if (!this.far) { this.far = new THREE.CubeCamera(FAR * .9, distant.far, cameras.renderTarget); this.far.coordinateSystem = renderer.coordinateSystem; this.far.updateCoordinateSystem(); }
+    this.far.position.copy(cameras.position); this.far.updateMatrixWorld(true);
     context.visit(cameras.position);
     const state = { background: scene.background, target: renderer.getRenderTarget(), mrt: renderer.getMRT(), clear: renderer.autoClearColor };
-    const hidden = [...new Set([...context.hidden, ...this.envelopes.get(site.id)!, ...extra])], shown = hidden.map(object => object.visible);
-    hidden.forEach(object => { object.visible = false; }); scene.background = sky; this.haze.value.copy(haze);
+    const hidden = [...new Set([...context.hidden, ...this.envelopes.get(site.id)!, ...extra, ...exterior ? [] : distant.ranges])], shown = hidden.map(object => object.visible);
+    hidden.forEach(object => { object.visible = false; }); this.haze.value.copy(haze);
     try {
       renderer.setRenderTarget(face); renderer.setMRT(source?.mrt ?? null);
-      if (ranges) {
-        // The town then draws over the ranges and their sky with only the depth cleared (render/output.ts).
-        renderer.render(ranges.scene, this.far!.children[index] as THREE.Camera);
-        scene.background = null; renderer.autoClearColor = false;
-        renderer.render(scene, camera);
-      } else renderer.render(scene, camera);
+      renderer.render(distant.scene, this.far.children[index] as THREE.Camera);
+      scene.background = null; renderer.autoClearColor = false;
+      renderer.render(scene, camera);
       renderer.setMRT(null); renderer.setRenderTarget(cube, index); quad.render(renderer);
     } finally {
       hidden.forEach((object, i) => { object.visible = shown[i]; });
@@ -236,7 +242,7 @@ export class ProbeBake {
   private readonly results = new Map<string, THREE.RenderTarget>();
   /** What every face reflects while baking: the sky alone. */
   readonly view: ProbeView;
-  constructor(private readonly probes: ReflectionProbes, readonly phase: SkyPhase, private readonly sky: { background: THREE.Texture; environment: THREE.Texture }, private readonly haze: THREE.Color) {
+  constructor(private readonly probes: ReflectionProbes, readonly phase: SkyPhase, sky: { environment: THREE.Texture }, private readonly haze: THREE.Color) {
     this.view = { sky: sky.environment, probes: new Map() };
   }
   get done(): boolean { return this.cancelled || this.site >= this.probes.scopes.length; }
@@ -252,7 +258,7 @@ export class ProbeBake {
     this.extra ??= ((found: THREE.Object3D[]) => { context.scene.traverse(object => { const material = (object as THREE.Mesh).material as THREE.Material & { map?: THREE.Texture | null }; if (((object as THREE.Mesh).isMesh && !Array.isArray(material) && material.userData.display && material.map) || object.userData.nightGlow) found.push(object); }); return found; })([]);
     const scope = this.probes.scopes[this.site];
     if (this.face === 6) { this.results.set(scope.site.id, this.probes.prefilter(context, scope)); this.face = 0; this.site++; }
-    else { this.probes.renderFace(context, scope, this.face, this.sky.background, this.haze, this.extra); this.face++; }
+    else { this.probes.renderFace(context, scope, this.face, this.haze, this.extra); this.face++; }
     this.ms += performance.now() - start; this.steps++;
     if (this.site >= this.probes.scopes.length) this.probes.finish(this.phase, this.results, this.ms, this.steps);
     return this.done;

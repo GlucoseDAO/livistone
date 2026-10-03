@@ -256,30 +256,49 @@ function bakeSize(tier: GraphicsTier, night: boolean, look: SkyLook): number {
   return night ? profile.skyNight : look === 'classic' ? profile.skyDay / 2 : profile.skyDay;
 }
 
+export type Sky = { background: THREE.CubeTexture; environment: THREE.Texture; haze: THREE.CubeTexture };
 /** Bake the sky once: the background and the jewelry reflections see the same cubemap.
  *  darkGround shades the lower hemisphere, hidden behind terrain, like shaded surroundings: polished metal then shows a
  *  dark-below, bright-above horizon line instead of a flat sky tint, until reflection probes capture the real town.
  *  `haze` is the aerial perspective's fog colour (render/aerial.ts): the same sky, 64 px a face with mipmaps, horizon below.
  *  The cpu tier keeps linear fog and gets the background there instead. */
-export function createSky(renderer: THREE.WebGPURenderer, mobile: boolean, night = false, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', darkGround = false, look: SkyLook = skyLook()): { background: THREE.CubeTexture; environment: THREE.Texture; haze: THREE.CubeTexture } {
+export function createSky(renderer: THREE.WebGPURenderer, mobile: boolean, night = false, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', darkGround = false, look: SkyLook = skyLook()): Sky {
+  const steps = skyBake(renderer, mobile, night, tier, darkGround, look);
+  for (;;) { const step = steps.next(); if (step.done) return step.value; }
+}
+/**
+ * createSky in steps, a cube face or the prefilter at a time, for a sky first needed after loading: the night baked in the
+ * background (sub-plan 07) took a frame of about half a second on an integrated GPU in one piece.
+ */
+export function* skyBake(renderer: THREE.WebGPURenderer, mobile: boolean, night = false, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', darkGround = false, look: SkyLook = skyLook()): Generator<void, Sky> {
   const scene = new THREE.Scene(), size = bakeSize(tier, night, look);
   const material = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false, fog: false });
   const clouds = look === 'physical' && !night ? cloudNoise(QUALITY[tier].noise) : null;
   const colour = (haze: boolean): V3 => look === 'classic' ? (night ? classicNight(haze) : classicDay(darkGround, haze)) : night ? physicalNight(size, haze) : physicalDay(darkGround, tier, clouds!, haze);
   material.colorNode = colour(false);
   const geometry = new THREE.SphereGeometry(10, 24, 16), sphere = new THREE.Mesh(geometry, material); scene.add(sphere);
-  const bake = (faces: number): THREE.CubeRenderTarget => {
+  // CubeCamera.update() one face per step: mipmaps once the last face is in, the prefilter told the cube changed.
+  const bake = function* (faces: number): Generator<void, THREE.CubeRenderTarget> {
     const target = new THREE.CubeRenderTarget(faces, { type: tier === 'cpu' ? THREE.UnsignedByteType : THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
-    new THREE.CubeCamera(.1, 20, target).update(renderer, scene); return target;
+    const cameras = new THREE.CubeCamera(.1, 20, target); cameras.updateMatrixWorld(); cameras.coordinateSystem = renderer.coordinateSystem; cameras.updateCoordinateSystem();
+    for (let face = 0; face < 6; face++) {
+      const previous = renderer.getRenderTarget(), cube = renderer.getActiveCubeFace(), level = renderer.getActiveMipmapLevel();
+      target.texture.generateMipmaps = face === 5; renderer.setRenderTarget(target, face); renderer.render(scene, cameras.children[face] as THREE.Camera);
+      renderer.setRenderTarget(previous, cube, level); if (face < 5) yield;
+    }
+    target.texture.needsPMREMUpdate = true; return target;
   };
-  const target = bake(size);
+  const target = yield* bake(size);
   if (tier === 'cpu') { clouds?.dispose(); geometry.dispose(); material.dispose(); return { background: target.texture, environment: target.texture, haze: target.texture }; }
+  yield;
   // The reflections keep the classic bake size: PMREM grows fourfold per doubling of the cube, and every lit surface samples it.
-  const small = size > bakeSize(tier, night, 'classic') ? bake(bakeSize(tier, night, 'classic')) : null;
+  const small = size > bakeSize(tier, night, 'classic') ? yield* bake(bakeSize(tier, night, 'classic')) : null;
+  if (small) yield;
   const pmrem = new THREE.PMREMGenerator(renderer), environment = pmrem.fromCubemap((small ?? target).texture).texture;
+  yield;
   const hazeMaterial = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false, fog: false });
   hazeMaterial.colorNode = colour(true); sphere.material = hazeMaterial;
-  const haze = bake(64).texture;
+  const haze = (yield* bake(64)).texture;
   small?.dispose(); clouds?.dispose(); pmrem.dispose(); geometry.dispose(); material.dispose(); hazeMaterial.dispose();
   return { background: target.texture, environment, haze };
 }

@@ -25,6 +25,8 @@ function haloTexture(): THREE.DataTexture {
 // shows brighter than ACES did, a plain sum clipped red and lifted green into peach-white blots (dev-only ?haze=classic keeps
 // the sum). One node for every halo; colour and opacity stay per material.
 let haloNode: Node<'vec4'> | undefined;
+// Shared too: a node of its own per halo keyed each one's shader apart, and the first night built all 33 of them at once.
+const haloOpacity = float(1);
 /** A depth-tested halo and a light location; the renderer shares a fixed pool of actual lights. */
 export function addGlow(parent: THREE.Object3D, position: THREE.Vector3, color: string, size: number, intensity = 0, distance = 12, opacity = .45): THREE.Sprite {
   if (!haloNode) {
@@ -34,7 +36,7 @@ export function addGlow(parent: THREE.Object3D, position: THREE.Vector3, color: 
     haloNode = vec4(max(untoneMapped(fromSRGB(min(raised, vec3(1)))).sub(behind), vec3(0)).mul(vec3(1).sub(aerialFactor)), 1);
   }
   const material = new THREE.SpriteNodeMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
-  material.colorNode = haloNode; material.opacityNode = float(1); material.mrtNode = KEEP_DISPLAY;
+  material.colorNode = haloNode; material.opacityNode = haloOpacity; material.mrtNode = KEEP_DISPLAY;
   const glow = new THREE.Sprite(material); glow.position.copy(position); glow.scale.setScalar(size); glow.name = 'Night halo';
   glow.userData.nightGlow = true; glow.userData.lightSource = { color, intensity, distance }; parent.add(glow); return glow;
 }
