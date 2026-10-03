@@ -5,7 +5,7 @@ export { landscapeHeight as mountainHeight } from './terrain';
 import { landscapeHeight, ridgesLook } from './terrain';
 import { FAR_LAYER, farLandscapeGeometry, farLandscapeMaterial } from './far-landscape';
 import { groundCover } from './ground-cover';
-import { COULOIR_SHADE_BOX, MOUNTAIN, couloirShade, meltwater, snowCover, turfCover } from './mountain-layout';
+import { COULOIR_SHADE_BOX, MOUNTAIN, couloirShade, meltwater, snowCover, trailFrame, turfCover } from './mountain-layout';
 import { SUN_DIR } from './sky';
 import { groundLook, groundNodes, groundTextureFiles } from './ground-material';
 import type { GrassShade } from './ground-material';
@@ -19,7 +19,7 @@ export const GRASS = new THREE.Color('#c5c5a4'), FRESH = new THREE.Color('#a1b89
 
 /** Subtract the rail clearance from the actual hillside triangles, including both far exits. */
 function cutRailwayOpening(source: THREE.BufferGeometry): THREE.BufferGeometry {
-  const soil = source.getAttribute('groundSoil'), soils: number[] = [], shade = source.getAttribute('groundShade'), shades: number[] = [], paint = source.getAttribute('groundPaint'), paints: number[] = [];
+  const soil = source.getAttribute('groundSoil'), soils: number[] = [], shade = source.getAttribute('groundShade'), shades: number[] = [], paint = source.getAttribute('groundPaint'), paints: number[] = [], frame = source.getAttribute('trailFrame'), frames: number[] = [];
   const pos = source.getAttribute('position'), color = source.getAttribute('color'), normal = source.getAttribute('normal'), positions: number[] = [], colors: number[] = [], normals: number[] = [];
   type Vertex = number[];
   // The Dark Nut mouths flare wider than the lined bore; cut that same apron out of the hillside.
@@ -35,15 +35,15 @@ function cutRailwayOpening(source: THREE.BufferGeometry): THREE.BufferGeometry {
     }
     return result;
   };
-  const emit = (polygon: Vertex[]): void => { for (let i = 1; i < polygon.length - 1; i++) for (const v of [polygon[0], polygon[i], polygon[i + 1]]) { positions.push(...v.slice(0, 3)); colors.push(...v.slice(3, 6)); normals.push(...v.slice(6, 9)); soils.push(v[9]); shades.push(v[10]); if (paint) paints.push(...v.slice(11, 15)); } };
+  const emit = (polygon: Vertex[]): void => { for (let i = 1; i < polygon.length - 1; i++) for (const v of [polygon[0], polygon[i], polygon[i + 1]]) { positions.push(...v.slice(0, 3)); colors.push(...v.slice(3, 6)); normals.push(...v.slice(6, 9)); soils.push(v[9]); shades.push(v[10]); if (paint) paints.push(...v.slice(11, 15)); if (frame) frames.push(...v.slice(15, 19)); } };
   const index = source.index!;
   for (let i = 0; i < index.count; i += 3) {
-    let polygon = [0, 1, 2].map((j) => { const n = index.getX(i + j); return [pos.getX(n), pos.getY(n), pos.getZ(n), color.getX(n), color.getY(n), color.getZ(n), normal.getX(n), normal.getY(n), normal.getZ(n), soil.getX(n), shade.getX(n), ...paint ? [paint.getX(n), paint.getY(n), paint.getZ(n), paint.getW(n)] : []]; });
+    let polygon = [0, 1, 2].map((j) => { const n = index.getX(i + j); return [pos.getX(n), pos.getY(n), pos.getZ(n), color.getX(n), color.getY(n), color.getZ(n), normal.getX(n), normal.getY(n), normal.getZ(n), soil.getX(n), shade.getX(n), ...paint ? [paint.getX(n), paint.getY(n), paint.getZ(n), paint.getW(n)] : [], ...frame ? [frame.getX(n), frame.getY(n), frame.getZ(n), frame.getW(n)] : []]; });
     const planes = polygon.every(v => v[1] <= .02) ? floorPlanes : tunnelPlanes;
     if (planes.some((plane) => polygon.every((v) => plane(v) <= 0))) { emit(polygon); continue; }
     for (const plane of planes) { emit(clip(polygon, plane, false)); polygon = clip(polygon, plane, true); if (!polygon.length) break; }
   }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3)); g.setAttribute('groundSoil', new THREE.Float32BufferAttribute(soils, 1)); g.setAttribute('groundShade', new THREE.Float32BufferAttribute(shades, 1)); if (paint) g.setAttribute('groundPaint', new THREE.Float32BufferAttribute(paints, 4)); g.normalizeNormals(); source.dispose(); return g;
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3)); g.setAttribute('groundSoil', new THREE.Float32BufferAttribute(soils, 1)); g.setAttribute('groundShade', new THREE.Float32BufferAttribute(shades, 1)); if (paint) g.setAttribute('groundPaint', new THREE.Float32BufferAttribute(paints, 4)); if (frame) g.setAttribute('trailFrame', new THREE.Float32BufferAttribute(frames, 4)); g.normalizeNormals(); source.dispose(); return g;
 }
 
 /**
@@ -87,7 +87,7 @@ function sunVisibility(x: number, z: number, y: number): number {
 export function mountainGeometry(mobile: boolean, shade: (x: number, z: number) => number = () => 1, wide = ridgesLook() === 'classic'): THREE.BufferGeometry {
     // Two-metre cells match the walking terrain; distant ridges use wider cells in both quality tiers.
     const { xs, zs } = terrainAxes(mobile, wide);
-    const positions: number[] = [], colors: number[] = [], soils: number[] = [], shades: number[] = [], paints: number[] = [], indices: number[] = [], color = new THREE.Color(), grass = GRASS, fresh = FRESH, stone = new THREE.Color('#a6a294');
+    const positions: number[] = [], colors: number[] = [], soils: number[] = [], shades: number[] = [], paints: number[] = [], frames: number[] = [], indices: number[] = [], color = new THREE.Color(), grass = GRASS, fresh = FRESH, stone = new THREE.Color('#a6a294');
     for (let j = 0; j < zs.length; j++) for (let i = 0; i < xs.length; i++) {
       const x = xs[i], z = zs[j], y = landscapeHeight(x, z);
       positions.push(x, y, z);
@@ -97,11 +97,14 @@ export function mountainGeometry(mobile: boolean, shade: (x: number, z: number) 
       // Sub-plan 27: alpine turf round the plants, old snow, meltwater (painted by ground-material.ts) and the sun's visibility, which
       // scales the sun's shadow term there (`receivedShadowNode` below).
       if (MOUNTAIN) paints.push(turfCover(x, z), snowCover(x, z), meltwater(x, z), sunVisibility(x, z, y));
+      // The trail's frame on the snow, where the ground lays its boot prints (9 m across: none); true values out to 6 m, so the two-metre
+      // triangles round the prints interpolate it correctly.
+      if (MOUNTAIN) { const f = trailFrame(x, z); frames.push(...f ? [f.along, f.across, f.dx, f.dz] : [0, 9, 0, 0]); }
       color.copy(grass).lerp(fresh, cover.freshness * .6).lerp(stone, rock).multiplyScalar(cover.shade);
       colors.push(color.r, color.g, color.b);
       if (i < xs.length - 1 && j < zs.length - 1) { const n = j * xs.length + i; indices.push(n, n + xs.length, n + 1, n + 1, n + xs.length, n + xs.length + 1); }
     }
-    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geo.setAttribute('groundSoil', new THREE.Float32BufferAttribute(soils, 1)); geo.setAttribute('groundShade', new THREE.Float32BufferAttribute(shades, 1)); if (MOUNTAIN) geo.setAttribute('groundPaint', new THREE.Float32BufferAttribute(paints, 4)); geo.setIndex(indices); geo.computeVertexNormals();
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geo.setAttribute('groundSoil', new THREE.Float32BufferAttribute(soils, 1)); geo.setAttribute('groundShade', new THREE.Float32BufferAttribute(shades, 1)); if (MOUNTAIN) { geo.setAttribute('groundPaint', new THREE.Float32BufferAttribute(paints, 4)); geo.setAttribute('trailFrame', new THREE.Float32BufferAttribute(frames, 4)); } geo.setIndex(indices); geo.computeVertexNormals();
     return cutRailwayOpening(geo);
 }
 
@@ -161,11 +164,13 @@ export class Mountains extends THREE.Group {
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.anisotropy = tier === 'gpu' ? 4 : 2; return texture;
     });
     const files = groundTextureFiles(tier), shoreFiles = shoreTextureFiles(tier);
+    // The snow's boot prints (sub-plan 27): height, normal and wear on the trail's frame, wrapping along it; gpu and mobile only.
+    const prints = MOUNTAIN && tier !== 'cpu' ? load(`textures/snow/footprints-${tier === 'gpu' ? 'gpu' : 'mobile'}.webp`, false).then((t) => { t.wrapS = THREE.ClampToEdgeWrapping; t.flipY = false; t.anisotropy = tier === 'gpu' ? 8 : 4; t.needsUpdate = true; return t; }).catch(() => null) : Promise.resolve(null);
     // The shore gravel is optional: without it the banks keep their wet band, silt and caustics.
     const shore = Promise.all(shoreFiles.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))).catch(() => []);
-    this.ready = Promise.all([Promise.all(files.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))), load('textures/mountains/rock-color.jpg', true), tier === 'gpu' ? load('textures/mountains/rock-normal.jpg', false) : Promise.resolve(null), shore]).then(([ground, rock, rockNormal, gravel]) => {
+    this.ready = Promise.all([Promise.all(files.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))), load('textures/mountains/rock-color.jpg', true), tier === 'gpu' ? load('textures/mountains/rock-normal.jpg', false) : Promise.resolve(null), shore, prints]).then(([ground, rock, rockNormal, gravel, footprints]) => {
       const albedo = ground.filter((_, i) => files[i].includes('-albedo-')), nrh = tier === 'cpu' ? albedo : ground.filter((_, i) => files[i].includes('-nrh-'));
-      const nodes = groundNodes(tier, look, { albedo, nrh, rock, rockNormal, shore: gravel.length === 2 ? { albedo: gravel[0], nrh: gravel[1] } : null }, GRASS, grass, ridgesLook() === 'ranges', MOUNTAIN);
+      const nodes = groundNodes(tier, look, { albedo, nrh, rock, rockNormal, shore: gravel.length === 2 ? { albedo: gravel[0], nrh: gravel[1] } : null, footprints }, GRASS, grass, ridgesLook() === 'ranges', MOUNTAIN);
       material.colorNode = nodes.colorNode; material.normalNode = nodes.normalNode;
       if (plain) { const ridge = farLandscapeMaterial(tier, rock, rockNormal); plain.dispose(); for (const mesh of ranges) mesh.material = ridge; }
       if (material instanceof THREE.MeshStandardNodeMaterial) material.roughnessNode = nodes.roughnessNode;

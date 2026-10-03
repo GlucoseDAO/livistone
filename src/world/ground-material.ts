@@ -194,8 +194,11 @@ const GROUND = {
  * tiny yellow flowers; on cpu, which draws neither plant, patches of their colour), old avalanche snow with a lumpy edge, dirt
  * streaks and debris over a dark wet rim, and meltwater. Colours are albedos: the vertex colour that multiplies the ground afterwards is divided out.
  */
-function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean): void {
+function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean, footprints: THREE.Texture | null): void {
   const marks = attribute<'vec4'>('groundPaint', 'vec4').xyz.toVar(), tint = max(attribute<'vec3'>('color', 'vec3'), vec3(.05)).toVar();
+  // The boot prints' coordinates on the trail's frame (metres across it over the tile's 1.2 m, along it over 9.6 m), with their
+  // gradients taken here, outside the snow's branch, so the lookup inside it stays legal.
+  const frame = attribute<'vec4'>('trailFrame', 'vec4'), printUV = vec2(frame.y.div(1.2).add(.5), frame.x.div(9.6)).toVar(), printDx = dFdx(printUV).toVar(), printDy = dFdy(printUV).toVar();
   If(marks.x.greaterThan(.01), () => {
     // Bright alpine turf between the plants, as in the owner's photos: the meadow's own grain and value, its hue and level pulled
     // to a fresh green, with no rock or bare soil showing (its flowers are alpine-plants.ts's, on stems).
@@ -214,33 +217,19 @@ function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean): void
   const crags = float(1).sub(smoothstep(-240, -234, positionLocal.z)).mul(smoothstep(-80, -70, positionLocal.x)).mul(float(1).sub(smoothstep(14, 24, positionLocal.x))).mul(GROUND.rock);
   ground.assign(mix(ground, vec3(dot(ground, LUMA)).mul(vec3(1.32, 1.3, 1.24)), crags.mul(.85)));
   If(marks.y.greaterThan(.01), () => {
-    // Old avalanche snow as in the owner's photographs of the gully: grey-white, never paint-white, its surface a network of
-    // sun-cup hollows with dirt gathered along the ridges between them, soil streaks down the fall line, needles,
-    // twigs and stones lying on it; greyer and banded where its edge stands steep; trampled grey where the trail crosses it.
+    // Old avalanche snow as in the owner's photographs of the gully: grey-white, never paint-white, with soil streaks down the
+    // fall line, dirt patches, needles, twigs and stones lying on it; greyer and banded where its edge stands steep; boot prints
+    // where the trail crosses it.
     const edge = marks.y.add(valueNoise(xz.div(1.7)).sub(.5).mul(.36)).add(valueNoise(xz.div(.45)).sub(.5).mul(.12)).toVar();
     // Never up the gully's walls: the 2 m grid's wall triangles would carry it up in white teeth.
     const snow = smoothstep(.42, .5, edge).mul(smoothstep(.58, .8, up)).toVar(), rim = smoothstep(.18, .42, edge).mul(float(1).sub(snow)).toVar();
-    // Sun cups: Voronoi hollows about 45 cm across (nearest of nine jittered points); the ridges between them are the cells' edges.
-    // Gently warped, so the hollows are irregular without stretching into streaks (a varying scale did that).
-    const warp = vec2(valueNoise(xz.div(1.6)), valueNoise(xz.div(1.6).add(13.7))).sub(.5).mul(.16);
-    const cupP = xz.add(warp).div(.42).toVar(), cupCell = floor(cupP).toVar(), cupF = fract(cupP).toVar(), nearest = float(8).toVar(), away = vec2(0).toVar();
-    for (const [ox, oy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) {
-      const r = vec2(ox, oy).add(hash22(cupCell.add(vec2(ox, oy))).mul(.8).add(.1)).sub(cupF).toVar(), d = dot(r, r).toVar();
-      If(d.lessThan(nearest), () => { nearest.assign(d); away.assign(r.negate()); });
-    }
-    const f1 = sqrt(nearest).toVar(), t = clamp(f1.sub(.08).div(.6), 0, 1).toVar(), ridge = t.mul(t).mul(float(3).sub(t.mul(2))).toVar();
-    // The hollow's slope per metre, outward from its centre: the derivative of that smoothstep along the unit vector away.
-    const cups = away.div(max(f1, .0001)).mul(t.mul(float(1).sub(t)).mul(6 / .6 / .42));
     const near = float(1).sub(far).toVar(), soilAt = attribute<'float'>('groundSoil', 'float');
     const streaks = valueNoise(vec2(xz.x.div(1.4), xz.y.div(8))).toVar(), grime = valueNoise(xz.div(3.1).add(7.7)).toVar();
     const clean = vec3(.47, .485, .51).mul(valueNoise(xz.div(5)).mul(.1).add(.95)).mul(valueNoise(xz.div(.035)).mul(.08).add(.96)).toVar();
-    // Dirt along the cup ridges, thickest where the slope's soil streaks run, and a brownish cast in broad patches.
-    // Dirt runs in streaks down the fall line and lies in broad patches; only a faint, broken share follows the cups' ridges, so
-    // the hollows shape the light without printing a pattern of cells.
+    // Dirt runs in streaks down the fall line and lies in broad patches.
     const patchy = valueNoise(xz.div(.8).add(3.3)).toVar();
-    const dirt = smoothstep(.42, .9, streaks).mul(.5).add(smoothstep(.52, .85, grime).mul(.34)).add(smoothstep(.85, 1, ridge).mul(smoothstep(.55, .8, patchy)).mul(.22)).add(.06).toVar();
+    const dirt = smoothstep(.42, .9, streaks).mul(.5).add(smoothstep(.52, .85, grime).mul(.34)).add(smoothstep(.62, .9, patchy).mul(.12)).add(.06).toVar();
     const white = mix(clean, vec3(.31, .28, .24), clamp(dirt, 0, .8)).toVar();
-    // Cup hollows sit a shade darker on every tier (the gpu also tilts their normal): the mottling the photographs show.
     // Debris up close: conifer needles in 6 cm cells, twigs in 50 cm cells, a few stones, all short dark strokes.
     const stroke = (cellSize: number, chance: number, reach: number, width: number, seed: number): F => {
       const cell = xz.div(cellSize).add(seed).toVar(), id = floor(cell), h = hash22(id).toVar(), angle = h.x.mul(6.2831853), dir = vec2(cos(angle), sin(angle));
@@ -252,23 +241,32 @@ function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean): void
     white.assign(mix(white, vec3(.16, .12, .08), needles));
     white.assign(mix(white, vec3(.14, .1, .07), twigs));
     white.assign(mix(white, vec3(.24, .23, .22), stones));
-    // Where the trail crosses, boots have trampled a grey, smoother line.
-    const tramp = smoothstep(.35, .8, soilAt).toVar();
-    white.assign(mix(white, vec3(.42, .41, .4).mul(valueNoise(xz.div(.18)).mul(.3).add(.85)), tramp.mul(.75)));
+    // Where the trail crosses, people have walked it before: a slightly grey, packed line and, on it, the baked boot prints going up
+    // and down (scripts/build-snow-footprints.py: R height, GB normal across/along, A how trodden), darker and dirtier where deep.
+    const tramp = smoothstep(.35, .8, soilAt).toVar(), printSlope = vec2(0).toVar();
+    white.assign(mix(white, vec3(.44, .43, .42).mul(valueNoise(xz.div(.18)).mul(.2).add(.9)), tramp.mul(.35)));
+    if (footprints) If(abs(frame.y).lessThan(.62), () => {
+      const print = texture(footprints, printUV).grad(printDx, printDy).toVar(), depth = clamp(float(.5).sub(print.r).mul(255 * .0015 / .05), 0, 1);
+      const band = float(1).sub(smoothstep(.5, .62, abs(frame.y))).mul(near);
+      white.assign(mix(white, mix(white.mul(.8), vec3(.36, .34, .31), .3), depth.mul(band)).mul(float(1).sub(print.a.mul(.06).mul(band))));
+      // The print's slope on the trail's frame, turned into the world: across is to the right of the trail's direction.
+      const n = print.gb.mul(2).sub(1), along = vec2(frame.z, frame.w), across = vec2(frame.w.negate(), frame.z);
+      printSlope.assign(across.mul(n.x).add(along.mul(n.y)).negate().div(max(float(1).sub(dot(n, n)).sqrt(), .2)).mul(band));
+    });
     // A steep snow edge shows its layers: greyer, banded every few tens of centimetres of height.
     const face = float(1).sub(smoothstep(.55, .8, up)).toVar();
     white.assign(mix(white, white.mul(.78).mul(sin(positionLocal.y.mul(19).add(valueNoise(xz.div(.7)).mul(4))).mul(.07).add(.93)), face));
     ground.assign(mix(ground.mul(float(1).sub(rim.mul(.45))), white.div(tint), snow));
     GROUND.rock.mulAssign(float(1).sub(snow)); GROUND.detail.mulAssign(float(1).sub(snow));
-    GROUND.relief.assign(mix(GROUND.relief, cups.mul(float(1).sub(tramp.mul(.7))).mul(.12), snow));
-    // Spring snow is wet and coarse: glossy on the ridges, rougher in the dirt; a few crystals catch the sun on gpu.
+    GROUND.relief.assign(mix(GROUND.relief, printSlope.mul(1 / .16), snow));
+    // Spring snow is wet and coarse: glossier where clean, rougher in the dirt; a few crystals catch the sun on gpu.
     const glint = step(.992, hash12(floor(xz.div(.006)))).mul(near);
     GROUND.roughness.assign(mix(GROUND.roughness.sub(rim.mul(.3)), mix(.58, .78, dirt).sub(glint.mul(.45)).sub(tramp.mul(.1)), snow));
   });
   If(marks.z.greaterThan(.01), () => { ground.mulAssign(float(1).sub(marks.z.mul(.5))); GROUND.roughness.assign(mix(GROUND.roughness, .3, marks.z)); });
 }
 
-export interface GroundMaps { albedo: THREE.Texture[]; nrh: THREE.Texture[]; rock: THREE.Texture; rockNormal: THREE.Texture | null; shore?: ShoreMaps | null }
+export interface GroundMaps { albedo: THREE.Texture[]; nrh: THREE.Texture[]; rock: THREE.Texture; rockNormal: THREE.Texture | null; shore?: ShoreMaps | null; footprints?: THREE.Texture | null }
 /** The near grass field's lookup (grass-field.ts): alpha is how fully grass grows on its 2 m grid; radius in metres. */
 export interface GrassShade { mask: THREE.Texture; minX: number; minZ: number; width: number; depth: number; radius: number }
 
@@ -340,7 +338,7 @@ export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMa
       GROUND.rock.assign(heightWeights(vec3(float(1).sub(exposed), exposed, 0), vec3(height, clamp(dot(rock, LUMA).mul(2.2), 0, 1), -2), .2).y);
       ground.assign(mix(ground, rock.mul(1.8), GROUND.rock)); GROUND.roughness.assign(mix(GROUND.roughness, .9, GROUND.rock));
     });
-    if (paint) mountainPaint(ground, xz, far, n.y, tier !== 'cpu');
+    if (paint) mountainPaint(ground, xz, far, n.y, tier !== 'cpu', maps.footprints ?? null);
     // River shores (sub-plan 14): gravel, the wet band, the silt bed and caustics, only near the channels.
     shoreGround(tier, maps.shore ?? null, { ground, roughness: GROUND.roughness, detail: GROUND.detail, relief: GROUND.relief }, dx, dy, grassVertexColour);
     return ground;

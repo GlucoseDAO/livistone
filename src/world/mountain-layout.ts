@@ -89,6 +89,23 @@ export function trailNearest(x: number, z: number): { s: number; d: number } | n
   let d = REACH, s = -1; nearTrail(x, z, (distance, at) => { if (distance < d) { d = distance; s = at; } });
   return s < 0 ? null : { s, d };
 }
+/** Metres between trail samples (the curve's even spacing). */
+const SPACING = TRAIL_CURVE.getLength() / (TRAIL_SAMPLES.length - 1);
+/**
+ * The trail's own frame at (x, z) within 6 m of it on the snow, for the boot prints on it (ground-material.ts): metres along the
+ * trail, signed metres across it (+ to the right of the way up) and the trail's direction there. Null elsewhere.
+ */
+export function trailFrame(x: number, z: number): { along: number; across: number; dx: number; dz: number } | null {
+  if (!MOUNTAIN) return null;
+  let best = 6, frame: { along: number; across: number; dx: number; dz: number } | null = null;
+  nearTrail(x, z, (d, s) => {
+    if (d >= best || s < STAGE.snout - 4 || s > STAGE.head + 4) return;
+    const i = Math.min(TRAIL_SAMPLES.length - 2, Math.floor(s)), a = TRAIL_SAMPLES[i], b = TRAIL_SAMPLES[i + 1], l = Math.hypot(b.x - a.x, b.z - a.z) || 1, dx = (b.x - a.x) / l, dz = (b.z - a.z) / l;
+    const t = s - i, cx = a.x + (b.x - a.x) * t, cz = a.z + (b.z - a.z) * t;
+    best = d; frame = { along: s * SPACING, across: (x - cx) * -dz + (z - cz) * dx, dx, dz };
+  });
+  return frame;
+}
 /** Worn soil along the trail, 0–1, for the ground cover bake: bare at the centre, fraying into the grass, gone past the barrier. */
 export function trailWear(x: number, z: number): number {
   const near = trailNearest(x, z); if (!near || near.d >= 2.5) return 0;

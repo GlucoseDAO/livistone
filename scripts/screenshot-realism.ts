@@ -47,7 +47,7 @@ const VIEWS: Record<string, View> = Object.fromEntries(([
   // couloir between its two peaks seen from the climb, and the view back from the plateau.
   ['trail-from-path', -4, -158, .27, .06], ['trailhead-signs', -11.8, -185.62, .24, .2], ['woods-switchback', -36, -224.3, -1.24, .08],
   ['gorge-mouth', -16, -232.3, -1.06, .15], ['gorge-canyon', -9, -246.3, 1.45, .1], ['waterfall', -27, -248.8, -1.23, .3],
-  ['snow-snout', -43, -248.2, 1.21, .12], ['snow-gully', -58.6, -259, .1, .2], ['mountain-flowers', -40, -272, -1.86, -.12],
+  ['snow-snout', -43, -248.2, 1.21, .12], ['snow-gully', -58.6, -259, .1, .2], ['snow-prints', -57.91, -258, .365, -.45], ['mountain-flowers', -40, -272, -1.86, -.12],
   ['plateau-crags', -20, -262, 0, .25], ['plateau-view', -26, -258, Math.PI, -.12],
   ['flowers-close', -27.5, -257.6, 0, -.55], ['flowers-mid', -46, -262, -1.45, -.16],
 ] as View[]).map(view => [view[0], view]));
@@ -63,7 +63,7 @@ const SETS: Record<string, string[]> = {
   // Sub-plan 08: front, side and close views of the five building-pieces (Science, Station, Time Tower, Future House, Gateway).
   materials: ['science-front', 'science-side', 'nanot-arch', 'nanot-close', 'science-inside', 'embryo-station-front', 'station-ring-close', 'embryo-station-platform', 'time-tower', 'time-tower-close', 'future-house-entry', 'future-house-legs', 'future-house-neck', 'gateway-front', 'gateway-side', 'gateway-gem'],
   station: ['station-entrance', 'station-bench', 'station-glazing', 'station-platform', 'station-amber-below', 'station-canopy', 'station-arrival', 'embryo-station-front'],
-  mountain: ['trail-from-path', 'trailhead-signs', 'woods-switchback', 'gorge-mouth', 'gorge-canyon', 'waterfall', 'snow-snout', 'snow-gully', 'mountain-flowers', 'flowers-close', 'flowers-mid', 'plateau-crags', 'plateau-view', 'ridge-north'],
+  mountain: ['trail-from-path', 'trailhead-signs', 'woods-switchback', 'gorge-mouth', 'gorge-canyon', 'waterfall', 'snow-snout', 'snow-gully', 'snow-prints', 'mountain-flowers', 'flowers-close', 'flowers-mid', 'plateau-crags', 'plateau-view', 'ridge-north'],
   fixes: ['city-hall-far', 'city-hall-north', 'nanot-arch', 'future-house-entry', 'future-house-neck', 'junction-garden', 'junction-glucose', 'junction-station', 'enhancement-front', 'grove-floor', 'mycelium-grove', 'sky-up', 'ridge-northwest', 'railway-east-portal'],
 };
 // `all` keeps the 33 realism views; these sets are reviewed on their own.

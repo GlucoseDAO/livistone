@@ -49,7 +49,7 @@ import type { Surfaces } from './surfaces';
 import { BUDGET_OFF } from '../game/render-budget';
 import { PROBE_SITES } from './probes';
 import type { ProbeScope } from './probes';
-import { MOUNTAIN } from './mountain-layout';
+import { MOUNTAIN, snowCover } from './mountain-layout';
 import { createTrailSigns, paintTrailSigns, trailBoulders } from './mountain-trail';
 import { createAlpinePlants } from './alpine-plants';
 import type { ContactSite } from './contact-shadows';
@@ -431,7 +431,7 @@ export class Town {
   /** One multiply-blended draw grounds trunks, rocks, feet, posts and benches; tree patches follow the forest's own cells. */
   private createContactShadows(): void {
     const trees = forestCells(this.forest.sites).map(cell => cell.sites.flatMap(({ p, index }) => treeContactSites(p, index)));
-    this.contactShadows = createContactShadows([...objectContactSites(), ...rockContactSites([...this.rocks, ...this.boulders]), ...this.trailContacts], trees);
+    this.contactShadows = createContactShadows([...objectContactSites(), ...rockContactSites([...this.rocks, ...this.boulders.filter(b => snowCover(b.x, b.z) < .5)]), ...this.trailContacts], trees);
     if (!CONTACT_OFF) this.root.add(this.contactShadows.mesh);
     this.forest.onCells = this.contactShadows.showGroups;
   }
