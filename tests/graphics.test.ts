@@ -31,6 +31,14 @@ describe('modest GPU names', () => {
     expect(modestRenderer('Intel(R) Arc A770 Graphics')).toBe(false);
     expect(modestRenderer('Apple M2')).toBe(false);
   });
+  it('recognises newer integrated GPUs that drop the UHD/Iris names, but not discrete Arc or Radeon cards', () => {
+    for (const name of ['ANGLE (Intel, Mesa Intel(R) Graphics (RPL-S), OpenGL 4.6)', 'ANGLE (Intel, Intel(R) Graphics (0x0000A780) Direct3D11 vs_5_0 ps_5_0, D3D11)',
+      'ANGLE (Intel, Intel(R) Arc(TM) Graphics (0x00007D55) Direct3D11 vs_5_0 ps_5_0, D3D11)', 'Intel(R) Arc(TM) 140V GPU', 'Intel(R) Arc(TM) 140T GPU',
+      'Mesa Intel(R) Xe Graphics (TGL GT2)', 'Intel(R) Iris(R) Xe Graphics', 'AMD Radeon 780M Graphics', 'AMD Radeon(TM) Vega 8 Graphics']) expect(modestRenderer(name), name).toBe(true);
+    for (const name of ['ANGLE (Intel, Intel(R) Arc(TM) A770 Graphics (0x000056A0) Direct3D11 vs_5_0 ps_5_0, D3D11)', 'Intel(R) Arc(TM) B580 Graphics',
+      'AMD Radeon RX 7600M XT', 'AMD Radeon Pro 5500M', 'ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Laptop GPU Direct3D11 vs_5_0 ps_5_0, D3D11)']) expect(modestRenderer(name), name).toBe(false);
+    expect(graphicsTier({ coarse: false, renderer: 'ANGLE (Intel, Mesa Intel(R) Graphics (RPL-S), OpenGL 4.6)' })).toBe('mobile');
+  });
 });
 
 describe('reduced graphics policy', () => {

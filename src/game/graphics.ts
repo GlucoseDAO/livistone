@@ -1,6 +1,10 @@
 /** Reduced geometry is a coarse pointer, software GL, or a typical laptop iGPU — not a discrete card. */
 const SOFTWARE = /swiftshader|llvmpipe|softpipe|microsoft basic|gdi generic|\bwarp\b/i;
-const INTEGRATED = /intel\(r\) (uhd|hd graphics|iris)|intel iris|\bintel hd\b|radeon\(tm\) graphics|amd radeon graphics/i;
+// Newer iGPUs drop the UHD/Iris family names: the dev laptop's Raptor Lake reads "Mesa Intel(R) Graphics (RPL-S)" (Chrome 154,
+// Linux, 3 Oct 2026); Windows ANGLE reports "Intel(R) Graphics (0x…)". Meteor/Arrow/Lunar Lake integrate "Intel(R) Arc(TM) Graphics"
+// or "Arc(TM) 140V/140T GPU", while discrete Arc cards carry an A/B model ("Arc(TM) A770", "B580"). AMD APUs report "Radeon(TM)
+// Graphics", "Radeon 780M" or "Vega 8 Graphics"; discrete cards say "RX" or "Pro".
+const INTEGRATED = /intel\(r\) (uhd|hd graphics|iris|xe graphics|graphics\b)|intel\(r\) arc\(tm\) (graphics|\d{3}[vt]\b)|intel iris|\bintel hd\b|radeon(\(tm\))? (graphics|vega \d+ graphics|\d{3}m\b)|amd radeon graphics/i;
 
 export function softwareRenderer(name: string): boolean {
   return SOFTWARE.test(name);
