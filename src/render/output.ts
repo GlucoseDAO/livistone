@@ -87,6 +87,12 @@ export class OutputPipeline {
       const drawn = texture(this.target.textures[0]), shown = texture(this.target.textures[1]), material = new THREE.NodeMaterial();
       const display = fromSRGB(mix(toSRGB(toneMapNode(drawn.rgb as unknown as Node<'vec3'>, exposure)), toSRGB(displayFog.color as unknown as Node<'vec3'>), shown.g) as unknown as Node<'vec3'>);
       material.fragmentNode = vec4(untoneMapNode(display, exposure), 1); material.name = 'aerial.behind';
+      // Sized once, before anything compiles, and never resized: a resize gives the target a new texture, and r186 refreshes the
+      // object-group bindings of materials without node properties only when the material changes, so they would go on sampling
+      // the destroyed one. Read by screenUV, it need not follow the render scale: the largest buffer the game draws (the screen at
+      // up to 1.5 pixels a point, main.ts), at most 1920 × 1080's worth of pixels.
+      const ratio = Math.min(globalThis.devicePixelRatio || 1, 1.5), w = (globalThis.screen?.width || 1920) * ratio, h = (globalThis.screen?.height || 1080) * ratio, k = Math.min(1, Math.sqrt(1920 * 1080 / (w * h)));
+      AERIAL_BEHIND.setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
       this.behind = new THREE.QuadMesh(material); this.behind.name = 'Aerial · behind';
     }
   }
@@ -155,12 +161,11 @@ export class OutputPipeline {
     } finally { for (const material of twoPass.keys()) material.side = THREE.DoubleSide; this.unbind(); }
     // The output passes and their screen-space stages build their shaders on first use: build both now, not on the first map.
     for (const occlusion of [true, false]) { if (occlusion && this.post.occlusion) this.post.prepare(this.renderer); this.pipeline(occlusion && !!this.post.occlusion).render(); }
-    if (this.behind) { this.bind(); this.renderer.setMRT(null); this.renderer.setRenderTarget(AERIAL_BEHIND); this.behind.render(this.renderer); this.unbind(); }
+    if (this.behind) { this.renderer.setMRT(null); this.renderer.setRenderTarget(AERIAL_BEHIND); this.behind.render(this.renderer); this.unbind(); }
   }
   private bind(): void {
     this.renderer.getDrawingBufferSize(this.size);
     if (this.target.width !== this.size.x || this.target.height !== this.size.y) this.target.setSize(this.size.x, this.size.y);
-    if (this.behind && (AERIAL_BEHIND.width !== this.size.x || AERIAL_BEHIND.height !== this.size.y)) AERIAL_BEHIND.setSize(this.size.x, this.size.y);
     this.renderer.setRenderTarget(this.target); this.renderer.setMRT(this.targets);
   }
   private unbind(): void { this.renderer.setRenderTarget(null); this.renderer.setMRT(null); }
