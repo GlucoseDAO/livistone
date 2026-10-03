@@ -25,7 +25,7 @@ import type { RockSite } from './water-surface';
  */
 export const GRASS_TIERS = {
   gpu: { levels: 3, cells: 22, cell: .5, blades: 36, segments: 3, height: .3, width: .024 },
-  mobile: { levels: 3, cells: 16, cell: .375, blades: 16, segments: 2, height: .32, width: .032 },
+  mobile: { levels: 3, cells: 16, cell: .375, blades: 25, segments: 2, height: .32, width: .032 },
 } as const;
 type Spec = (typeof GRASS_TIERS)[keyof typeof GRASS_TIERS];
 

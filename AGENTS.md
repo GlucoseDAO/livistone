@@ -150,7 +150,7 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   height and a signed clearance equal to `plantingAllowed` at every point (`footprintReserved`, binned path samples, water);
   blades start 0.25 m beyond it, on the terrain mesh's own triangles. New reserved ground belongs in `footprintReserved` or the
   path and water clearances, never in `plantingAllowed` alone; `tests/grass-field.test.ts` checks the agreement. The field is
-  one draw (gpu 52k blades to 22 m, mobile 12k to 12 m, none on cpu), lives in the details group so map mode hides it, shades
+  one draw (gpu 52k blades to 22 m, mobile 19k to 12 m, none on cpu), lives in the details group so map mode hides it, shades
   the ground between its blades, takes the terrain's baked crown and wall occlusion (`groundShadeField`) as its own aoNode,
   and sinks `planting.ts` tufts inside its radius. Animate plants only through `wind.ts`
   (`windTime`: the game's elapsed time, frozen by `?capture=1`, still under reduced motion), never TSL's `time`. Dev switches:

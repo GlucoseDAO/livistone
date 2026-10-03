@@ -91,10 +91,10 @@ describe('near grass field', () => {
     expect(checked).toBeGreaterThan(1500);
   });
 
-  it('draws one field of about 50k blades on gpu and 12k on mobile, and none on cpu', () => {
+  it('draws one field of about 50k blades on gpu and 19k on mobile, and none on cpu', () => {
     const gpu = grassFieldCounts('gpu')!, mobile = grassFieldCounts('mobile')!;
     expect(gpu.blades).toBeGreaterThan(45000); expect(gpu.blades).toBeLessThan(55000); expect(gpu.radius).toBe(22);
-    expect(mobile.blades).toBeGreaterThan(10000); expect(mobile.blades).toBeLessThan(14000); expect(mobile.radius).toBe(12);
+    expect(mobile.blades).toBeGreaterThan(17000); expect(mobile.blades).toBeLessThan(21000); expect(mobile.radius).toBe(12);
     expect(grassFieldCounts('cpu')).toBeNull(); expect(createGrassField('cpu')).toBeNull();
     for (const tier of ['gpu', 'mobile'] as const) {
       const { mesh: field, ground } = createGrassField(tier)!, geometry = field.geometry as THREE.InstancedBufferGeometry, counts = grassFieldCounts(tier)!;
