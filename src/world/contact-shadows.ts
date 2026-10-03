@@ -19,7 +19,7 @@ import { KEEP_DISPLAY } from '../render/output';
 import { ROCK_STRETCH, rockReach } from './river-rocks';
 import { aerialFactor } from '../render/aerial';
 import type { Node, NodeBuilder } from 'three/webgpu';
-import { STATION, STATION_BENCHES, stationPoint } from './station-layout';
+import { STATION, STATION_BENCHES, STATION_FITTINGS, stationClassic, stationPoint } from './station-layout';
 import { landscapeHeight } from './terrain';
 import { LAMP_POSTS } from './town-layout';
 import { WATER_EDGE } from './water-surface';
@@ -166,6 +166,11 @@ export function objectContactSites(): ContactSite[] {
   for (const p of posterLayout('future-house', pieces('future-house'))) sites.push(feet(p.x, p.z, p.yaw, 1.4, .48, FUTURE_HOUSE.floor));
   for (const [x, z] of STATION_BENCHES) { const at = stationPoint(x, z); sites.push({ x: at.x, z: at.z, yaw: Math.PI, rx: 2, rz: .85, floor: STATION.floor, strength: .75 }); }
   const story = stationPoint(-8.5, -66.35); sites.push(...placeSign(story.x, story.z, Math.PI, 1, STATION.floor));
+  if (!stationClassic()) {
+    for (const [x, z] of STATION_FITTINGS.lamps) { const at = stationPoint(x, z); sites.push(post(at.x, at.z, .6, STATION.floor)); }
+    for (const [x, z] of STATION_FITTINGS.bins) { const at = stationPoint(x, z); sites.push(post(at.x, at.z, .5, STATION.floor)); }
+    const panel = stationPoint(STATION_FITTINGS.panel.x, STATION_FITTINGS.panel.z); sites.push(feet(panel.x, panel.z, Math.PI, STATION_FITTINGS.panel.width, .3, STATION.floor));
+  }
   sites.push(feet(GATEWAY_POSTER.x, GATEWAY_POSTER.z, GATEWAY_POSTER.yaw, 1.45, .48));
   sites.push(...placeSign(INTRODUCTION_SITE.x, INTRODUCTION_SITE.z, INTRODUCTION_SITE.yaw, INTRODUCTION_SCALE));
   sites.push(...placeSign(ENHANCEMENT_SIGN.x, ENHANCEMENT_SIGN.z, ENHANCEMENT_SIGN.yaw));

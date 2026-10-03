@@ -206,6 +206,11 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   surface coordinates through `stationRingAnchor`.
   Keep the central foyer doorway and eastern side entrance open, with glass colliders only
   where panes are rendered. `createStationStructure` remains DOM-independent for Rapier tests.
+  Sub-plan 28: the shank's base levels onto the platform as a pierced silver threshold (`stationRingGeometry(mobile, footed)`),
+  never through the slab; ashlar coping, footings and a threshold stone dress the slab; benches are teak slats on cast-silver
+  ring frames; the curtain wall east of the ring has framed bays, a kick plate and one top rail; the amber's columns are silver
+  with a girdle bezel. Lamps, bins and the map panel come from `STATION_FITTINGS`, which contact shadows also read; the clock,
+  departures board and map faces share one canvas atlas. Dev-only `?station=classic` restores the earlier station.
 - **Railways pass through real mountain openings.** `station-layout.ts` shares the track extent,
   tunnel mouth/exit positions, bore clearance, and narrow extended walking corridor.
   `railway.ts` keeps geometry/collider creation DOM-independent and loads attributed local

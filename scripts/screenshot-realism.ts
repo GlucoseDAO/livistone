@@ -34,6 +34,9 @@ const VIEWS: Record<string, View> = Object.fromEntries(([
   ['lake-west-pools', -27, -101, Math.PI / 2 + .15, -.35], ['lake-east-pool', 2.5, -106, 2.55, -.45],
   // October 2026 owner report: the opal rill lying on the Mycelium paths.
   ['rill-crossing', 68, -86, 1.25, -.22], ['rill-culvert', 65, -105, Math.PI / 2 + .25, -.25], ['rill-culvert-down', 57, -104, 0, -.5], ['rill-culvert-mouth', 62.8, -105.9, Math.PI / 4, -.55],
+  // Sub-plan 28: the Embryo station's entrance threshold, benches, glazed foyer, platform and amber canopy.
+  ['station-entrance', 0, 55.5, Math.PI, -.04], ['station-bench', 6.6, 66.9, Math.PI + .5, -.22], ['station-glazing', -12, 50, Math.PI - .98, .08],
+  ['station-platform', -10, 66.5, Math.PI + .2, 0], ['station-amber-below', -18, 68, Math.PI / 2 + .3, .62],
   ['valley-east', 16, 42, -Math.PI / 2, .06], ['summit-northwest', 80, -174, 1, .02, 24], ['summit-southwest', 80, -174, 2.4, -.05, 24], ['ridge-north', 0, -150, 0, .1],
   // Sub-plans 07/08: each building-piece's metal, stone and amber at arm's length, beside the existing front and side views.
   ['nanot-close', 36, -1, .611, .25], ['station-ring-close', 5, 52, 2.583, .3], ['time-tower-close', 24, -30, .661, .35],
@@ -50,10 +53,11 @@ const SETS: Record<string, string[]> = {
   skyline: ['valley-east', 'summit-northwest', 'summit-southwest', 'ridge-north'],
   // Sub-plan 08: front, side and close views of the five building-pieces (Science, Station, Time Tower, Future House, Gateway).
   materials: ['science-front', 'science-side', 'nanot-arch', 'nanot-close', 'science-inside', 'embryo-station-front', 'station-ring-close', 'embryo-station-platform', 'time-tower', 'time-tower-close', 'future-house-entry', 'future-house-legs', 'future-house-neck', 'gateway-front', 'gateway-side', 'gateway-gem'],
+  station: ['station-entrance', 'station-bench', 'station-glazing', 'station-platform', 'station-amber-below', 'station-arrival', 'embryo-station-front'],
   fixes: ['city-hall-far', 'city-hall-north', 'nanot-arch', 'future-house-entry', 'future-house-neck', 'junction-garden', 'junction-glucose', 'junction-station', 'enhancement-front', 'grove-floor', 'mycelium-grove', 'sky-up', 'ridge-northwest', 'railway-east-portal'],
 };
 // `all` keeps the 33 realism views; these sets are reviewed on their own.
-const REVIEWED_ALONE = ['fixes', 'skyline', 'lake', 'intersections', 'materials'];
+const REVIEWED_ALONE = ['fixes', 'skyline', 'lake', 'intersections', 'materials', 'station'];
 SETS.all = [...new Set(Object.entries(SETS).filter(([set]) => !REVIEWED_ALONE.includes(set)).flatMap(([, views]) => views))];
 
 const [outDir, profileArg = 'desktop', setArg = 'quick', time = 'day'] = process.argv.slice(2);
