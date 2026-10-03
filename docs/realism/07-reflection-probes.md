@@ -55,8 +55,8 @@ Branch `realism/07-probes-after-load`, 3–4 October 2026. All numbers are headl
 | Time to ready, probes against `?probes=off` | 19.6 / 17.9, 19.7 / 20.3, 22.4 / 17.5 s | 15.4 / 11.8, 13.0 / 13.9, 13.0 / 14.2 s |
 | From the shadow pass to ready (in-page) | 3.3–5.8 s against 0.5–0.8 s | 1.5–3.7 s against 0.3–0.4 s |
 | of which the bake's main thread | 1.4–2.8 s | 0.2–0.7 s |
-| Shader builds at load | +29–32 (pipelines +4) | +28–31 (pipelines +4) |
-| First switch to night: main thread, until three frames drew | 3.4–3.7 s, 3.8–4.2 s (off: 0.05–0.1 s, 1.3–1.9 s) | 1.6–2.7 s, 2.4–5.4 s (off: 0.02–0.1 s, 1.5–1.6 s) |
+| Shader builds at load | +31–32 (pipelines +4) | +30–31 (pipelines +4) |
+| First switch to night: main thread, until three frames drew | 3.4–3.7 s, 3.8–4.2 s (off: 0.05–0.11 s, 1.3–1.9 s) | 1.6–2.7 s, 2.4–5.4 s (off: 0.02–0.11 s, 1.5–1.6 s) |
 | Shaders built by that switch | 177 (off: 115) | 166 (off: 106) |
 
 Time to ready on its own is mostly compile noise here (3.5–11 s from run to run); the in-page interval after the shadow pass isolates the bake. It was not the shader builds: the per-building material copies built about 24 more node graphs whose WGSL was the town's own (4 more pipelines), well under the bake. The bake drew 66 faces of the whole town plus 42 distant-pass faces; on gpu about 70% of its main thread was `queue.writeBuffer` (every drawn object's uniforms again for each face, per a CPU profile), and the first frame then waited 1.8–3.5 s for its GPU work. Each face costs this GPU 35–75 ms with the distant pass, each prefilter 60–70 ms. The night switch rebuilt every lit shader because three keys the scene environment by texture.
@@ -79,7 +79,7 @@ Time to ready is again `?probes=off`'s; the probes' work moved into the frames a
 | Day bake after ready (77 steps) | 9.3–11.7 s, 0.44–0.55 s main thread in all | 3.5–5.0 s, 0.33–0.52 s |
 | Night sky (15 steps), then the night (77) | 1.3–2.0 s, then 8.4–11.9 s | 0.5–0.8 s, then 3.1–5.3 s |
 | Frames until both are baked (median, 95th percentile, longest) | 83–133, 283–367, 417–483 ms (off over ten seconds: 83–133, 167–300, 167–483) | 17, 50–100, 100–283 ms (off: 17, 17–50, 100–300) |
-| First switch to night: main thread, until three frames drew | 1–2 ms, 181–548 ms (off: 31–75 ms, 284–919 ms) | 1 ms, 78–161 ms (off: 16–38 ms, 115–306 ms) |
+| First switch to night (measured at 1f22719, before the re-bake): main thread, until three frames drew | 1–2 ms, 181–548 ms (off: 31–75 ms, 284–919 ms) | 1 ms, 78–161 ms (off: 16–38 ms, 115–306 ms) |
 | Shaders built by that switch | 1, the night halo (off: 6, the night sky's) | 1 (off: 6) |
 | Texture memory at ready, after the bakes, after the first night | 343, 548, 556 MB (off: 343, 343, 458) | 182, 232, 236 MB (off: 182, 187, 216) |
 
