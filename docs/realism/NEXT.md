@@ -27,7 +27,8 @@ Measured after the rebase (headless, loaded machine, `?probes=off` interleaved):
 Goal: time to ready within about 300 ms of `?probes=off` on gpu and mobile, and no hitch over about 100 ms after ready.
 - Open with sky reflections (today's `?probes=off` look) and bake after ready, one probe face or one probe per idle frame, then swap each site's `pmremTexture` node value; nothing rebuilds, since the node already exists.
 - Make the per-building material copies cheap or unnecessary: compile them inside `OutputPipeline.compile`/`warmUp` at load if they must exist, or share one material per class if three allows switching the probe texture per draw.
-- Night: bake the other phase in the background after the day bake, not on the first switch; the switch then only swaps textures.
+- Night: prebake the other phase in the background right after the day bake, not on the first switch; the switch then only swaps textures.
+- Alternative to measure against the above: prebake every probe offline at build time and ship them as assets, as `scripts/build-share-images.ts` renders the share images from a dev server. The town is static apart from day and night, so 11 sites × 2 phases cover everything and the browser bakes nothing; the costs are the download (keep each cube small, e.g. RGBE or half-float WebP faces, and report total size) and a rebake whenever a building, the sky or the haze changes. Prebaking does not remove the per-building material copies, so measure their shader builds first.
 - Consider gpu only (mobile pays the most and gains the least); ask the owner if the numbers stay high.
 - Gates: `tests/post.spec.ts`, `tests/night.spec.ts`, `tests/graphics-profile.spec.ts` on both backends; readyMs and the first night switch measured with and without `?probes=off`, three interleaved pairs each, written into [07](07-reflection-probes.md) and `docs/3d-game-plan.md`.
 
