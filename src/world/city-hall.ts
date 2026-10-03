@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { cameraPosition, color, float, materialColor, mix, normalWorldGeometry, positionWorld, smoothstep, step } from 'three/tsl';
+import type { Node } from 'three/webgpu';
 import type { ColliderSpec } from '../game/physics';
 import { ShellMaterial } from '../render/shell';
 import { nightEmission } from './night-lighting';
@@ -11,17 +13,41 @@ function point(phi: number, theta: number, radius: number): THREE.Vector3 {
   return new THREE.Vector3(Math.sin(phi) * Math.sin(theta) * radius, Math.cos(theta) * radius + CITY_HALL.centerY, Math.cos(phi) * Math.sin(theta) * radius);
 }
 
+/** Smoky quartz seen as a body rather than through, after the dark grey of the photographed stone. */
+const SMOKY_BODY = '#2e2a30';
+/**
+ * How much of the crystal reads as a solid stone instead of clear glass (`solid`). Toward the silhouette, as a real quartz sphere
+ * darkens with internal reflection; and with distance, where the thin shell otherwise showed only the bright sky behind it (and
+ * beyond ROOM_RANGE the hall's interior is hidden too), so the hall looked cut in half. The outline (`edge`) also mirrors less of
+ * the baked sky: its bright horizon, where a real one shows trees and buildings, had erased the silhouette. Back faces, the view
+ * from inside, stay clear.
+ */
+const looks = new WeakMap<ShellMaterial, { solid: Node<'float'>; edge: Node<'float'> }>();
+function crystalLook(): { solid: Node<'float'>; edge: Node<'float'> } {
+  // The shell's outward geometric normal faces the camera exactly on front faces (normalWorld is flipped on back faces).
+  const toCamera = cameraPosition.sub(positionWorld), facing = normalWorldGeometry.dot(toCamera.normalize()), front = step(0, facing);
+  const grazing = facing.clamp().oneMinus(), rim = grazing.pow(1.3).mul(.95), far = smoothstep(16, 70, toCamera.length()).mul(.8);
+  return { solid: float(1).sub(rim.oneMinus().mul(far.oneMinus())).mul(front), edge: grazing.pow(2).mul(front) };
+}
+
 export function cityHallCrystalMaterial(low: boolean): ShellMaterial {
   const material = new ShellMaterial({ color: '#e1dce5', roughness: .075, metalness: 0, ior: 1.54, thickness: .9,
     attenuationColor: '#c9c3d0', attenuationDistance: 12, envMapIntensity: 1.5, side: THREE.DoubleSide });
   material.name = 'Nut of Power smoky crystal'; material.userData.cityHallCrystal = material.userData.heroEnv = true;
+  const look = crystalLook(); looks.set(material, look);
+  // The body colour replaces the clear tint (and its cloud map) where the crystal reads solid, on every tier.
+  material.colorNode = mix(materialColor.rgb, color(SMOKY_BODY), look.solid);
+  material.specularIntensityNode = float(1).sub(look.edge.mul(.95));
   nightEmission(material, '#c4bad6', .16); setCityHallCrystalQuality(material, low); return material;
 }
 
 export function setCityHallCrystalQuality(material: ShellMaterial, low: boolean): void {
   // The reduced crystal blends in linear light before tone mapping, where its own colour outweighs the dark garden behind it
   // far more than in the classic renderer's blend of encoded colours: .14 here looks as the classic .30 did.
+  const solid = looks.get(material)?.solid ?? float(0);
   material.transmission = low ? 0 : .78; material.transparent = low; material.opacity = low ? .14 : 1;
+  // Transmission stays: the smoky colour absorbs what it carries. The reduced tier, without it, turns opaque where it reads solid.
+  material.opacityNode = low ? mix(float(.14), float(.92), solid) : null;
   material.depthWrite = !low; material.clearcoat = 0; material.forceSinglePass = true; material.needsUpdate = true;
 }
 

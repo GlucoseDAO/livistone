@@ -22,6 +22,8 @@ export async function prepareCpuDetail(root: THREE.Object3D, reflection: THREE.C
       if (!standard(source)) return source;
       const material = new THREE.MeshLambertMaterial({ color: source.color, map: source.map, emissive: source.emissive, emissiveIntensity: source.emissiveIntensity, emissiveMap: source.emissiveMap, vertexColors: source.vertexColors, transparent: source.transparent, opacity: source.opacity, alphaTest: source.alphaTest, side: source.side, depthWrite: source.depthWrite, flatShading: source.flatShading, fog: source.fog });
       material.name = source.name; material.userData = { ...source.userData };
+      // The Nut of Power crystal keeps its rim and distance solidity (city-hall.ts): at its bare opacity it vanished against the sky.
+      if (source.userData.cityHallCrystal) { const { colorNode, opacityNode } = source as unknown as THREE.MeshStandardNodeMaterial; Object.assign(material, { colorNode, opacityNode }); }
       if (source.metalness > .4) { material.envMap = reflection; material.reflectivity = .28; }
       materials.set(source, material); return material;
     };

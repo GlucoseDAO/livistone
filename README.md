@@ -4,7 +4,7 @@ Explore a 3D art-and-science town built around Livia Zaharia’s jewelry, artwor
 
 **[Visit Livistone](https://livistone.liviazaharia.com/)** · [Run it locally](#run-it-locally) · [Deploy the website](docs/deployment.md) · [Technical guide](docs/technical-guide.md)
 
-City Hall interprets the Nut of Power with finer walnut relief, curved brass clasps and smoky crystal. Reduced detail uses smaller baked maps and single-pass crystal transparency; physical-device performance remains unverified.
+City Hall interprets the Nut of Power with finer walnut relief, curved brass clasps and smoky crystal, which darkens toward its outline and with distance so the whole nut reads from across town. Reduced detail uses smaller baked maps and single-pass crystal transparency; physical-device performance remains unverified.
 
 ## Visiting the town
 

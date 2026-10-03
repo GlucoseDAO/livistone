@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { createCityHallFacade, cityHallCrystalMaterial, setCityHallCrystalQuality } from '../src/world/city-hall';
+import { prepareCpuDetail } from '../src/world/cpu-detail';
 
 describe('Nut of Power facade', () => {
   it('keeps both quality tiers outside the entrance, within the established footprint, and bounded in cost', () => {
@@ -47,5 +48,19 @@ describe('Nut of Power facade', () => {
     expect(material.transparent).toBe(false); expect(material.depthWrite).toBe(true); expect(material.opacity).toBe(1);
     expect(material.attenuationColor.getHex()).toBe(attenuation); expect(material.userData.nightEmission).toEqual(night); expect(material.ior).toBe(1.54);
     material.dispose();
+  });
+
+  it('keeps the crystal reading as a smoky volume from afar on every tier', async () => {
+    // Rich: transmission is unchanged and the smoky colour absorbs it; reduced: the opacity rises where the crystal reads solid.
+    const material = cityHallCrystalMaterial(false); expect(material.colorNode).not.toBeNull(); expect(material.specularIntensityNode).not.toBeNull();
+    expect(material.transmission).toBe(.78); expect(material.opacityNode).toBeNull();
+    setCityHallCrystalQuality(material, true); expect(material.opacityNode).not.toBeNull();
+    setCityHallCrystalQuality(material, false); expect(material.opacityNode).toBeNull();
+    // The cpu tier's Lambert copy keeps the same colour and opacity nodes rather than a bare 14% opacity.
+    const low = cityHallCrystalMaterial(true), root = new THREE.Group(), mesh = new THREE.Mesh(new THREE.SphereGeometry(10, 8, 6), low); root.add(mesh);
+    await prepareCpuDetail(root, new THREE.CubeTexture());
+    const copy = mesh.material as unknown as THREE.MeshStandardNodeMaterial;
+    expect(copy).toBeInstanceOf(THREE.MeshLambertMaterial); expect(copy.colorNode).toBe(low.colorNode); expect(copy.opacityNode).toBe(low.opacityNode);
+    material.dispose(); low.dispose();
   });
 });
