@@ -23,7 +23,7 @@ import { updateWind } from './wind';
 import type { Planting } from './planting';
 import { TOWN_PAVING, walkingSurface } from './walking-surface';
 import { Mountains } from './mountains';
-import { PlanarExhibition } from './planar-exhibition';
+import { PlanarExhibition, PosterResidency } from './planar-exhibition';
 import { GARDEN_BRIDGES, riverCenter } from './waterways';
 import { createTimeTower } from './time-tower';
 import { createFutureHouse } from './future-house';
@@ -92,6 +92,8 @@ export class Town {
   readonly occluders: THREE.Object3D[] = [];
   readonly water: THREE.Material;
   readonly exhibitions: PlanarExhibition[] = [];
+  /** Full poster photographs and captions only for the collections most recently approached (sub-plan 12). */
+  readonly posters = new PosterResidency(this.exhibitions);
   train!: THREE.Object3D;
   gardens!: LivingWaters;
   readonly researchPanels: THREE.Mesh[] = [];
@@ -153,7 +155,7 @@ export class Town {
     }
     this.researchPanels.push(...station.posters);
     const gallery = new THREE.Group(); arrival.add(gallery);
-    this.exhibitions.push(new PlanarExhibition('station', gallery, 0, 0, stationColliders, stationInteractions));
+    this.exhibitions.push(new PlanarExhibition('station', gallery, 0, 0, stationColliders, stationInteractions, this.tier));
     arrival.rotation.y = Math.PI; arrival.position.x = -16; arrival.updateMatrix(); arrival.name = 'Embryo Station and train'; this.root.add(arrival);
     this.addRoom(this.exhibitions[this.exhibitions.length - 1], arrival.matrix);
     this.colliders.push(...transformColliders(stationColliders, arrival.matrix, Math.PI));
@@ -175,7 +177,7 @@ export class Town {
     const enhancementSign = createEnhancementPanel(this.root, this.colliders); this.researchPanels.push(...enhancementSign.panels); this.interactives.push({ id: 'materialized-enhancements', object: enhancementSign.panels[0], position: enhancementSign.position });
     const enhancementGallery = createEnhancementGallery(this.root, this.colliders); this.researchPanels.push(...enhancementGallery.panels); this.interactives.push(...enhancementGallery.interactives);
     label('Enhancement gallery');
-    for (const id of ['timeface', 'future-house']) { this.exhibitions.push(new PlanarExhibition(id, this.root, 0, 0, this.colliders, this.interactives)); label('Posters · ' + id); }
+    for (const id of ['timeface', 'future-house']) { this.exhibitions.push(new PlanarExhibition(id, this.root, 0, 0, this.colliders, this.interactives, this.tier)); label('Posters · ' + id); }
     // Timeface hangs its posters on the open gallery, seen across town; the Future House keeps its three inside the cabin.
     this.addRoom(this.exhibitions[this.exhibitions.length - 1]);
     label('Glucose Commons');
@@ -352,7 +354,7 @@ export class Town {
       const shelves = new THREE.Mesh(mergeGeometries(fins, false)!, amber); shelves.position.y = -0.16; structure.add(shelves);
       for (const fin of fins) fin.dispose();
     }
-    this.exhibitions.push(new PlanarExhibition(id, group, x, z, this.colliders, this.interactives));
+    this.exhibitions.push(new PlanarExhibition(id, group, x, z, this.colliders, this.interactives, this.tier));
     const light = new THREE.PointLight(id === 'energy' ? '#ffc56d' : '#fff2d5', this.mobile ? 7 : 12, 18, 1.8); light.position.set(0, 5.5, 0); group.add(light);
     const lantern = mesh(new THREE.TorusGeometry(2.7, 0.025, 6, 50), new THREE.MeshBasicMaterial({ color: '#f4dfad' }), group, 0, 6, 0); lantern.rotation.x = Math.PI / 2;
     this.rooms.push({ center: new THREE.Vector3(x, 0, z), parts: group.children.filter((child) => !(child as THREE.Light).isLight), shown: null });
@@ -400,6 +402,8 @@ export class Town {
     // Shrub batches toggle every couple of metres while walking; re-baking for them cost a shadow pass per ~2 m, so their shadows catch up at the next quarter-box re-bake.
     this.planting?.update(camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
     this.pebbles?.update(camera);
+    // The map's camera is far above the town; residency follows the walking eye only.
+    if (!mapView) this.posters.update(camera.position);
     for (const room of this.rooms) {
       const shown = mapView || BUDGET_OFF || camera.position.distanceTo(room.center) < ROOM_RANGE;
       if (shown !== room.shown) { room.shown = shown; for (const part of room.parts) part.visible = shown; }
@@ -416,8 +420,8 @@ export class Town {
   /**
    * Before the first frame: every tree and plant instanced, and culling off, so the precompile and the first shadow pass build
    * each shader during loading; on WebGPU a shader first built while walking would stall that frame. Photographs, captions and
-   * signs keep their culling: the view from the station already builds their two shaders, and uploading every canvas and photo
-   * now would only move their upload from first sight to loading.
+   * signs keep their culling: the view from the station already builds their shaders, and uploading every canvas and photo
+   * now would only move their upload from first sight to loading. Poster maps that arrive later swap onto built materials.
    */
   warmUp(on: boolean): void {
     this.forest.warmUp(on); this.planting?.warmUp(on); this.pebbles?.warmUp(on); this.gardens.warmUp(on);

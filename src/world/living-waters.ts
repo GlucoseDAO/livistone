@@ -2,7 +2,7 @@ import { paintPosterText } from './poster-text';
 import * as THREE from 'three';
 import { instancedBufferAttribute, length, uniform, uv, vec2 } from 'three/tsl';
 import { lakeWaterMaterial } from './water-material';
-import { displayMaterial } from '../render/output';
+import { displayMaterial, paperPhotoMaterial } from '../render/output';
 import { createPlaceSign, paintPlaceSign } from './place-sign';
 import type { PlaceSign } from './place-sign';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -250,7 +250,8 @@ export class LivingWaters {
         map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
         const image = map.image as HTMLImageElement, size = photoSize(image.naturalWidth, image.naturalHeight, 2.52, 1.32);
         photo.geometry.dispose(); photo.geometry = new THREE.PlaneGeometry(size.width, size.height);
-        const material = photo.material as THREE.MeshBasicMaterial; material.color.set('#f4f0e5'); material.map = map; material.needsUpdate = true;
+        // The catalogue thumbnail's sweep is baked to paper: key it to the exact paper, the jewel in its own colours.
+        (photo.material as THREE.Material).dispose(); photo.material = paperPhotoMaterial(map);
       });
     }
   }

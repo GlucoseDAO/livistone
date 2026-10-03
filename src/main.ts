@@ -183,6 +183,9 @@ class Game {
         // The capture harness stands on whatever lies under a view, ground, deck or floor, looking from 2.2 m above the terrain.
         standingHeight: (x: number, z: number) => this.physics?.standingHeight(x, z, terrainHeight(x, z) + 2.2) ?? null,
       } });
+      // Dev-only, beside the stable hook: poster texture residency (sub-plan 12) with the renderer's texture memory and the
+      // count of node builds and shader programs, so a test can see that swapping poster maps builds nothing.
+      Object.assign(window, { __posters: () => this.town && ({ ...this.town.posters.report(), gpu: { textures: this.renderer.info.memory.textures, bytes: this.renderer.info.memory.texturesSize, programs: this.renderer.info.memory.programs, builds: (this.renderer as unknown as { _nodes?: { nodeBuilderCache?: Map<unknown, unknown> } })._nodes?.nodeBuilderCache?.size ?? 0 } }) });
     }
   }
   /** Dev-only: the top-level town group of a drawn object, or the frame's own passes outside the town. */

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { displayMaterial } from '../render/output';
+import { displayMaterial, paperPhotoMaterial } from '../render/output';
 import type { ColliderSpec } from '../game/physics';
 import { COLLECTION, photoSize, photoURL } from '../game/exhibits';
 import { GATEWAY_POSTER } from './gateway-layout';
@@ -40,7 +40,9 @@ export function createGatewayPoster(parent: THREE.Group, colliders: ColliderSpec
   const ready = new THREE.TextureLoader().loadAsync(photoURL(piece.photos[0].thumb ?? piece.photos[0].file)).then(map => {
     map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
     const image = map.image as HTMLImageElement, size = photoSize(image.naturalWidth, image.naturalHeight, 2.05, 1.45);
-    for (const face of photoFaces) { face.geometry.dispose(); face.geometry = new THREE.PlaneGeometry(size.width, size.height); const material = face.material as THREE.MeshBasicMaterial; material.map = map; material.needsUpdate = true; }
+    // The thumbnail's studio sweep is baked to paper; the photo material keys it to the exact paper and keeps the jewel's colours.
+    const material = paperPhotoMaterial(map);
+    for (const face of photoFaces) { face.geometry.dispose(); face.geometry = new THREE.PlaneGeometry(size.width, size.height); (face.material as THREE.Material).dispose(); face.material = material; }
   }).catch(() => { for (const face of photoFaces) face.visible = false; });
   return { panels, position: new THREE.Vector3(site.x, ground + 1.78, site.z), ready };
 }

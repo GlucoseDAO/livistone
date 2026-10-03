@@ -12,7 +12,7 @@ import crystals from '../src/world/models/enhancement-crystals.json';
 import meta from '../data/enhancement/crystals/meta.json';
 import { createTimeTower } from '../src/world/time-tower';
 import { towerPoint,TOWER_WALK } from '../src/world/elevated-layout';
-import { posterLayout } from '../src/world/poster-layout';
+import { posterBoard, posterLayout } from '../src/world/poster-layout';
 import font from '../src/world/fonts/monument-serif.json';
 import source from '../src/world/models/enhancement-shell.json';
 async function follow(physics:Physics,points:THREE.Vector3[]) {
@@ -86,7 +86,7 @@ describe('enhancement and signage',()=>{
   const root=new THREE.Group(),colliders:ColliderSpec[]=[];createTimeTower(root,colliders,true);
   for(const site of posterLayout('timeface',6)) {
    expect(Math.hypot(4.65+.1,1.05)).toBeLessThan(TOWER_WALK.inner);
-   colliders.push({type:'box',position:[site.x,site.y!+1.82,site.z],size:[1.05,1.475,.09],yaw:site.yaw});
+   const board=posterBoard(2);colliders.push({type:'box',position:[site.x,site.y!+board.y,site.z],size:[board.halfWidth,board.halfHeight,.09],yaw:site.yaw});
   }
   const physics=await Physics.create(colliders),points=Array.from({length:241},(_,i)=>towerPoint(i/240));
   try{const p=points[0];physics.teleport({x:p.x,y:p.y+.9,z:p.z});await follow(physics,points);}finally{physics.dispose();}

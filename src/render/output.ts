@@ -5,7 +5,7 @@
 // classic renderer fogged after encoding; cream paper stays #f4f0e5 by day and night. Ambient occlusion and bloom (sub-plan
 // 18) belong before this mix, and must leave display pixels alone.
 import * as THREE from 'three';
-import { Fn, float, mat3, max, min, mix, mrt, output, positionView, renderGroup, sRGBTransferEOTF, sRGBTransferOETF, smoothstep, sqrt, texture, toneMappingExposure, uniform, vec3, vec4 } from 'three/tsl';
+import { Fn, abs, float, mat3, materialReference, max, min, mix, mrt, output, positionView, renderGroup, sRGBTransferEOTF, sRGBTransferOETF, smoothstep, sqrt, texture, toneMappingExposure, uniform, vec3, vec4 } from 'three/tsl';
 import type { Node, NodeBuilder } from 'three/webgpu';
 
 // @types/three r186 leaves these untyped; the casts only restore the shader types three itself infers.
@@ -95,6 +95,23 @@ export function displayMaterial(parameters: THREE.MeshBasicMaterialParameters = 
   const material = new THREE.MeshBasicNodeMaterial({ ...parameters, fog: false });
   material.mrtNode = DISPLAY; material.userData.display = true;
   return material;
+}
+/** The posters' cream paper, sRGB-encoded (#f4f0e5): backings, margins, captions and the photographs' studio backgrounds. */
+const PAPER = vec3(0xf4 / 255, 0xf0 / 255, 0xe5 / 255);
+// Each material's own map through a reference, so every photograph shares one node graph and one shader, and a map swapped
+// for a sharper one (planar-exhibition.ts residency) rebinds without a rebuild.
+const photoMap = materialReference('map', 'texture') as unknown as Node<'vec4'>;
+const PAPER_KEY = Fn(() => {
+  const colour = toSRGB(photoMap.rgb).toVar(), offset = abs(colour.sub(PAPER));
+  return vec4(fromSRGB(mix(PAPER, colour, smoothstep(3 / 255, 7 / 255, max(offset.x, max(offset.y, offset.z))))), 1);
+})();
+/**
+ * A catalogue photograph on paper: build-catalogue.mjs bakes the studio sweep to paper, but lossy WebP returns #f4f0e5 as
+ * #f5efe6, so colours within three levels of paper key to the exact value (fading out by seven) and the print meets its
+ * backing paper without a seam. The jewel keeps its photographed colours. Unlit and masked like every displayMaterial.
+ */
+export function paperPhotoMaterial(map: THREE.Texture): THREE.MeshBasicNodeMaterial {
+  const material = displayMaterial({ map }); material.colorNode = PAPER_KEY; return material;
 }
 /** For additive sprites: no mask and no fog of their own, so the surface behind them keeps both. */
 export const KEEP_DISPLAY = mrt({ display: vec4(0) });
