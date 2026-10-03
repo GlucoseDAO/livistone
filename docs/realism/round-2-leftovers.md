@@ -99,4 +99,4 @@ In order of expected visible change:
 
 ## Browser suite at merge
 
-A full Playwright run on WebGPU against `realism/round-2` was in progress when `main` was merged; its result is recorded below if it finished during the session. Otherwise run it as step 1.2 above.
+The full Playwright run on WebGPU against `realism/round-2` (13, 14, 16, 24 and 25 on top of WebGPU) finished after the merge: 45 of 47 passed in 17.4 minutes. Both failures were `tests/ground.spec.ts`, which expected exactly three ground textures, while sub-plan 14's shore layer loads a fourth (the gravel scan). The spec now counts the three layers and the gravel separately and passes on WebGPU and on the WebGL 2 fallback. The full fallback suite has not been run on the merged code; do that in step 1.2.

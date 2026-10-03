@@ -11,8 +11,11 @@ for (const mobile of [false, true]) test(`textured ground loads (${mobile ? 'tou
     await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 });
     const reduced = await page.evaluate(() => (window as any).__livistone.snapshot().reducedGraphics);
     // Three layers, each an albedo plus a packed normal/roughness/height map (gpu 1024 + 512, reduced 512 + 256).
-    expect(assets.filter(url => url.includes(`-albedo-${reduced ? 512 : 1024}.webp`))).toHaveLength(3);
-    expect(assets.filter(url => url.includes(`-nrh-${reduced ? 256 : 512}.webp`))).toHaveLength(3);
+    const layers = assets.filter(url => !url.includes('/gravel-'));
+    expect(layers.filter(url => url.includes(`-albedo-${reduced ? 512 : 1024}.webp`))).toHaveLength(3);
+    expect(layers.filter(url => url.includes(`-nrh-${reduced ? 256 : 512}.webp`))).toHaveLength(3);
+    // Sub-plan 14's shore layer adds the gravel scan at one size on gpu and mobile.
+    expect(assets.filter(url => url.includes('/gravel-')).map(url => url.slice(url.lastIndexOf('/') + 1)).sort()).toEqual(['gravel-albedo-512.webp', 'gravel-nrh-256.webp']);
     await page.evaluate(() => (window as any).__livistone.teleport(10, 52, -.9));
     await page.waitForTimeout(700);
     await page.screenshot({ path: `output/testing/ground-${mobile ? 'mobile' : 'desktop'}.png` });
