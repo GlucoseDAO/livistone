@@ -19,6 +19,8 @@
     { "id": "first-ring", "use": "featured", "files": ["02_PARAM 2018/inel_propriu_test4livia.stl/inel_propriu_test4livia.stl"], "rotate": [90, 0, 0], "size": 1.2, "triangles": [10000] },
     { "id": "deep-sea-pearl", "use": "featured", "files": ["complete/+deepsea (3).stl"], "rotate": [0, 0, 0], "size": 1.4, "triangles": [10000] },
     { "id": "mycelium", "use": "grove", "files": ["05_PARAM 2021/mountain of gold, mycelium, yellow submarine/+mycelium2.stl"], "rotate": [0, 0, 0], "size": 3.6, "triangles": [10000] },
+    { "id": "eye-of-winter-gate", "use": "gate", "files": ["eye of winter/+EOW-base.stl", "eye of winter/+EOW-complex half.stl"], "rotate": [90, 0, 180], "size": 12, "anchor": "base", "triangles": [30000, 8000] },
+    { "id": "eyelense-gate", "use": "gate", "files": ["+eyelens1-1.stl", "+eyelens1-2.stl"], "rotate": [90, 0, 47], "size": 10, "anchor": "base", "triangles": [20000, 6000] },
     { "id": "eye-of-winter-base", "use": "gate", "files": ["eye of winter/+EOW-base.stl"], "rotate": [0, 0, 0], "size": 12, "triangles": [30000, 8000] },
     { "id": "eye-of-winter-half", "use": "gate", "files": ["eye of winter/+EOW-complex half.stl"], "rotate": [0, 0, 0], "size": 8.5, "triangles": [10000, 3000] },
     { "id": "eyelense-1", "use": "gate", "files": ["+eyelens1-1.stl"], "rotate": [0, 0, 0], "size": 10, "triangles": [15000, 5000] },

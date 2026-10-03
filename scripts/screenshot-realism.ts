@@ -52,7 +52,10 @@ const VIEWS: Record<string, View> = Object.fromEntries(([
   ['flowers-close', -27.5, -257.6, 0, -.55], ['flowers-mid', -46, -262, -1.45, -.16],
   // Jewelry models: each building's hovering piece above its poster (src/game/featured.ts; hour 0 under ?capture=1).
   ['featured-energy', -25.8, -8.8, -1.632, .29], ['featured-science', 27.79, -10.53, -1.204, .29], ['featured-city-hall', .43, -21.26, -1.032, .29],
-  ['featured-station', 6, 71.5, 0, .29], ['featured-station-navette', -17, 71.5, 0, .29], ['featured-timeface', 14.51, -46.66, -2.827, .3, 24.6], ['featured-future-house', -64, -108.9, 0, .32, 13.05], ['mycelium-ring', 75, -123, Math.PI, .22], ['mycelium-ring-far', 56, -99, -1.05, .12],
+  ['featured-station', 6, 71.5, 0, .29], ['featured-station-navette', -17, 71.5, 0, .29], ['featured-timeface', 14.51, -46.66, -2.827, .3, 24.6], ['featured-future-house', -64, -108.9, 0, .32, 13.05], ['mycelium-ring', 75, -123, Math.PI, .22],
+  // Moon gate concepts (?concept=gates): each gate from its approach path, three-quarter and from afar.
+  ['winter-gate-front', -88, -31, Math.PI / 2, .22], ['winter-gate-angle', -94, -18, .86, .18], ['winter-gate-far', -66, -20, 1.338, .1],
+  ['eyelense-gate-front', 88, -36, -Math.PI / 2, .22], ['eyelense-gate-angle', 94, -24, -.785, .18], ['eyelense-gate-far', 66, -24, -1.28, .1], ['mycelium-ring-far', 56, -99, -1.05, .12],
 ] as View[]).map(view => [view[0], view]));
 const SETS: Record<string, string[]> = {
   quick: ['arrival-meadow', 'city-hall-front', 'energy-front', 'bridge-bank', 'east-tributary', 'meadow-ground', 'city-hall-gallery', 'vittoria-lake'],
@@ -62,6 +65,7 @@ const SETS: Record<string, string[]> = {
   galleries: ['city-hall-gallery', 'energy-gallery', 'science-gallery', 'energy-inside', 'science-inside', 'catalogue-poster', 'embryo-station-platform'],
   lake: ['lake-path', 'lake-path-down', 'lake-crossing', 'lake-west-pools', 'lake-east-pool', 'vittoria-lake', 'vittoria-back', 'dewdrop-back'],
   intersections: ['rill-crossing', 'rill-culvert', 'rill-culvert-down', 'rill-culvert-mouth'],
+  gates: ['winter-gate-front', 'winter-gate-angle', 'winter-gate-far', 'eyelense-gate-front', 'eyelense-gate-angle', 'eyelense-gate-far'],
   featured: ['featured-energy', 'featured-science', 'featured-city-hall', 'featured-station', 'featured-timeface', 'featured-future-house', 'mycelium-ring', 'mycelium-ring-far'],
   skyline: ['valley-east', 'summit-northwest', 'summit-southwest', 'ridge-north'],
   // Sub-plan 08: front, side and close views of the five building-pieces (Science, Station, Time Tower, Future House, Gateway).
@@ -71,7 +75,7 @@ const SETS: Record<string, string[]> = {
   fixes: ['city-hall-far', 'city-hall-north', 'nanot-arch', 'future-house-entry', 'future-house-neck', 'junction-garden', 'junction-glucose', 'junction-station', 'enhancement-front', 'grove-floor', 'mycelium-grove', 'sky-up', 'ridge-northwest', 'railway-east-portal'],
 };
 // `all` keeps the 33 realism views; these sets are reviewed on their own.
-const REVIEWED_ALONE = ['fixes', 'skyline', 'lake', 'intersections', 'materials', 'station', 'mountain', 'featured'];
+const REVIEWED_ALONE = ['fixes', 'skyline', 'lake', 'intersections', 'materials', 'station', 'mountain', 'featured', 'gates'];
 SETS.all = [...new Set(Object.entries(SETS).filter(([set]) => !REVIEWED_ALONE.includes(set)).flatMap(([, views]) => views))];
 
 const [outDir, profileArg = 'desktop', setArg = 'quick', time = 'day'] = process.argv.slice(2);

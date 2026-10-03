@@ -25,8 +25,8 @@ This is the working plan for bringing Livia's jewelry STLs into the town as real
 | 0. Offline pipeline `scripts/build-jewelry-models.ts` + manifest `data/catalogue/models.json` | **Done.** 22 models built; provenance (SHA-256, dates, triangles, deviation) in `public/models/jewelry/sources.json` |
 | 1. Hovering featured model per building (`src/game/featured.ts`, `planar-exhibition.ts`) | **Done, desktop-verified** (captures below). Touch and software captures and a Playwright spec are still to do |
 | 2. Mycelium Ring above the opal orb (`living-waters.ts`) | **Done, desktop-verified** |
-| 3a. Eye of Winter Gate (west) | Not started. Models are built (`eye-of-winter-base`, `eye-of-winter-half`); a concept image needs owner approval first |
-| 3b. Eyelense Gate (east) | Not started. Models are built (`eyelense-1`, `eyelense-2`); a concept image needs owner approval first |
+| 3a. Eye of Winter Gate (west) | **Concept awaiting approval**: in-engine render of the real assembly (`eye-of-winter-gate`) in [concepts/15-moon-gates](../concepts/15-moon-gates/notes.md), dev-only `?concept=gates` |
+| 3b. Eyelense Gate (east) | **Concept awaiting approval**: crescent assembly standing on its two tips (`eyelense-gate`), same switch |
 | Frame budget | The script now reads jewelry GLBs and classifies "hovering jewelry models". It has not been run to completion: the earlier attempt hung waiting for poster photos under Bun |
 | Docs | This page and AGENTS.md (the never-commit-originals rule). README, the game plan status and the catalogue "In Livistone" column wait until the gates exist |
 

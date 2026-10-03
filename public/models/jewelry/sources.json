@@ -688,5 +688,89 @@
         "deviationOfFeature": 0.012
       }
     ]
+  },
+  "eye-of-winter-gate": {
+    "use": "gate",
+    "sources": [
+      {
+        "file": "eye of winter/+EOW-base.stl",
+        "sha256": "abc2e5c05bc5fbc661209ccebe251a4de1bf9889b0403ef96b5c3ba823d6147b",
+        "modified": "2026-01-28T22:10:21.000Z",
+        "triangles": 10264076
+      },
+      {
+        "file": "eye of winter/+EOW-complex half.stl",
+        "sha256": "f783dd858ff63726e20bc2599b9c4cefa560b4c8f59eb625feba7249f2ff0736",
+        "modified": "2026-01-28T22:13:30.000Z",
+        "triangles": 681158
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 10945234
+    },
+    "featureMm": 0.718,
+    "metresPerMm": 0.2994,
+    "levels": [
+      {
+        "file": "public/models/jewelry/eye-of-winter-gate.glb",
+        "triangles": 30000,
+        "bytes": 708584,
+        "deviationMm": 0.055,
+        "deviationOfFeature": 0.077
+      },
+      {
+        "file": "public/models/jewelry/eye-of-winter-gate-far.glb",
+        "triangles": 7998,
+        "bytes": 331632,
+        "deviationMm": 0.166,
+        "deviationOfFeature": 0.231
+      }
+    ]
+  },
+  "eyelense-gate": {
+    "use": "gate",
+    "sources": [
+      {
+        "file": "+eyelens1-1.stl",
+        "sha256": "0f75f56f31340da08480b52edc66fd37d0a731927b001460efe46ded5d9dd6d3",
+        "modified": "2025-12-02T08:17:38.105Z",
+        "triangles": 54964
+      },
+      {
+        "file": "+eyelens1-2.stl",
+        "sha256": "812a81314274de041a89d9c33347a7067474234aa4643d2e688e25900df19541",
+        "modified": "2025-12-02T08:18:19.686Z",
+        "triangles": 57338
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 2,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 112302
+    },
+    "featureMm": 3.374,
+    "metresPerMm": 0.15125,
+    "levels": [
+      {
+        "file": "public/models/jewelry/eyelense-gate.glb",
+        "triangles": 19992,
+        "bytes": 400808,
+        "deviationMm": 0.02,
+        "deviationOfFeature": 0.006
+      },
+      {
+        "file": "public/models/jewelry/eyelense-gate-far.glb",
+        "triangles": 5972,
+        "bytes": 130192,
+        "deviationMm": 0.063,
+        "deviationOfFeature": 0.019
+      }
+    ]
   }
 }
