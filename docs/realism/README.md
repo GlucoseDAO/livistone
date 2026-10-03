@@ -4,6 +4,10 @@ Livistone is getting more realistic in small, separately reviewed steps. Each fi
 
 Planned on 3 October 2026 against commit `5a95bfd`. Line numbers refer to that commit; re-check them before editing.
 
+## Status after round 1 (3 October 2026)
+
+00–04 are merged into `main` (`a16ad0d`). 20 (WebGPU, Phase A) is parked on `realism/20-webgpu`. **Start round 2 from [NEXT.md](NEXT.md)**: it has the results, open decisions, the reordered plan and the binding agent rules (capture budget, first-capture checkpoint, visible-change gate, per-sub-plan dev switches, stopping dev servers after merge). New in round 2: [21 contrast and aerial perspective](21-contrast-aerial.md), [22 iGPU tier detection](22-igpu-detection.md), [23 flaky Living Waters spec](23-flaky-living-waters-spec.md).
+
 ## Owner decisions (3 October 2026)
 
 - Stay on WebGL2 for now. A measured WebGPURenderer spike, using its automatic WebGL2 fallback, is optional sub-plan 20.
@@ -69,11 +73,11 @@ New scripts are TypeScript, run with `bun scripts/<name>.ts`. Bun runs TypeScrip
 
 | # | Sub-plan | Needs | Tiers | Main files |
 | --- | --- | --- | --- | --- |
-| 00 | [Before/after harness](00-harness.md) | — | all | `scripts/` |
-| 01 | [Fix sun shadows + following frustum](01-shadows.md) | 00 | gpu, mobile | `main.ts`, new `game/shadow-frame.ts` |
-| 02 | [Light and sky coherence](02-light-sky-coherence.md) | 01 | all | `sky.ts`, `main.ts` |
-| 03 | [Ground material rebuild](03-ground-material.md) | 02 | all (graded) | `mountains.ts`, `scripts/build-ground-textures.py` |
-| 04 | [River water shading rewrite](04-river-water.md) | 02 | all (graded) | new `world/water-material.ts`, `river.ts`, `world.ts` |
+| 00 ✅ | [Before/after harness](00-harness.md) | — | all | `scripts/` |
+| 01 ✅ | [Fix sun shadows + following frustum](01-shadows.md) | 00 | gpu, mobile | `main.ts`, new `game/shadow-frame.ts` |
+| 02 ✅ | [Light and sky coherence](02-light-sky-coherence.md) | 01 | all | `sky.ts`, `main.ts` |
+| 03 ✅ | [Ground material rebuild](03-ground-material.md) | 02 | all (graded) | `mountains.ts`, `scripts/build-ground-textures.py` |
+| 04 ✅ | [River water shading rewrite](04-river-water.md) | 02 | all (graded) | new `world/water-material.ts`, `river.ts`, `world.ts` |
 | 05 | [Golden-hour dawn/dusk](05-golden-hour.md) | 02 | all | `daylight.ts`, `sky.ts`, `main.ts`, `ui.ts` |
 | 06 | [Adaptive resolution](06-adaptive-resolution.md) | 00 | gpu, mobile | `main.ts` |
 | 07 | [Reflection probes](07-reflection-probes.md) | 02 | gpu, mobile | new `world/probes.ts` |
@@ -89,6 +93,9 @@ New scripts are TypeScript, run with `bun scripts/<name>.ts`. Bun runs TypeScrip
 | 17 | [Wind](17-wind.md) | 00 | gpu, mobile | `forest.ts`, `planting.ts`, `living-waters.ts` |
 | 18 | [GPU post-processing (experiment)](18-gpu-post.md) | 01, 02 | gpu | `main.ts` |
 | 19 | [AI reconstructions (gated)](19-ai-reconstructions.md) | 09 | offline | manifest only |
-| 20 | [WebGPURenderer spike with WebGL2 fallback (experiment)](20-webgpu-spike.md) | 00, ideally after 03 and 04 | all | `main.ts`, TSL ports of sky, terrain and water |
+| 20 ⏸ | [WebGPURenderer spike with WebGL2 fallback (experiment)](20-webgpu-spike.md) | 00, ideally after 03 and 04 | all | `main.ts`, TSL ports of sky, terrain and water |
+| 21 | [Sun/ambient contrast and aerial perspective](21-contrast-aerial.md) | 01, 02 (merged) | all | `main.ts`, fog chunk |
+| 22 | [iGPU tier detection](22-igpu-detection.md) | — | probe | `game/graphics.ts` |
+| 23 | [Flaky Living Waters spec](23-flaky-living-waters-spec.md) | — | test | `tests/living-waters.spec.ts` |
 
 01 → 02 → 05 all edit `main.ts`, so run them one after another. 03, 04, 09, 12, 16 and 17 touch separate files and can run in parallel worktrees once 00 exists.
