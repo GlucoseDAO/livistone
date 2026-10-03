@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { Fn, If, abs, attribute, cameraViewMatrix, clamp, cos, dFdx, dFdy, dot, float, floor, fract, length, max, mix, normalLocal, normalize, positionLocal, positionView, pow, property, select, sin, smoothstep, sqrt, step, texture, vec2, vec3, vec4, vertexStage } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
+import { shoreGround } from './shore-nodes';
+import type { ShoreMaps } from './shore-nodes';
 
 /**
  * Terrain ground shading (realism sub-plan 03), as TSL node builders for the terrain's node material:
@@ -175,7 +177,7 @@ const GROUND = {
   weights: property('vec3', 'groundWeights'), p: property('vec3', 'groundP'), dpx: property('vec3', 'groundPdx'), dpy: property('vec3', 'groundPdy'),
 };
 
-export interface GroundMaps { albedo: THREE.Texture[]; nrh: THREE.Texture[]; rock: THREE.Texture; rockNormal: THREE.Texture | null }
+export interface GroundMaps { albedo: THREE.Texture[]; nrh: THREE.Texture[]; rock: THREE.Texture; rockNormal: THREE.Texture | null; shore?: ShoreMaps | null }
 
 /**
  * Nodes for the vertex-coloured terrain: colour on every tier, roughness on gpu and mobile, detail normals on gpu. The cpu
@@ -228,10 +230,13 @@ export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMa
       GROUND.rock.assign(heightWeights(vec3(float(1).sub(exposed), exposed, 0), vec3(height, clamp(dot(rock, LUMA).mul(2.2), 0, 1), -2), .2).y);
       ground.assign(mix(ground, rock.mul(1.8), GROUND.rock)); GROUND.roughness.assign(mix(GROUND.roughness, .9, GROUND.rock));
     });
+    // River shores (sub-plan 14): gravel, the wet band, the silt bed and caustics, only near the channels.
+    shoreGround(tier, maps.shore ?? null, { ground, roughness: GROUND.roughness, detail: GROUND.detail, relief: GROUND.relief }, dx, dy, grassVertexColour);
     return ground;
   })();
   if (tier === 'cpu') return { colorNode, roughnessNode: null, normalNode: null };
-  const roughnessNode = clamp(GROUND.roughness, .4, 1);
+  // The shore's wet band is the only ground glossier than 0.4.
+  const roughnessNode = clamp(GROUND.roughness, .15, 1);
   if (tier !== 'gpu' || !maps.rockNormal) return { colorNode, roughnessNode, normalNode: null };
   const rockNormal = maps.rockNormal;
   const normalNode = Fn(() => {

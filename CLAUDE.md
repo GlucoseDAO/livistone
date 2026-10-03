@@ -103,6 +103,9 @@ src/
     water-material.ts River shader per device tier and the dev-only ?look=a|b variants
     water-surface.ts Clipped river sheet with baked flow, depth and rock attributes
     surfaces.ts      Mapped ashlar, terrazzo and brass for plain architecture, per tier; dev-only ?surfaces=off
+    river-rocks.ts   Blended boulder variants (instanced morphs), seated and in-stream placement, one collider trimesh
+    pebbles.ts       Seeded shore pebbles: one unshadowed mesh refilled from the cells near the camera, none on cpu
+    shore-nodes.ts   TSL shore: channel distance on the GPU, gravel, wet band, silt bed, caustics; rock moss and wet foot
     waterways.ts     Shared river/tributary boundaries, bridge sites and tower footprint
     time-tower.ts    Silver hourglass, round plaza, guarded spiral gallery and summit terrace
     elevated-layout.ts Shared tower, camel neck and Future House clearances
@@ -228,6 +231,21 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   `riverRockSites`, and joins tributaries into the river without a seam. GPU and mobile water is
   transparent (no depth write, drawn first among transparent objects) and tagged `heroEnv`; CPU bakes
   depth colour into opaque vertex colours. Regenerate the ripple maps with `python3 scripts/build-water-textures.py`.
+- **River rocks are one instanced draw.** `river-rocks.ts` blends four seeded shape variants per rock through relative
+  instanced morph targets (gpu/mobile/cpu: 320/180/80 triangles); `rockMatrix` and `rockWeights` place both the render and
+  `rockColliders`, one trimesh sampled from the same blended shape. `riverRockSites` (`stone.ts`) stays the single list for
+  rocks, colliders and the water's `rock` foam; a few stream rocks lean with the bank and `seatedHeight` buries every
+  underside in the ground, so none floats or overhangs the channel. Props on the ground use `terrainSurfaceHeight` /
+  `terrainSurfaceNormal` (the triangulated two-metre grid), not the analytic `terrainHeight`; `layoutAllows` is planting
+  clearance without the water band. Shore pebbles are one unshadowed mesh in `details` (map mode hides it, cpu has none),
+  refilled like the forest from the 8 m cells within two cells of the camera, only when the camera crosses a cell.
+- **Shores are shaded on the GPU from the same channel field.** `channelDistance` in `shore-nodes.ts` mirrors `waterDistance`;
+  keep the two in step. The ground's colour stage calls `shoreGround`: gravel from the sub-plan 03 shore scan (gpu, mobile),
+  a ragged wet band up to 0.4 m above the water (glossy above it), dark silt under the river and, on gpu, caustics driven by
+  `shoreTime`, which `Town.update` sets from game time so `?capture=1` freezes them. `rockShore` gives the node rock material
+  moss from the `moss` attribute and the world normal, and a wet foot at the river; the cpu tier's Lambert copy keeps baked
+  lichen instead. The lake material is `lakeWaterMaterial` in `water-material.ts`: the river's optics on an opaque sheet,
+  `heroEnv`, no emission, so the outer lake stays subdued at night around the lit pavilion.
 - **The Mitoring hall is not a sphere.** `createEnergyHall` builds an amber cup with a domed lid
   from `ENERGY_HALL` (`a`, `b` semi-axes, wall and dome heights, door angle); the basket strands
   below the rim are projected onto its outside, and the crown loops curl onto the lower roof.
