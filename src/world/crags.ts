@@ -489,8 +489,8 @@ export function cragGrassDiscs(sites: readonly CragSite[]): GroundDisc[] {
 
 /**
  * The blocks' limestone (limestone.ts), world-space like the ground's so bedding and joints run on across them: gpu adds the
- * scan's normal map and the joint blocks' facets, mobile keeps the colour work, cpu shades a Lambert node material with one
- * scale of the scan and the bedding only (cpu-detail.ts leaves it alone). Vertex colours (ambient × tint) multiply the result.
+ * scan's normal map and the joint blocks' facets, mobile keeps the colour work, cpu shades a Lambert node material with the scan's
+ * value alone (cpu-detail.ts leaves it alone). Vertex colours (ambient × tint) multiply the result.
  * Until `useMaps` the blocks are plain pale grey.
  */
 export function cragMaterial(tier: GraphicsTier): THREE.MeshStandardNodeMaterial | THREE.MeshLambertNodeMaterial {
@@ -509,9 +509,12 @@ export function useCragMaps(material: THREE.MeshStandardNodeMaterial | THREE.Mes
   // Dev-only `?crags=debug` paints the blocks red, to tell them from the ground's own rock.
   const debug = !!import.meta.env?.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).get('crags') === 'debug';
   material.colorNode = Fn(() => {
-    const at = inputs(), bricks = limestoneBricks(at.p, at.pixel, tier !== 'cpu');
-    tilt.assign(bricks.tilt);
-    return debug ? vec3(.8, .05, .02) : limestoneColour(tier, rock, at, bricks, attribute<'float'>('moss', 'float')).albedo;
+    const at = inputs();
+    if (debug) return vec3(.8, .05, .02);
+    // Software rendering (cpu) takes the scan's value alone; the blocks' baked ambient and tint still shade it.
+    if (tier === 'cpu') return limestoneColour(tier, rock, at, null).albedo;
+    const bricks = limestoneBricks(at.p, at.pixel); tilt.assign(bricks.tilt);
+    return limestoneColour(tier, rock, at, bricks, attribute<'float'>('moss', 'float')).albedo;
   })();
   if (tier === 'gpu' && rockNormal && material instanceof THREE.MeshStandardNodeMaterial) material.normalNode = Fn(() => {
     const at = inputs(), bricks = { tilt } as unknown as Bricks;

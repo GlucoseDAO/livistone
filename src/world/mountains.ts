@@ -85,7 +85,8 @@ function sunVisibility(x: number, z: number, y: number): number {
 }
 
 /** `shade` bakes ambient ground occlusion into the `groundShade` attribute (1 = open sky), the ground material's aoNode. */
-export function mountainGeometry(mobile: boolean, shade: (x: number, z: number) => number = () => 1, wide = ridgesLook() === 'classic'): THREE.BufferGeometry {
+/** `jointed`: steep ground will be shaded as the crags' jointed limestone, which takes the stone colour whole (below). */
+export function mountainGeometry(mobile: boolean, shade: (x: number, z: number) => number = () => 1, wide = ridgesLook() === 'classic', jointed = CRAGS && !wide): THREE.BufferGeometry {
     // Two-metre cells match the walking terrain; distant ridges use wider cells in both quality tiers.
     const { xs, zs } = terrainAxes(mobile, wide);
     const positions: number[] = [], colors: number[] = [], soils: number[] = [], shades: number[] = [], paints: number[] = [], frames: number[] = [], indices: number[] = [], color = new THREE.Color(), grass = GRASS, fresh = FRESH, stone = STONE;
@@ -93,8 +94,8 @@ export function mountainGeometry(mobile: boolean, shade: (x: number, z: number) 
       const x = xs[i], z = zs[j], y = landscapeHeight(x, z);
       positions.push(x, y, z);
       const slope = Math.hypot(landscapeHeight(x + 1, z) - landscapeHeight(x - 1, z), landscapeHeight(x, z + 1) - landscapeHeight(x, z - 1)) / 2;
-      // Jointed limestone (CRAGS) divides the stone back out of the colour, so steep ground takes it whole; meadow left in it greened the rock.
-      const rock = Math.min(1, THREE.MathUtils.smoothstep(slope, .6, 1.7) * (CRAGS ? 1 : .85) + THREE.MathUtils.smoothstep(y, 58, 100) * .65);
+      // Jointed limestone divides the stone back out of the colour, so steep ground takes it whole; meadow left in it greened the rock.
+      const rock = Math.min(1, THREE.MathUtils.smoothstep(slope, .6, 1.7) * (jointed ? 1 : .85) + THREE.MathUtils.smoothstep(y, 58, 100) * .65);
       const cover = groundCover(x, z); soils.push(cover.soil); shades.push(shade(x, z));
       // Sub-plan 27: alpine turf round the plants, old snow, meltwater (painted by ground-material.ts) and the sun's visibility, which
       // scales the sun's shadow term there (`receivedShadowNode` below).
@@ -148,7 +149,9 @@ export class Mountains extends THREE.Group {
   constructor(mobile: boolean, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', shade?: (x: number, z: number) => number, grass?: GrassShade) {
     super(); this.name = 'Continuous valley and mountain ridges';
     // The distant ranges and the walking view's distant pass (main.ts): gpu and mobile, unless ?ridges=classic.
-    const far = tier !== 'cpu' && ridgesLook() === 'ranges', geo = mountainGeometry(mobile, shade, !far);
+    // Sub-plan 27 round 2: steep ground shares the crags' jointed limestone (limestone.ts; on cpu only its pale scan), except with
+    // ?crags=off, ?mountain=off or ?ridges=classic.
+    const far = tier !== 'cpu' && ridgesLook() === 'ranges', jointed = CRAGS && ridgesLook() === 'ranges', geo = mountainGeometry(mobile, shade, !far, jointed);
     // The cpu tier lights everything with Lambert (cpu-detail.ts) and keeps only the ground colour, so it starts there.
     const material = tier === 'cpu' ? new THREE.MeshLambertNodeMaterial({ vertexColors: true }) : new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: .96 });
     // Baked crown, trunk and wall occlusion dims only indirect light (sky, hemisphere, environment), on Lambert and standard alike:
@@ -175,8 +178,7 @@ export class Mountains extends THREE.Group {
     this.rock = Promise.all([load('textures/mountains/rock-color.jpg', true), tier === 'gpu' ? load('textures/mountains/rock-normal.jpg', false) : Promise.resolve(null)]).then(([rock, rockNormal]) => ({ rock, rockNormal }));
     this.ready = Promise.all([Promise.all(files.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))), this.rock, shore, prints]).then(([ground, { rock, rockNormal }, gravel, footprints]) => {
       const albedo = ground.filter((_, i) => files[i].includes('-albedo-')), nrh = tier === 'cpu' ? albedo : ground.filter((_, i) => files[i].includes('-nrh-'));
-      // Sub-plan 27 round 2: steep ground shares the crags' jointed limestone (limestone.ts) unless ?crags=off or ?mountain=off.
-      const nodes = groundNodes(tier, look, { albedo, nrh, rock, rockNormal, shore: gravel.length === 2 ? { albedo: gravel[0], nrh: gravel[1] } : null, footprints }, GRASS, grass, ridgesLook() === 'ranges', MOUNTAIN, CRAGS && ridgesLook() === 'ranges');
+      const nodes = groundNodes(tier, look, { albedo, nrh, rock, rockNormal, shore: gravel.length === 2 ? { albedo: gravel[0], nrh: gravel[1] } : null, footprints }, GRASS, grass, ridgesLook() === 'ranges', MOUNTAIN, jointed);
       material.colorNode = nodes.colorNode; material.normalNode = nodes.normalNode;
       if (plain) { const ridge = farLandscapeMaterial(tier, rock, rockNormal); plain.dispose(); for (const mesh of ranges) mesh.material = ridge; }
       if (material instanceof THREE.MeshStandardNodeMaterial) material.roughnessNode = nodes.roughnessNode;

@@ -115,21 +115,20 @@ function triplanar(map: THREE.Texture, at: Limestone, scale: number): V3 {
 export interface LimestoneColour { albedo: V3; relief: F }
 /**
  * Final linear albedo of the limestone at `at`, before any vertex colour: the scan's grain on pale grey, the blocks' cracks,
- * grooves and values, water streaks down steep faces and lichen. `moss` (0–1) greens upward faces in patches. The cpu tier
- * takes one scale of the scan and no streaks.
+ * grooves and values, water streaks down steep faces and lichen. `moss` (0–1) greens upward faces in patches. The cpu tier,
+ * where software rendering pays for every noise per pixel, takes one scale of the scan's value alone (`bricks` unused).
  */
-export function limestoneColour(tier: GraphicsTier, rock: THREE.Texture, at: Limestone, bricks: Bricks, moss: F | number = 0): LimestoneColour {
+export function limestoneColour(tier: GraphicsTier, rock: THREE.Texture, at: Limestone, bricks: Bricks | null, moss: F | number = 0): LimestoneColour {
   const near = triplanar(rock, at, ROCK_SCALE), scan = (tier === 'cpu' ? near : mix(near, triplanar(rock, at, ROCK_SCALE * BROAD), .45)).toVar();
   const luma = max(dot(scan, LUMA), 1e-3).toVar(), value = luma.div(SCAN_LUMA).toVar();
+  if (tier === 'cpu' || !bricks) return { albedo: vec3(...PALE).mul(pow(value, 1.35)), relief: luma.mul(2.2).clamp(0, 1) };
   // The scan's brown is turned to grey; a trace of its hue keeps some blocks warmer, and its value, steepened, carries the grain.
   const albedo = vec3(...PALE).mul(mix(vec3(1), scan.div(luma), .12)).mul(pow(value, 1.35)).toVar();
   albedo.mulAssign(bricks.shade.add(1)); albedo.mulAssign(float(1).sub(bricks.crack.mul(.62))); albedo.mulAssign(float(1).sub(bricks.groove.mul(.2)));
-  const p = at.p, steep = float(1).sub(smoothstep(.3, .78, at.normal.y.abs())).toVar();
-  if (tier !== 'cpu') {
-    // Dark water streaks hang down steep faces: noise stretched along the height in the two side projections.
-    const w = at.weights, streak = valueNoise(vec2(p.z.mul(1.7), p.y.mul(.09))).mul(w.x).add(valueNoise(vec2(p.x.mul(1.7), p.y.mul(.09))).mul(w.z)).div(max(w.x.add(w.z), 1e-3));
-    albedo.mulAssign(float(1).sub(smoothstep(.56, .86, streak).mul(steep).mul(.34)));
-  }
+  // Dark water streaks hang down steep faces: noise stretched along the height in the two side projections.
+  const p = at.p, steep = float(1).sub(smoothstep(.3, .78, at.normal.y.abs())).toVar(), w = at.weights;
+  const streak = valueNoise(vec2(p.z.mul(1.7), p.y.mul(.09))).mul(w.x).add(valueNoise(vec2(p.x.mul(1.7), p.y.mul(.09))).mul(w.z)).div(max(w.x.add(w.z), 1e-3));
+  albedo.mulAssign(float(1).sub(smoothstep(.56, .86, streak).mul(steep).mul(.34)));
   // Broad stains a few metres across, then crustose lichen: clusters of small black spots and pale yellow-grey crusts.
   albedo.mulAssign(valueNoise(p.xz.div(7.5).add(p.y.mul(.13))).mul(.3).add(.85));
   const lichen = valueNoise(p.xz.mul(1.9).add(p.y.mul(1.3))).mul(.55).add(valueNoise(p.xz.mul(6.1).sub(p.y.mul(4.3))).mul(.45)).toVar();

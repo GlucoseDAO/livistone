@@ -342,11 +342,12 @@ export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMa
     if (jointed) If(exposed.greaterThan(.01), () => {
       // Sub-plan 27 round 2: the crags' limestone, cut into blocks by bedding planes and joints; the vertex colour's stone is
       // divided out so the rock lands on the blocks' albedo.
-      const at: Limestone = { p: positionLocal, dpx: GROUND.dpx.div(ROCK_SCALE), dpy: GROUND.dpy.div(ROCK_SCALE), weights, normal: n, pixel }, bricks = limestoneBricks(positionLocal, pixel, tier !== 'cpu');
+      // The cpu tier skips the blocks (software rendering pays for every noise per pixel) and keeps the scan's value.
+      const at: Limestone = { p: positionLocal, dpx: GROUND.dpx.div(ROCK_SCALE), dpy: GROUND.dpy.div(ROCK_SCALE), weights, normal: n, pixel }, bricks = tier === 'cpu' ? null : limestoneBricks(positionLocal, pixel);
       const stone = limestoneColour(tier, maps.rock, at, bricks);
       GROUND.rock.assign(heightWeights(vec3(float(1).sub(exposed), exposed, 0), vec3(height, stone.relief, -2), .2).y);
       ground.assign(mix(ground, stone.albedo.div(vec3(STONE.r, STONE.g, STONE.b)), GROUND.rock)); GROUND.roughness.assign(mix(GROUND.roughness, .9, GROUND.rock));
-      GROUND.facet.assign(bricks.tilt);
+      if (bricks) GROUND.facet.assign(bricks.tilt);
     });
     else If(exposed.greaterThan(.01), () => {
       const rock = texture(maps.rock, p.yz).grad(GROUND.dpx.yz, GROUND.dpy.yz).rgb.mul(weights.x).add(texture(maps.rock, p.xz).grad(GROUND.dpx.xz, GROUND.dpy.xz).rgb.mul(weights.y)).add(texture(maps.rock, p.xy).grad(GROUND.dpx.xy, GROUND.dpy.xy).rgb.mul(weights.z)).toVar();
