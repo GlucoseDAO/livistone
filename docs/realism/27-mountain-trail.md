@@ -1,48 +1,50 @@
-# 27 — Jepii Mici trail, rhododendrons and snow
+# 27 — Jepii Mici trail, alpine plateau and snow couloir
 
-**Needs:** 26 (merged). **Tiers:** all (graded). **Branch:** `realism/27-mountain-trail`. **Review:** `review/27-mountain-trail/`.
+**Needs:** 26, 21 (merged). **Tiers:** all (graded). **Branch:** `realism/27-mountain-trail`. **Review:** `review/27-mountain-trail/`.
 See [README](README.md) and the rules in [NEXT.md](NEXT.md).
 
-## Owner request (3 October 2026)
+## Owner request and corrections (3 October 2026)
 
-"I want to modify the mountains. Make a tourist route and put a 'Jepi Mici' pointer sign there together with danger sign like on the photo. Also, put nice flowers like photo on at least part of the mountain and a bit of the snow like on another mountain."
+"I want to modify the mountains. Make a tourist route and put a 'Jepi Mici' pointer sign there together with danger sign like on the photo. Also, put nice flowers like photo on at least part of the mountain and a bit of the snow like on another mountain." Then, from reference photos: the trail should start on a forest-heavy hill with the board roped between two trunks; the rhododendrons are low shrubs with flower trusses, with moss campion between them; the flowers belong on an upper plateau visitors can walk on; the snow fills a shaded chimney between two peaks, not a long narrow streak.
 
 The real trail is **Jepii Mici** (Bucegi, Romania): marked with a blue cross, closed in winter. The signs use that spelling.
 
 ## What and where
 
-All layout lives in `src/world/mountain-layout.ts` (DOM-free fields); `src/world/mountain-trail.ts` builds what stands on it.
+Layout lives in `src/world/mountain-layout.ts` (DOM-free); `src/world/mountain-trail.ts` builds what stands on it. Terrain shaping (`mountainShape`) applies with the eroded ridges only, so the forest's seeded draws stay put.
 
-- **Trail.** Leaves the north lake-garden path at (-5, -159) through an opening in its kerb, runs north through the woods to the trailhead at (-9, -177), then switchbacks up the north ridge's open slope to a log barrier at (-27, -221), 4.3 m inside the walking bound and 9.5 m higher, so nobody following the trail walks into `main.ts`'s out-of-bounds reset. Past the barrier the worn line continues up toward the crags to (-23, -276), 170 m from the path. It is baked bare earth in the ground cover's `groundSoil` (no paving, no kerbs), which also thins the near grass field to its edges. Trees within 3.3 m of it, at the trailhead, on the rhododendron meadow and in the snow gully are taken out of the forest after its seeded draws, so every other tree keeps its place (`tests/far-ranges.test.ts` records 892/498 trees).
-- **Trailhead.** A 1.6 × 0.9 m white board with a blue painted border and red hand-lettered warnings in Romanian and English (ATENȚIE! · ATTENTION! / TRASEU ÎNCHIS! TRAIL CLOSED! / PERICOL DE MOARTE! DEATH HAZARD! / INTERZIS! · FORBIDDEN!) hangs across the trail on four cream ropes tied to posts; its lower edge is 1.8 m up, so a walker passes beneath. Left of it, a white arrow pointer with a black outline, the blue-cross mark and JEPII MICI, lettered on both faces; on the right post, two small boards (TRASEU DIFICIL · DIFFICULT TRAIL, ÎNCHIS IARNA · CLOSED IN WINTER). Blue-cross blazes mark the posts and nine trail-side boulders, which lean with the slope and are seated like the river rocks (`seatedHeight`), in their own matte grey material. Every sign face, post, rope and blaze maps into one 2048 × 1024 canvas atlas (1024 × 512 on mobile and cpu) on one lit material: one draw. Not the Livia-style `place-sign.ts`. The barrier (`TRAIL_BARRIER`) is two posts and two log rails with a small TRASEU ÎNCHIS · TRAIL CLOSED board, one collider over its span and a boulder at each end. Board, posts, pointer and barrier have colliders; the mesh is clickable and E opens the trail's journal story.
-- **Rhododendrons** (*Rhododendron myrtifolium*, bujor de munte). Five drifts on the north ridge's slope east of the trail, from the woods' edge up toward the crags (x -30…14, z -205…-245), patchy and thinning above 30 m. Up close: one instanced draw of low cushions (gpu 520, mobile 220, none on cpu), 15–35 cm high and up to about 2 m across, overlapping into drifts. Each is built from small jittered clumps (gpu 34, mobile 16) with a broken outline: magenta-pink blossom (#c8378f to #e05ab0) over most of the top with leaves beneath, olive foliage round the skirt and in the gaps; a TSL Worley pattern about 3.5 cm across breaks each clump into single flowers. The ground's baked `groundPaint.x` carries the drift's pink only with distance (a light olive undergrowth near the walker; on cpu blossom clumps up close too), with tiny yellow flowers in the grass. Limestone boulders (gpu 16, mobile 9) lie among them.
-- **Snow.** A tongue of old avalanche snow in a gully carved 4.5 m into the western summit's south-east face, across the saddle from the trail: from (-53, -277), about 80 m up, down to its snout at about (-47, -247), with a wet runnel below. `terrain.ts` carves the gully only with the eroded ridges, so the forest's draws are unchanged; the ground material paints the snow from `groundPaint.y` (lumpy edge, dirt streaks down the fall line, debris, a dark wet rim, lumpy normals on gpu) and the meltwater from `.z`. No new draws, no emission. It is in view from every point of the trail and shows from town as a pale streak through the haze (`ridge-north`).
-- **Map.** Jepii Mici is destination 11, after Materialized Enhancements (not a civic landmark). Choosing it arrives on the garden path at (-5, -159) facing the trailhead (yaw 0.2). Its journal story keeps the facts (a steep Bucegi trail marked with a blue cross, closed in winter) apart from the Livistone fiction (everything in the scene).
+- **Trail.** Leaves the north lake-garden path at (-5, -159) through a gap in its kerb, runs through the woods to the trailhead at (-13, -190.5), climbs straight up a forested slope raised 3.4 m over ten metres behind the board (`hillRise`, about 30°), zigzags up the ridge's face on a bench graded into the slope (`trailBench`: level within 1.8 m of the centreline, blending out by 4.2 m) and enters the plateau at about (-17, -240). It is bare earth in the baked `groundSoil`.
+- **Trailhead.** In thick woods (trees appended round it, ashes nearest the trail), a 1.6 × 0.9 m white board with a blue border and red hand-lettered warnings (ATENȚIE! · ATTENTION! / TRASEU ÎNCHIS! TRAIL CLOSED! / PERICOL DE MOARTE! DEATH HAZARD! / INTERZIS! · FORBIDDEN!) hangs with its lower edge 2.05 m up on four ropes tied round two big bark-mapped trunks, whose roots cross the trail. The JEPII MICI arrow (blue-cross mark, both faces) and a blaze are nailed to the left trunk; two boards with blue-cross squares to the right one: "TRASEU DEOSEBIT DE PERICULOS! / PERMIS NUMAI TURIȘTILOR ECHIPAȚI CORESPUNZĂTOR ȘI BINE ANTRENAȚI / PENTRU URGENȚE: 112" and "DIFFICULT OR DANGEROUS TRAIL! / CLOSED IN WINTER (NOVEMBER–APRIL)". Ferns and butterbur (cut out of the atlas by alpha test) crowd the edges. Blazes mark nine boulders up the climb. Board, trunks, pointer, fence and barrier have colliders; the mesh is clickable and E opens the trail's story.
+- **Plateau.** A rolling alpine meadow round (-12, -249.5), 50 × 20 m, 30.5–35 m up, below a band of pale grey limestone crags with buttresses and ledges. A rope fence runs round its open edges (where no crag at least 7.5 m high closes it), with gaps for the trail; a log barrier with a TRASEU ÎNCHIS · TRAIL CLOSED board ends the walkable trail at (-11, -255.6) at the crags' foot. `trailCorridor` (the climb and the plateau) is where `main.ts` does not reset walkers past the town's bound. The grass field's bake reaches z = -262 to cover them.
+- **Plants.** Rhododendron shrubs (gpu 80, mobile 44; 1–2.8 m across, 0.4–0.7 m tall): glossy dark-green leaf clumps with a red-brown cast and magenta trusses (#c8378f–#e05ab0) dense on top, a few lone ones on the sides; a world-space Worley pattern breaks trusses into blooms and clumps into leaves. Moss campion (gpu 110, mobile 55; 0.3–1.2 m, a few centimetres high, hugging the ground, grass through it) with TSL five-petalled lilac stars about 1.8 cm across and dark-red buds on bright moss, between the shrubs and on the climb's top verges. Two merged draws, none on cpu (where the ground paints their colour). Bright alpine turf (`groundPaint.x`) covers walkable ground between them; the crags and the climb's banks keep their rock.
+- **Snow.** Two rocky peaks west of the plateau (about 75 and 85 m high) on a raised massif, with a couloir carved 13 m deep between them, opening toward the plateau. Old snow fills its upper part, about 15–17 m across at the top, tapering to a ragged, melting snout about 46 m up, with a wet runnel below. The default sun is high in the south-west, so the walls alone shade only about a third of the snow: the sun's terrain shade is ray-marched into `groundPaint.w` round the couloir and applied through the ground's `receivedShadowNode`, and **extra shade is baked into the inner upper couloir** (`couloirShade`). The snow is seen from the climb, the plateau and, through the haze, `ridge-north`.
+- **Map.** Jepii Mici is destination 11, after Materialized Enhancements (not a civic landmark). Choosing it arrives on the trail 7 m below the board at (-11.25, -183.68), facing it. Its journal story keeps the facts (a steep Bucegi trail marked with a blue cross, closed in winter) apart from the Livistone fiction.
 
 ## Switch
 
-Dev-only `?mountain=off` restores the mountains before this sub-plan: no trail, carve, paint attribute, signs, boulders or cushions; the full forest, the closed kerb and the original reeds. The map destination and journal story stay.
+Dev-only `?mountain=off` restores the mountains before this sub-plan: no trail, terrain shaping, paint, signs, plants, fence or corridor; the original forest, kerb and reeds. The map destination and story stay. Captures (`?capture=1`) no longer reset views placed past the walking bounds, and a view that cannot stand still (the plateau's steep slope under `?mountain=off`) is taken after 240 frames.
 
-## Budget (day, WebGPU; `review/27-mountain-trail/{before,after}/{desktop,touch}/day/captures.json`)
+## Budget (day, WebGPU on `main` with sub-plan 21; before = `?mountain=off` on the same server)
 
-Calls / triangles, before (`main` 9489bd3) → after, and the share of pixels changing by more than 20 levels.
-
-| View | Desktop (gpu) | Changed | Touch (mobile) | Changed |
+| View | Desktop calls / triangles | Changed | Touch calls / triangles | Changed |
 | --- | --- | --- | --- | --- |
-| trail-from-path | 56 / 2.14 M → 59 / 2.30 M | 42 % | 42 / 931k → 43 / 916k | 39 % |
-| trailhead-signs | 55 / 2.02 M → 58 / 2.19 M | 39 % | 40 / 862k → 43 / 823k | 41 % |
-| mountain-flowers | 52 / 1.28 M → 53 / 1.41 M | 66 % | 37 / 609k → 40 / 529k | 46 % |
-| snow-gully | 49 / 1.31 M → 52 / 1.37 M | 58 % | 34 / 420k → 37 / 426k | 59 % |
-| ridge-north | 58 / 1.54 M → 61 / 1.76 M | 23 % | 46 / 807k → 49 / 675k | 19 % |
+| trail-from-path | 55 / 2.41 M → 59 / 2.44 M | 41 % | 39 / 1.18 M → 43 / 1.16 M | 41 % |
+| trailhead-signs | 51 / 1.97 M → 55 / 2.17 M | 65 % | 36 / 924k → 40 / 897k | 68 % |
+| mountain-flowers | 46 / 1.43 M → 50 / 1.32 M | 74 % | 30 / 491k → 34 / 442k | 73 % |
+| snow-gully | 45 / 979k → 49 / 946k | 73 % | 30 / 294k → 34 / 338k | 72 % |
+| plateau-view | 139 / 2.35 M → 144 / 2.43 M | 30 % | 92 / 1.22 M → 97 / 1.21 M | 22 % |
+| ridge-north | 61 / 2.17 M → 67 / 2.17 M | 25 % | 48 / 1.19 M → 52 / 1.01 M | 19 % |
 
-Three new draws: the signs and barrier (one mesh, about 1k triangles), the cushions (one; 248k triangles on gpu, 49k on mobile) and the trail boulders (one, 9k). Terrain, snow, bloom and trail paint add none. The 13 (mobile 8) trees taken off the trail, meadow and gully lower the touch totals.
+Four new draws: signs, trunks, fence, barrier and undergrowth (one mesh, 11k triangles on gpu), trail boulders (one, 9k), rhododendron shrubs (one, 103k gpu, 28k mobile) and moss campion (one, 3k). Terrain, turf, snow and shade add none. Fewer trees on the plateau, peaks and couloir offset most of the triangles.
 
 ## Captures
 
-`bun scripts/screenshot-realism.ts <dir> desktop mountain day` (set `mountain`, outside `all`): `trail-from-path`, `trailhead-signs`, `mountain-flowers`, `snow-gully` and the existing `ridge-north`. `map-jepii-mici.png` in the review folder is a one-off screenshot of the map panel. `tests/mountain-trail.test.ts` walks a Rapier capsule from the map arrival under the board to the barrier, keeps pushing up the painted trail and checks that it stays behind the barrier and inside `TOWN_BOUNDS`, and keeps trunks, boulders and cushions off the trail; `tests/entrances.spec.ts` includes the new map destination.
+`bun scripts/screenshot-realism.ts <dir> desktop mountain day` (set `mountain`, outside `all`): `trail-from-path`, `trailhead-signs`, `mountain-flowers` (on the plateau), `snow-gully` (the couloir between its peaks from the plateau), `plateau-view` (back toward the town) and `ridge-north`. `tests/mountain-trail.test.ts` walks a Rapier capsule from the map arrival under the board, up the bench onto the plateau, never meeting the reset, and pushes it toward every edge of the plateau (held by fence and crags); `tests/entrances.spec.ts` includes the map destination.
 
 ## Open
 
-- The cushions now read as blossom-covered mounds, but their clumps are still faceted up close (most visibly on mobile, with fewer, larger clumps), and between drifts at 8–15 m the partly pink ground reads slightly brown.
-- The snow reads clean white from the trail; its dirt and debris only show close up.
-- `after-first-look/` holds the first pass (smooth domes with pink spots, boulders in the river rocks' draw); software captures were not taken.
+- Up close the shrubs' leaf clumps and trusses are low-poly; the photo's leaves and funnel blooms are finer.
+- From town (`ridge-north`) the couloir is about 110 m away, deep in the walking haze, so the snow reads only faintly.
+- The crag band behind the plateau is still a broad, fairly smooth face at the two-metre grid's resolution.
+- An oak at the trailhead hangs a little foliage across the board's left edge in `trailhead-signs`.
+- Software captures were not taken.

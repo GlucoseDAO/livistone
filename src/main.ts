@@ -552,8 +552,9 @@ class Game {
     }
     const pos = this.physics.position();
     const b = TOWN_BOUNDS;
-    // The railway corridor and the Jepii Mici climb and plateau (sub-plan 27) reach past the town's walking bounds.
-    if (pos.y < FALL_FLOOR || ((pos.x < b.minX || pos.x > b.maxX || pos.z < b.minZ || pos.z > b.maxZ) && !railwayCorridor(pos.x, pos.z) && !trailCorridor(pos.x, pos.z))) { this.physics.teleport(SPAWN); this.input.yaw = SPAWN.yaw; this.ui.toast('Back on the station garden path.'); }
+    // The railway corridor and the Jepii Mici climb and plateau (sub-plan 27) reach past the town's walking bounds. Dev captures
+    // (?capture=1) stand where they are placed, so a view past the bounds compares with ?mountain=off, where no corridor exists.
+    if (pos.y < FALL_FLOOR || (!this.capture && (pos.x < b.minX || pos.x > b.maxX || pos.z < b.minZ || pos.z > b.maxZ) && !railwayCorridor(pos.x, pos.z) && !trailCorridor(pos.x, pos.z))) { this.physics.teleport(SPAWN); this.input.yaw = SPAWN.yaw; this.ui.toast('Back on the station garden path.'); }
     this.ambience.setGarden(pos.z < -60);
 
     const current = this.physics.position(), yaw = this.input.yaw, lead = this.graphics.tier === 'cpu' ? EYE_LEAD : 0;

@@ -62,7 +62,7 @@ Tasks that edit `main.ts` or `sky.ts` (21, 18, 05, 25) merge one after another; 
 
 ### After round 2 (owner request, 3 October 2026)
 
-- [27 Jepii Mici trail, rhododendrons and snow](27-mountain-trail.md): a blazed earth trail with Romanian trail signs up the north ridge, rhododendron drifts on its slope and old snow in the next summit's gully; view set `mountain`, switch `?mountain=off`.
+- [27 Jepii Mici trail, alpine plateau and snow couloir](27-mountain-trail.md): a forested trailhead with Romanian trail signs, a benched climb to a walkable plateau of rhododendrons and moss campion below limestone crags, and old snow in a shaded couloir between two peaks; view set `mountain`, switch `?mountain=off`.
 - [26 Physical sky and distant mountains](26-sky-mountains.md): a baked single-scattering sky with ray-marched cumulus, distant ranges in a second camera pass, eroded ridges and limestone strata. Edits `sky.ts`, `main.ts` and `render/output.ts`, so it merges in turn with 21, 18 and 05; 05 builds its golden sky on this atmosphere.
 
 ### Done or small

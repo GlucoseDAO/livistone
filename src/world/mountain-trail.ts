@@ -371,8 +371,8 @@ export function paintTrailSigns(signs: TrailSigns, tier: GraphicsTier): void {
   const r = REGION.rope; ctx.fillStyle = '#e4dcc5'; ctx.fillRect(r[0], r[1], r[2] - r[0], r[3] - r[1]);
   for (let i = -128; i < 128; i += 9) { ctx.strokeStyle = 'rgba(150,135,105,.35)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(r[0] + i, r[1]); ctx.lineTo(r[0] + i + 128, r[3]); ctx.stroke(); }
   // Fir bark: grey-brown plates split by dark vertical furrows, mossy toward the foot (the bottom of the strip).
-  const k = REGION.bark, kw = k[2] - k[0], kh = k[3] - k[1]; ctx.fillStyle = '#4e463f'; ctx.fillRect(k[0], k[1], kw, kh);
-  for (let i = 0; i < 260; i++) { const x = k[0] + rand() * kw, y = k[1] + rand() * kh; ctx.fillStyle = `rgba(${rand() < .5 ? '58,50,44' : '140,128,116'},${.25 + rand() * .3})`; ctx.fillRect(x, y, 3 + rand() * 9, 14 + rand() * 40); }
+  const k = REGION.bark, kw = k[2] - k[0], kh = k[3] - k[1]; ctx.fillStyle = '#5b4a3b'; ctx.fillRect(k[0], k[1], kw, kh);
+  for (let i = 0; i < 260; i++) { const x = k[0] + rand() * kw, y = k[1] + rand() * kh; ctx.fillStyle = `rgba(${rand() < .5 ? '62,48,36' : '150,132,112'},${.25 + rand() * .3})`; ctx.fillRect(x, y, 3 + rand() * 9, 14 + rand() * 40); }
   for (let i = 0; i < 26; i++) { const x = k[0] + rand() * kw; ctx.strokeStyle = 'rgba(30,25,22,.55)'; ctx.lineWidth = 1.5 + rand() * 2.5; ctx.beginPath(); ctx.moveTo(x, k[1]); for (let y = 0; y <= kh; y += 24) ctx.lineTo(x + Math.sin(y * .05 + i) * 3, k[1] + y); ctx.stroke(); }
   const moss = ctx.createLinearGradient(0, k[3] - kh * .22, 0, k[3]); moss.addColorStop(0, 'rgba(78,98,38,0)'); moss.addColorStop(1, 'rgba(78,98,38,.85)'); ctx.fillStyle = moss; ctx.fillRect(k[0], k[3] - kh * .22, kw, kh * .22);
   // Butterbur: a big kidney-shaped leaf with pale radiating veins on a transparent ground the alpha test cuts away.

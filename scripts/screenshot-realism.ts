@@ -100,14 +100,16 @@ const settle = async (count: number) => {
 };
 // A teleported capsule drops or steps onto the ground over several physics steps (one per frame under ?capture=1). Wait until
 // it has held its position for a few frames, so no view depends on how long the network took (bridge-bank was caught mid-drop).
+// A view on ground too steep to stand on (sub-plan 27's plateau under ?mountain=off) never holds still: after 240 frames it is
+// taken where the slide has carried it, which the frame-locked physics makes the same every run.
 const still = async (frames: number) => {
   await page.evaluate(() => { delete (window as unknown as { __still?: unknown }).__still; });
   await page.waitForFunction((n) => {
-    const w = window as unknown as { __livistone: Hook; __still?: { at: string; since: number } };
+    const w = window as unknown as { __livistone: Hook; __still?: { at: string; since: number; start: number } };
     const s = w.__livistone.snapshot(), p = s.position as { x: number; y: number; z: number } | undefined;
     if (!p) return false;
     const at = [p.x, p.y, p.z].map((v) => v.toFixed(3)).join();
-    if (w.__still?.at !== at) { w.__still = { at, since: s.frames }; return false; }
+    if (w.__still?.at !== at) { w.__still = { at, since: s.frames, start: w.__still?.start ?? s.frames }; return s.frames - w.__still.start >= 240; }
     return s.frames - w.__still.since >= n;
   }, frames, { timeout: frameTimeout, polling: 100 });
 };
