@@ -399,7 +399,9 @@ export class Town {
     this.water.userData.time.value = time; shoreTime.value = time;
     if (!camera) return false;
     const profile = graphicsProfile(this.tier);
-    const trees = this.forest.update(camera, mapView ? fogFar : Math.min(fogFar, profile.forest), mapView, shadow);
+    const range = mapView ? fogFar : Math.min(fogFar, profile.forest), trees = this.forest.update(camera, range, mapView, shadow);
+    // Grove crowns follow the forest's range; their light silhouette matches, so a cached shadow map waits for its next re-bake.
+    this.gardens.updateDetail(camera, range, mapView);
     // Shrub batches toggle every couple of metres while walking; re-baking for them cost a shadow pass per ~2 m, so their shadows catch up at the next quarter-box re-bake.
     this.planting?.update(camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
     this.pebbles?.update(camera);
@@ -414,7 +416,7 @@ export class Town {
    * now would only move their upload from first sight to loading.
    */
   warmUp(on: boolean): void {
-    this.forest.warmUp(on); this.planting?.warmUp(on); this.pebbles?.warmUp(on);
+    this.forest.warmUp(on); this.planting?.warmUp(on); this.pebbles?.warmUp(on); this.gardens.warmUp(on);
     this.root.traverse((object) => {
       const material = (object as THREE.Mesh).material;
       if (!Array.isArray(material) && material?.userData.display) return;
