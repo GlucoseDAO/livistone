@@ -1,0 +1,76 @@
+{
+  "commit": "dce22d2",
+  "backend": "webgpu",
+  "browser": "154.0.8037.97",
+  "capturedAt": "2026-10-03T17:56:08.134Z",
+  "shots": [
+    {
+      "name": "readme-gateway",
+      "viewport": [
+        1600,
+        900
+      ],
+      "pose": [
+        0,
+        48.6,
+        0,
+        0.1
+      ],
+      "outputs": [
+        {
+          "file": "livistone-gateway.jpg",
+          "width": 1600,
+          "height": 900,
+          "type": "image/jpeg",
+          "quality": 0.84
+        }
+      ]
+    },
+    {
+      "name": "readme-centre",
+      "viewport": [
+        1600,
+        900
+      ],
+      "pose": [
+        25,
+        15,
+        0.607,
+        0.08
+      ],
+      "outputs": [
+        {
+          "file": "livistone-centre.jpg",
+          "width": 1600,
+          "height": 900,
+          "type": "image/jpeg",
+          "quality": 0.84
+        }
+      ]
+    },
+    {
+      "name": "readme-map",
+      "viewport": [
+        1600,
+        900
+      ],
+      "pose": [
+        0,
+        49.6,
+        0,
+        0.1
+      ],
+      "map": true,
+      "outputs": [
+        {
+          "file": "livistone-map.jpg",
+          "width": 1600,
+          "height": 900,
+          "type": "image/jpeg",
+          "quality": 0.84
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

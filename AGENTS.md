@@ -40,7 +40,7 @@ current build is generated in code at load time; binary assets are two tree GLBs
 | Mitoring comparisons | `node scripts/screenshot-mitoring.mjs [outDir] [desktop\|touch\|software]` | Fixed daylight/cameras; real SwiftShader is separate from touch emulation |
 | Surface maps | `python3 scripts/build-surface-textures.py [previewDir]` | Pillow + numpy, seeded and procedural; ashlar, terrazzo and brass albedo + nrh WebPs into `public/textures/surfaces/` |
 | Enhancement assets | `python3 scripts/build-enhancement.py [photoDir]` | Pillow; WebP posters + compact crystal meshes. Regrow crystals with `scripts/generate-enhancement-crystals.py` inside a materialized-enhancements checkout |
-| Share images | `bun scripts/build-share-images.ts [outDir]` | Dev server only; renders the 1200×630 `og:image` card and the loading-screen backdrops into `public/images/share/`. Rerun after visible changes on the arrival path |
+| Share images | `bun scripts/build-share-images.ts [outDir] [--readme]` | Dev server only; renders the 1200×630 `og:image` card and the loading-screen backdrops into `public/images/share/`, or with `--readme` the README's gate, civic-centre and map screenshots into `docs/images/`. Rerun after visible changes on the arrival path |
 | Frame budget | `bun scripts/frame-budget.ts [--json] [--far 150]` | No browser: main-pass draw calls and triangles per producer (Living Waters, glucose, Enhancement, terrain, planting; posters and forest under Bun) over the capture poses. Not device timings |
 
 `bun run test` uses Vitest; `bun test` would invoke Bun's own runner and fail. Playwright

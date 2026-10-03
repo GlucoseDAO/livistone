@@ -1,26 +1,67 @@
 # Livistone
 
-Explore a 3D art-and-science town built around Livia Zaharia’s jewelry, artworks and research projects. Every stop is inspired by a real, existing work. Ten destinations lead from Embryo Station through the civic halls and gardens to Materialized Enhancements hill.
+**Walk into a town where rings and pendants have become buildings.**
 
-**[Visit Livistone](https://livistone.liviazaharia.com/)** · [Run it locally](#run-it-locally) · [Deploy the website](docs/deployment.md) · [Technical guide](docs/technical-guide.md)
+![The LIVISTONE city gate: a silver ring holding a long green tourmaline over a stone bridge, with the walnut-and-crystal City Hall framed inside it, the amber Ministry of Energy on the left and the silver-lattice Ministry of Science on the right](docs/images/livistone-gateway.jpg)
 
-City Hall interprets the Nut of Power with finer walnut relief, curved brass clasps and smoky crystal, which darkens toward its outline and with distance so the whole nut reads from across town. Reduced detail uses smaller baked maps and single-pass crystal transparency; physical-device performance remains unverified.
+Livia Zaharia trained as an architect, became a parametric jewellery designer and then a citizen scientist. Livistone puts all three in one place: a 3D town in your browser where her jewellery has grown to the size of buildings you can walk into, and her research projects have places of their own.
+
+You step off a train at a station roofed in amber, walk under a ring-shaped city gate and cross the river. Ahead of you is a City Hall made from a walnut shell and smoky crystal. Further on you'll find an amber Ministry of Energy wrapped in folded silver, a lake laced with silver walkways, a grove of silver mushrooms, a copper camel whose neck you can climb, and a violet crystal hill with a human figure on its summit.
+
+**[▶ Visit Livistone](https://livistone.liviazaharia.com/)** (a recent browser is all you need) · [Run it locally](#run-it-locally) · [How it's made](#how-its-made) · [Technical guide](docs/technical-guide.md)
+
+## Ten stops, each from a real work
+
+![The civic centre at street level: the amber Ministry of Energy on the left, the walnut City Hall in the middle and the silver-lattice Ministry of Science on the right, with the spiral gallery of Timeface Tower behind it, among paved paths, flowers and grass](docs/images/livistone-centre.jpg)
+
+Every building and garden starts from something Livia actually made: a ring, a pendant, a research project. Inside, you'll find photographs of the original pieces and their stories.
+
+| | Stop | Inspired by | What you'll find |
+| --- | --- | --- | --- |
+| 1 | **Embryo Station** | The Embryo Ring: raw amber held in silver prongs | You arrive here: a pierced silver ring entrance and a parked maglev train you can board |
+| 2 | **Ministry of Energy** | The Mitoring: amber in silver folds that recall the cristae inside mitochondria | A long amber hall, entered through the ring itself |
+| 3 | **Ministry of Science** | The Nanot of Power pendant | A glass hall inside the pendant's silver lattice |
+| 4 | **City Hall** | The Nut of Power: a walnut shell, amethyst and brass | The heart of the town, joined by brass clasps |
+| 5 | **Timeface Tower** | Timeface and older studio works | A spiral gallery round a silver hourglass, with a terrace above the town |
+| 6 | **Glucose Commons** | Livia's GlucoseDAO research | A walk beneath human insulin, traced from its atomic structure; six chapters of the research |
+| 7 | **Vittoria Lake** | The Vittoria Amazonica pendant and the Dewdrop ring | Silver walkways between water pools and a faceted blue pavilion |
+| 8 | **Future House** | Camel Dalí: copper, a 3D-printed part and leather | A copper camel drinking from the lake. Climb its neck into the exhibition cabin |
+| 9 | **Mycelium Rain Garden** | The Mycelium ring, whose silver folds let water drain off its opal | Tall silver mushrooms with opal hearts and a visible rain rill |
+| 10 | **Materialized Enhancements** | The [enhancement.bio](https://enhancement.bio/) bioart project | A violet Voronoi hill to climb, with gene-category crystals grown by the project itself |
+
+The facts, photographs and research come from Livia's work and link to their sources. The powers the town gives its artifacts (the "Livia Lore") are fiction, and the game labels them that way.
+
+![The aerial map: the town from above, with numbered labels from Embryo Station by the railway, across the river to the civic halls, Vittoria Lake, the mushroom grove and the violet hill, and a list of destinations on the right](docs/images/livistone-map.jpg)
+
+*Press **M** at any time for the aerial map. The numbers follow the route from the station to the hill; choose a stop to arrive at its entrance.*
+
+## How it's made
+
+- **No 3D modelling program was involved.** Buildings, terrain, river, paths, bridges and planting are all generated in code each time the page loads. The binary assets are photographs, textures and two tree models.
+- **The silver comes from the jewellery itself.** The ministries' silver strands were traced from Livia's own 3D models of the rings (1–2 million triangles each) and rebuilt as cast-silver ribbons around the halls.
+- **The science is real data.** Glucose Commons lifts the backbone of human insulin from Protein Data Bank entry 1TRZ, and the crystals on the violet hill come out of the Materialized Enhancements pipeline.
+- **The sky is physically based.** On load, the game bakes a single-scattering atmosphere with ray-marched clouds, or a night sky with stars, the Milky Way and the moon. Distant mountain ranges fade into the valley haze.
+- **It's a static website.** It uses Three.js with WebGPU (falling back to WebGL 2) and Rapier physics in WebAssembly, and there's no server, account or database. Your progress stays in your browser.
+- **The soundtrack is Livia playing kalimba**, recorded on her phone.
+
+Want the details? The [technical guide](docs/technical-guide.md) covers the architecture, assets and project history, and [the design plan](docs/3d-game-plan.md) says where it's going.
 
 ## Visiting the town
 
-You only need a recent browser with hardware acceleration. The town renders with WebGPU where the browser offers it and with WebGL 2 everywhere else. No installation, IDE, account or login is required to visit the website.
+You only need a recent browser with hardware acceleration. The town renders with WebGPU where the browser offers it and with WebGL 2 everywhere else. You don't need to install anything, create an account or log in.
 
-1. The loading screen introduces Livia with her artistic homepage portrait and shows preparation progress. On short screens, scroll to see the full portrait. The town opens in **first person at the station exit, facing the Livistone entrance**.
-2. Walk towards the bridge and city gate. Choose **Map** (M) to see the town from above or select a named stop to arrive at its entrance.
-3. Approach a display and press **E**, or tap its discovery prompt, to read the story. Click a photograph to enlarge it. The pointer turns into a hand over anything you can click; the posters at Materialized Enhancements open [enhancement.bio](https://enhancement.bio/) in a new tab. Large dark signs in gold lattice frames introduce a place; cream boards show individual pieces.
-4. Open **Journal** to browse the stories and jewelry catalogue at any time.
+1. While the town loads, a screen introduces Livia with her homepage portrait. On short screens, scroll to see the whole portrait. The town opens in **first person at the station exit, facing the Livistone gate**.
+2. Walk towards the bridge and the city gate. Press **Map** (M) to see the town from above, or pick a named stop to go straight to its entrance.
+3. Approach a display and press **E**, or tap its prompt, to read the story. Click a photograph to enlarge it. The pointer turns into a hand over anything you can click. The posters at Materialized Enhancements open [enhancement.bio](https://enhancement.bio/) in a new tab. Large dark signs in gold lattice frames introduce a place; cream boards show individual pieces.
+4. Open **Journal** to read the stories and browse the jewellery catalogue at any time.
 
-An introduction poster to the right of the bridge approach tells the story of Livia’s journey from architecture to parametric jewellery and citizen science. On the left, a photo poster shows the King’s Chapel Double Ring that inspired the bridge arch. Click the posters or press E nearby to read their stories. The larger **Map** button (M) opens the aerial view without moving you. A nearby-piece panel introduces what you pass in one sentence; choose **Read story**, click the **E** control, or press **E** to read more. Use the small line icon to minimize the panel to its labels, then the square icon to restore it. The desktop controls strip has the same icons, and the top-bar speaker icon toggles the radio.
+On the bridge approach, an introduction poster on the right tells how Livia went from architecture to parametric jewellery and citizen science. A photo poster on the left shows the King's Chapel Double Ring that inspired the gate. As you walk, a panel names whatever you're passing in one sentence; choose **Read story**, click the **E** control or press **E** to read more. The line icon folds the panel down to its labels and the square icon restores it. The desktop controls strip folds the same way.
 
 | Action | Computer | Phone or tablet |
 | --- | --- | --- |
 | Walk | W/A/S/D or arrow keys; Shift moves faster | Left thumbstick |
 | Look around | Hold the left mouse button and drag; ←/→ also turn | Drag the scene |
+| Jump | Space | Jump button |
 | Read a nearby display | E or click its prompt | Tap its prompt |
 | Fold or expand the nearby description | Line / square icon on the place card | Line / square icon on the place card |
 | Fold or expand control hints | Line / square icon on the hint strip | Touch controls stay visible |
@@ -29,14 +70,14 @@ An introduction poster to the right of the bridge approach tells the story of Li
 | Move / zoom the map | Drag / scroll | Drag / pinch |
 | Menu | Escape or ☰ | ☰ |
 
-Paths use natural-looking limestone paving and raised bevelled stone kerbs with matching collision surfaces; where routes meet, the paving merges into one surface with rounded inside corners and the kerbs follow its outline; meadow patches, scattered grass islands and grove colours soften the landscape. A raised path connects the western lake loop to the Future House neck, a straight, even copper ramp you can walk up into the cabin without jumping, and the Glucose Commons approach passes through its map arrival point. All road ends join another route or a paved destination; the station, bridge and building approaches share one walking network. The daytime sky is a baked, physically based atmosphere with sunlit cumulus clouds, the night sky has graded stars, a faint Milky Way and the moon, and on the GPU and mobile profiles distant mountain ranges, bluer with distance, rise out of the valley haze beyond the town's own eroded ridges. Three automatic graphics profiles cover GPU, mobile/typical integrated graphics, and software-rendered CPU WebGL. Profiles scale architecture, foliage, sky resolution, lighting and rendering resolution; the menu shows the active profile. Resolution then adapts to the frame rate: the GPU profile aims for 50 FPS and the mobile profile for 28, lowering sharpness after two slow seconds and recovering gradually. CPU detail loads a small mesh simplifier, keeps the original collision world and uses simpler lighting without shadows. Actual SwiftShader remains only 2–4 FPS in local arrival measurements, so CPU-only playability is still unfinished. Touch emulation does not establish physical-phone performance.
+Jump to clear gallery rails, wade across the river, and climb the copper ramp into Future House or the facets of the violet hill. Falls do no damage.
 
 ### Make yourself comfortable
 
 - **Day or night:** choose Auto, Day or Night in the menu. Day and Night work independently of the current time.
 - **Music:** on by default. If your browser blocks autoplay, it starts after your first click, tap or keypress. Use the speaker button or **Livistone Radio** in the menu whenever you prefer silence.
 - **About the music:** these are informal phone recordings of Livia Zaharia playing kalimba, not professional studio recordings. The six included clips were reviewed and approved by Livia.
-- **Performance:** select **Gentle** visual detail if movement is slow. Initial loading can take longer on a phone or a slower connection.
+- **Performance:** select **Gentle** visual detail if movement is slow. Initial loading can take longer on a phone or a slower connection. The game picks one of three graphics profiles automatically (GPU, mobile/integrated graphics, or CPU software rendering) and shows it in the menu. Resolution then adapts to the frame rate: the GPU profile aims for 50 FPS and the mobile profile for 28. Software rendering on the CPU still runs at only 2–4 FPS, so it is not yet playable.
 - **Progress:** visits and stories read are saved in this browser. They do not sync between devices; clearing site data resets them.
 - **Lost?** Choose a destination on the map, or use the menu’s return-to-entrance action.
 
@@ -90,24 +131,11 @@ bun run check:hosts
 Browser tests require Chrome and use the dev server on port 5173. On Linux they turn on headless WebGPU; `LIVISTONE_BACKEND=webgl bun run test:browser` runs the same tests on the WebGL 2 fallback. `check:hosts` requires a completed build and checks real development/preview HTTP responses for the configured hostname and an unapproved hostname.
 
 - [Technical guide: architecture, assets, controls and project history](docs/technical-guide.md)
+- [README screenshots and how to retake them](docs/images/README.md)
 - [Design and implementation plan](docs/3d-game-plan.md)
 - [Contributor instructions](AGENTS.md)
 - [Artwork and research references](docs/extension-references.md)
 - [Enhancement hill and human-mesh provenance](docs/enhancement-reference.md)
 - [Kalimba credits and source records](public/audio/kalimba/README.md)
 
-Livistone is a playable prototype. Performance varies by device, and physical-phone and Safari verification (including Safari's WebGPU) remain ongoing work. Artwork and recording credits, third-party asset licences and concept references are preserved in the [technical guide](docs/technical-guide.md#credits-and-licensing).
-
-Ground cover combines local grass-and-soil photographs with worn path edges, earth near riverbanks and broad spring-green meadow variation. It uses the existing terrain mesh: reduced detail loads two 512 px WebP textures (about 130 KiB combined), while rich detail uses 1024 px textures. Physical-phone performance still needs measurement. Texture sources and regeneration are recorded in `public/textures/ground/ATTRIBUTION.md`.
-
-Bridges, the gateway's stone bases and the civic hall floors show generated stone instead of flat colour: a pale limestone ashlar with a light weathering band near the ground, and a honed terrazzo with brass strips. Brass stands and rails gain subtle tarnish. Average colours are unchanged. Reduced detail loads about 250 KiB of these maps, rich detail about 940 KiB. Their generator and seeds are recorded in `public/textures/surfaces/ATTRIBUTION.md`.
-
-Mitoring's Ministry of Energy uses cloudy honey-coloured amber and rounded cast-silver folds, guided by both photographs of the original ring. Small prebuilt colour and roughness maps improve the finish in both visual-detail settings; Gentle uses simple partial transparency without amber refraction or clearcoat. The full silver sections stay outside the amber, including between curve samples. This first material pass preserves the hall footprint and doorway. Run `python3 scripts/build-mitoring-textures.py` (NumPy and Pillow) to rebuild its original procedural maps. `node scripts/screenshot-mitoring.mjs [outDir] [desktop|touch|software]` captures matching daylight front, side and interior views; `node scripts/build-mitoring-comparison.mjs [captureDir]` assembles the original, amber, silver, clearance and transparency stages into a local review page. Touch emulation does not measure a physical phone. Whole-town CPU software rendering remains too slow in the pilot captures.
-
-Open grass areas have broad rolling contours, reaching roughly 1–2.5 metres where space allows, with a subdued spring-green palette. `meadow-relief.ts` bakes a clearance distance field once and tapers the contours around paths, buildings and other authored clearances, including a 2.5-metre interpolation margin. The existing terrain mesh and Rapier surface share these heights; plants follow the same field. Contours add no triangles or draw calls.
-
-Around the player, the GPU and mobile profiles grow a meadow of individual grass blades (22 m and 12 m across; none on the CPU profile) that stays off paths, water and buildings but also covers the mycelium grove floor, the meadow round the Enhancement hill and the ground under the Future House camel, sways gently in the wind and holds still when the system asks for reduced motion. It costs one draw call. Development builds accept `?grass=off` to compare without it.
-
-On the GPU profile, screen-space ambient occlusion darkens corners, kerbs, the feet of stands, dense grass and the folds of the buildings, and a restrained bloom lets the neon gate, lamps and other lights brighter than white glow softly at night. Posters, photographs, captions and signs keep their exact colours. The mobile and CPU profiles skip both; the aerial map and the Gentle visual-detail setting skip the occlusion but keep the bloom. Development builds accept `?post=off` to compare without them, and `?post=gi` for an experimental, still noisy screen-space bounce light.
-
-Players arrive outside the town-facing train door at Embryo Station, with a Livistone Station sign ahead. Space (or the touch Jump button) jumps; players can clear gallery rails and fall back to the ground without damage. The main navigation includes a labeled Mute sound / Enable sound button.
+Livistone is a playable prototype. Performance varies by device, and physical-phone and Safari verification (including Safari's WebGPU) remain ongoing work. The [technical guide](docs/technical-guide.md#look-and-materials) describes how the ground, stone, water, grass and lighting are made. Artwork and recording credits, third-party asset licences and concept references are preserved in the [technical guide](docs/technical-guide.md#credits-and-licensing).
