@@ -219,11 +219,11 @@ function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean): void
     // twigs and stones lying on it; greyer and banded where its edge stands steep; trampled grey where the trail crosses it.
     const edge = marks.y.add(valueNoise(xz.div(1.7)).sub(.5).mul(.36)).add(valueNoise(xz.div(.45)).sub(.5).mul(.12)).toVar();
     // Never up the gully's walls: the 2 m grid's wall triangles would carry it up in white teeth.
-    const snow = smoothstep(.42, .5, edge).mul(smoothstep(.45, .7, up)).toVar(), rim = smoothstep(.18, .42, edge).mul(float(1).sub(snow)).toVar();
+    const snow = smoothstep(.42, .5, edge).mul(smoothstep(.58, .8, up)).toVar(), rim = smoothstep(.18, .42, edge).mul(float(1).sub(snow)).toVar();
     // Sun cups: Voronoi hollows about 45 cm across (nearest of nine jittered points); the ridges between them are the cells' edges.
-    // Warped and sized by broad noise, so the hollows run from 25 to 60 cm and never sit in rows.
-    const warp = vec2(valueNoise(xz.div(.9)), valueNoise(xz.div(.9).add(13.7))).sub(.5).mul(.5);
-    const cupP = xz.add(warp).div(valueNoise(xz.div(4.3).add(2.2)).mul(.35).add(.25)).toVar(), cupCell = floor(cupP).toVar(), cupF = fract(cupP).toVar(), nearest = float(8).toVar(), away = vec2(0).toVar();
+    // Gently warped, so the hollows are irregular without stretching into streaks (a varying scale did that).
+    const warp = vec2(valueNoise(xz.div(1.6)), valueNoise(xz.div(1.6).add(13.7))).sub(.5).mul(.16);
+    const cupP = xz.add(warp).div(.42).toVar(), cupCell = floor(cupP).toVar(), cupF = fract(cupP).toVar(), nearest = float(8).toVar(), away = vec2(0).toVar();
     for (const [ox, oy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) {
       const r = vec2(ox, oy).add(hash22(cupCell.add(vec2(ox, oy))).mul(.8).add(.1)).sub(cupF).toVar(), d = dot(r, r).toVar();
       If(d.lessThan(nearest), () => { nearest.assign(d); away.assign(r.negate()); });
@@ -235,10 +235,12 @@ function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean): void
     const streaks = valueNoise(vec2(xz.x.div(1.4), xz.y.div(8))).toVar(), grime = valueNoise(xz.div(3.1).add(7.7)).toVar();
     const clean = vec3(.47, .485, .51).mul(valueNoise(xz.div(5)).mul(.1).add(.95)).mul(valueNoise(xz.div(.035)).mul(.08).add(.96)).toVar();
     // Dirt along the cup ridges, thickest where the slope's soil streaks run, and a brownish cast in broad patches.
-    const dirt = smoothstep(.55, .95, ridge).mul(streaks.mul(.6).add(.4)).mul(.55).add(smoothstep(.4, .85, streaks).mul(.38)).add(.15).toVar();
-    const white = mix(clean, vec3(.31, .28, .24), clamp(dirt.add(grime.sub(.5).max(0).mul(.9)), 0, .85)).toVar();
+    // Dirt runs in streaks down the fall line and lies in broad patches; only a faint, broken share follows the cups' ridges, so
+    // the hollows shape the light without printing a pattern of cells.
+    const patchy = valueNoise(xz.div(.8).add(3.3)).toVar();
+    const dirt = smoothstep(.42, .9, streaks).mul(.5).add(smoothstep(.52, .85, grime).mul(.34)).add(smoothstep(.85, 1, ridge).mul(smoothstep(.55, .8, patchy)).mul(.22)).add(.06).toVar();
+    const white = mix(clean, vec3(.31, .28, .24), clamp(dirt, 0, .8)).toVar();
     // Cup hollows sit a shade darker on every tier (the gpu also tilts their normal): the mottling the photographs show.
-    white.mulAssign(mix(.92, 1.02, ridge));
     // Debris up close: conifer needles in 6 cm cells, twigs in 50 cm cells, a few stones, all short dark strokes.
     const stroke = (cellSize: number, chance: number, reach: number, width: number, seed: number): F => {
       const cell = xz.div(cellSize).add(seed).toVar(), id = floor(cell), h = hash22(id).toVar(), angle = h.x.mul(6.2831853), dir = vec2(cos(angle), sin(angle));
@@ -258,7 +260,7 @@ function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean): void
     white.assign(mix(white, white.mul(.78).mul(sin(positionLocal.y.mul(19).add(valueNoise(xz.div(.7)).mul(4))).mul(.07).add(.93)), face));
     ground.assign(mix(ground.mul(float(1).sub(rim.mul(.45))), white.div(tint), snow));
     GROUND.rock.mulAssign(float(1).sub(snow)); GROUND.detail.mulAssign(float(1).sub(snow));
-    GROUND.relief.assign(mix(GROUND.relief, cups.mul(float(1).sub(tramp.mul(.7))).mul(.3), snow));
+    GROUND.relief.assign(mix(GROUND.relief, cups.mul(float(1).sub(tramp.mul(.7))).mul(.12), snow));
     // Spring snow is wet and coarse: glossy on the ridges, rougher in the dirt; a few crystals catch the sun on gpu.
     const glint = step(.992, hash12(floor(xz.div(.006)))).mul(near);
     GROUND.roughness.assign(mix(GROUND.roughness.sub(rim.mul(.3)), mix(.58, .78, dirt).sub(glint.mul(.45)).sub(tramp.mul(.1)), snow));

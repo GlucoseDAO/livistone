@@ -244,7 +244,7 @@ export const TRAIL_TOP = TRAIL_SAMPLES[TRAIL_BARRIER.index - 1];
 // The gorge: its mouth, the canyon west along the crags' foot and the snow gully up to the plateau
 
 /** The gorge's axis: the trail from just before its mouth to just past the gully's head, indexed for distance queries. */
-const GORGE_FROM = STAGE.mouth - 8, GORGE_TO = STAGE.head + 6, GORGE_REACH = 20, gorgeBins = new Map<string, number[]>();
+const GORGE_FROM = STAGE.mouth - 8, GORGE_TO = STAGE.head + 6, GORGE_REACH = 32, gorgeBins = new Map<string, number[]>();
 for (let i = GORGE_FROM + 1; i <= GORGE_TO; i++) {
   const a = TRAIL_SAMPLES[i - 1], b = TRAIL_SAMPLES[i];
   for (let x = Math.floor((Math.min(a.x, b.x) - GORGE_REACH) / CELL); x <= Math.floor((Math.max(a.x, b.x) + GORGE_REACH) / CELL); x++)
@@ -296,7 +296,7 @@ function gorgeShape(x: number, z: number, h: number): number {
   const ends = smooth(s, GORGE_FROM + 2, STAGE.mouth - 1) * (1 - smooth(s, STAGE.head + 1, GORGE_TO - 1));
   const top = Math.max(h, floor + gorgeWall(s, side) + depth), q = d / half, snowHalf = half * (.88 + .3 * mountainNoise(x * .45 + 3, z * .45));
   // Old snow lies as a slab, flat across and ending in a steep, ragged edge short of the walls (the paint's own edge, snowCover).
-  const cross = depth * (1 - smooth(d, snowHalf * .72, snowHalf * .98)) + .25 * (mountainNoise(x * .5, z * .5) - .5) * smooth(q, .4, 1);
+  const cross = depth * (1 - smooth(d, snowHalf * .64, snowHalf * .9)) + .25 * (mountainNoise(x * .5, z * .5) - .5) * smooth(q, .4, 1);
   let target: number;
   if (d <= half) target = floor + cross;
   else if (d <= half + run) target = lerp(floor, top, Math.pow(smooth(d, half, half + run), .7));
@@ -323,7 +323,7 @@ function buttressRaise(x: number, z: number): number {
 export function snowCover(x: number, z: number): number {
   const g = gorgeCoords(x, z); if (!g || g.s < STAGE.snout - 2 || g.s > STAGE.head) return 0;
   const half = gorgeHalf(g.s) * (.88 + .3 * mountainNoise(x * .45 + 3, z * .45)), ends = smooth(g.s, STAGE.snout - 1 + 2 * mountainNoise(x * .4, z * .4 + 9), STAGE.snout + 1.5) * (1 - smooth(g.s, STAGE.head - 5, STAGE.head - 1.5));
-  return ends * (1 - smooth(g.d, half * .7, half * .92));
+  return ends * (1 - smooth(g.d, half * .62, half * .86));
 }
 /** Meltwater, 0–1: a dark wet band along the gorge's floor below the snout, where its stream runs. */
 export function meltwater(x: number, z: number): number {
@@ -349,7 +349,7 @@ export const COULOIR_SHADE_BOX = { minX: -74, maxX: -38, minZ: -284, maxZ: -244 
  */
 export function mountainCalm(x: number, z: number): number {
   if (!MOUNTAIN || z > -205 || z < -305 || x < -95 || x > 35) return 0;
-  const g = gorgeCoords(x, z), edge = g ? gorgeHalf(g.s) + wallRun(g.s) : 0, gorge = g ? 1 - smooth(g.d, edge + 5, edge + 15) : 0;
+  const g = gorgeCoords(x, z), edge = g ? gorgeHalf(g.s) + wallRun(g.s) : 0, gorge = g ? 1 - smooth(g.d, edge + 9, edge + 19) : 0;
   return Math.max(gorge * smooth(g?.s ?? 0, STAGE.mouth - 8, STAGE.mouth - 2), smooth(plateauInside(x, z), -16, -5));
 }
 
