@@ -12,6 +12,7 @@ import type { GrassShade } from './ground-material';
 import { attribute } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { shoreTextureFiles } from './shore-nodes';
+import { CRAGS, STONE } from './limestone';
 import type { GraphicsTier } from '../game/graphics';
 
 /** Baseline meadow vertex colour; the ground shader divides it back out of its palette. FRESH is the young-growth tint. */
@@ -51,7 +52,7 @@ function cutRailwayOpening(source: THREE.BufferGeometry): THREE.BufferGeometry {
  * with 32 m cells to 1.4 km, the rounds 1–2 extent that the cpu tier and ?ridges=classic keep; otherwise the distant ranges
  * (far-landscape.ts) take over at 520 m.
  */
-function terrainAxes(mobile: boolean, wide: boolean): { xs: number[]; zs: number[] } {
+export function terrainAxes(mobile: boolean, wide: boolean): { xs: number[]; zs: number[] } {
   const axis = (start: number, end: number, nearStart: number, nearEnd: number): number[] => {
     const values: number[] = []; for (let value = start; value <= end; value += value >= nearStart && value < nearEnd ? 2 : Math.abs(value) > 520 ? 32 : mobile ? 8 : 4) values.push(value); return values;
   };
@@ -87,12 +88,13 @@ function sunVisibility(x: number, z: number, y: number): number {
 export function mountainGeometry(mobile: boolean, shade: (x: number, z: number) => number = () => 1, wide = ridgesLook() === 'classic'): THREE.BufferGeometry {
     // Two-metre cells match the walking terrain; distant ridges use wider cells in both quality tiers.
     const { xs, zs } = terrainAxes(mobile, wide);
-    const positions: number[] = [], colors: number[] = [], soils: number[] = [], shades: number[] = [], paints: number[] = [], frames: number[] = [], indices: number[] = [], color = new THREE.Color(), grass = GRASS, fresh = FRESH, stone = new THREE.Color('#a6a294');
+    const positions: number[] = [], colors: number[] = [], soils: number[] = [], shades: number[] = [], paints: number[] = [], frames: number[] = [], indices: number[] = [], color = new THREE.Color(), grass = GRASS, fresh = FRESH, stone = STONE;
     for (let j = 0; j < zs.length; j++) for (let i = 0; i < xs.length; i++) {
       const x = xs[i], z = zs[j], y = landscapeHeight(x, z);
       positions.push(x, y, z);
       const slope = Math.hypot(landscapeHeight(x + 1, z) - landscapeHeight(x - 1, z), landscapeHeight(x, z + 1) - landscapeHeight(x, z - 1)) / 2;
-      const rock = Math.min(1, THREE.MathUtils.smoothstep(slope, .6, 1.7) * .85 + THREE.MathUtils.smoothstep(y, 58, 100) * .65);
+      // Jointed limestone (CRAGS) divides the stone back out of the colour, so steep ground takes it whole; meadow left in it greened the rock.
+      const rock = Math.min(1, THREE.MathUtils.smoothstep(slope, .6, 1.7) * (CRAGS ? 1 : .85) + THREE.MathUtils.smoothstep(y, 58, 100) * .65);
       const cover = groundCover(x, z); soils.push(cover.soil); shades.push(shade(x, z));
       // Sub-plan 27: alpine turf round the plants, old snow, meltwater (painted by ground-material.ts) and the sun's visibility, which
       // scales the sun's shadow term there (`receivedShadowNode` below).
@@ -140,6 +142,8 @@ export function terrainTiles(source: THREE.BufferGeometry): THREE.BufferGeometry
 
 export class Mountains extends THREE.Group {
   readonly ready: Promise<void>;
+  /** The rock scan's colour and (gpu) normal maps once loaded, shared with the crag blocks (crags.ts). */
+  readonly rock: Promise<{ rock: THREE.Texture; rockNormal: THREE.Texture | null }>;
   /** `grass` is the near grass field's lookup, so the ground shades the soil between its blades. */
   constructor(mobile: boolean, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', shade?: (x: number, z: number) => number, grass?: GrassShade) {
     super(); this.name = 'Continuous valley and mountain ridges';
@@ -168,9 +172,11 @@ export class Mountains extends THREE.Group {
     const prints = MOUNTAIN && tier !== 'cpu' ? load(`textures/snow/footprints-${tier === 'gpu' ? 'gpu' : 'mobile'}.webp`, false).then((t) => { t.wrapS = THREE.ClampToEdgeWrapping; t.flipY = false; t.anisotropy = tier === 'gpu' ? 8 : 4; t.needsUpdate = true; return t; }).catch(() => null) : Promise.resolve(null);
     // The shore gravel is optional: without it the banks keep their wet band, silt and caustics.
     const shore = Promise.all(shoreFiles.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))).catch(() => []);
-    this.ready = Promise.all([Promise.all(files.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))), load('textures/mountains/rock-color.jpg', true), tier === 'gpu' ? load('textures/mountains/rock-normal.jpg', false) : Promise.resolve(null), shore, prints]).then(([ground, rock, rockNormal, gravel, footprints]) => {
+    this.rock = Promise.all([load('textures/mountains/rock-color.jpg', true), tier === 'gpu' ? load('textures/mountains/rock-normal.jpg', false) : Promise.resolve(null)]).then(([rock, rockNormal]) => ({ rock, rockNormal }));
+    this.ready = Promise.all([Promise.all(files.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))), this.rock, shore, prints]).then(([ground, { rock, rockNormal }, gravel, footprints]) => {
       const albedo = ground.filter((_, i) => files[i].includes('-albedo-')), nrh = tier === 'cpu' ? albedo : ground.filter((_, i) => files[i].includes('-nrh-'));
-      const nodes = groundNodes(tier, look, { albedo, nrh, rock, rockNormal, shore: gravel.length === 2 ? { albedo: gravel[0], nrh: gravel[1] } : null, footprints }, GRASS, grass, ridgesLook() === 'ranges', MOUNTAIN);
+      // Sub-plan 27 round 2: steep ground shares the crags' jointed limestone (limestone.ts) unless ?crags=off or ?mountain=off.
+      const nodes = groundNodes(tier, look, { albedo, nrh, rock, rockNormal, shore: gravel.length === 2 ? { albedo: gravel[0], nrh: gravel[1] } : null, footprints }, GRASS, grass, ridgesLook() === 'ranges', MOUNTAIN, CRAGS && ridgesLook() === 'ranges');
       material.colorNode = nodes.colorNode; material.normalNode = nodes.normalNode;
       if (plain) { const ridge = farLandscapeMaterial(tier, rock, rockNormal); plain.dispose(); for (const mesh of ranges) mesh.material = ridge; }
       if (material instanceof THREE.MeshStandardNodeMaterial) material.roughnessNode = nodes.roughnessNode;

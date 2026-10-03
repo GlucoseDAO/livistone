@@ -1,9 +1,11 @@
 import * as THREE from 'three';
-import { Fn, If, abs, attribute, sign, cameraViewMatrix, clamp, cos, dFdx, dFdy, dot, float, floor, fract, length, max, mix, normalLocal, normalize, positionLocal, positionView, pow, property, select, sin, smoothstep, sqrt, step, texture, vec2, vec3, vec4, vertexStage } from 'three/tsl';
+import { Fn, If, abs, attribute, sign, cameraViewMatrix, clamp, cos, cross, dFdx, dFdy, dot, float, floor, fract, length, max, mix, normalLocal, normalize, positionLocal, positionView, pow, property, select, sin, smoothstep, sqrt, step, texture, vec2, vec3, vec4, vertexStage } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
 import { shoreGround } from './shore-nodes';
 import type { ShoreMaps } from './shore-nodes';
+import { ROCK_SCALE, STONE, limestoneBricks, limestoneColour, limestoneNormal } from './limestone';
+import type { Bricks, Limestone } from './limestone';
 
 /**
  * Terrain ground shading (realism sub-plan 03), as TSL node builders for the terrain's node material:
@@ -187,6 +189,7 @@ export function meadowAverage(look: GroundLook, macro: Node<'vec4'>): V3 {
 const GROUND = {
   roughness: property('float', 'groundRoughness'), detail: property('vec2', 'groundDetail'), relief: property('vec2', 'groundRelief'), rock: property('float', 'groundRock'),
   weights: property('vec3', 'groundWeights'), p: property('vec3', 'groundP'), dpx: property('vec3', 'groundPdx'), dpy: property('vec3', 'groundPdy'),
+  facet: property('vec3', 'groundFacet'),
 };
 
 /**
@@ -194,7 +197,7 @@ const GROUND = {
  * tiny yellow flowers; on cpu, which draws neither plant, patches of their colour), old avalanche snow with a lumpy edge, dirt
  * streaks and debris over a dark wet rim, and meltwater. Colours are albedos: the vertex colour that multiplies the ground afterwards is divided out.
  */
-function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean, footprints: THREE.Texture | null): void {
+function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean, footprints: THREE.Texture | null, pale = true): void {
   const marks = attribute<'vec4'>('groundPaint', 'vec4').xyz.toVar(), tint = max(attribute<'vec3'>('color', 'vec3'), vec3(.05)).toVar();
   // The boot prints' coordinates on the trail's frame (metres across it over the tile's 1.2 m, along it over 9.6 m), with their
   // gradients taken here, outside the snow's branch, so the lookup inside it stays legal.
@@ -213,9 +216,12 @@ function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean, footp
     }
     GROUND.rock.mulAssign(float(1).sub(turf)); GROUND.detail.mulAssign(float(1).sub(turf.mul(.3)));
   });
-  // The plateau's crags and the peaks are pale grey limestone (the first flower photograph), paler than the ridges' rock.
-  const crags = float(1).sub(smoothstep(-240, -234, positionLocal.z)).mul(smoothstep(-80, -70, positionLocal.x)).mul(float(1).sub(smoothstep(14, 24, positionLocal.x))).mul(GROUND.rock);
-  ground.assign(mix(ground, vec3(dot(ground, LUMA)).mul(vec3(1.32, 1.3, 1.24)), crags.mul(.85)));
+  // The plateau's crags and the peaks are pale grey limestone (the first flower photograph), paler than the ridges' rock. The
+  // jointed limestone of round 2 (limestone.ts) is that pale everywhere, so it skips this.
+  if (pale) {
+    const crags = float(1).sub(smoothstep(-240, -234, positionLocal.z)).mul(smoothstep(-80, -70, positionLocal.x)).mul(float(1).sub(smoothstep(14, 24, positionLocal.x))).mul(GROUND.rock);
+    ground.assign(mix(ground, vec3(dot(ground, LUMA)).mul(vec3(1.32, 1.3, 1.24)), crags.mul(.85)));
+  }
   If(marks.y.greaterThan(.01), () => {
     // Old avalanche snow as in the owner's photographs of the gully: grey-white, never paint-white, with soil streaks down the
     // fall line, dirt patches, needles, twigs and stones lying on it; greyer and banded where its edge stands steep; boot prints
@@ -274,8 +280,12 @@ export interface GrassShade { mask: THREE.Texture; minX: number; minZ: number; w
  * Nodes for the vertex-coloured terrain: colour on every tier, roughness on gpu and mobile, detail normals on gpu. The cpu
  * tier uses the colour on a Lambert node material. Vertex colours still multiply the result, as they did the GLSL patch.
  */
-/** `paint` reads sub-plan 27's baked `groundPaint` (x alpine turf, y old snow, z meltwater; w, the sun's visibility, is mountains.ts's). */
-export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMaps, grassVertexColour: THREE.Color, grass?: GrassShade, limestone = true, paint = false): { colorNode: V3; roughnessNode: F | null; normalNode: V3 | null } {
+/**
+ * `paint` reads sub-plan 27's baked `groundPaint` (x alpine turf, y old snow, z meltwater; w, the sun's visibility, is mountains.ts's).
+ * `jointed` (sub-plan 27 round 2) shades steep rock as the crags' jointed limestone (limestone.ts), projected by each triangle's
+ * own normal; without it the rock keeps sub-plan 26's grey-limestone scan.
+ */
+export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMaps, grassVertexColour: THREE.Color, grass?: GrassShade, limestone = true, paint = false, jointed = false): { colorNode: V3; roughnessNode: F | null; normalNode: V3 | null } {
   const L = LOOKS[look], [meadowAlbedo, sparseAlbedo, soilAlbedo] = maps.albedo, [meadowNrh, sparseNrh, soilNrh] = maps.nrh;
   const colorNode = Fn(() => {
     const n = normalize(normalLocal).toVar(), xz = positionLocal.xz.toVar(), dx = dFdx(xz).toVar(), dy = dFdy(xz).toVar();
@@ -320,11 +330,25 @@ export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMa
         ground.mulAssign(float(1).sub(texture(grass.mask, uv).level(float(0)).a.mul(near).mul(.32)));
       });
     }
-    const weights = pow(abs(n), vec3(4)).toVar(); weights.divAssign(max(dot(weights, vec3(1)), .001)); GROUND.weights.assign(weights);
+    // Jointed rock projects the scan by each triangle's own normal: smoothed vertex normals lean toward the sky across the two-metre
+    // grid's folds, and the top-down projection then streaked the scan down the faces. (Derivatives here, outside any branch.)
+    const facet = jointed ? normalize(cross(dFdx(positionLocal), dFdy(positionLocal))).toVar() : n;
+    if (jointed) facet.mulAssign(select(dot(facet, n).lessThan(0), float(-1), float(1)));
+    const pixel = max(length(GROUND.dpx), length(GROUND.dpy)).div(ROCK_SCALE).toVar();
+    const weights = pow(abs(facet), vec3(4)).toVar(); weights.divAssign(max(dot(weights, vec3(1)), .001)); GROUND.weights.assign(weights);
     const exposed = clamp(smoothstep(.18, .65, float(1).sub(abs(n.y))).add(smoothstep(58, 105, positionLocal.y).mul(.5)), 0, 1).toVar();
-    GROUND.rock.assign(0);
+    GROUND.rock.assign(0); if (jointed) GROUND.facet.assign(vec3(0));
     // Flat garden ground skips the rock taps; cliffs keep their triplanar detail.
-    If(exposed.greaterThan(.01), () => {
+    if (jointed) If(exposed.greaterThan(.01), () => {
+      // Sub-plan 27 round 2: the crags' limestone, cut into blocks by bedding planes and joints; the vertex colour's stone is
+      // divided out so the rock lands on the blocks' albedo.
+      const at: Limestone = { p: positionLocal, dpx: GROUND.dpx.div(ROCK_SCALE), dpy: GROUND.dpy.div(ROCK_SCALE), weights, normal: facet, pixel }, bricks = limestoneBricks(positionLocal, pixel, tier !== 'cpu');
+      const stone = limestoneColour(tier, maps.rock, at, bricks);
+      GROUND.rock.assign(heightWeights(vec3(float(1).sub(exposed), exposed, 0), vec3(height, stone.relief, -2), .2).y);
+      ground.assign(mix(ground, stone.albedo.div(vec3(STONE.r, STONE.g, STONE.b)), GROUND.rock)); GROUND.roughness.assign(mix(GROUND.roughness, .9, GROUND.rock));
+      GROUND.facet.assign(bricks.tilt);
+    });
+    else If(exposed.greaterThan(.01), () => {
       const rock = texture(maps.rock, p.yz).grad(GROUND.dpx.yz, GROUND.dpy.yz).rgb.mul(weights.x).add(texture(maps.rock, p.xz).grad(GROUND.dpx.xz, GROUND.dpy.xz).rgb.mul(weights.y)).add(texture(maps.rock, p.xy).grad(GROUND.dpx.xy, GROUND.dpy.xy).rgb.mul(weights.z)).toVar();
       if (limestone) {
         // Sub-plan 26: a second copy four times larger breaks the 15 m repeat on big faces; the photographed rock turns toward grey
@@ -338,7 +362,7 @@ export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMa
       GROUND.rock.assign(heightWeights(vec3(float(1).sub(exposed), exposed, 0), vec3(height, clamp(dot(rock, LUMA).mul(2.2), 0, 1), -2), .2).y);
       ground.assign(mix(ground, rock.mul(1.8), GROUND.rock)); GROUND.roughness.assign(mix(GROUND.roughness, .9, GROUND.rock));
     });
-    if (paint) mountainPaint(ground, xz, far, n.y, tier !== 'cpu', maps.footprints ?? null);
+    if (paint) mountainPaint(ground, xz, far, n.y, tier !== 'cpu', maps.footprints ?? null, !jointed);
     // River shores (sub-plan 14): gravel, the wet band, the silt bed and caustics, only near the channels.
     shoreGround(tier, maps.shore ?? null, { ground, roughness: GROUND.roughness, detail: GROUND.detail, relief: GROUND.relief }, dx, dy, grassVertexColour);
     return ground;
@@ -353,7 +377,12 @@ export function groundNodes(tier: GraphicsTier, look: GroundLook, maps: GroundMa
     const detail = vec3(GROUND.detail.mul(r4(L.normal)).mul(float(1).sub(smoothstep(25, 90, positionView.length()).mul(.6))).sub(GROUND.relief.mul(r4(L.relief))), 0).toVar();
     detail.z.assign(sqrt(max(float(1).sub(dot(detail.xy, detail.xy)), .05)));
     const world = reorient(n, detail).toVar();
-    If(GROUND.rock.greaterThan(.001), () => {
+    if (jointed) If(GROUND.rock.greaterThan(.001), () => {
+      // The scan's relief and each joint block's facet, around the smooth surface normal.
+      const at: Limestone = { p: positionLocal, dpx: GROUND.dpx.div(ROCK_SCALE), dpy: GROUND.dpy.div(ROCK_SCALE), weights: w, normal: n, pixel: float(0) };
+      world.assign(normalize(mix(world, limestoneNormal(rockNormal, at, n, { tilt: GROUND.facet } as unknown as Bricks, .5), GROUND.rock)));
+    });
+    else If(GROUND.rock.greaterThan(.001), () => {
       const nx = texture(rockNormal, p.yz).grad(GROUND.dpx.yz, GROUND.dpy.yz).xy.mul(2).sub(1), ny = texture(rockNormal, p.xz).grad(GROUND.dpx.xz, GROUND.dpy.xz).xy.mul(2).sub(1), nz = texture(rockNormal, p.xy).grad(GROUND.dpx.xy, GROUND.dpy.xy).xy.mul(2).sub(1);
       const rockDetail = vec3(0, nx.y, nx.x).mul(w.x).add(vec3(ny.x, 0, ny.y).mul(w.y)).add(vec3(nz.x, nz.y, 0).mul(w.z));
       world.assign(normalize(mix(world, normalize(n.add(rockDetail.mul(.32))), GROUND.rock)));

@@ -31,7 +31,7 @@ import { cpuWaterColour, waterMaterial } from './water-material';
 import { waterSurfaceGeometry } from './water-surface';
 import type { RockSite } from './water-surface';
 import { pavingMaterial, riverRockSites, rockMaterial } from './stone';
-import { createRiverRocks, rockColliders } from './river-rocks';
+import { createRiverRocks, rockColliders, rockReach } from './river-rocks';
 import { createPebbles } from './pebbles';
 import { shoreTime } from './shore-nodes';
 import type { ShorePebbles } from './pebbles';
@@ -52,6 +52,8 @@ import type { ProbeScope } from './probes';
 import { MOUNTAIN, snowCover } from './mountain-layout';
 import { createTrailSigns, paintTrailSigns, trailBoulders } from './mountain-trail';
 import { createAlpinePlants } from './alpine-plants';
+import { CRAGS, CRAG_REGION, cragSites, createCrags, useCragMaps } from './crags';
+import type { Crags } from './crags';
 import type { ContactSite } from './contact-shadows';
 
 /** Culling flags saved while Town.warmUp() draws everything. */
@@ -119,6 +121,9 @@ export class Town {
   /** Sub-plan 27: the Jepii Mici trail's boulders (in the river rocks' collider) and its sign posts' contact patches. */
   private boulders: RockSite[] = [];
   private trailContacts: ContactSite[] = [];
+  /** Sub-plan 27 round 2: the mountain's limestone crags (one mesh, one collider), shaded once the mountains' rock maps load. */
+  private crags: Crags | null = null;
+  private cragsReady: Promise<void> = Promise.resolve();
   /** Hall interiors and enclosed collections, whose meshes (never their lights, which WebGPU builds into shaders) hide beyond ROOM_RANGE. */
   private readonly rooms: { center: THREE.Vector3; parts: THREE.Object3D[]; shown: boolean | null }[] = [];
   private contactShadows!: ContactShadows;
@@ -215,6 +220,7 @@ export class Town {
     // The concourse glows stay a quarter below their first strength, so the platform lamps' own pools read at night (sub-plan 28).
     for (const x of [-20, 0, 20]) addGlow(arrival, new THREE.Vector3(x, 4.3, -68), '#ffd28a', 12, 50, 17, .22);
     this.mountains = new Mountains(mobile, this.tier, this.groundOcclusion, this.grassShade); this.root.add(this.mountains);
+    const crags = this.crags; if (crags) this.cragsReady = this.mountains.rock.then(({ rock, rockNormal }) => useCragMaps(crags.material, this.tier, rock, rockNormal)).catch(() => { /* Plain grey crags if the rock maps fail. */ });
   }
   private createTerrain(): void {
     const geo = townTerrainGeometry(); this.terrainVertices = new Float32Array(geo.getAttribute('position').array);
@@ -391,7 +397,7 @@ export class Town {
     return PROBE_SITES.flatMap(site => { const parts = this.probeParts.get(site.id); return parts ? [{ site, ...parts }] : []; });
   }
   readonly forest = new Forest();
-  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows, this.wind), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
+  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows, this.wind), this.mountains.ready, this.cragsReady, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
     const sites = forestSites(this.mobile);
     for (const { x, y, z } of sites) this.colliders.push({ type: 'box', position: [x, y + 2, z], size: [0.3, 2, 0.3] });
@@ -403,7 +409,14 @@ export class Town {
     this.groundOcclusion = CONTACT_OFF ? undefined : groundShadeField(treeShadeDiscs(this.forest.sites), TOWN_SHADE_FOOTPRINTS);
     const trail = MOUNTAIN ? trailBoulders(this.mobile) : [];
     this.boulders = trail.map(boulder => boulder.site); const rocks = [...this.rocks, ...this.boulders];
-    const grass = createGrassField(this.tier, { rocks, stems: this.gardens.stems, height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
+    if (CRAGS) {
+      // Sub-plan 27 round 2: limestone crags wherever the mountain is steep, clear of trunks and the trail's boulders; one draw,
+      // and one collider on every tier.
+      const near = (p: { x: number; z: number }): boolean => p.x > CRAG_REGION.minX - 12 && p.x < CRAG_REGION.maxX + 12 && p.z > CRAG_REGION.minZ - 12 && p.z < CRAG_REGION.maxZ + 12;
+      const obstacles = [...this.forest.sites.filter(near).map(t => ({ x: t.x, z: t.z, radius: .8 })), ...this.boulders.filter(near).map(b => ({ x: b.x, z: b.z, radius: rockReach(b.s) + .2 }))];
+      this.crags = createCrags(this.tier, cragSites({ obstacles })); this.root.add(this.crags.mesh); this.colliders.push(this.crags.collider);
+    }
+    const grass = createGrassField(this.tier, { rocks, stems: [...this.gardens.stems, ...this.crags?.discs ?? []], height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
     if (grass) { this.details.add(grass.mesh); this.grassShade = grass.ground; }
     this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter, this.tier, grass?.ground.radius ?? 0, this.wind);
     // One instanced draw of blended boulder variants; one collider mesh sampled from the same shapes and transforms.
@@ -417,7 +430,7 @@ export class Town {
       const signs = createTrailSigns(this.colliders, trail, this.forest.sites, this.mobile); this.root.add(signs.mesh); paintTrailSigns(signs, this.tier);
       this.researchPanels.push(signs.mesh); this.interactives.push({ id: 'jepii-mici', object: signs.mesh, position: signs.position });
       // The plateau's rhododendron mats, their cards with the turf's flowers and moss campion: three draws, none on cpu.
-      const plants = createAlpinePlants(this.tier, rocks, FOREST_DETAIL.coverage); this.root.add(...plants.meshes); this.trailContacts = [...signs.contacts, ...plants.contacts];
+      const plants = createAlpinePlants(this.tier, rocks, FOREST_DETAIL.coverage); this.root.add(...plants.meshes); this.trailContacts = [...signs.contacts, ...plants.contacts, ...this.crags?.contacts ?? []];
     }
     // Shore pebbles live with the other near-ground details, so map mode hides them; cpu has none. Only nearby cells draw.
     this.pebbles = createPebbles(this.tier, this.rocks); if (this.pebbles) this.details.add(this.pebbles.mesh);
