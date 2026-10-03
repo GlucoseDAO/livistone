@@ -16,9 +16,14 @@ for (const mobile of [false, true]) test(`loading introduction and first-person 
     await expect(page.locator('.loading-story')).toContainText(TOWN_INTRO.music);
     await expect(page.getByRole('progressbar')).toBeVisible();
     await expect(page.locator('.loading-portrait img')).toBeVisible();
+    // A real in-game view of the gate: the wide backdrop on desktop, the centred banner on phones.
+    await expect(page.locator('.loading-view img')).toBeVisible();
+    await expect(page.locator('.loading-view img')).toHaveJSProperty('naturalWidth', mobile ? 1200 : 1920, { timeout: 15000 });
+    // The progress bar spans the bottom of the viewport; scrolled to the end, the portrait sits above it, never under it.
+    await page.locator('#boot-loading').evaluate(el => { el.scrollTop = el.scrollHeight; });
     const portrait = (await page.locator('.loading-portrait img').boundingBox())!, bar = (await page.getByRole('progressbar').boundingBox())!;
-    expect(bar.width).toBeCloseTo(page.viewportSize()!.width);
-    expect(portrait.width).toBeLessThanOrEqual(bar.width); expect(portrait.y).toBeGreaterThan(bar.y + bar.height);
+    expect(bar.width).toBeCloseTo(page.viewportSize()!.width); expect(bar.y + bar.height).toBeGreaterThan(page.viewportSize()!.height - 80);
+    expect(portrait.width).toBeLessThanOrEqual(bar.width); expect(portrait.y + portrait.height).toBeLessThanOrEqual(bar.y + 1);
     await expect(page.locator('.loading-portrait img')).toHaveJSProperty('naturalWidth', 1536, { timeout: 15000 });
     await page.screenshot({ path: `output/testing/introduction/loading-${mobile ? 'mobile' : 'desktop'}.png` });
     release();
@@ -68,7 +73,7 @@ test('enlarged loading introduction remains reachable on short phones', async ({
       expect(box.y).toBeGreaterThanOrEqual(0);
       await page.locator('#boot-loading').evaluate(el => { el.scrollTop = el.scrollHeight; });
       box = (await portrait.boundingBox())!; expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(size.width);
-      expect(box.y).toBeGreaterThanOrEqual(0); expect(box.y + box.height).toBeLessThanOrEqual(size.height + 1);
+      expect(box.y).toBeGreaterThanOrEqual(0); expect(box.y + box.height).toBeLessThanOrEqual((await page.locator('.loading-bar').boundingBox())!.y + 1);
       expect(await page.evaluate(() => { const screen = document.querySelector<HTMLElement>('#boot-loading')!; return screen.scrollWidth <= screen.clientWidth + 1; })).toBe(true);
       await page.screenshot({ path: `output/testing/introduction/loading-short-${size.width}.png` });
     }

@@ -1,0 +1,62 @@
+{
+  "commit": "2cd7c29",
+  "backend": "webgpu",
+  "browser": "154.0.8037.97",
+  "capturedAt": "2026-10-03T08:51:41.627Z",
+  "shots": [
+    {
+      "name": "gateway-card",
+      "viewport": [
+        1200,
+        630
+      ],
+      "pose": [
+        0,
+        48.6,
+        0,
+        0.1
+      ],
+      "zoom": 1,
+      "outputs": [
+        {
+          "file": "livistone-gateway.jpg",
+          "width": 1200,
+          "height": 630,
+          "type": "image/jpeg",
+          "quality": 0.84
+        },
+        {
+          "file": "loading-narrow.webp",
+          "width": 1200,
+          "height": 630,
+          "type": "image/webp",
+          "quality": 0.8
+        }
+      ]
+    },
+    {
+      "name": "gateway-wide",
+      "viewport": [
+        1600,
+        900
+      ],
+      "pose": [
+        -1.5,
+        50,
+        0.3,
+        0.13
+      ],
+      "zoom": 1,
+      "outputs": [
+        {
+          "file": "loading-wide.webp",
+          "width": 1920,
+          "height": 1080,
+          "type": "image/webp",
+          "quality": 0.8
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

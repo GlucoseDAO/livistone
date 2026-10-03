@@ -6,6 +6,24 @@
     <meta name="theme-color" content="#263d32" />
     <meta name="description" content="Walk into Livistone, a green town of art, science, and extraordinary architecture inspired by Livia's jewelry." />
     <title>Livistone — A living world</title>
+    <!-- Link previews: a real in-game view of the city gate (scripts/build-share-images.ts). Crawlers need absolute URLs. -->
+    <link rel="canonical" href="https://livistone.liviazaharia.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Livistone" />
+    <meta property="og:url" content="https://livistone.liviazaharia.com/" />
+    <meta property="og:title" content="Livistone — A town from a jeweller’s imagination" />
+    <meta property="og:description" content="Walk into Livistone, a green town of art, science, and extraordinary architecture inspired by Livia's jewelry. Free in your browser." />
+    <meta property="og:image" content="https://livistone.liviazaharia.com/images/share/livistone-gateway.jpg" />
+    <meta property="og:image:secure_url" content="https://livistone.liviazaharia.com/images/share/livistone-gateway.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="In-game view of the LIVISTONE city gate, with City Hall and the two ministries beyond the bridge" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Livistone — A town from a jeweller’s imagination" />
+    <meta name="twitter:description" content="Walk into Livistone, a green town of art, science, and extraordinary architecture inspired by Livia's jewelry. Free in your browser." />
+    <meta name="twitter:image" content="https://livistone.liviazaharia.com/images/share/livistone-gateway.jpg" />
+    <meta name="twitter:image:alt" content="In-game view of the LIVISTONE city gate, with City Hall and the two ministries beyond the bridge" />
     <link rel="stylesheet" href="/src/loading.css" />
     <script>
       if (window.location.hostname === 'livistone.liviazaharia.com') {
@@ -23,18 +41,28 @@
   </head>
   <body>
     <section id="boot-loading" class="loading-screen" aria-labelledby="loading-title">
+      <figure class="loading-view">
+        <picture>
+          <source media="(max-width: 900px)" srcset="/images/share/loading-narrow.webp" width="1200" height="630" />
+          <img src="/images/share/loading-wide.webp" width="1920" height="1080" alt="In-game view of the LIVISTONE city gate, with City Hall and the two ministries beyond the bridge" fetchpriority="high" />
+        </picture>
+        <figcaption>In the game · the city gate from the station path</figcaption>
+      </figure>
       <div class="loading-layout">
       <div class="loading-story">
         <div class="loading-brand">LIVISTONE · ART, SCIENCE &amp; NATURE</div>
         <h1 id="loading-title">A town from a jeweller’s imagination</h1>
         <div class="loading-journey">Architect → parametric jewellery designer → citizen scientist</div>
         <p>Livia Zaharia began with architecture, moved into parametric jewellery design, and became a citizen scientist. In Livistone, she brings these worlds together: her jewellery pieces become buildings you can walk into, while her machine learning and scientific projects have places of their own.</p>
-        <p class="loading-music">The background music is Livia herself playing kalimba, recorded live on her phone. You can turn the radio on or off in the menu.</p>
-        <div class="loading-meta"><span id="loading-status" role="status">Preparing your visit…</span><span id="loading-count">0%</span></div>
-        <progress id="loading-progress" value="0" max="100" aria-label="Town preparation"></progress>
-        <small>Preparing the town, its galleries and walking paths.</small>
-        <figure class="loading-portrait"><img src="/images/about/livia.jpg" width="1536" height="1024" alt="Artistic portrait of Livia Zaharia, framed by green scientific imagery and golden parametric forms" fetchpriority="high" /></figure>
+        <div class="loading-artist">
+          <figure class="loading-portrait"><img src="/images/about/livia.jpg" width="1536" height="1024" alt="Artistic portrait of Livia Zaharia, framed by green scientific imagery and golden parametric forms" /></figure>
+          <p class="loading-music">The background music is Livia herself playing kalimba, recorded live on her phone. You can turn the radio on or off in the menu.</p>
+        </div>
       </div>
+      </div>
+      <div class="loading-bar">
+        <progress id="loading-progress" value="0" max="100" aria-label="Town preparation"></progress>
+        <div class="loading-meta"><span><span id="loading-status" role="status">Preparing your visit…</span><small>Preparing the town, its galleries and walking paths.</small></span><span id="loading-count">0%</span></div>
       </div>
     </section>
     <noscript>Enable JavaScript to explore Livistone.</noscript>
