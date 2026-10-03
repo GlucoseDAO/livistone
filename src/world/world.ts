@@ -371,13 +371,15 @@ export class Town {
       addGlow(this.root, new THREE.Vector3(x, 2.8, z), '#ffcf79', 4.5, 36, 10, .7);
     }
   }
-  update(time: number, camera?: THREE.Camera, fogFar = 220, mapView = false): void {
+  /** Returns whether a shadow caster changed detail or visibility this frame. */
+  update(time: number, camera?: THREE.Camera, fogFar = 220, mapView = false): boolean {
     this.water.userData.time.value = time;
-    if (!camera) return;
+    if (!camera) return false;
     const profile = graphicsProfile(this.tier);
-    this.forest.update(camera, mapView ? fogFar : Math.min(fogFar, profile.forest), mapView);
-    updatePlanting(this.plantBatches, camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
+    const trees = this.forest.update(camera, mapView ? fogFar : Math.min(fogFar, profile.forest), mapView);
+    const plants = updatePlanting(this.plantBatches, camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
     if (this.tier === 'cpu') this.details.visible = false;
+    return trees || plants;
   }
   setMapMode(active: boolean): void { this.interiors.visible = !active; this.details.visible = !active; }
 }

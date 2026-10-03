@@ -22,14 +22,24 @@ import { graphicsProfile, probeGraphics } from './game/graphics';
 import { parseTimeOfDay, readTimeOfDay, resolveNight, saveTimeOfDay } from './game/daylight';
 import type { TimeOfDay } from './game/daylight';
 import { NightLighting } from './world/night-lighting';
+import { shadowFrame } from './game/shadow-frame';
+import { installShadowFade, shadowFade } from './world/shadow-fade';
 import type { Physics } from './game/physics';
 
-const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 }, SUN_DISTANCE = 180;
+const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 };
 // Dev-only ?look=a keeps the old hemisphere-heavy fill (sun and haze coherence only). b, the default, lets the baked sky
 // carry more of the ambient light and gives heroEnv materials their own reflection strength.
 const LOOK = import.meta.env.DEV && new URLSearchParams(location.search).get('light') === 'a' ? 'a' : 'b';
 const FILL: Record<'a' | 'b', Record<SkyPhase, { environment: number; hemi: number }>> = {
   a: { day: { environment: .5, hemi: 1.2 }, night: { environment: .2, hemi: .28 } }, b: { day: { environment: .9, hemi: .55 }, night: { environment: .3, hemi: .22 } } };
+// The map shadow box stays on the town centre; walking boxes follow the player.
+const SHADOW_TARGET = new THREE.Vector3(0, 0, -60);
+// Far enough along the light that the ±160 m map box keeps every caster and receiver between near and far for suns above ~20°.
+const SUN_DISTANCE = 400;
+// Walking boxes trade reach for ~5 cm (2048) and ~8 cm (1024) texels, led ahead of the view so the edge falls into the fog; the map keeps the whole town.
+// The depth bias is a fixed few centimetres in world units; the normal offset follows texel size.
+// Shadows fade out between 72% and 90% of the walking half-size: with the lead and the quarter-box re-bake drift, that band stays inside the box across the whole view.
+const SHADOW = { walk: 50, walkReduced: 40, map: 160, lead: .3, fade: [.72, .9], bias: .05, normalBias: .6 };
 
 class Game {
   private readonly renderer: THREE.WebGLRenderer;
@@ -46,7 +56,11 @@ class Game {
   private readonly input: Input;
   private readonly ambience = new Ambience();
   private readonly sun: THREE.DirectionalLight;
+  /** Unit vector from the shadow target toward the sun or moon; the light always sits SUN_DISTANCE along it. */
   private readonly sunDirection = new THREE.Vector3();
+  private readonly shadowAim = new THREE.Vector3();
+  private readonly shadowCenter = new THREE.Vector3(Infinity, 0, 0);
+  private shadowHalf = 0;
   private readonly progress = readProgress();
   private readonly raycaster = new THREE.Raycaster();
   private readonly direction = new THREE.Vector3();
@@ -102,12 +116,8 @@ class Game {
     this.hemi = new THREE.HemisphereLight(this.night ? '#8ea4c6' : '#e9f4f0', this.night ? '#121820' : '#73805c', this.fill.hemi);
     this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(this.night ? '#c9d6ee' : '#fff0ce', this.night ? .32 : 2.4); this.sun.castShadow = true;
-    this.sun.shadow.mapSize.setScalar(this.reduced ? 1024 : 2048);
-    const shadow = this.reduced ? 90 : 160;
-    this.sun.shadow.camera.left = -shadow; this.sun.shadow.camera.right = shadow; this.sun.shadow.camera.top = shadow; this.sun.shadow.camera.bottom = shadow;
-    this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = 360; this.sun.shadow.normalBias = 0.035; this.sun.shadow.bias = -0.00015;
-    this.sunDirection.copy(this.night ? MOON_DIR : SUN_DIR); this.sun.target.position.set(0, 0, -60);
-    this.sun.position.copy(this.sun.target.position).addScaledVector(this.sunDirection, SUN_DISTANCE); this.scene.add(this.sun, this.sun.target);
+    this.sun.shadow.mapSize.setScalar(this.reduced ? 1024 : 2048); this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = SUN_DISTANCE * 2;
+    this.scene.add(this.sun, this.sun.target); installShadowFade(); this.aimSun();
     const sky = createSky(this.renderer, this.reduced, this.night, this.graphics.tier, LOOK === 'b'); this.skies.set(this.night, sky); this.skyBackground = sky.background; this.scene.background = sky.background; this.scene.environment = this.graphics.tier === 'cpu' ? null : sky.environment;
     this.scene.environmentIntensity = this.fill.environment;
     // The town and sun are static; refresh shadows only when scene visibility changes.
@@ -160,7 +170,7 @@ class Game {
     document.querySelector<HTMLElement>('#graphics-profile')!.textContent = 'Device profile: ' + ({ gpu: 'GPU', mobile: 'Mobile / integrated GPU', cpu: 'CPU software renderer' }[this.graphics.tier]);
     await loadingStage(92, 'Preparing your first view…');
     this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true);
-    this.renderer.shadowMap.needsUpdate = true;
+    this.frameShadow(true);
     this.walkCamera.position.set(SPAWN.x, SPAWN.y + .78, SPAWN.z); this.walkCamera.rotation.set(0, SPAWN.yaw, 0, 'YXZ');
     await this.renderer.compileAsync(this.scene, this.walkCamera);
     await loadingStage(100, 'Welcome to Livistone');
@@ -194,7 +204,7 @@ class Game {
     this.orbit.enabled = mode === 'map';
     const haze = HORIZON_HAZE[this.phase], fog = this.mapView ? MAP_FOG : WALK_FOG;
     this.scene.background = this.mapView ? haze.clone() : this.skyBackground; this.scene.fog = new THREE.Fog(haze, fog.near, fog.far);
-    this.ui.setMode(mode, this.mapView); this.town.setMapMode(this.mapView); this.renderer.shadowMap.needsUpdate = true; this.resize();
+    this.ui.setMode(mode, this.mapView); this.town.setMapMode(this.mapView); this.frameShadow(true); this.resize();
     this.cursorDirty = true;
     if (mode === 'walking') this.ui.canvas.focus({ preventScroll: true });
   }
@@ -322,7 +332,7 @@ class Game {
     this.renderer.toneMappingExposure = SKY_EXPOSURE[this.phase];
     this.hemi.color.set(night ? '#8ea4c6' : '#e9f4f0'); this.hemi.groundColor.set(night ? '#121820' : '#73805c'); this.hemi.intensity = this.fill.hemi;
     this.sun.color.set(night ? '#c9d6ee' : '#fff0ce'); this.sun.intensity = night ? .32 : 2.4;
-    this.sunDirection.copy(night ? MOON_DIR : SUN_DIR); this.sun.position.copy(this.sun.target.position).addScaledVector(this.sunDirection, SUN_DISTANCE);
+    this.aimSun();
     const haze = HORIZON_HAZE[this.phase], fog = this.mapView ? MAP_FOG : WALK_FOG;
     this.scene.background = this.mapView ? haze.clone() : this.skyBackground; this.scene.fog = new THREE.Fog(haze, fog.near, fog.far);
     this.nightLighting.setNight(night); this.renderer.shadowMap.needsUpdate = true;
@@ -339,9 +349,25 @@ class Game {
       }
     });
   }
+  private aimSun(): void { this.sunDirection.copy(this.night ? MOON_DIR : SUN_DIR); this.frameShadow(true); }
+  /** Fit the sun's shadow box to the view and re-bake only when forced or after the box centre drifts a quarter box, so standing still costs no shadow pass. */
+  private frameShadow(force = false): void {
+    const camera = this.sun.shadow.camera, size = this.sun.shadow.mapSize.x;
+    const walking = !this.mapView && !!this.physics, half = walking ? (size >= 2048 ? SHADOW.walk : SHADOW.walkReduced) : SHADOW.map;
+    if (walking) { const p = this.physics!.position(), lead = half * SHADOW.lead; this.shadowAim.set(p.x - Math.sin(this.input.yaw) * lead, p.y, p.z - Math.cos(this.input.yaw) * lead); }
+    else this.shadowAim.copy(SHADOW_TARGET);
+    if (!force && half === this.shadowHalf && this.shadowAim.distanceTo(this.shadowCenter) < half / 4) return;
+    this.shadowCenter.copy(this.shadowAim); this.shadowHalf = half;
+    const frame = shadowFrame(this.shadowAim, half, size, this.sunDirection);
+    camera.left = frame.left; camera.right = frame.right; camera.top = frame.top; camera.bottom = frame.bottom; camera.updateProjectionMatrix();
+    this.sun.target.position.set(frame.target.x, frame.target.y, frame.target.z); this.sun.position.copy(this.sun.target.position).addScaledVector(this.sunDirection, SUN_DISTANCE);
+    this.sun.shadow.normalBias = frame.texel * SHADOW.normalBias; this.sun.shadow.bias = -SHADOW.bias / (camera.far - camera.near);
+    shadowFade.x = walking ? half * SHADOW.fade[0] : 0; shadowFade.y = walking ? half * SHADOW.fade[1] : 0;
+    this.renderer.shadowMap.needsUpdate = true;
+  }
   private quality(low: boolean): void {
     this.lowQuality = low || this.graphics.tier === 'cpu'; this.renderScale = Math.min(low ? 1 : 1.5, this.graphics.pixelRatio); this.renderer.setPixelRatio(this.pixelRatio());
-    this.sun.shadow.mapSize.setScalar(low ? 1024 : 2048); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; this.renderer.shadowMap.needsUpdate = true;
+    this.sun.shadow.mapSize.setScalar(low ? 1024 : 2048); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; this.frameShadow(true);
     this.scene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
@@ -434,9 +460,11 @@ class Game {
     if (this.graphics.tier !== 'cpu') this.town.gardens.update(this.elapsed, this.mode === 'walking' && !this.capture ? dt : 0, matchMedia('(prefers-reduced-motion: reduce)').matches);
     if (this.mode === 'map') { this.orbit.update(); this.updateMarkers(); }
     const camera = this.mapView ? this.mapCamera : this.walkCamera;
-    this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : WALK_FOG.far, this.mapView);
+    // Walking re-bakes when near shrubs or tree detail change, so their shadows appear with them; the map keeps its one bake.
+    if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : WALK_FOG.far, this.mapView) && !this.mapView && this.graphics.shadows) this.renderer.shadowMap.needsUpdate = true;
     this.updateExhibitionControls();
     this.clockCheck += rawDt; if (this.clockCheck > 30) { this.clockCheck = 0; if (this.timeOfDay === 'auto') this.applyTimeOfDay(); }
+    if (this.graphics.shadows) this.frameShadow();
     this.nightLighting.update(camera); this.renderer.render(this.scene, camera);
     if (this.cursorDirty) { this.cursorDirty = false; this.updateCursor(); }
     this.frames++; this.fpsFrames++; this.fpsTime += rawDt;

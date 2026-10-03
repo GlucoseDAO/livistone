@@ -60,7 +60,7 @@ export class Forest extends THREE.Group {
             color.setHSL(.19 + grove * .055, source.name === 'foliage' ? .18 + grove * .12 : .04, .67 + grove * .13 + (index % 3) * .025);
             batch.setColorAt(i, color);
           });
-          batch.castShadow = source.name !== 'foliage'; batch.receiveShadow = true; batch.computeBoundingSphere(); batch.name = source.name; this.add(batch);
+          batch.castShadow = true; batch.receiveShadow = true; batch.computeBoundingSphere(); batch.name = source.name; this.add(batch);
           if (reduced) {
             batch.userData.fullGeo = mobile ? reduced : geo; batch.userData.reducedGeo = reduced;
             cell.foliage.push(batch);
@@ -69,8 +69,9 @@ export class Forest extends THREE.Group {
       }
     }
   }
-  update(camera: THREE.Camera, fogFar: number, mapView: boolean): void {
-    const origin = camera.position;
+  /** Returns whether near foliage switched detail; the far hide/show happens beyond any walking shadow box and is not reported. */
+  update(camera: THREE.Camera, fogFar: number, mapView: boolean): boolean {
+    const origin = camera.position; let casters = false;
     for (const cell of this.cells) {
       const lod = forestLod(origin.distanceTo(cell.center), fogFar);
       const show = lod !== 'hidden', useFull = !mapView && lod === 'full';
@@ -78,8 +79,9 @@ export class Forest extends THREE.Group {
       for (const mesh of cell.foliage) {
         mesh.visible = show && !mapView;
         const full = mesh.userData.fullGeo as THREE.BufferGeometry, reduced = mesh.userData.reducedGeo as THREE.BufferGeometry;
-        mesh.geometry = useFull ? full : reduced;
+        if (mesh.geometry !== (useFull ? full : reduced)) { mesh.geometry = useFull ? full : reduced; casters = true; }
       }
     }
+    return casters;
   }
 }

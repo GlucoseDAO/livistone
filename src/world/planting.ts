@@ -150,10 +150,13 @@ export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: 
   return result;
 }
 
-export function updatePlanting(batches: THREE.InstancedMesh[], camera: THREE.Camera, range: number): void {
-  const origin = camera.position, range2 = range * range;
+/** Returns whether a shadow-casting batch appeared or disappeared, so a cached shadow map can follow. */
+export function updatePlanting(batches: THREE.InstancedMesh[], camera: THREE.Camera, range: number): boolean {
+  const origin = camera.position, range2 = range * range; let casters = false;
   for (const batch of batches) {
-    const dx = origin.x - batch.userData.lodX, dz = origin.z - batch.userData.lodZ;
-    batch.visible = dx * dx + dz * dz < range2;
+    const dx = origin.x - batch.userData.lodX, dz = origin.z - batch.userData.lodZ, visible = dx * dx + dz * dz < range2;
+    if (batch.castShadow && batch.visible !== visible) casters = true;
+    batch.visible = visible;
   }
+  return casters;
 }
