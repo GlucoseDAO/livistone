@@ -79,9 +79,10 @@ describe('mountain waterfall', () => {
     const geometry = waterfallGeometry(spec, tier), position = geometry.getAttribute('position'), fall = geometry.getAttribute('fall'), water = geometry.getAttribute('water');
     for (const name of ['position', 'normal', 'fall', 'water']) { expect(geometry.getAttribute(name).count).toBe(position.count); expect(finite(geometry.getAttribute(name))).toBe(true); }
     expect(!!geometry.getAttribute('color')).toBe(tier === 'cpu');
-    let top = -Infinity, bottom = Infinity, sheet = 0, pool = 0, topWidth = 0, footWidth = 0;
+    let top = -Infinity, bottom = Infinity, sheet = 0, pool = 0, wet = 0, topWidth = 0, footWidth = 0;
     for (let i = 0; i < position.count; i++) {
       const x = position.getX(i), y = position.getY(i), z = position.getZ(i);
+      if (water.getX(i) > 1.5) { wet++; continue; }
       if (water.getX(i) > .5) { pool++; expect(water.getY(i)).toBeGreaterThanOrEqual(0); continue; }
       sheet++; top = Math.max(top, y); bottom = Math.min(bottom, y);
       // Above the pool the sheet keeps clear of the rock; below it, it sinks into water or ground on purpose.
@@ -90,7 +91,7 @@ describe('mountain waterfall', () => {
       if (Math.abs(y - 24.1) < 1e-3) topWidth = Math.max(topWidth, Math.abs(fall.getX(i)) / Math.max(fall.getW(i), 1e-6));
       if (Math.abs(y - spec.foot[1]) < 1e-3) footWidth = Math.max(footWidth, Math.abs(fall.getX(i)) / Math.max(fall.getW(i), 1e-6));
     }
-    expect(sheet).toBeGreaterThan(100); expect(pool).toBeGreaterThan(50);
+    expect(sheet).toBeGreaterThan(100); expect(pool).toBeGreaterThan(50); expect(wet > 0).toBe(tier !== 'cpu');
     expect(top).toBeCloseTo(24.1, 3); expect(bottom).toBeLessThan(spec.foot[1] - 1);
     // Half-widths: the lip's, and the foot's at the default spread of 2.2 plus the splash where it lands.
     expect(topWidth).toBeCloseTo(1, 2); expect(footWidth).toBeGreaterThan(2.2); expect(footWidth).toBeLessThan(2.2 * 1.25);
@@ -113,7 +114,7 @@ describe('mountain waterfall', () => {
       const geometry = waterfallGeometry({ ...spec, ledge: undefined, foot: [0, level, 3], pool: 3, ground }, 'gpu'), position = geometry.getAttribute('position'), water = geometry.getAttribute('water');
       let flat = 0, film = 0;
       for (let i = 0; i < position.count; i++) {
-        if (water.getX(i) < .5) continue;
+        if (Math.round(water.getX(i)) !== 1) continue;
         const y = position.getY(i), g = ground(position.getX(i), position.getZ(i));
         if (Math.abs(y - level) < 1e-4 && g < level - .05) flat++; else if (Math.abs(y - g - .03) < 1e-4) film++;
         // Never more than a film over ground above the level, nor a sheet floating over ground that falls away.
@@ -165,8 +166,13 @@ describe('the gorge water, placed from the layout', () => {
       }
       expect(lowest).toBeLessThan(.5);
       for (let i = 0; i < position.count; i++) if (water.getX(i) < .5) expect(Math.hypot(position.getX(i) - GORGE_FALL.foot[0], position.getZ(i) - GORGE_FALL.foot[2])).toBeLessThan(8);
-      // Its pool keeps off the trail's bare earth.
-      for (let i = 0; i < position.count; i++) if (water.getX(i) > .5 && water.getY(i) > 0) expect(trailDistance(position.getX(i), position.getZ(i))).toBeGreaterThan(TRAIL_HALF);
+      // Its pool keeps off the trail's bare earth; the wet rock lies just in front of the rock, never inside it.
+      const fall = geometry.getAttribute('fall');
+      for (let i = 0; i < position.count; i++) {
+        const kind = Math.round(water.getX(i)), x = position.getX(i), y = position.getY(i), z = position.getZ(i);
+        if (kind === 1 && water.getY(i) > 0) expect(trailDistance(x, z)).toBeGreaterThan(TRAIL_HALF);
+        if (kind === 2 && fall.getW(i) <= 1) { expect(terrainSurfaceHeight(x, z)).toBeLessThan(y); expect(terrainSurfaceHeight(x, z)).toBeGreaterThan(y - 1.2); }
+      }
     }
   });
   it('runs the gorge stream out of the cave and down GORGE_STREAM, and the brook down PLATEAU_STREAM to the lip', () => {

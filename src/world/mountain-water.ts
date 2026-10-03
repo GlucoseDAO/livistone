@@ -8,7 +8,7 @@
 // emits, so none of it glows at night.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { Fn, abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, cross, dot, exp, faceDirection, float, fract, length, max, mix, mx_noise_float, mx_worley_noise_float, normalWorldGeometry, normalize, positionWorld, pow, property, select, sin, smoothstep, texture, uv, vec2, vec3, vec4 } from 'three/tsl';
+import { Fn, abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, cross, dot, exp, faceDirection, float, fract, length, max, mix, mx_noise_float, mx_worley_noise_float, normalWorldGeometry, normalize, positionWorld, pow, property, select, sin, smoothstep, step, texture, uv, vec2, vec3, vec4 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
 import { waterMaterial } from './water-material';
@@ -97,9 +97,9 @@ const SINK = 1.4;
 /** A pool stands level over ground up to this far below its surface without a hollow to hold it, metres. */
 const SHALLOW = .3;
 const DETAIL = {
-  gpu: { rows: 2.4, columns: 14, rings: 9, rays: 30, cards: 18, foam: 256 },
-  mobile: { rows: 1.5, columns: 9, rings: 6, rays: 20, cards: 9, foam: 128 },
-  cpu: { rows: 1, columns: 6, rings: 4, rays: 14, cards: 0, foam: 64 },
+  gpu: { rows: 2.4, columns: 14, film: 10, rings: 9, rays: 30, cards: 18, foam: 256 },
+  mobile: { rows: 1.5, columns: 9, film: 6, rings: 6, rays: 20, cards: 9, foam: 128 },
+  cpu: { rows: 1, columns: 6, film: 0, rings: 4, rays: 14, cards: 0, foam: 64 },
 } as const;
 
 interface Fall { lip: THREE.Vector3; foot: THREE.Vector3; ledge: THREE.Vector3 | null; out: THREE.Vector3; side: THREE.Vector3; width: number; spread: number; pool: number; height: number; ground?: Ground }
@@ -162,11 +162,12 @@ function fallRows(f: Fall, perMetre: number): Row[] {
 }
 
 /**
- * The sheet and its plunge pool as one geometry, so they share one draw. Attributes for the shader:
+ * The sheet, the wet rock behind it and its plunge pool as one geometry, so they share one draw. Attributes for the shader:
  *  - `fall` (vec4): sheet: metres across, launch delay `tau` (s), aeration 0–1, |across| over the water's half-width (past 1 only
- *    strands); pool: unused, metres from the impact, its froth 0–1, distance over the pool's ragged rim;
- *  - `water` (vec4): sheet: 0, the drop's share of the whole fall, splash 0–1 where it lands on a ledge or the pool; pool: 1,
- *    water depth (m), outward unit direction in x, z.
+ *    strands); wet rock: metres across, the trickle's delay, 0, |across| over the film's half-width; pool: unused, metres from
+ *    the impact, its froth 0–1, distance over the pool's ragged rim;
+ *  - `water` (vec4): sheet: 0, the drop's share of the whole fall, splash 0–1 where it lands on a ledge or the pool; wet rock: 2,
+ *    the drop's share; pool: 1, water depth (m), outward unit direction in x, z.
  * The cpu tier gets the core of the sheet only, with ragged edges, and baked colours.
  */
 export function waterfallGeometry(spec: WaterfallSpec, tier: GraphicsTier): THREE.BufferGeometry {
@@ -210,6 +211,28 @@ export function waterfallGeometry(spec: WaterfallSpec, tier: GraphicsTier): THRE
       }
     }
   });
+  // Behind the sheet the rock runs wet, as in the owner's photograph: a dark film on the rock face itself (found at each row's
+  // height along -out), wider than the water where the spray reaches, with a thin film of water trickling down it. It draws first,
+  // under the sheet. Not on cpu, which has no transparency.
+  if (!cpu && f.ground) {
+    const g = f.ground, start = positions.length / 3, film = detail.film, high = rows.filter(row => row.centre.y > f.foot.y + .25);
+    const rock = (x: number, z: number, y: number): THREE.Vector3 | null => {
+      const height = (d: number): number => g(x + f.out.x * d, z + f.out.z * d); let front = 6, back = -4;
+      if (height(front) >= y || height(back) < y) return null;
+      for (let k = 0; k < 10; k++) { const mid = (front + back) / 2; if (height(mid) >= y) back = mid; else front = mid; }
+      const px = x + f.out.x * front, pz = z + f.out.z * front, normal = new THREE.Vector3(-(g(px + .2, pz) - g(px - .2, pz)) / .4, 1, -(g(px, pz + .2) - g(px, pz - .2)) / .4).normalize();
+      return new THREE.Vector3(px, y, pz).addScaledVector(normal, .06);
+    };
+    high.forEach((row, i) => {
+      const share = Math.min(row.drop / f.height, 1), spread = 2.1 * (1 + .35 * share);
+      for (let c = 0; c <= film; c++) {
+        const e = (c / film * 2 - 1) * spread, across = e * row.width / 2, p = row.centre.clone().addScaledVector(f.side, across), wet = rock(p.x, p.z, p.y);
+        // No rock behind (past the lip's ends): the vertex stays on the sheet's line, outside the film's fade.
+        positions.push(...(wet ?? p).toArray()); falls.push(across, row.drop / 1.4, 0, wet ? Math.abs(e) / spread : 9); waters.push(2, share, 0, 0);
+        if (i < high.length - 1 && c < film) { const a = start + i * (film + 1) + c, b = a + film + 1; indices.push(a, b, a + 1, a + 1, b, b + 1); }
+      }
+    });
+  }
   // Bottom row first: where the lower tier leaves a ledge in front of the upper one's foot, that frothy foot draws over the join.
   for (let i = rows.length - 2; i >= 0; i--) for (let j = 0; j < columns; j++) { const a = i * (columns + 1) + j, b = a + columns + 1; indices.push(a, b, a + 1, a + 1, b, b + 1); }
   if (f.pool > 0) {
@@ -255,7 +278,7 @@ export function waterfallGeometry(spec: WaterfallSpec, tier: GraphicsTier): THRE
 }
 
 /** Glassy water at the lip, foam once it has fallen, and the pool's body over its stones; linear colours, lit by the scene. */
-const GLASS = vec3(.032, .06, .058), FOAM = vec3(.72, .76, .76), GREY = vec3(.42, .47, .49), POOL = vec3(.035, .07, .066);
+const GLASS = vec3(.032, .06, .058), FOAM = vec3(.72, .76, .76), GREY = vec3(.42, .47, .49), POOL = vec3(.035, .07, .066), WET_ROCK = vec3(.018, .02, .021);
 /**
  * The sheet and pool's shader (gpu, mobile). Sheet: two foam samples in launch time (one on mobile), streaks and lumps whose share
  * of the surface thins toward the edges into separate strands and, lower down, opens gaps; dark translucent glassy water near
@@ -273,7 +296,9 @@ function waterfallMaterial(tier: GraphicsTier): THREE.Material {
   const shade = { alpha: property('float', 'fallAlpha'), roughness: property('float', 'fallRoughness'), normal: property('vec3', 'fallNormal') };
   material.colorNode = Fn(() => {
     // normalWorldGeometry, not normalWorld, which would read this very normal back through normalNode.
-    const pool = water.x.toVar(), geometric = normalWorldGeometry.mul(faceDirection).toVar(), view = normalize(cameraPosition.sub(positionWorld)).toVar();
+    // Kinds by `water.x`: 0 the falling sheet, 1 the pool, 2 the wet rock behind the sheet.
+    const pool = step(.5, water.x).mul(step(water.x, 1.5)).toVar(), wetRock = step(1.5, water.x).toVar();
+    const geometric = normalWorldGeometry.mul(faceDirection).toVar(), view = normalize(cameraPosition.sub(positionWorld)).toVar();
     const launch = fract(windTime.mul(RATE)).sub(fall.y.mul(RATE)).toVar(), across = fall.x.div(STREAK).toVar();
     const phase = windTime.mul(.42).toVar(), a = fract(phase), b = fract(phase.add(.5)), blend = abs(float(1).sub(a.mul(2)));
     const outward = water.zw, bed = positionWorld.xz.mul(.32);
@@ -304,10 +329,14 @@ function waterfallMaterial(tier: GraphicsTier): THREE.Material {
     white.assign(max(white, veil.mul(2.4).clamp(0, 1).mul(float(1).sub(cover))));
     // Seen obliquely a sheet of foam is a longer path through it, so it thickens toward edge-on instead of thinning to glass.
     const sheet = max(cover.mul(mix(.36, .95, white)), veil), oblique = float(1).div(max(abs(dot(geometric, view)), .3));
-    shade.alpha.assign(mix(float(1).sub(pow(float(1).sub(sheet), oblique)), pooled, pool));
-    shade.roughness.assign(mix(mix(.1, .82, white), mix(.05, .8, froth), pool));
-    shade.normal.assign(normalize(mix(fluted, level, pool)));
-    return mix(mix(GLASS, mix(GREY, FOAM, fine), white), mix(POOL, FOAM, froth), pool);
+    // The wet rock: dark and glossy, patchy where the trickle runs thin, fading at its sides and top and toward its foot.
+    const film = float(.82).mul(float(1).sub(smoothstep(.7, 1, fall.w.add(lumps.sub(.5).mul(.4))))).mul(lumps.mul(.25).add(.75))
+      .mul(smoothstep(0, .03, water.y)).mul(float(1).sub(smoothstep(.9, 1, water.y)));
+    shade.alpha.assign(mix(mix(float(1).sub(pow(float(1).sub(sheet), oblique)), pooled, pool), film, wetRock));
+    // Rough enough that the sun's sheen, which from below the fall reflects almost straight at the eye, never outshines the dark.
+    shade.roughness.assign(mix(mix(mix(.1, .82, white), mix(.05, .8, froth), pool), mix(.75, .62, streaks), wetRock));
+    shade.normal.assign(normalize(mix(mix(fluted, level, pool), geometric, wetRock)));
+    return mix(mix(mix(GLASS, mix(GREY, FOAM, fine), white), mix(POOL, FOAM, froth), pool), WET_ROCK, wetRock);
   })();
   material.opacityNode = shade.alpha as unknown as F; material.roughnessNode = shade.roughness as unknown as F;
   material.normalNode = normalize(cameraViewMatrix.mul(vec4(shade.normal, 0)).xyz);
