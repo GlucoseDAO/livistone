@@ -458,6 +458,38 @@ export function mountainPlace(x: number, z: number): string | null {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// Where the crag blocks stand (crags.ts): the rock zones, and the walkable ground they keep off
+
+/** The gorge's walls from the floor's edge to 14 m beyond it: the canyon's (`gully` false) or the snow gully's (true). */
+export function gorgeWallZone(x: number, z: number, gully: boolean): boolean {
+  const g = gorgeCoords(x, z); if (!g || g.d < gorgeHalf(g.s) || g.d > gorgeHalf(g.s) + 14) return false;
+  return gully ? g.s >= STAGE.snout - 3 && g.s <= STAGE.head + 3 : g.s > GORGE_FROM && g.s < STAGE.snout - 3;
+}
+/** The two buttresses at the gorge's mouth, out to 1.3 times their radius. */
+export function buttressZone(x: number, z: number): boolean { return BUTTRESSES.some(b => Math.hypot(x - b.x, z - b.z) < b.radius * 1.3); }
+/** The crest's crags above the plateau. */
+export function crestZone(x: number, z: number): boolean { return z < -276 && x > -62 && x < 16; }
+/** Any of the rock zones. */
+export function rockZone(x: number, z: number): boolean { return crestZone(x, z) || buttressZone(x, z) || gorgeWallZone(x, z, false) || gorgeWallZone(x, z, true); }
+/** How close the narrow passage brings its rock, 0–1: whole within 3 trail metres of it, gone by 7. */
+export function passageClosing(s: number): number { return 1 - smooth(Math.abs(s - STAGE.passage), 3, 7); }
+/** The trail samples along which the passage's steel cable is leaded into the rock (mountain-trail.ts), on the gorge's side -1. */
+export const PASSAGE_CABLE = { from: STAGE.passage - 5, to: STAGE.passage + 7, side: -1, offset: (s: number): number => gorgeHalf(s) - .2 } as const;
+/**
+ * Whether a crag block's point on the ground may stand at (x, z): the gorge's walkable floor stays open to 0.3 m inside its edge;
+ * at the narrow passage rock closes the floor in to TRAIL_HALF + 0.9 m of the trail, as in the gorge photograph, but not over the
+ * cable; a small `boulder` lying on the floor keeps TRAIL_HALF + 1 m.
+ */
+export function cragFloorClear(x: number, z: number, boulder: boolean): boolean {
+  const g = gorgeCoords(x, z); if (!g || g.s < GORGE_FROM || g.s > GORGE_TO) return true;
+  let limit = lerp(gorgeHalf(g.s) - .3, TRAIL_HALF + .9, passageClosing(g.s));
+  if (g.side === PASSAGE_CABLE.side && g.s >= PASSAGE_CABLE.from - 1 && g.s <= PASSAGE_CABLE.to + 1) limit = Math.max(limit, PASSAGE_CABLE.offset(g.s) + .05);
+  return g.d >= (boulder ? Math.min(limit, TRAIL_HALF + 1) : limit);
+}
+/** Ground no crag block stands on: the old snow and the plateau's meadow. */
+export function cragKeepsOff(x: number, z: number): boolean { return snowCover(x, z) > .2 || plateauInside(x, z) > 0; }
+
+// ---------------------------------------------------------------------------------------------------------------------
 // The meadow's plants (alpine-plants.ts) and its turf
 
 /** How strongly the alpine meadow claims a point, 0–1: the plateau, kept free of trees. */

@@ -1,10 +1,13 @@
-// Sub-plan 27 round 2: limestone crags on the mountain. Blocks are found from the terrain itself, wherever the ground inside a
-// region is steep (bedded steps and rounded masses) or lies at the foot of such ground (talus), so they follow whatever the
-// layout shapes. Each block is a stack of slabs between bedding planes (limestone.ts shades them like the ground's rock), turned
-// to face down the fall line, tilted by the beds' regional dip and lowered until its whole base lies under every ground mesh
-// that can stand there: never floating, and walking-safe, since one trimesh of every block on the walking terrain is its
-// collider on every tier. Blocks keep clear of the trail, the plateau's meadow, the snow, trees and the trail's boulders.
-// All of them draw as one mesh in one material; DOM-free apart from the material's texture maps.
+// Sub-plan 27 round 2: limestone crags on the mountain. The terrain's two-metre grid can only draw walls leaned back to about 60°
+// (steeper ones alias into fins), so sheer rock comes from blocks: a row of them lines both walls of the gorge from its mouth up
+// the snow gully, closing the floor in at the narrow passage as in the owner's photograph; boulders lie on its floor; and in the
+// rock zones (mountain-layout.ts: the crest's crags above the plateau, the mouth's buttresses, the gorge's walls) and, more
+// thinly, on other steep ground, blocks are found from the terrain itself: bedded steps, ledges hung on near-vertical walls,
+// rounded conglomerate masses, and talus below the faces. Each block is a stack of slabs between bedding planes (limestone.ts
+// shades them like the ground's rock), turned to face down the fall line or into the gorge, tilted by the beds' regional dip and
+// lowered until its base lies under every ground mesh that can stand there: never floating, and walking-safe, since one trimesh
+// of every block on the walking terrain is its collider on every tier. All of them draw as one mesh in one material; DOM-free
+// apart from the material's texture maps.
 import * as THREE from 'three';
 import { Fn, attribute, cameraViewMatrix, cross, dFdx, dFdy, dot, length, max, normalLocal, normalize, positionLocal, property, select, vec3, vec4 } from 'three/tsl';
 import type { ColliderSpec } from '../game/physics';
@@ -13,7 +16,7 @@ import type { ContactSite } from './contact-shadows';
 import type { GroundDisc } from './grass-field';
 import { TERRAIN_GRID, terrainHeight } from './terrain';
 import { terrainAxes } from './mountains';
-import { TRAIL_HALF, plateauHeight, plateauMask, plateauRadius, snowCover, trailDistance, turfCover } from './mountain-layout';
+import { GORGE_STREAM, PASSAGE_CABLE, STAGE, TRAIL_HALF, WATERFALL, besideTrail, brookDistance, cragFloorClear, cragKeepsOff, gorgeHalf, passageClosing, rockZone, trailDistance } from './mountain-layout';
 import { limestoneBricks, limestoneColour, limestoneNormal, triplanarWeights } from './limestone';
 import type { Bricks, Limestone } from './limestone';
 export { CRAGS, cragsLook } from './limestone';
@@ -23,42 +26,71 @@ export type CragKind = 'bedded' | 'massive' | 'talus';
 export interface CragSite {
   /** The base outline's centre, at the height that seats the block (`y`). */
   x: number; y: number; z: number;
-  /** Object3D-style yaw: local +z faces down the fall line. */
+  /** Object3D-style yaw: local +z faces down the fall line, or into the gorge. */
   yaw: number;
   /** The beds' dip (or a talus block's tumble) after the yaw, as a quaternion. */
   tilt: readonly [number, number, number, number];
-  /** Along the contour (local x), into the slope (local z) and height, metres. */
+  /** Across the fall line (local x), into the slope (local z) and height, metres. */
   width: number; depth: number; height: number;
   kind: CragKind; seed: number;
   /** Ground slope under the block (degrees) and its horizontal reach from (x, z). */
   slope: number; reach: number;
   /** On a near-vertical wall only the block's back is seated: its front juts out of the wall as a ledge with a visible underside. */
   hung: boolean;
+  /** How far every point of its outline keeps from the trail's centreline, metres. */
+  trail: number;
   /** Stands on the walking terrain (TERRAIN_GRID), so it gets a collider on every tier. */
   collider: boolean;
   /** 0–1: the mobile tier draws the lower half of blocks without a collider, the cpu tier none of them. */
   rank: number;
 }
-/** The region searched for crags, with optional rock zones (0–1 density), extra clearance and the share of rounded masses. */
+/** The region searched for crags, with rock zones (0–1 density), the ground blocks keep off and the share of rounded masses. */
 export interface CragRegion {
   minX: number; maxX: number; minZ: number; maxZ: number;
   weight?: (x: number, z: number) => number;
-  /** False where no block may stand on the ground (checked at every point of its outline within 2.5 m of the ground). */
-  clear?: (x: number, z: number) => boolean;
+  /** False where a block may not stand on the ground (checked at every point of its outline from 1.5 m under the ground to 2.5 m over it). */
+  clear?: (x: number, z: number, site: CragSite) => boolean;
+  /** False where no part of a block may stand at any height (a waterfall's fall). */
+  open?: (x: number, z: number) => boolean;
   /** Chance (0–1) that a face block is a rounded conglomerate mass rather than bedded limestone. */
   massive?: (x: number, z: number) => number;
 }
-/** Steep ground north of z = −200 between x = −110 and 60, up to the north ridge's crest. */
-export const CRAG_REGION: CragRegion = { minX: -110, maxX: 60, minZ: -330, maxZ: -200 };
-/** How far a block's outline keeps from the trail's centreline: the tread and a metre beside it stay open. */
+/** Points within this distance of a polyline (in plan). */
+function nearLine(points: readonly { x: number; z: number }[], x: number, z: number, within: number): boolean {
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i], dx = b.x - a.x, dz = b.z - a.z, t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz || 1)));
+    if (Math.hypot(x - a.x - dx * t, z - a.z - dz * t) < within) return true;
+  }
+  return false;
+}
+/**
+ * The Jepii Mici's rock (mountain-layout.ts): every rock zone at full density and other steep ground of the north ridge at a third.
+ * Blocks keep off the gorge's walkable floor (but for its boulders and the passage's closing rock), the snow, the plateau's meadow,
+ * the gorge's stream and the plateau's brook, and leave the waterfall's fall open.
+ */
+export const CRAG_REGION: CragRegion = {
+  minX: -110, maxX: 60, minZ: -330, maxZ: -200,
+  weight: (x, z) => rockZone(x, z) ? 1 : .35,
+  clear: (x, z, site) => {
+    const dbg0 = (globalThis as { __cragClear?: (r: string, site: CragSite, x: number, z: number) => void }).__cragClear, dbg = dbg0 && ((r: string): void => dbg0(r, site, x, z));
+    if (cragKeepsOff(x, z)) { dbg?.('keepsOff'); return false; }
+    if (!cragFloorClear(x, z, site.kind === 'talus' && site.width < 2.2)) { dbg?.('floor'); return false; }
+    if (nearLine(GORGE_STREAM, x, z, .9)) { dbg?.('stream'); return false; }
+    if (brookDistance(x, z) <= 1.2) { dbg?.('brook'); return false; }
+    return true;
+  },
+  open: (x, z) => !nearLine([WATERFALL.lip, WATERFALL.foot], x, z, 1.6),
+  massive: () => .22,
+};
+/** How far a block's outline keeps from the trail's centreline away from the gorge: the tread and a metre beside it stay open. */
 export const CRAG_TRAIL_CLEARANCE = TRAIL_HALF + 1;
-/** Metres every point of a block's base lies under the lowest ground mesh at its spot. */
+/** Metres the full outline of every block's foot lies under the lowest ground mesh at its spot. */
 export const CRAG_BURY: Record<CragKind, number> = { bedded: .4, massive: .4, talus: .25 };
 /** Slope (degrees) from which ground counts as a crag face, and from which a step hangs as a ledge seated by its back. */
 const FACE_SLOPE = 47, HUNG_SLOPE = 66;
 const TAU = Math.PI * 2, DEG = Math.PI / 180;
 function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
-const smooth = THREE.MathUtils.smoothstep;
+const smooth = THREE.MathUtils.smoothstep, lerp = THREE.MathUtils.lerp;
 
 /** Seeded 3D value noise, 0–1, for the blocks' lumps. */
 function lattice(x: number, y: number, z: number, seed: number): number {
@@ -66,7 +98,7 @@ function lattice(x: number, y: number, z: number, seed: number): number {
   h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d); h = Math.imul(h ^ (h >>> 12), 0x297a2d39); return ((h ^ (h >>> 15)) >>> 0) / 4294967296;
 }
 function noise(x: number, y: number, z: number, seed: number): number {
-  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, s = (t: number): number => t * t * (3 - 2 * t), lerp = THREE.MathUtils.lerp;
+  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, s = (t: number): number => t * t * (3 - 2 * t);
   const c = (i: number, j: number, k: number): number => lattice(ix + i, iy + j, iz + k, seed), u = s(fx), v = s(fy), w = s(fz);
   return lerp(lerp(lerp(c(0, 0, 0), c(1, 0, 0), u), lerp(c(0, 1, 0), c(1, 1, 0), u), v), lerp(lerp(c(0, 0, 1), c(1, 0, 1), u), lerp(c(0, 1, 1), c(1, 1, 1), u), v), w);
 }
@@ -115,57 +147,61 @@ export class CragGround {
 /** One slab between two bedding planes: its outline corners (local x, z, ordered by angle), heights and rounded edge. */
 interface Slab { corners: [number, number][]; cx: number; cz: number; y0: number; y1: number; bevel: number }
 interface Shape { slabs: Slab[]; crisp: boolean; lump: number }
-/** The blocks' outline, slabs and lumps follow from the site alone, so every tier and the collider share them. */
-function cragShape(site: CragSite): Shape {
+/** The block's outline, slabs and lumps follow from the site alone, so every tier and the collider share them. */
+const shapes = new WeakMap<CragSite, Shape>();
+export function cragShape(site: CragSite): Shape {
+  let shape = shapes.get(site); if (shape) return shape;
   const rand = random(site.seed), { width: w, depth: d, height: h, kind } = site;
   const sides = kind === 'massive' ? 8 : kind === 'talus' ? 5 : 6, phase = rand();
   const base = Array.from({ length: sides }, (_, k) => {
-    const a = (k + phase + (rand() - .5) * .5) / sides * TAU, r = .84 + rand() * .18;
+    const a = (k + phase + (rand() - .5) * .5) / sides * TAU, r = .78 + rand() * .26;
     return [Math.cos(a) * w / 2 * r, Math.sin(a) * d / 2 * r] as [number, number];
   });
-  const count = kind === 'massive' ? 1 : kind === 'talus' ? (rand() < .35 ? 2 : 1) : Math.max(2, Math.min(5, Math.round(h / (1 + rand() * .6))));
-  const parts = Array.from({ length: count }, () => .7 + rand() * .6), total = parts.reduce((a, b) => a + b, 0);
+  const count = kind === 'massive' ? 1 : kind === 'talus' ? (rand() < .35 ? 2 : 1) : Math.max(2, Math.min(5, Math.round(h / (.8 + rand() * 1.1))));
+  const parts = Array.from({ length: count }, () => .5 + rand() * 1.1), total = parts.reduce((a, b) => a + b, 0);
   // Higher beds of a step recede a little into the slope or, now and then, jut out over the one below.
   const run = 1 / Math.tan(Math.max(site.slope, 20) * DEG), recede = kind === 'bedded' ? rand() * .35 : 0, slabs: Slab[] = [];
   let y = 0;
   parts.forEach((part, i) => {
-    const t = h * part / total, scale = (kind === 'bedded' ? 1 - .05 * i : 1) + (rand() - .5) * .12, overhang = kind === 'bedded' && i > 0 && rand() < .22 ? .15 * d : 0;
-    const dx = (rand() - .5) * .12 * w, dz = -recede * run * y + (rand() - .5) * .18 * d + overhang;
-    const corners = base.map(([cx, cz]) => { const r = .94 + rand() * .12; return [cx * scale * r + dx, cz * scale * r + dz] as [number, number]; });
-    const bevel = kind === 'massive' ? .32 * Math.min(w, d, h) : Math.min(.16, .22 * t, kind === 'talus' ? .2 * Math.min(w, d) : 1);
+    const t = h * part / total, scale = (kind === 'bedded' ? 1 - .04 * i : 1) + (rand() - .5) * .14, overhang = kind === 'bedded' && i > 0 && rand() < .25 ? (.08 + rand() * .12) * d : 0;
+    const dx = (rand() - .5) * .14 * w, dz = -recede * run * y + (rand() - .5) * .16 * d + overhang;
+    const corners = base.map(([cx, cz]) => { const r = .88 + rand() * .2; return [cx * scale * r + dx, cz * scale * r + dz] as [number, number]; });
+    const bevel = kind === 'massive' ? .32 * Math.min(w, d, h) : Math.min(.06 + rand() * .14, .22 * t, kind === 'talus' ? .2 * Math.min(w, d) : 1);
     slabs.push({ corners, cx: corners.reduce((s, c) => s + c[0], 0) / sides, cz: corners.reduce((s, c) => s + c[1], 0) / sides, y0: y, y1: y + t, bevel });
     y += t;
   });
-  return { slabs, crisp: kind !== 'massive', lump: kind === 'massive' ? .2 : kind === 'talus' ? .05 : .06 };
+  shape = { slabs, crisp: kind !== 'massive', lump: kind === 'massive' ? .2 : kind === 'talus' ? .05 : .07 };
+  shapes.set(site, shape); return shape;
 }
-/** The block's frame without its height: yaw, then tilt, at (x, 0, z). */
-function frame(site: CragSite, y = site.y): THREE.Matrix4 {
+/** The block's frame: yaw, then tilt, at (x, y, z). */
+export function frame(site: CragSite, y = site.y): THREE.Matrix4 {
   const q = new THREE.Quaternion(...site.tilt).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), site.yaw));
   return new THREE.Matrix4().compose(new THREE.Vector3(site.x, y, site.z), q, new THREE.Vector3(1, 1, 1));
 }
+/** Share of a hung block's depth, from its back, whose base is seated in the wall. */
+const HUNG_SEATED = .55;
 /**
- * Points along the lowest slab's base outline (corners and three between each), in the frame `matrix`: all of them, or for a
- * block hung on a wall the back ones (into the wall) up to `HUNG_SEATED` of its depth.
+ * Points along the lowest slab's full outline (corners and three between each) where its rounded foot reaches full width, in the
+ * frame `matrix`: all of them, or for a block hung on a wall the back ones (into the wall) up to `HUNG_SEATED` of its depth.
+ * Seating these under the ground buries the rounding below them, so even a rounded mass meets the ground as a wall, not a pebble.
  */
 function basePoints(shape: Shape, matrix: THREE.Matrix4, hung = false): THREE.Vector3[] {
   const slab = shape.slabs[0], points: THREE.Vector3[] = [], zs = slab.corners.map(c => c[1]), back = Math.min(...zs), cut = back + (Math.max(...zs) - back) * HUNG_SEATED;
   slab.corners.forEach((a, k) => {
     const b = slab.corners[(k + 1) % slab.corners.length];
     for (let s = 0; s < 4; s++) {
-      const u = s / 4, x = a[0] + (b[0] - a[0]) * u, z = a[1] + (b[1] - a[1]) * u, p = inset(slab, x, z, slab.bevel, slab.y0);
+      const u = s / 4, p = new THREE.Vector3(a[0] + (b[0] - a[0]) * u, slab.y0 + Math.min(slab.bevel, (slab.y1 - slab.y0) * .45), a[1] + (b[1] - a[1]) * u);
       if (!hung || p.z <= cut) points.push(p.applyMatrix4(matrix));
     }
   });
   return points;
 }
-/** Share of a hung block's depth, from its back, whose base is seated in the wall. */
-const HUNG_SEATED = .55;
 /** A point of a slab's outline pulled `by` metres toward its centre, at height y. */
 function inset(slab: Slab, x: number, z: number, by: number, y: number): THREE.Vector3 {
   const rx = x - slab.cx, rz = z - slab.cz, r = Math.hypot(rx, rz) || 1, k = Math.max(.05, 1 - by / r);
   return new THREE.Vector3(slab.cx + rx * k, y, slab.cz + rz * k);
 }
-/** Every slab's full outline at both of its faces, in world space: the block's extent in plan. */
+/** Every slab's full outline at both of its faces, in world space: the block's extent. */
 function outlinePoints(shape: Shape, matrix: THREE.Matrix4): THREE.Vector3[] {
   return shape.slabs.flatMap(slab => slab.corners.flatMap(([x, z]) => [new THREE.Vector3(x, slab.y0, z), new THREE.Vector3(x, slab.y1, z)]).map(p => p.applyMatrix4(matrix)));
 }
@@ -180,38 +216,106 @@ export function seatHeight(site: CragSite, ground: CragGround): number {
 
 /** Something a block keeps clear of: a trunk or a boulder. */
 export interface CragObstacle { x: number; z: number; radius: number }
-/**
- * Ground claimed by the plateau's meadow and the fence round it, the walkable alpine turf (its mask also spans steep ground the
- * shader leaves rock) and the couloir's snow: no point of a block on the ground stands on it. Steep ground may carry blocks inside
- * the plateau's rim where it rises as a wall behind the meadow (no fence there), but where the rim drops away only beyond the
- * fence line (its posts stand at 0.86 of the plateau's radius).
- */
-function defaultClear(ground: CragGround): (x: number, z: number) => boolean {
-  return (x, z) => {
-    if (snowCover(x, z) >= .35) return false;
-    if (plateauMask(x, z) < .02 && turfCover(x, z) < .01) return true;
-    if (ground.normal(x, z).slope < 50) return false;
-    const rim = plateauRadius(x, z);
-    return rim > .95 || (rim > .88 && ground.near(x, z) > plateauHeight(x, z) + 3);
-  };
+/** Most blocks a region holds: face blocks (steps, ledges and masses) and talus, besides the gorge's lining and floor boulders. */
+const CAPS = { face: 300, talus: 70 };
+const GRID = 8;
+/** Seats and keeps blocks that stand clear of the trail, the obstacles, the region's ground and the blocks already kept. */
+class Placer {
+  readonly sites: CragSite[] = [];
+  private readonly grid = new Map<number, CragSite[]>();
+  constructor(readonly ground: CragGround, readonly region: CragRegion, readonly obstacles: readonly CragObstacle[]) {}
+  private key(i: number, j: number): number { return (i + 512) * 1024 + j + 512; }
+  private nearby(x: number, z: number): CragSite[] {
+    const i = Math.floor(x / GRID), j = Math.floor(z / GRID), out: CragSite[] = [];
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) out.push(...this.grid.get(this.key(i + a, j + b)) ?? []);
+    return out;
+  }
+  /**
+   * Seats `site` and keeps it if: no trunk or boulder stands within its reach; every point of its outline keeps `site.trail` from
+   * the trail and stands where the region leaves open; every point near the ground's surface (a ledge high on a wall or a corner
+   * buried deep in it claims none) on ground the region allows; and no block already kept is nearer, in three dimensions, than
+   * `overlap` of their summed sizes (0: may touch).
+   */
+  place(site: CragSite, overlap: number): boolean {
+    const shape = cragShape(site), outline = outlinePoints(shape, frame(site, 0));
+    site.reach = Math.max(...outline.map(p => Math.hypot(p.x - site.x, p.z - site.z)));
+    const why = (reason: string): boolean => { (globalThis as { __cragReject?: (s: CragSite, r: string) => void }).__cragReject?.(site, reason); return false; };
+    if (this.obstacles.some(o => Math.hypot(o.x - site.x, o.z - site.z) < o.radius + site.reach)) return why('obstacle');
+    if (outline.some(p => trailDistance(p.x, p.z) < site.trail)) return why('trail');
+    if (outline.some(p => this.region.open && !this.region.open(p.x, p.z))) return why('open');
+    site.y = seatHeight(site, this.ground);
+    const clear = this.region.clear;
+    if (clear && outline.some(p => { const above = p.y + site.y - this.ground.near(p.x, p.z); return above > -1.5 && above < 2.5 && !clear(p.x, p.z, site); })) return why('clear');
+    // Apart in three dimensions: ledges hung one above another on a wall share their plan position.
+    const size = (s: CragSite): number => Math.hypot(s.reach, s.height / 2), centre = site.y + site.height / 2;
+    if (overlap > 0 && this.nearby(site.x, site.z).some(s => Math.hypot(s.x - site.x, s.y + s.height / 2 - centre, s.z - site.z) < (size(s) + size(site)) * overlap)) return false;
+    const end = { x: TERRAIN_GRID.minX + (TERRAIN_GRID.columns - 1) * TERRAIN_GRID.step, z: TERRAIN_GRID.minZ + (TERRAIN_GRID.rows - 1) * TERRAIN_GRID.step };
+    site.collider = outline.some(p => p.x > TERRAIN_GRID.minX && p.x < end.x && p.z > TERRAIN_GRID.minZ && p.z < end.z);
+    this.sites.push(site);
+    const cell = this.key(Math.floor(site.x / GRID), Math.floor(site.z / GRID)); (this.grid.get(cell) ?? this.grid.set(cell, []).get(cell)!).push(site);
+    return true;
+  }
 }
-/** Most blocks a region holds: face blocks (steps, ledges and masses) and talus. */
-const CAPS = { face: 380, talus: 90 };
+/** The beds' regional dip: about 7° toward the south-south-west everywhere, give or take 3°. */
+function bedDip(roll: number): THREE.Quaternion { return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(-.94, 0, .34).normalize(), (7 + (roll - .5) * 6) * DEG); }
+const site = (fields: Omit<CragSite, 'y' | 'reach' | 'collider'>): CragSite => ({ ...fields, y: 0, reach: 0, collider: false });
 
 /**
- * Seeded crag blocks inside `region`: on ground steeper than about 47° (more on steeper, south-facing faces) bedded steps, hung
- * ledges on near-vertical walls or, now and then, rounded masses; on gentler ground within ten metres below such a face, talus.
- * Candidates on a jittered 3 m grid (more in steep cells, which hold more face than their plan shows) are taken best first; face
- * blocks may overlap into continuous crags, talus stays apart. Every point of a block's outline keeps `CRAG_TRAIL_CLEARANCE` from
- * the trail and lies on clear ground; trunks and boulders (`obstacles`) keep their radius.
+ * The gorge's walls lined with sheer rock: from its mouth up the snow gully, a block every 2–4 m on each side, its face at the
+ * floor's edge (nearer the trail at the narrow passage, but behind its cable), as high as the wall behind it or a little higher,
+ * and deep enough to run back into it. Rounded conglomerate masses below the waterfall, bedded limestone above it and in the gully.
+ * Then boulders on the floor, thickest under the waterfall, clear of the trail, its stream and its pool.
  */
-export function cragSites(options: { region?: CragRegion; obstacles?: readonly CragObstacle[]; seed?: number; ground?: CragGround } = {}): CragSite[] {
-  const region = options.region ?? CRAG_REGION, ground = options.ground ?? new CragGround(), rand = random(options.seed ?? 6151), clear = region.clear ?? defaultClear(ground);
+function gorgeSites(placer: Placer, rand: () => number): void {
+  const ground = placer.ground;
+  for (const side of [1, -1]) {
+    for (let s = STAGE.mouth - 3; s < STAGE.head - 1;) {
+      const draws = Array.from({ length: 10 }, rand), width = 2.8 + draws[0] * 2.4;
+      const half = gorgeHalf(s), closing = passageClosing(s), out = (d: number): { x: number; z: number } => besideTrail(s, -side * d);
+      // besideTrail's offsets run to the right of the way up, gorgeCoords' sides to the left: hence -side.
+      let face = lerp(half - .3 + draws[1] * .35, TRAIL_HALF + .95 + draws[1] * .8, closing);
+      if (side === PASSAGE_CABLE.side && s >= PASSAGE_CABLE.from - 1 && s <= PASSAGE_CABLE.to + 1) face = Math.max(face, PASSAGE_CABLE.offset(s) + .06);
+      const foot = out(face + .3), floorY = ground.near(foot.x, foot.z);
+      const wall = Math.max(...[3, 5, 7, 9].map(d => { const p = out(half + d); return ground.near(p.x, p.z); })) - floorY;
+      s += width * (.58 + draws[2] * .2);
+      if (wall < 2.4) continue;
+      const height = Math.min(11, Math.max(2.6, wall * (.72 + draws[3] * .38)));
+      // Deep enough that the block's back top runs into the wall behind it.
+      let depth = 3; while (depth < 7) { const back = out(face + depth); if (ground.near(back.x, back.z) - floorY > height - .4) break; depth += .5; }
+      const centre = out(face + depth / 2), axis = out(0), yaw = Math.atan2(axis.x - centre.x, axis.z - centre.z);
+      const below = s < STAGE.waterfall - 4, kind: CragKind = below && draws[4] < .62 ? 'massive' : 'bedded';
+      const tilt = kind === 'massive' ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(Math.cos(draws[5] * TAU), 0, Math.sin(draws[5] * TAU)), draws[6] * 6 * DEG) : bedDip(draws[6]);
+      const block = site({ x: centre.x, z: centre.z, yaw, tilt: [tilt.x, tilt.y, tilt.z, tilt.w], width, depth, height, kind, seed: Math.floor(draws[7] * 2 ** 31), slope: 60, hung: false, trail: TRAIL_HALF + .9, rank: draws[8] });
+      // A block that does not fit (a boulder, the waterfall, the snow's edge) is tried a little narrower and further back.
+      if (!placer.place(block, 0)) placer.place({ ...block, width: width * .7, depth: depth + .4, x: out(face + .5 + depth / 2).x, z: out(face + .5 + depth / 2).z }, 0);
+    }
+  }
+  // Boulders on the floor along the walls, more of them and bigger under the waterfall: a fallen-rock cone, off its pool.
+  for (let k = 0, placed = 0; k < 400 && placed < 34; k++) {
+    const draws = Array.from({ length: 8 }, rand), s = STAGE.mouth + 5 + draws[0] * (STAGE.snout - STAGE.mouth - 7), near = 1 - smooth(Math.abs(s - STAGE.waterfall), 3, 12);
+    const width = .7 + draws[1] * (.7 + .9 * near), half = gorgeHalf(s), d = Math.max(TRAIL_HALF + 1.2 + width * .6, half - .2 - draws[2] * 1.4 * (1 - near * .5)), side = draws[3] < .5 ? 1 : -1;
+    const p = besideTrail(s, -side * d), foot = WATERFALL.foot;
+    if (Math.hypot(p.x - foot.x, p.z - foot.z) < 2.6 + width || draws[4] > .35 + .6 * near) continue;
+    const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(Math.cos(draws[5] * TAU), 0, Math.sin(draws[5] * TAU)), (6 + 20 * draws[6]) * DEG);
+    if (placer.place(site({ x: p.x, z: p.z, yaw: draws[7] * TAU, tilt: [tilt.x, tilt.y, tilt.z, tilt.w], width, depth: width * (.6 + draws[2] * .4), height: width * (.45 + draws[6] * .3), kind: 'talus', seed: Math.floor(draws[0] * 2 ** 31), slope: 10, hung: false, trail: TRAIL_HALF + 1, rank: draws[5] }), .9)) placed++;
+  }
+}
+
+/**
+ * Seeded crag blocks inside `region`: the gorge's lining and floor boulders (unless `gorge` is false), then on ground steeper than
+ * about 47° (more on steeper, south-facing faces, and in the rock zones) bedded steps, ledges hung on near-vertical walls or, now
+ * and then, rounded masses; on gentler ground within ten metres below such a face, talus. Candidates on a jittered 3 m grid (more
+ * in steep cells, which hold more face than their plan shows) are taken best first; face blocks may overlap into continuous crags,
+ * talus stays apart. Trunks and boulders (`obstacles`) keep their radius.
+ */
+export function cragSites(options: { region?: CragRegion; obstacles?: readonly CragObstacle[]; seed?: number; ground?: CragGround; gorge?: boolean } = {}): CragSite[] {
+  const region = options.region ?? CRAG_REGION, ground = options.ground ?? new CragGround(), rand = random(options.seed ?? 6151), placer = new Placer(ground, region, options.obstacles ?? []);
+  if (options.gorge ?? true) gorgeSites(placer, rand);
   type Candidate = { x: number; z: number; priority: number; talus: number; n: THREE.Vector3; slope: number; draws: number[] };
   const candidates: Candidate[] = [], STEP = 3;
   for (let z = region.maxZ; z >= region.minZ; z -= STEP) for (let x = region.minX; x <= region.maxX; x += STEP) {
     // Every number is drawn up front, so a rejected candidate never shifts the next one. A steep cell holds more face than its
-    // plan shows (a 35 m wall is a 4 m band in plan), so it gets up to six candidates, about one per 9 m² of face.
+    // plan shows (a 30 m wall is a band a few metres wide in plan), so it gets up to six candidates, about one per 9 m² of face.
     const draws = Array.from({ length: 72 }, rand), cell = ground.normal(x, z).slope, count = Math.min(6, Math.max(1, Math.round(.9 / Math.cos(Math.min(cell, 85) * DEG))));
     for (let i = 0; i < count; i++) {
       const d = draws.slice(i * 12, i * 12 + 12), px = x + (d[0] - .5) * STEP, pz = z + (d[1] - .5) * STEP, weight = region.weight ? region.weight(px, pz) : 1;
@@ -232,10 +336,7 @@ export function cragSites(options: { region?: CragRegion; obstacles?: readonly C
     }
   }
   candidates.sort((a, b) => b.priority - a.priority);
-  const sites: CragSite[] = [], obstacles = options.obstacles ?? [], placed = { face: 0, talus: 0 };
-  // Placed blocks by 8 m cell, for the overlap test.
-  const grid = new Map<number, CragSite[]>(), key = (i: number, j: number): number => (i + 512) * 1024 + j + 512;
-  const nearby = (x: number, z: number): CragSite[] => { const i = Math.floor(x / 8), j = Math.floor(z / 8), out: CragSite[] = []; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) out.push(...grid.get(key(i + a, j + b)) ?? []); return out; };
+  const placed = { face: 0, talus: 0 };
   for (const c of candidates) {
     const talus = c.talus > 0, quota = talus ? 'talus' : 'face'; if (placed[quota] >= CAPS[quota]) continue;
     const [, , , , a, b, k, kindRoll, yawRoll, dipRoll, seedRoll, rankRoll] = c.draws;
@@ -247,31 +348,17 @@ export function cragSites(options: { region?: CragRegion; obstacles?: readonly C
     } else {
       // A step stands out of the slope: deep enough that its top runs back into the hillside behind it. On a near-vertical wall
       // a step could stand out only by its height × cot(slope), so it hangs instead: a deeper ledge seated by its back.
-      height = massive ? 2.6 + a * 2.8 : 2.2 + a * 3.8 * smooth(c.slope, FACE_SLOPE, 70); width = massive ? 2.8 + b * 2.8 : 3 + b * 4.5;
+      height = massive ? 2.6 + a * 2.8 : 2.2 + a * 3.8 * smooth(c.slope, FACE_SLOPE, 70); width = massive ? 2.8 + b * 2.8 : 2.4 + b * 5.2;
       depth = Math.min(5, (height + .6) / Math.tan(c.slope * DEG) + .4 + k + (hung ? 1.4 + k * .6 : 0));
-      // The beds dip about 7° toward the south-south-west everywhere; a rounded mass leans as it likes. A hung ledge also tips
-      // back into its wall, so its lowest corner is a seated one.
-      tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(-.94, 0, .34).normalize(), (massive ? (dipRoll - .5) * 16 : 7 + (dipRoll - .5) * 6) * DEG);
+      // A rounded mass leans as it likes; a hung ledge also tips back into its wall, so its lowest corner is a seated one.
+      tilt = massive ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(-.94, 0, .34).normalize(), (dipRoll - .5) * 16 * DEG) : bedDip(dipRoll);
       if (hung) tilt.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw)), -(14 + 6 * dipRoll) * DEG));
     }
-    const site: CragSite = { x: c.x, y: 0, z: c.z, yaw, tilt: [tilt.x, tilt.y, tilt.z, tilt.w], width, depth, height, kind, seed: Math.floor(seedRoll * 2 ** 31), slope: c.slope, reach: 0, collider: false, rank: rankRoll, hung };
-    const shape = cragShape(site), outline = outlinePoints(shape, frame(site, 0));
-    site.reach = Math.max(...outline.map(p => Math.hypot(p.x - site.x, p.z - site.z)));
-    // Trunks, boulders and the trail; then clear ground under every point of the outline near the ground (a ledge high on a
-    // wall claims none), and blocks already placed near by.
-    if (obstacles.some(o => Math.hypot(o.x - site.x, o.z - site.z) < o.radius + site.reach)) continue;
-    if (outline.some(p => trailDistance(p.x, p.z) < CRAG_TRAIL_CLEARANCE + .4)) continue;
-    site.y = seatHeight(site, ground);
-    if (outline.some(p => p.y + site.y < ground.near(p.x, p.z) + 2.5 && !clear(p.x, p.z))) continue;
-    // Apart in three dimensions: ledges hung one above another on a wall share their plan position.
-    const size = (s: CragSite): number => Math.hypot(s.reach, s.height / 2), centre = site.y + height / 2;
-    if (nearby(site.x, site.z).some(s => Math.hypot(s.x - site.x, s.y + s.height / 2 - centre, s.z - site.z) < (size(s) + size(site)) * (s.kind === 'talus' || talus ? (s.kind === 'talus' && talus ? .95 : .75) : .55))) continue;
-    site.collider = outline.some(p => p.x > TERRAIN_GRID.minX && p.x < TERRAIN_GRID.minX + (TERRAIN_GRID.columns - 1) * TERRAIN_GRID.step && p.z > TERRAIN_GRID.minZ && p.z < TERRAIN_GRID.minZ + (TERRAIN_GRID.rows - 1) * TERRAIN_GRID.step);
-    sites.push(site); placed[quota]++;
-    const cellKey = key(Math.floor(site.x / 8), Math.floor(site.z / 8)); (grid.get(cellKey) ?? grid.set(cellKey, []).get(cellKey)!).push(site);
+    const block = site({ x: c.x, z: c.z, yaw, tilt: [tilt.x, tilt.y, tilt.z, tilt.w], width, depth, height, kind, seed: Math.floor(seedRoll * 2 ** 31), slope: c.slope, hung, trail: CRAG_TRAIL_CLEARANCE + .4, rank: rankRoll });
+    if (placer.place(block, talus ? .95 : .55)) placed[quota]++;
     if (placed.face >= CAPS.face && placed.talus >= CAPS.talus) break;
   }
-  return sites;
+  return placer.sites;
 }
 /** The blocks a tier draws: every block with a collider (no invisible walls), and on gpu every block; mobile half the rest. */
 export function cragsDrawn(sites: readonly CragSite[], tier: GraphicsTier): CragSite[] {
