@@ -23,6 +23,11 @@ const VIEWS: Record<string, View> = Object.fromEntries(([
   ['vittoria-lake', -18, -64, 0, .08], ['mycelium-grove', 74, -138, Math.PI, .18],
   ['city-hall-gallery', -2.4, -24, -.23], ['energy-gallery', -31.4, -10.5, -.28], ['science-gallery', 26.6, -12.2, -.28], ['energy-inside', -29, -5, 0], ['science-inside', 29, -7, 0],
   ['catalogue-poster', 2.51, -18.21, -2.409], ['embryo-station-platform', 0, 73, Math.PI - 1.1],
+  // October 2026 owner reports: distant City Hall glass, Nanot arch, Future House entry, path joins, grass in the gardens, sky and ridges.
+  ['city-hall-far', 25, 15, .607, .08], ['city-hall-north', 12, -48, 2.723, .08], ['nanot-arch', 29, 6, 0, .12],
+  ['future-house-entry', -30, -105, Math.PI / 2, .1], ['future-house-neck', -38, -104, Math.PI / 2, .15],
+  ['junction-garden', 6, 12, .876, -.5], ['junction-glucose', 22, -30, -.876, -.5], ['junction-station', 6, 53, .98, -.5],
+  ['enhancement-front', 100, -154.6, .575, .05], ['grove-floor', 78, -118, Math.PI, -.3], ['sky-up', 0, 58, .5, .6], ['ridge-northwest', -30, -105, Math.PI / 4, .12],
 ] as View[]).map(view => [view[0], view]));
 const SETS: Record<string, string[]> = {
   quick: ['arrival-meadow', 'city-hall-front', 'energy-front', 'bridge-bank', 'east-tributary', 'meadow-ground', 'city-hall-gallery', 'vittoria-lake'],
@@ -30,8 +35,10 @@ const SETS: Record<string, string[]> = {
   ground: ['arrival-meadow', 'north-meadow', 'meadow-ground', 'path-edge', 'garden-path', 'woodland-edge'],
   water: ['bridge-bank', 'shore-closeup', 'east-tributary', 'west-tributary', 'vittoria-lake', 'mycelium-grove'],
   galleries: ['city-hall-gallery', 'energy-gallery', 'science-gallery', 'energy-inside', 'science-inside', 'catalogue-poster', 'embryo-station-platform'],
+  fixes: ['city-hall-far', 'city-hall-north', 'nanot-arch', 'future-house-entry', 'future-house-neck', 'junction-garden', 'junction-glucose', 'junction-station', 'enhancement-front', 'grove-floor', 'mycelium-grove', 'sky-up', 'ridge-northwest', 'railway-east-portal'],
 };
-SETS.all = [...new Set(Object.values(SETS).flat())];
+// `all` keeps the 33 realism views; `fixes` is reviewed on its own.
+SETS.all = [...new Set(Object.entries(SETS).filter(([set]) => set !== 'fixes').flatMap(([, views]) => views))];
 
 const [outDir, profileArg = 'desktop', setArg = 'quick', time = 'day'] = process.argv.slice(2);
 if (!outDir) throw new Error('Usage: bun scripts/screenshot-realism.ts <outDir> <desktop|touch|software> [viewSet] [day|golden|night]');

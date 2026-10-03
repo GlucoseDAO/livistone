@@ -110,6 +110,6 @@ bun scripts/build-realism-comparison.ts <reviewDir> --title "…"
 LIVISTONE_BASE_URL=http://127.0.0.1:5181 npx playwright test tests/<spec>.spec.ts
 ```
 
-View sets: `quick`, `exteriors`, `ground`, `water`, `galleries`, `all`. Times: `day`, `golden` (after 05), `night`. Headless WebGPU on Linux needs `--enable-unsafe-webgpu --enable-features=Vulkan --use-webgpu-power-preference=force-low-power`; Stage A puts these in the harness and Playwright config.
+View sets: `quick`, `exteriors`, `ground`, `water`, `galleries`, `all`, and `fixes` (the October 2026 owner reports, outside `all`). Times: `day`, `golden` (after 05), `night`. Headless WebGPU on Linux needs `--enable-unsafe-webgpu --enable-features=Vulkan --use-webgpu-power-preference=force-low-power`; Stage A puts these in the harness and Playwright config.
 
 Review pages are served from `~/sources/livistone-realism/review/` with `python3 -m http.server 5199 --bind 127.0.0.1`; `combined-all/` and `baseline-76104be/` hold the round-1 result and the original look. These files live outside git.
