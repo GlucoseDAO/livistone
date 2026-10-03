@@ -48,7 +48,7 @@ Branch `realism/02-light-sky`, built on the 00 harness at `76104be`. Spec: [docs
 
 ## Variants
 
-The switch is dev-only: `?look=a|b`. The harness passes it as `LIVISTONE_LOOK`. Production builds always use b.
+The switch is dev-only: `?light=a|b` (renamed from `?look` when merging, because the river uses `?look`). The harness passes it via `LIVISTONE_PARAMS=light=a`. Production builds always use b.
 
 - **a**: steps 1–2 only, meaning the shared sun and moon directions plus the matched haze.
 - **b**: a, plus reflection strength (step 3) and the darker reflection ground.

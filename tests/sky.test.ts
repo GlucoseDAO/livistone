@@ -5,7 +5,7 @@ import { mitoringAmberMaterial, mitoringSilverMaterial } from '../src/world/mito
 import { gatewayMaterials } from '../src/world/gateway-materials';
 import { cityHallCrystalMaterial, createCityHallFacade } from '../src/world/city-hall';
 import { stationAmberMaterial } from '../src/world/station-amber';
-import { riverMaterial } from '../src/world/river';
+import { waterMaterial } from '../src/world/water-material';
 
 describe('sky coherence', () => {
   it('shares unit sun and moon directions above the horizon', () => {
@@ -23,7 +23,7 @@ describe('sky coherence', () => {
   it('tags hero materials so they keep their own reflection strength', () => {
     const gateway = gatewayMaterials(true), group = new THREE.Group(); createCityHallFacade(group, true);
     const hall = ['City Hall brass clasps', 'City Hall silver pins'].map(name => (group.getObjectByName(name) as THREE.Mesh).material as THREE.Material);
-    const heroes = [mitoringAmberMaterial(true), mitoringSilverMaterial(), gateway.silver, gateway.gem, cityHallCrystalMaterial(true), stationAmberMaterial(true), riverMaterial(), ...hall];
+    const heroes = [mitoringAmberMaterial(true), mitoringSilverMaterial(), gateway.silver, gateway.gem, cityHallCrystalMaterial(true), stationAmberMaterial(true), waterMaterial('gpu'), ...hall];
     for (const material of heroes) expect(material.userData.heroEnv, material.name).toBe(true);
     expect(gateway.limestone.userData.heroEnv).toBeUndefined();
   });

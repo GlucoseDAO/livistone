@@ -27,7 +27,7 @@ import type { Physics } from './game/physics';
 const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 }, SUN_DISTANCE = 180;
 // Dev-only ?look=a keeps the old hemisphere-heavy fill (sun and haze coherence only). b, the default, lets the baked sky
 // carry more of the ambient light and gives heroEnv materials their own reflection strength.
-const LOOK = import.meta.env.DEV && new URLSearchParams(location.search).get('look') === 'a' ? 'a' : 'b';
+const LOOK = import.meta.env.DEV && new URLSearchParams(location.search).get('light') === 'a' ? 'a' : 'b';
 const FILL: Record<'a' | 'b', Record<SkyPhase, { environment: number; hemi: number }>> = {
   a: { day: { environment: .5, hemi: 1.2 }, night: { environment: .2, hemi: .28 } }, b: { day: { environment: .9, hemi: .55 }, night: { environment: .3, hemi: .22 } } };
 
