@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { GARDENS } from '../src/world/living-waters-layout';
-interface Snapshot { mode: string; zone: string; journey: string | null; position: { x: number; y: number; z: number }; yaw: number; progress: { discovered: string[] }; }
+interface Snapshot { mode: string; zone: string; journey: string | null; position: { x: number; y: number; z: number }; yaw: number; interaction: string | null; progress: { discovered: string[] }; }
 const snapshot = (page: Page): Promise<Snapshot> => page.evaluate(() => (window as unknown as { __livistone: { snapshot(): Snapshot } }).__livistone.snapshot());
 const teleport = (page: Page, x: number, z: number, yaw = 0) => page.evaluate(({ x, z, yaw }) => (window as unknown as { __livistone: { teleport(x: number, z: number, yaw: number): void } }).__livistone.teleport(x, z, yaw), { x, z, yaw });
 for (const mobile of [false, true]) test(`integrated garden stories, walking and map preservation (${mobile ? 'touch' : 'desktop'})`, async ({ browser }) => {
@@ -13,7 +13,11 @@ for (const mobile of [false, true]) test(`integrated garden stories, walking and
     for (const id of ['station', 'city-hall', 'living-waters', 'mycelium-garden']) expect(await page.locator('#marker-' + id).evaluate(e => e.hasAttribute('hidden'))).toBe(false);
     await page.locator('#view-toggle').click();
     for (const [id, x, z, title] of [['living-vittoria', -16, -49, 'Vittoria Amazonica at the lake'], ['living-dewdrop', -13, 1.5, 'Dewdrop at the pavilion'], ['living-mycelium', 70, -20, 'A crown that lets water go']] as const) {
-      await teleport(page, GARDENS.x + x, GARDENS.z + z); await expect(page.locator('#interact')).toContainText(title); await page.locator('#interact').click(); await expect(page.locator('#lore-title')).toHaveText(title);
+      await teleport(page, GARDENS.x + x, GARDENS.z + z);
+      // The prompt follows a per-frame raycast from the settled capsule. Under load, headless Chrome can render a few slow frames
+      // with a neighbouring exhibit in view before the capsule lands, so wait for the game's own state, then check the label.
+      await expect.poll(async () => (await snapshot(page)).interaction, { timeout: 20000 }).toBe(id);
+      await expect(page.locator('#interact')).toContainText(title); await page.locator('#interact').click(); await expect(page.locator('#lore-title')).toHaveText(title);
       if (id === 'living-dewdrop') {
         await expect(page.locator('#lore-slide-body')).toContainText('Swiss blue topaz');
         const image = page.locator('#lore-figure .source-image img');
