@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import type { ColliderSpec } from '../game/physics';
 
 export const TOWN_BOUNDS = { minX: -165, maxX: 195, minZ: -225, maxZ: 115 };
+/** Capsule centre height that counts as falling out of the world: well below the 2 m river bed, so wading is not a fall. */
+export const FALL_FLOOR = -6;
 /** Gold lamp posts beside the bridge and its approaches. */
 export const LAMP_POSTS: readonly (readonly [number, number])[] = [[-6.5, 5], [-6.5, 13], [-6.5, 39], [6.5, 5], [6.5, 13], [6.5, 39]];
 export function transformColliders(specs: ColliderSpec[], matrix: THREE.Matrix4, yaw = 0): ColliderSpec[] {

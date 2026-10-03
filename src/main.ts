@@ -5,7 +5,7 @@ import { loadingStage } from './loading';
 import './style.css';
 import * as THREE from 'three';
 import { RAILWAY, railwayCorridor } from './world/station-layout';
-import { TOWN_BOUNDS } from './world/town-layout';
+import { TOWN_BOUNDS, FALL_FLOOR } from './world/town-layout';
 import { terrainHeight } from './world/terrain';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createSky, HORIZON_HAZE, HORIZON_RADIANCE, MOON_DIR, SKY_EXPOSURE, SUN_DIR } from './world/sky';
@@ -446,7 +446,7 @@ class Game {
     }
     const pos = this.physics.position();
     const b = TOWN_BOUNDS;
-    if (pos.y < -.5 || ((pos.x < b.minX || pos.x > b.maxX || pos.z < b.minZ || pos.z > b.maxZ) && !railwayCorridor(pos.x, pos.z))) { this.physics.teleport(SPAWN); this.input.yaw = SPAWN.yaw; this.ui.toast('Back on the station garden path.'); }
+    if (pos.y < FALL_FLOOR || ((pos.x < b.minX || pos.x > b.maxX || pos.z < b.minZ || pos.z > b.maxZ) && !railwayCorridor(pos.x, pos.z))) { this.physics.teleport(SPAWN); this.input.yaw = SPAWN.yaw; this.ui.toast('Back on the station garden path.'); }
     this.ambience.setGarden(pos.z < -60);
 
     const current = this.physics.position(), yaw = this.input.yaw, lead = this.graphics.tier === 'cpu' ? EYE_LEAD : 0;
