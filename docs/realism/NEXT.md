@@ -88,8 +88,9 @@ LIVISTONE_BASE_URL=http://127.0.0.1:5181 npx playwright test tests/<spec>.spec.t
 
 View sets: `quick`, `exteriors`, `ground`, `water`, `galleries`, `all`. Times: `day`, `golden` (after 05), `night`.
 
-## Housekeeping left from round 1
+## Housekeeping (done 3 October 2026)
 
-- Merged branches `realism/00-harness` through `realism/04-river` can be deleted locally once the owner agrees.
-- `realism/20-webgpu` is parked.
+- The merged worktrees and their branches `realism/00-harness` through `realism/04-river` are deleted.
+- `realism/20-webgpu` (worktree `~/sources/livistone-realism/20-webgpu`) is parked, local only.
+- The downloaded Poly Haven originals (72 MB) are in the main checkout's git-ignored `data/textures-src/ground/`, so ground and shore work needn't download them again.
 - Concept notes exist for 02 and 04; `concepts/14-realism/round-1.md` covers 01 and 03.
