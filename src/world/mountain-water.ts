@@ -8,7 +8,7 @@
 // emits, so none of it glows at night.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { Fn, abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, cross, dot, exp, faceDirection, float, fract, length, max, mix, mx_noise_float, normalWorldGeometry, normalize, positionWorld, pow, property, select, sin, smoothstep, step, texture, uv, vec2, vec3, vec4 } from 'three/tsl';
+import { Fn, abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, cross, dot, exp, faceDirection, float, fract, length, max, mix, normalWorldGeometry, normalize, positionWorld, pow, property, select, sin, smoothstep, step, texture, uv, vec2, vec3, vec4 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
 import { waterMaterial } from './water-material';
@@ -215,12 +215,15 @@ export function waterfallGeometry(spec: WaterfallSpec, tier: GraphicsTier): THRE
   // height along -out), wider than the water where the spray reaches, with a thin film of water trickling down it. It draws first,
   // under the sheet. Not on cpu, which has no transparency.
   if (!cpu && f.ground) {
-    const g = f.ground, start = positions.length / 3, film = detail.film, high = rows.filter(row => row.centre.y > f.foot.y + .25);
+    // Every other row of the sheet is enough for a film that only darkens; each search costs a dozen ground samples.
+    const g = f.ground, start = positions.length / 3, film = detail.film, high = rows.filter((row, i) => row.centre.y > f.foot.y + .25 && (i % 2 === 0 || row.drop < 2));
     const rock = (x: number, z: number, y: number): THREE.Vector3 | null => {
-      const height = (d: number): number => g(x + f.out.x * d, z + f.out.z * d); let front = 6, back = -4;
-      if (height(front) >= y || height(back) < y) return null;
-      for (let k = 0; k < 10; k++) { const mid = (front + back) / 2; if (height(mid) >= y) back = mid; else front = mid; }
-      const px = x + f.out.x * front, pz = z + f.out.z * front, normal = new THREE.Vector3(-(g(px + .2, pz) - g(px - .2, pz)) / .4, 1, -(g(px, pz + .2) - g(px, pz - .2)) / .4).normalize();
+      const height = (d: number): number => g(x + f.out.x * d, z + f.out.z * d); let front = 6, back = 3.5;
+      if (height(front) >= y) return null;
+      // Step back 2.5 m at a time until inside the rock, then halve the bracket down to about a centimetre.
+      while (height(back) < y) { front = back; back -= 2.5; if (back < -4) return null; }
+      for (let k = 0; k < 8; k++) { const mid = (front + back) / 2; if (height(mid) >= y) back = mid; else front = mid; }
+      const px = x + f.out.x * front, pz = z + f.out.z * front, here = g(px, pz), normal = new THREE.Vector3(-(g(px + .2, pz) - here) / .2, 1, -(g(px, pz + .2) - here) / .2).normalize();
       return new THREE.Vector3(px, y, pz).addScaledVector(normal, .06);
     };
     high.forEach((row, i) => {
@@ -594,13 +597,14 @@ function snowCaveMaterial(tier: GraphicsTier): THREE.Material {
   if (tier === 'cpu') { const material = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); material.name = 'Snow cave'; return material; }
   const material = new THREE.MeshStandardNodeMaterial({ vertexColors: true, side: THREE.DoubleSide, metalness: 0, roughness: .72 });
   material.name = 'Snow cave';
-  const p = positionWorld, mottle = mx_noise_float(p.mul(2.3)).mul(.07).add(mx_noise_float(p.mul(9.1)).mul(.04)).add(1);
+  // The foam's tiling noises (red long streaks, green lumps, blue grain), looked up in world metres: cheaper to build than noise code.
+  const noise = texture(foamTexture(DETAIL[tier].foam)), p = positionWorld, grain = noise.sample(p.xz.mul(.43).add(p.y.mul(.11))), mottle = grain.b.sub(.5).mul(.12).add(grain.g.sub(.5).mul(.1)).add(1);
   // On top, as the ground's snow (ground-material.ts): soil streaks down the gully's fall line and broad dirt patches, no pattern.
-  const streaks = mx_noise_float(vec3(p.x.mul(.7), 0, p.z.mul(.125))).mul(.5).add(.5), grime = mx_noise_float(vec3(p.x.mul(.32), 7.7, p.z.mul(.32))).mul(.5).add(.5);
-  const dirt = smoothstep(.42, .9, streaks).mul(.5).add(smoothstep(.52, .85, grime).mul(.34)).add(.06), top = mix(vec3(1), vec3(.7, .63, .53), dirt.clamp(0, .8));
+  const broad = noise.sample(vec2(p.x.mul(.09), p.z.mul(.016)).add(.31)), dirt = smoothstep(.42, .9, broad.r).mul(.5).add(smoothstep(.52, .85, broad.g).mul(.34)).add(.06);
+  const top = mix(vec3(1), vec3(.7, .63, .53), dirt.clamp(0, .8));
   // As the ground's snow where its edge stands steep: in layers a few tens of centimetres thick, with dirt washed down in runnels.
   const steep = float(1).sub(smoothstep(.55, .8, normalWorldGeometry.y.abs()));
-  const layers = sin(p.y.mul(19).add(mx_noise_float(p.mul(1.4)).mul(4))).mul(.05).add(.95), runnels = smoothstep(.15, .55, mx_noise_float(vec3(p.x.mul(5.3), p.y.mul(.3), p.z.mul(5.3))));
+  const face = noise.sample(vec2(p.x.add(p.z).mul(.5), p.y.mul(.07))), layers = sin(p.y.mul(19).add(face.g.mul(4))).mul(.05).add(.95), runnels = smoothstep(.55, .85, face.r);
   material.colorNode = mix(top.mul(mottle), mix(vec3(1), vec3(.72, .67, .6), runnels.mul(.55)).mul(layers).mul(mottle), steep);
   material.roughnessNode = mix(mix(float(.62), float(.78), dirt.clamp(0, 1)), float(.62), steep);
   return material;
