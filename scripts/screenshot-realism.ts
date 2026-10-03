@@ -25,7 +25,7 @@ const VIEWS: Record<string, View> = Object.fromEntries(([
   ['catalogue-poster', 2.51, -18.21, -2.409], ['embryo-station-platform', 0, 73, Math.PI - 1.1],
   // October 2026 owner reports: distant City Hall glass, Nanot arch, Future House entry, path joins, grass in the gardens, sky and ridges.
   ['city-hall-far', 25, 15, .607, .08], ['city-hall-north', 12, -48, 2.723, .08], ['nanot-arch', 29, 6, 0, .12],
-  ['future-house-entry', -30, -105, Math.PI / 2, .1], ['future-house-neck', -38, -104, Math.PI / 2, .15],
+  ['future-house-entry', -30, -105, Math.PI / 2, .1], ['future-house-neck', -36, -105.25, 1.3258, .15],
   ['junction-garden', 6, 12, .876, -.5], ['junction-glucose', 22, -30, -.876, -.5], ['junction-station', 6, 53, .98, -.5],
   ['enhancement-front', 100, -154.6, .575, .05], ['grove-floor', 78, -118, Math.PI, -.3], ['sky-up', 0, 58, .5, .6], ['ridge-northwest', -30, -105, Math.PI / 4, .12],
 ] as View[]).map(view => [view[0], view]));

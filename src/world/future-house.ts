@@ -4,7 +4,7 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import serif from './fonts/monument-serif.json';
 import type { ColliderSpec } from '../game/physics';
-import { FUTURE_HOUSE as H, FUTURE_NECK } from './elevated-layout';
+import { FUTURE_HOUSE as H, FUTURE_NECK, NECK_WIDTH } from './elevated-layout';
 import { guardRail, solidMesh, walkwayGeometry } from './walkway';
 import { addGlow, nightEmission } from './night-lighting';
 
@@ -69,29 +69,35 @@ export function createFutureHouse(parent: THREE.Group, colliders: ColliderSpec[]
     layers.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 64, .025, 4, false));
   }
   parent.add(new THREE.Mesh(mergeGeometries(layers)!, patina)); layers.forEach(g => g.dispose());
-  // Broad leather straps loop over the printed body and cinch its two long flanks.
+  // Broad leather straps loop over the printed body and cinch its two long flanks. The middle one springs from above the neck
+  // aperture instead of hanging through the doorway like a post, and so has no clasp on that side.
   for (const dz of [-6, 0, 6]) {
-    const points = Array.from({ length: 41 }, (_, i) => { const a = -.15 + i / 40 * (Math.PI + .3); return new THREE.Vector3(H.x + Math.cos(a) * 8.5, 12 + Math.sin(a) * (6 - Math.abs(dz) * .07), H.z + dz); });
+    const start = dz ? -.15 : .66, points = Array.from({ length: 41 }, (_, i) => { const a = start + i / 40 * (Math.PI + .15 - start); return new THREE.Vector3(H.x + Math.cos(a) * 8.5, 12 + Math.sin(a) * (6 - Math.abs(dz) * .07), H.z + dz); });
     const strapPositions: number[] = [], strapIndices: number[] = [];
     points.forEach((p, i) => { for (const side of [-1, 1]) strapPositions.push(p.x, p.y, p.z + side * .3); if (i < 40) { const n = i * 2; strapIndices.push(n, n + 2, n + 1, n + 1, n + 2, n + 3); } });
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(strapPositions, 3)); g.setIndex(strapIndices); g.computeVertexNormals(); parent.add(new THREE.Mesh(g, leather));
-    for (const side of [-1, 1]) { const clasp = new THREE.Mesh(new THREE.TorusGeometry(.36, .055, 6, 12), copper); clasp.rotation.y = Math.PI / 2; clasp.position.set(H.x + side * 8.55, 11.8, H.z + dz); parent.add(clasp); }
+    for (const side of dz ? [-1, 1] : [-1]) { const clasp = new THREE.Mesh(new THREE.TorusGeometry(.36, .055, 6, 12), copper); clasp.rotation.y = Math.PI / 2; clasp.position.set(H.x + side * 8.55, 11.8, H.z + dz); parent.add(clasp); }
   }
-  const path = FUTURE_NECK.getPoints(150); solidMesh(parent, colliders, walkwayGeometry(path, 3.2), floor, 'Future House · climb through the neck');
+  const path = FUTURE_NECK.getPoints(150), half = NECK_WIDTH / 2; solidMesh(parent, colliders, walkwayGeometry(path, NECK_WIDTH), floor, 'Future House · climb through the neck');
+  const across = (t: number): THREE.Vector3 => { const tangent = FUTURE_NECK.getTangent(t); return new THREE.Vector3(-tangent.z, 0, tangent.x).normalize(); };
   for (const side of [-1, 1]) {
-    const edge = path.map((p, i) => { const tangent = FUTURE_NECK.getTangent(i / 150), normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize(); return p.clone().addScaledVector(normal, side * 1.6); });
+    const edge = path.map((p, i) => p.clone().addScaledVector(across(i / 150), side * half));
     guardRail(parent, colliders, edge.filter((_, i) => i % 3 === 0), copper);
     copperStrand(edge.filter((_, i) => i % 10 === 0).map(p => [p.x, p.y - .22, p.z]), .48);
   }
+  // Rib arches spring from just outside the rails, so none crosses the walking width at head height.
   for (let i = 0; i < 12; i++) {
-    const t = i / 12, p = FUTURE_NECK.getPoint(t), tangent = FUTURE_NECK.getTangent(t), normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-    const arch = Array.from({ length: 13 }, (_, j) => p.clone().addScaledVector(normal, Math.cos(j / 12 * Math.PI) * 1.8).add(new THREE.Vector3(0, Math.sin(j / 12 * Math.PI) * 3.2, 0)));
+    const t = i / 12, p = FUTURE_NECK.getPoint(t), normal = across(t);
+    const arch = Array.from({ length: 13 }, (_, j) => p.clone().addScaledVector(normal, Math.cos(j / 12 * Math.PI) * (half + .2)).add(new THREE.Vector3(0, Math.sin(j / 12 * Math.PI) * 3.4, 0)));
     copperStrand(arch.map(v => v.toArray()), i % 3 ? .13 : .23);
   }
-  // Drooping muzzle stays hollow so the mouth is the entrance to the climb.
+  // Drooping muzzle stays hollow so the mouth is the entrance to the climb: its lips flank the foot outside the rails and run
+  // back along the neck at head height, and the eyes sit beside them.
+  const foot = FUTURE_NECK.getPoint(0), ahead = FUTURE_NECK.getTangent(0).setY(0).normalize(), sideways = across(0);
+  const muzzle = (along: number, up: number, out: number): number[] => foot.clone().addScaledVector(ahead, along).addScaledVector(sideways, out).add(new THREE.Vector3(0, up, 0)).toArray();
   for (const side of [-1, 1]) {
-    copperStrand([[-35, .1, -105 + side * 1.9], [-34.3, 1.3, -105 + side * 1.9], [-36.5, 3.1, -105 + side * 1.8], [-39, 3.2, -105 + side * 1.5]], .34);
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(.16, 10, 8), new THREE.MeshStandardMaterial({ color: '#112628', emissive: '#79dec5', emissiveIntensity: .5 })); eye.position.set(-36.4, 2.65, -105 + side * 1.95); parent.add(eye);
+    copperStrand([muzzle(0, -.05, side * (half + .3)), muzzle(-.7, 1.15, side * (half + .3)), muzzle(1.5, 3.2, side * (half + .25)), muzzle(4, 4.6, side * (half + .2))], .34);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(.16, 10, 8), new THREE.MeshStandardMaterial({ color: '#112628', emissive: '#79dec5', emissiveIntensity: .5 })); eye.position.fromArray(muzzle(1.4, 2.8, side * (half + .35))); parent.add(eye);
   }
   parent.add(new THREE.Mesh(mergeGeometries(pieces)!, copper)); pieces.forEach(g => g.dispose());
   const font = new FontLoader().parse(serif), letters = new TextGeometry('FUTURE HOUSE', { font, size: 1.45, depth: .1, curveSegments: 4 }); letters.computeBoundingBox(); letters.translate(-(letters.boundingBox!.max.x + letters.boundingBox!.min.x) / 2, 0, 0);
