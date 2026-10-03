@@ -26,3 +26,7 @@ See [README](README.md) for the shared workflow.
 
 - Objects look seated on the ground on every tier, including software.
 - One to two extra draw calls at most.
+
+## On WebGPU (round 2)
+
+On the gpu tier, try r186's screen-space shadow node (`sss` in `three/addons/tsl/display/SSSNode.js`, blurred) inside Stage A's output pipeline for fine contact shadows under small objects. Decals and the baked ground shade stay the mobile and cpu path, and the decals' material is a plain node material with multiply blending.

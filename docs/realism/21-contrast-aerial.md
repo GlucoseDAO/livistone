@@ -1,6 +1,6 @@
 # 21 — Sun/ambient contrast and aerial perspective
 
-**Needs:** 01 and 02, both merged. **Tiers:** all. **Branch:** `realism/21-contrast`.
+**Needs:** 01, 02 and 20 Phase B. **Tiers:** all. **Branch:** `realism/21-contrast`.
 See [README](README.md) and the rules in [NEXT.md](NEXT.md).
 
 ## Why
@@ -27,3 +27,10 @@ After round 1, sun shadows render, but they read pale. The hemisphere light plus
 - Far hills recede.
 - Night emissions are unchanged.
 - The owner picks a variant.
+
+## On WebGPU (round 2)
+
+- Build the aerial perspective as `scene.fogNode`, in linear light before tone mapping. Use height-aware exponential fog whose colour is the sky radiance along the view direction, sampled from the baked sky cubemap at a low mip, so silhouettes fade into the sky behind them rather than into one haze colour.
+- Fog far also drives forest culling (`world.ts` near the forest update). If the fog distances change, keep culled trees inside full fog.
+- Add tone-mapping variants `?tone=aces|agx|neutral`. ACES is today's look. The owner chooses.
+- The cpu tier keeps plain linear fog.

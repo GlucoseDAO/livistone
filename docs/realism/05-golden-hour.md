@@ -43,3 +43,7 @@ See [README](README.md) for the shared workflow.
 - Golden hour is visibly warm, with long shadows.
 - Switching phase does not rebuild meshes or move the player.
 - Each sky is baked once per phase.
+
+## On WebGPU (round 2)
+
+The sky preset is a TSL bake after Stage A. Add `HORIZON_RADIANCE.golden` as well as `HORIZON_HAZE.golden`. The capture harness accepts `golden`, but `daylight.ts` maps it to auto until this sub-plan lands.

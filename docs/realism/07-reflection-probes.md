@@ -33,3 +33,7 @@ Today every metal, glass and amber surface reflects only the baked sky. Silver o
 - Silver visibly reflects the surrounding town.
 - Interior metals reflect their hall.
 - Load-time increase is under about 300 ms on desktop. If it is more, report it.
+
+## On WebGPU (round 2)
+
+Bake with `CubeCamera` and the node `PMREMGenerator` after `renderer.init()`. The heroEnv re-pointing from 02 carries over unchanged.
