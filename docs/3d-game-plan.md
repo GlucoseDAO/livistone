@@ -1,5 +1,24 @@
 # Livistone: browser game implementation plan
 
+## WebGPU renderer — 3 October 2026
+
+Realism sub-plan 20 moved the game from `WebGLRenderer` to three r186's `WebGPURenderer`: WebGPU where the browser offers a hardware adapter, its built-in WebGL 2 backend everywhere else, including software adapters. Every shader is TSL; classic and its GLSL patches are gone. One output pass keeps the classic look: the classic ACES fit, fog toward the displayed horizon mixed after tone mapping, and exact paper and sign colours through a display mask. From inside, the Mitoring amber and the Nut of Power crystal keep the second layer of themselves that classic's transmission pass drew, and night halos add their displayed colour. The parity gate passed on both backends against classic `main` (review page `review/20-webgpu-b/`; pixels changed by more than 20 levels, median per view set): desktop day 1.9% and night 1.0%, touch 0.4%, fallback desktop 2.0% and touch 0.5%, no view over 10%; software 9.3%, with three views at 10–12% from the cpu tier's low render scale and linear-light blending of reduced glass. Paper and sign pixels match exactly; the fully fogged horizon is within 0.4 levels on average. Across all 33 desktop views, draw calls per frame fall from 611 to 296 by day and from 660 to 344 at night, because WebGPU needs no transmission pre-pass.
+
+Measured on the development laptop's integrated GPU in headless Chrome (WebGPU through the Linux flags in `playwright.config.ts`), dev servers, view `arrival-meadow`, three interleaved runs per row (median). These figures are informational, not a device benchmark; physical phones, Safari and Firefox remain unmeasured.
+
+| Profile | Renderer | Draw calls | Triangles | Headless fps | Time to ready |
+| --- | --- | --- | --- | --- | --- |
+| Desktop (gpu tier) | Classic `WebGLRenderer` | 591 | 6.9 M | 4 | 15.5 s |
+| | WebGPU | 280 | 3.6 M | 18 | 12.4 s (0.80×) |
+| | WebGL 2 fallback | 280 | 3.6 M | 5 | 15.4 s (1.00×) |
+| Touch (mobile tier) | Classic | 288 | 1.5 M | 16 | 9.5 s |
+| | WebGPU | 279 | 1.6 M | 27 | 9.4 s (0.99×) |
+| | WebGL 2 fallback | 279 | 1.6 M | 12 | 10.5 s (1.11×) |
+| Software (cpu tier) | Classic | 152 | 0.9 M | 3 | 8.9 s |
+| | WebGL 2 fallback (no WebGPU adapter) | 154 | 0.9 M | 3 | 11.7 s (1.32×) |
+
+The main JavaScript chunk grows from 1,397 kB (447 kB gzip) to 1,741 kB (557 kB gzip) with WebGPURenderer's node system. Time to ready is from navigation to first-person play; it includes building every shader at load (about 1.9 MB of WGSL in 134 modules on WebGPU), so walking never stalls on a shader the first time an object comes into view.
+
 ## Contact shadows (realism 16, WIP) — 3 October 2026
 
 One multiply-blended decal batch, a single extra draw call, grounds trees (a crown-wide patch and a trunk contact), bank rocks, lamp posts, poster and stand feet, place signs, plinths and station benches. Terrain patches lie on the rendered 2 m terrain triangles; tree patches hide with their forest cell, and the batch hides in the map. The gpu tier builds 2,316 patches (50.7k triangles), the mobile and cpu tiers 1,328 (28.6k); only nearby forest cells are drawn. The terrain also bakes a `groundShade` attribute under crowns, beside trunks and along building walls, which the ground material applies as ambient occlusion to indirect light only. Checked in headless Chrome on WebGPU (and earlier on the classic renderer); the WebGL 2 fallback, review captures and physical-device performance are still to come.
@@ -138,7 +157,7 @@ Bundle reviewed image derivatives locally; the runtime must not depend on the li
 
 ## 2. Technology decision
 
-Use **TypeScript, Vite, Three.js, and Rapier 3D physics compiled to WebAssembly**. Use Blender for authored meshes and glTF/GLB as the runtime asset format. Start with Three.js `WebGLRenderer` on WebGL 2.
+Use **TypeScript, Vite, Three.js, and Rapier 3D physics compiled to WebAssembly**. Use Blender for authored meshes and glTF/GLB as the runtime asset format. The game started on Three.js `WebGLRenderer` (WebGL 2) and since October 2026 renders with `WebGPURenderer`: WebGPU where the browser offers a hardware adapter, its WebGL 2 backend elsewhere.
 
 This choice keeps the application in the browser's ordinary development ecosystem, makes custom architectural geometry straightforward, and uses WebAssembly for collision and physics work through Rapier. Rapier's JavaScript distribution is itself a WebAssembly module. [Rapier installation documentation](https://rapier.rs/docs/user_guides/javascript/getting_started_js/)
 
@@ -150,7 +169,7 @@ This choice keeps the application in the browser's ordinary development ecosyste
 
 The comparison is a project judgment, not a claim that one engine universally performs better. Babylon's documented engine features include Havok physics and character control. Bevy publishes browser examples. [Babylon specifications](https://www.babylonjs.com/specifications/), [Bevy browser example results](https://example-runs.bevy.org/)
 
-Start with the established WebGL 2 renderer so the initial project has one rendering path to validate. Three.js documents `WebGPURenderer` with a WebGL 2 fallback, but also notes material/postprocessing compatibility differences and remaining experimental behavior. Evaluate that renderer later against an actual Livistone scene; switching is a separate tested task. [Three.js renderer guidance](https://threejs.org/manual/en/webgpurenderer)
+Start with the established WebGL 2 renderer so the initial project has one rendering path to validate. Three.js documents `WebGPURenderer` with a WebGL 2 fallback, but also notes material/postprocessing compatibility differences and remaining experimental behavior. Evaluate that renderer later against an actual Livistone scene; switching is a separate tested task. [Three.js renderer guidance](https://threejs.org/manual/en/webgpurenderer) That evaluation happened in October 2026 (realism sub-plan 20): the spike rendered the same views at 2–5× the headless frame rate with half the draw calls, and the migration passed a parity gate against classic on both backends (see the WebGPU section at the top).
 
 Writing the whole application in Rust would not by itself solve foliage overdraw, costly glass, large downloads, or poorly optimized meshes. Profile those costs before introducing a second application language.
 
@@ -362,7 +381,7 @@ Match the approved image through composition, scale, materials, and lush plantin
 
 Glass and amber require special attention because they occupy large screen areas. Restrict costly transmission to nearby hero surfaces; use simpler tinted materials and environment reflections for distant versions. Test views looking through a building from both directions. Three.js explicitly notes the extra per-pixel cost of its advanced physical material features. [MeshPhysicalMaterial documentation](https://threejs.org/docs/pages/MeshPhysicalMaterial.html)
 
-Use instanced vegetation grouped by spatial cell, distance-based detail, and reduced distant shadows. Forest cells already switch full leaf cards, thinned cards, and hidden batches from camera distance; planting batches hide beyond walking range. Avoid a single forest-wide instance group that defeats useful culling. Treat leaf overdraw and glass layers as first-class performance costs. [InstancedMesh](https://threejs.org/docs/pages/InstancedMesh.html), [LOD](https://threejs.org/docs/pages/LOD.html)
+Use instanced vegetation grouped by spatial cell, distance-based detail, and reduced distant shadows. Forest cells switch full leaf cards, thinned cards, and hidden batches from camera distance; planting batches hide beyond walking range. On WebGPU every instanced mesh costs its own shader build, so each species, part and detail is one mesh refilled from the cells in view (and, for shadows, in the sun's shadow frustum), which keeps cell culling without a mesh per cell. Treat leaf overdraw and glass layers as first-class performance costs. [InstancedMesh](https://threejs.org/docs/pages/InstancedMesh.html), [LOD](https://threejs.org/docs/pages/LOD.html)
 
 ## 8. Architecture and repository structure
 

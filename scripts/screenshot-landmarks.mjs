@@ -21,7 +21,9 @@ const views = [
   ['catalogue-poster', 2.51, -18.21, -2.409],
 ];
 const gpu = process.platform === 'win32' ? ['--use-angle=d3d11', '--ignore-gpu-blocklist'] : ['--use-gl=angle', '--use-angle=gl', '--ignore-gpu-blocklist'];
-const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', '--headless=new', ...gpu] });
+// Headless Linux Chrome offers a hardware WebGPU adapter only with these flags (the integrated GPU; see playwright.config.ts).
+const webgpu = process.platform === 'linux' ? ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-webgpu-power-preference=force-low-power'] : [];
+const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', '--headless=new', ...gpu, ...webgpu] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.setDefaultNavigationTimeout(90000); page.setDefaultTimeout(90000);
 page.on('pageerror', (e) => console.error('page error:', e.message));

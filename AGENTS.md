@@ -14,7 +14,8 @@ for where it is going.
 
 ## What this project is, in one paragraph
 
-A TypeScript + Vite single-page app. Three.js renders the town on WebGL 2; Rapier
+A TypeScript + Vite single-page app. Three.js renders the town with WebGPURenderer (WebGPU, or its
+built-in WebGL 2 backend where no hardware WebGPU adapter exists); Rapier
 (WebAssembly) provides a kinematic capsule character controller. There is no backend, no
 API key, no database, and no account system — the entire game is static files plus
 `localStorage`. Every building, tree placement, path, and piece of jewelry geometry in the
@@ -33,7 +34,7 @@ current build is generated in code at load time; binary assets are two tree GLBs
 | Sync agent docs | `bun run docs:sync` | What the pre-commit hook runs |
 | Install git hooks | `bun run hooks:install` | Sets `core.hooksPath` to `.githooks` |
 | Regenerate tree GLBs | `bun scripts/generate-trees.mjs` | Needs the dev server running |
-| Landmark screenshots | `node scripts/screenshot-landmarks.mjs [outDir]` | Needs the dev server; headless Chrome with GPU WebGL flags |
+| Landmark screenshots | `node scripts/screenshot-landmarks.mjs [outDir]` | Needs the dev server; headless Chrome with GPU WebGL flags, plus the WebGPU flags on Linux |
 | Realism captures | `bun scripts/screenshot-realism.ts <outDir> <desktop\|touch\|software> [quick\|exteriors\|ground\|water\|galleries\|all] [day\|golden\|night]` | Dev server only (`LIVISTONE_BENCHMARK_URL`, default port 5173); loads `?capture=1`, which freezes animation time, CPU render scale and physics stepping so runs are pixel-close. See `docs/realism/` |
 | Realism review page | `bun scripts/build-realism-comparison.ts <dir> [--base before] [--title text]` | Writes `<dir>/index.html`: before/after sliders, variants, draw-call/triangle deltas. Serve the folder over HTTP to view it |
 | Mitoring comparisons | `node scripts/screenshot-mitoring.mjs [outDir] [desktop\|touch\|software]` | Fixed daylight/cameras; real SwiftShader is separate from touch emulation |
@@ -54,6 +55,11 @@ src/
   main.ts            Game class: renderer, cameras, fixed-timestep loop, mode switching,
                      raycast interaction, the window.__livistone test hook
   style.css          All UI styling (no CSS framework)
+  render/
+    renderer.ts      WebGPURenderer creation, backend choice, classic transparent order, frame stats
+    output.ts        Output pass: classic ACES, paper/sign display mask, display-space fog, load-time precompile
+    lighting.ts      Batched shadowless lights that keep the sky's image-based light
+    shell.ts         Transmissive shells seen from inside through a second layer of themselves
   game/
     content.ts       LANDMARKS, DISCOVERIES, SPAWN, progress parse/read/write
     exhibits.ts      Source-linked factual jewelry catalogue and photograph metadata
@@ -300,8 +306,9 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   library.
 - **Time of day is selectable.** `daylight.ts` resolves persistent Auto / Day / Night; Auto follows the local clock without requesting GPS. Cache each `createSky` result on first use and switch fog, reflections, emissions and light sources without rebuilding town meshes or moving the player. `night-lighting.ts` keeps depth-tested additive halos and a fixed pool of six/ten nearby point lights. Lake lighting concentrates on the central briolette; keep the outer lake subdued. Quality changes must preserve night emissions.
 - **Contact shadows ground objects in one draw.** `contact-shadows.ts` builds a single multiply-blended `MeshBasicNodeMaterial` batch (shared 64 px `DataTexture`, no depth write, polygon offset, `renderOrder` -1) of soft footprints: crown-wide and trunk patches per tree, bank rocks, lamp posts, poster and stand feet, place signs, plinths and station benches, taken from the layouts that place them. The multiply scales linear light before the output pass; its `KEEP_DISPLAY` MRT leaves the ground's paper mask and fog factor untouched, so far decals fog with the ground. Terrain patches reuse the rendered terrain's 2 m grid and diagonal, so they are coplanar with the ground; floor sites are flat quads at their floor height. Tree patches follow `forestCells` and stay out of the index until `Forest.onCells` reports their cell's trunks, never per frame. Keep tree and rock patches inside their planting clearance, off paths and water. The batch hides in map mode, where bare trunks would leave unexplained blots. `userData.keepGeometry` keeps `cpu-detail.ts` from simplifying it. `ground-cover.ts` bakes a `groundShade` terrain attribute (crowns, trunks, building walls; 1 = open sky) that the ground material reads as its `aoNode`, dimming only indirect light on Lambert and standard alike. Dev-only `?contact=off` leaves out both for review.
-- **Sky, sun and haze share one source.** `sky.ts` exports `SUN_DIR` / `MOON_DIR` (the light sits at its target + direction × `SUN_DISTANCE`, kept in `Game.sunDirection`), `SKY_EXPOSURE` and the pre-tone-mapped `HORIZON_HAZE` used for fog and map backgrounds; do not hard-code fog colours. In r186 a material without its own `envMap` gets `scene.environmentIntensity` instead of its `envMapIntensity`, so tag materials whose reflection strength matters with `userData.heroEnv = true`; `main.ts` points them at the current sky after load and on day/night switches (CPU keeps its Lambert re-pointing).
-- **Graphics has three device profiles.** `graphics.ts` selects GPU, mobile/typical integrated graphics, or CPU software WebGL. Profiles cover raster and sky resolution, foliage range, lighting and architecture. CPU uses `cpu-detail.ts` to reduce visual geometry with locked boundaries and batch static opaque architecture, preserving collision geometry and parent visibility. CPU disables shadows and rain, retaining night emission and a bounded light pool. Test profile overrides do not prove actual device performance.
+- **Sky, sun and haze share one source.** `sky.ts` exports `SUN_DIR` / `MOON_DIR` (the light sits at its target + direction × `SUN_DISTANCE`, kept in `Game.sunDirection`), `SKY_EXPOSURE`, the displayed `HORIZON_HAZE` the output pass fogs toward and the pre-tone-mapped `HORIZON_RADIANCE` of the flat map background; do not hard-code fog colours. In r186 a material without its own `envMap` gets `scene.environmentIntensity` instead of its `envMapIntensity`, so tag materials whose reflection strength matters with `userData.heroEnv = true`; `main.ts` points them at the current sky after load and on day/night switches (CPU keeps its Lambert re-pointing).
+- **Graphics has three device profiles.** `graphics.ts` selects GPU, mobile/typical integrated graphics, or CPU software rendering (a software WebGPU adapter renders through the WebGL 2 backend). Profiles cover raster and sky resolution, foliage range, lighting and architecture. CPU uses `cpu-detail.ts` to reduce visual geometry with locked boundaries and batch static opaque architecture, preserving collision geometry and parent visibility. CPU disables shadows and rain, retaining night emission and a bounded light pool. Test profile overrides do not prove actual device performance.
+- **Rendering is WebGPURenderer with TSL.** `three` resolves to `three/webgpu` (Vite and Vitest alias, `tsconfig.json` paths; Playwright reads `tsconfig.playwright.json`). Shaders exist once, in TSL: never add GLSL or `onBeforeCompile`. The scene renders at top level into `OutputPipeline`'s half-float target, whose 8-bit `display` attachment carries a paper/sign mask (`displayMaterial()`) and each surface's fog factor; the output pass applies the classic ACES fit, sRGB and the fog, as classic did after encoding. Additive sprites keep the mask with `KEEP_DISPLAY`; night halos add their displayed colour to what lies behind them. Uniforms that reach every material from outside it (fog range, shadow fade) belong in `renderGroup`: r186 refreshes only shared groups for materials without node properties. On WebGPU each InstancedMesh costs its own TSL build, so prefer few instanced meshes; forest and planting refill one mesh per species, part and detail. Everything that can appear must exist at load: `OutputPipeline.compile` builds the town (double-sided transmissive materials one side at a time) while `warmUp` keeps every instance drawable. Transmissive surfaces draw before transparent ones, as in classic. Shadowless lights go through `TownLighting`, which keeps image-based light and pins the light class names minification would change.
 - **Plain architecture wears generated maps.** `surfaces.ts` puts the ashlar on the town white (bridges, hall rims, the Science arch) and gateway abutments, terrazzo on the hall floor insets, and brass on the town gold, poster stands and place-sign frames (tarnish only). Each albedo averages the flat colour it replaces and the material colour is that colour over the set's mean (`SURFACE_SETS`, kept equal to `sources.json` by `tests/surfaces.test.ts`), so the palette holds. Masonry uses an object-space triplanar with v up on every side face (three's `triplanarTexture` would stand courses on end); any new mesh with the masonry material needs `bakeMasonry()`, which adds the cpu UVs and the `surfaceClearance` that drives the weathering. gpu reads albedo, normal and roughness, mobile albedo and roughness, cpu only the stone albedo through the Lambert copy. Share these materials rather than making variants; dev-only `?surfaces=off` restores the flat colours.
 - **Frame budget (sub-plan 25).** `render-scale.ts` adapts resolution once a second: gpu holds 50 fps between scales 1 and 1.5, mobile 28 fps between .75 and 1, falling after 2 s short and recovering .05 every 4 s with 15% headroom; a scale that failed stays out of reach until headroom triples. The cpu tier keeps its .05-per-second fall to .3. `?capture=1` freezes the scale. The walk camera's far plane is the walking fog's far distance, so lengthening the fog lengthens the view. `terrainTiles` splits the ground into 33 culled tiles that keep every vertex attribute (soil, `groundShade`), the one ground material with its `aoNode` and shore layer, and the name `cpu-detail.ts` skips. Hall interiors and the station and Future House collections hide their meshes beyond `ROOM_RANGE` (never their lights, which WebGPU builds into shaders) and show during `Town.warmUp`. Poster frames and feet merge per collection without touching display materials. Distant trees draw branches without twigs through one view-only mesh; shadows and the map keep every branch. Flowers are one geometry coloured per instance by a `petal` mask, except on cpu. `?budget=off` restores the 150 m far plane, interiors and twigs for review; `snapshot().budget` (dev only) lists the last frame's draws by top-level town group.
 - **Mobile is a first-class target, not a later port.** `Town` takes a `mobile` flag
@@ -322,12 +329,15 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   driven headlessly through Rapier (`tests/physics.test.ts` walks a capsule into a wall).
 - Playwright drives the real game in Chrome through `window.__livistone`, which exposes
   `snapshot()` (mode, position, yaw, fps, draw calls, triangles, progress,
-  `reducedGraphics`, and `budget`, the last frame's draws by town group) and `teleport(x, z, yaw)`. **That hook is test infrastructure —
+  `reducedGraphics`, `backend`: `webgpu` or `webgl2-fallback`, and `budget`, the last frame's draws by town group) and `teleport(x, z, yaw)`. **That hook is test infrastructure —
   keep it working and keep its shape stable**, including the mobile-viewport run with
   touch emulation.
 - Browser tests launch headless Chrome with GPU flags and fall back to whatever Chrome
   provides (ANGLE D3D11 on Windows, native GL on Linux); `LIVISTONE_SOFTWARE_GL=1` forces SwiftShader, which can exceed the 120 s test
-  budget on a loaded machine. Neither mode says anything about real GPU performance.
+  budget on a loaded machine. Neither mode says anything about real GPU performance. On Linux the Playwright config and the
+  capture harness add `--enable-unsafe-webgpu --enable-features=Vulkan --use-webgpu-power-preference=force-low-power` (only
+  the integrated GPU presents headless). `LIVISTONE_BACKEND=webgl` runs the specs on the WebGL 2 fallback;
+  `LIVISTONE_PARAMS=backend=webgl` captures it. Run both after changing materials or the render path.
 - After changing anything in `src/`, run `bun run build` and `bun run test`. Run
   `bun run test:browser` for changes to input, modes, interaction, world layout, or the UI.
 - Realism work follows `docs/realism/README.md`: one sub-plan per `realism/NN-slug` branch, with before/after captures for desktop, touch and software. New scripts are TypeScript run with `bun scripts/<name>.ts`; `tsconfig.json` type-checks `scripts/**/*.ts`.
@@ -339,11 +349,15 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
 ## Gotchas
 
 - Rapier ships as `@dimforge/rapier3d-compat` with embedded WASM; its lazily-loaded chunk is
-  ~1.1 MB and Vite warns about it. That warning is known and accepted for the prototype.
+  ~1.1 MB and Vite warns about it. The main chunk (~1.7 MB, ~560 kB gzip with WebGPURenderer's node
+  system) is over the limit too. Both warnings are known and accepted for the prototype.
 - Port 5173 is fixed (`strictPort`) so the README, Playwright, and the tree generator all
   agree. If it is taken, reuse or stop that server instead of changing the port.
 - The tree generator needs the dev server plus real Google Chrome; it writes into
   `public/models/trees/`. Regenerating changes committed binaries — say so in the commit.
+- On the cpu tier the walking eye leads the capsule axis by 2 mm (`EYE_LEAD` in `main.ts`): SwiftShader smeared a terrain
+  vertex lying on the camera plane (standing exactly over a grid vertex, as whole-metre teleports do) into a flat near
+  triangle. Keep that lead if you move the camera.
 - Interiors are hidden by occluder geometry, not by physics. Moving a landmark means moving
   its occluders and colliders too.
 - Fonts load from Google Fonts with local fallbacks; the game must stay usable offline.
@@ -404,7 +418,7 @@ directory, so the hook travels with the repository.
 - The hill is satin violet, one tone per coplanar facet, after the project's rendered and printed crystals; do not return to terracotta, which read as rust. A single row (`GALLERY`, z = -160) alternates six photo posters with six gene-category stands; keep its gaps walkable and it clear of paths, the climb line and overhangs (`tests/enhancement.test.ts`). Posters, labels and emblems carry `href` to enhancement.bio. The join sign (`ENHANCEMENT_SIGN`) stands beside the start of the marked climb, never on it. Stand crystals are real pipeline outputs from `data/enhancement/crystals/` (every triangle kept, flat side down, 10× STL mm) and load as their own chunk; never substitute procedural shapes. Photo originals stay outside the repo; keep `public/images/enhancement/ATTRIBUTION.md` and `sources.json` current, label memes as AI-assisted and do not name visitors.
 - Enhancement retains the source Voronoi shell outside one approved internal shaft. Keep the cave spiral connected and the base panel small. The summit human uses the CC0 MakeHuman body surface in `enhancement-human.json`; preserve continuous anatomy and chest-scale copper geometry. Five smaller roadside mycelium trees taper toward the hill without obstructing its entrances.
 
-- Photo exhibition boards and jewel stands share cream paper (`#f4f0e5`) across backing, margins, and captions. Use unlit, non-tone-mapped paper so it stays consistent at night; white studio photo backgrounds are tinted to that paper color.
+- Photo exhibition boards and jewel stands share cream paper (`#f4f0e5`) across backing, margins, and captions. Use `displayMaterial()` (unlit, outside tone mapping) so the paper stays consistent at night; white studio photo backgrounds are tinted to that paper color.
 - Building and place story signs (Embryo Station story, Mycelium grove, Enhancement join sign) use `place-sign.ts` so they are never mistaken for piece posters: a larger 3.5 × 2.5 m board, dark face in Livia's site style (warm near-black, letter-spaced serif capitals, amber-to-green rule) inside a pierced cast-gold lattice frame, lettered on both faces and clickable. Geometry and colliders are DOM-independent; `paintPlaceSign` draws the face. New place signs use the same component.
 
 - Town and garden roads share the 2.6 m path width, 0.13 m surface elevation and world-aligned paving. Round joints cover ribbon endpoint wedges. Keep the Glucose rear connection direct (38,-49 to 38,-52), with no redundant north spur.

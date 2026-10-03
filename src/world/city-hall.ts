@@ -19,7 +19,9 @@ export function cityHallCrystalMaterial(low: boolean): ShellMaterial {
 }
 
 export function setCityHallCrystalQuality(material: ShellMaterial, low: boolean): void {
-  material.transmission = low ? 0 : .78; material.transparent = low; material.opacity = low ? .30 : 1;
+  // The reduced crystal blends in linear light before tone mapping, where its own colour outweighs the dark garden behind it
+  // far more than in the classic renderer's blend of encoded colours: .14 here looks as the classic .30 did.
+  material.transmission = low ? 0 : .78; material.transparent = low; material.opacity = low ? .14 : 1;
   material.depthWrite = !low; material.clearcoat = 0; material.forceSinglePass = true; material.needsUpdate = true;
 }
 

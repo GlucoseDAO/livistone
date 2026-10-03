@@ -37,6 +37,11 @@ import { BUDGET_OFF, trackDraws } from './game/render-budget';
 import type { DrawCost } from './game/render-budget';
 
 const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 };
+// On the cpu tier the eye sits this far ahead of the capsule axis. Standing exactly over a terrain grid vertex (map arrivals
+// and teleports use whole-metre positions) put that vertex on the camera plane, and SwiftShader then smeared its attributes
+// over the adjoining near triangles as one flat colour, in classic as in WebGPU. Two millimetres keep it clipped; hardware
+// rasterizers clip it correctly, so the other tiers keep the eye on the axis.
+const EYE_LEAD = .002;
 // Dev-only ?look=a keeps the old hemisphere-heavy fill (sun and haze coherence only). b, the default, lets the baked sky
 // carry more of the ambient light and gives heroEnv materials their own reflection strength.
 const LOOK = import.meta.env.DEV && new URLSearchParams(location.search).get('light') === 'a' ? 'a' : 'b';
@@ -444,7 +449,8 @@ class Game {
     if (pos.y < -.5 || ((pos.x < b.minX || pos.x > b.maxX || pos.z < b.minZ || pos.z > b.maxZ) && !railwayCorridor(pos.x, pos.z))) { this.physics.teleport(SPAWN); this.input.yaw = SPAWN.yaw; this.ui.toast('Back on the station garden path.'); }
     this.ambience.setGarden(pos.z < -60);
 
-    const current = this.physics.position(); this.walkCamera.position.set(current.x, this.eyeHeight(current), current.z); this.walkCamera.rotation.set(this.input.pitch, this.input.yaw, 0, 'YXZ');
+    const current = this.physics.position(), yaw = this.input.yaw, lead = this.graphics.tier === 'cpu' ? EYE_LEAD : 0;
+    this.walkCamera.position.set(current.x - Math.sin(yaw) * lead, this.eyeHeight(current), current.z - Math.cos(yaw) * lead); this.walkCamera.rotation.set(this.input.pitch, yaw, 0, 'YXZ');
     this.updateClock += dt;
     if (this.updateClock > 0.12) { this.updateClock = 0; this.findInteraction(); this.findLocation(); this.cursorDirty = true; }
   }
