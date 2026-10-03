@@ -19,7 +19,7 @@ import { createGatewayPoster } from './gateway-poster';
 import { createPlanting } from './planting';
 import { createGrassField } from './grass-field';
 import type { GrassShade } from './ground-material';
-import { updateWind } from './wind';
+import { WIND_OFF, updateWind } from './wind';
 import type { Planting } from './planting';
 import { TOWN_PAVING, walkingSurface } from './walking-surface';
 import { Mountains } from './mountains';
@@ -122,6 +122,8 @@ export class Town {
   private terrainVertices = new Float32Array(0);
   private grassShade?: GrassShade;
   private groundOcclusion?: (x: number, z: number) => number;
+  /** Plants sway (wind.ts) on the gpu and mobile tiers; the cpu tier and dev-only ?wind=off keep them still. */
+  private get wind(): boolean { return this.tier !== 'cpu' && !WIND_OFF; }
   private constructor(private mobile: boolean, private tier: GraphicsTier) {
     this.water = waterMaterial(tier); this.paving = pavingMaterial(mobile);
     this.surfaces = activateSurfaces(tier); this.masonry = this.surfaces?.masonry ?? this.white; this.brass = this.surfaces?.gold ?? this.gold;
@@ -163,7 +165,7 @@ export class Town {
     this.train = arrival.getObjectByName('Panoramic maglev')!;
     label('Embryo Station and train'); this.railway = createRailwayStructure(this.root, this.colliders, mobile); label('Mountain railway');
     await stage(46, 'Growing the lake gardens and elevated galleries…');
-    this.gardens = new LivingWaters(mobile, this.paving); this.root.add(this.gardens.root);
+    this.gardens = new LivingWaters(mobile, this.paving, this.wind); this.root.add(this.gardens.root);
     this.gardens.presentLakeJewelry();
     this.gardens.addInterpretation('living-mycelium', 'Mycelium Rain Garden', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
     this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
@@ -360,7 +362,7 @@ export class Town {
     this.rooms.push({ center: new THREE.Vector3(x, 0, z), parts: group.children.filter((child) => !(child as THREE.Light).isLight), shown: null });
   }
   readonly forest = new Forest();
-  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
+  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows, this.wind), this.mountains.ready, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
     const sites = forestSites(this.mobile);
     for (const { x, y, z } of sites) this.colliders.push({ type: 'box', position: [x, y + 2, z], size: [0.3, 2, 0.3] });
@@ -372,7 +374,7 @@ export class Town {
     this.groundOcclusion = CONTACT_OFF ? undefined : groundShadeField(treeShadeDiscs(this.forest.sites), TOWN_SHADE_FOOTPRINTS);
     const grass = createGrassField(this.tier, { rocks: this.rocks, stems: this.gardens.stems, height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
     if (grass) { this.details.add(grass.mesh); this.grassShade = grass.ground; }
-    this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter, this.tier, grass?.ground.radius ?? 0);
+    this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter, this.tier, grass?.ground.radius ?? 0, this.wind);
     // One instanced draw of blended boulder variants; one collider mesh sampled from the same shapes and transforms.
     this.root.add(createRiverRocks(this.rocks, rockMaterial(this.mobile), this.tier)); this.colliders.push(rockColliders(this.rocks));
     // Shore pebbles live with the other near-ground details, so map mode hides them; cpu has none. Only nearby cells draw.

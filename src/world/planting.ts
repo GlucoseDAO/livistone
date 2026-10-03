@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { attribute, cameraPosition, distance, float, mix, positionLocal, smoothstep, vec3 } from 'three/tsl';
+import type { Node } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { terrainNoise } from './terrain';
 import { CIVIC_LANDMARKS } from '../game/content';
 import { PATH_CURVES, PATH_WIDTH, plantingAllowed } from './landscape';
+import { WIND_ROOT, addWindRoots, plantSway, windRoots } from './wind';
 
 const UP = new THREE.Vector3(0, 1, 0), TAU = Math.PI * 2;
 function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
@@ -90,9 +92,11 @@ function flowerGeometry(seed: number, mobile: boolean, instanced = false): THREE
 }
 /** A 24 m cell of one planting kind: a slice of the kind's instance arrays, its centre and a bounding sphere. */
 interface PlantCell { x: number; z: number; first: number; count: number; sphere: THREE.Sphere; shown: boolean }
-interface PlantKind { mesh: THREE.InstancedMesh; cells: PlantCell[]; matrices: Float32Array; colors: Float32Array; petals: Float32Array | null }
+interface PlantKind { mesh: THREE.InstancedMesh; cells: PlantCell[]; matrices: Float32Array; colors: Float32Array; petals: Float32Array | null; roots: Float32Array | null }
 
 function kind(parent: THREE.Group, name: string, sites: Site[], geometry: THREE.BufferGeometry, material: THREE.Material, shadow: boolean): PlantKind {
+  // A swaying material (wind.ts) reads each plant's root from a per-instance attribute, refilled with the instance matrices.
+  const sways = material.userData.wind === true;
   const cells = new Map<string, Site[]>();
   for (const site of sites) { const key = Math.floor(site.x / 24) + ':' + Math.floor(site.z / 24), cell = cells.get(key) ?? []; cell.push(site); cells.set(key, cell); }
   const matrix = new THREE.Matrix4(), q = new THREE.Quaternion(), color = new THREE.Color(), scaled = new THREE.Sphere();
@@ -113,7 +117,8 @@ function kind(parent: THREE.Group, name: string, sites: Site[], geometry: THREE.
   mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(sites.length * 3), 3);
   mesh.count = 0; mesh.visible = false; mesh.castShadow = shadow; mesh.receiveShadow = true; parent.add(mesh);
   if (petals) geometry.setAttribute('petalColor', new THREE.InstancedBufferAttribute(new Float32Array(sites.length * 3), 3));
-  return { mesh, cells: result, matrices, colors, petals };
+  if (sways) addWindRoots(geometry, sites.length);
+  return { mesh, cells: result, matrices, colors, petals, roots: sways ? windRoots(matrices) : null };
 }
 
 /**
@@ -154,35 +159,53 @@ export class Planting {
   private refill(kind: PlantKind): void {
     const { mesh } = kind, target = mesh.instanceMatrix.array as Float32Array, colors = mesh.instanceColor!.array as Float32Array, sphere = new THREE.Sphere(new THREE.Vector3(), -1);
     const petals = kind.petals ? mesh.geometry.getAttribute('petalColor') as THREE.InstancedBufferAttribute : null;
+    const roots = kind.roots ? mesh.geometry.getAttribute(WIND_ROOT) as THREE.InstancedBufferAttribute : null;
     let count = 0;
     for (const cell of kind.cells) {
       if (!cell.shown) continue;
       target.set(kind.matrices.subarray(cell.first * 16, (cell.first + cell.count) * 16), count * 16);
       colors.set(kind.colors.subarray(cell.first * 3, (cell.first + cell.count) * 3), count * 3);
       if (petals) (petals.array as Float32Array).set(kind.petals!.subarray(cell.first * 3, (cell.first + cell.count) * 3), count * 3);
+      if (roots) (roots.array as Float32Array).set(kind.roots!.subarray(cell.first * 4, (cell.first + cell.count) * 4), count * 4);
       count += cell.count; if (sphere.radius < 0) sphere.copy(cell.sphere); else sphere.union(cell.sphere);
     }
     mesh.count = count; mesh.visible = count > 0; mesh.boundingSphere = count > 0 ? sphere : null;
-    mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor!.needsUpdate = true; if (petals) petals.needsUpdate = true;
+    mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor!.needsUpdate = true; if (petals) petals.needsUpdate = true; if (roots) roots.needsUpdate = true;
   }
 }
 
 /**
- * Meadow tufts for towns with a near grass field (grass-field.ts): inside its radius the field's blades replace them, so they
- * sink into the ground as the camera comes near, over the band where the field's outer blades thin out.
+ * How each kind bends (wind.ts plantSway): the height in metres where its tip leans `stiffness` times the grass field's lean,
+ * and its leaf shiver. Shrubs are stiff and shiver; flower stems and tufts bend about as the near grass field's blades do.
  */
-function tuftMaterial(radius: number): THREE.MeshStandardNodeMaterial {
+const SHRUB_SWAY = { reach: 1, stiffness: .1, flutter: .012 }, FLOWER_SWAY = { reach: .5, stiffness: .32, flutter: 0 }, TUFT_SWAY = { reach: .35, stiffness: .5, flutter: 0 };
+/**
+ * A vertex-coloured plant node material, shared by every kind drawn with it, that sways from its root with `sway`. Shrubs
+ * cast shadows: like the forest's, they keep the rest pose in the cached sun shadow map, so a re-bake never catches a random
+ * wind pose. `position` is the unswayed position (positionLocal, or the tufts' sinking one).
+ */
+function plantMaterial(sway: typeof SHRUB_SWAY | null, position: Node<'vec3'> = positionLocal, colorNode?: Node<'vec3'>): THREE.MeshStandardNodeMaterial {
   const material = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: .94, side: THREE.DoubleSide });
-  // 1 - smoothstep(a, b) rather than reversed edges, which WGSL leaves undefined.
-  material.positionNode = positionLocal.sub(vec3(0, float(1).sub(smoothstep(radius * .6, radius * .95, distance(positionLocal.xz, cameraPosition.xz))).mul(.8), 0));
+  if (sway) { material.positionNode = plantSway(position, sway.reach, sway.stiffness, sway.flutter); material.castShadowPositionNode = positionLocal; material.userData.wind = true; }
+  else if (position !== positionLocal) material.positionNode = position;
+  if (colorNode) material.colorNode = colorNode;
   return material;
 }
+/**
+ * Meadow tufts. Where the tier has a near grass field (grass-field.ts, `radius` > 0) its blades replace them: they sink into
+ * the ground as the camera comes near, over the band where the field's outer blades thin out.
+ */
+function tuftMaterial(radius: number, wind: boolean): THREE.MeshStandardNodeMaterial {
+  // 1 - smoothstep(a, b) rather than reversed edges, which WGSL leaves undefined.
+  return plantMaterial(wind ? TUFT_SWAY : null, radius > 0 ? positionLocal.sub(vec3(0, float(1).sub(smoothstep(radius * .6, radius * .95, distance(positionLocal.xz, cameraPosition.xz))).mul(.8), 0)) : positionLocal);
+}
 
-/** `grassRadius` is the near grass field's radius, or 0 where the tier draws none. */
-export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: boolean, height: (x: number, z: number) => number, river: (x: number) => number, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', grassRadius = 0): Planting {
+/** `wind`: the plants sway (wind.ts); never on the cpu tier, whose Lambert copies (cpu-detail.ts) would drop the sway and whose geometry stays as it was. */
+export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: boolean, height: (x: number, z: number) => number, river: (x: number) => number, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', grassRadius = 0, wind = tier !== 'cpu'): Planting {
   const result: PlantKind[] = [];
   const rand = random(58), shrubs: Site[][] = [[], [], []], grass: Site[] = [];
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .94, side: THREE.DoubleSide });
+  wind &&= tier !== 'cpu'; const shrubMaterial = wind ? plantMaterial(SHRUB_SWAY) : material;
   for (let i = 0; i < 2600; i++) {
     const l = CIVIC_LANDMARKS[i % CIVIC_LANDMARKS.length], angle = rand() * TAU, r = 12.8 + rand() * 7.5, scale = .65 + rand() * .65;
     const x = i % 4 ? l.x + Math.sin(angle) * r * (1 + (l.stretch.x - 1) * .85) : (rand() - .5) * 120;
@@ -192,7 +215,7 @@ export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: 
     shrubs[i % 3].push({ x, y: height(x, z), z, scale, angle });
     if (shrubs.flat().length >= (mobile ? 200 : 320)) break;
   }
-  shrubs.forEach((sites, i) => result.push(kind(root, 'Leafy shrubs', sites, shrubGeometry(191 + i, mobile, i > 0), material, true)));
+  shrubs.forEach((sites, i) => result.push(kind(root, 'Leafy shrubs', sites, shrubGeometry(191 + i, mobile, i > 0), shrubMaterial, true)));
   // Short, separated patches leave grass between flowers and keep the routes visually quiet.
   const flowers: Site[][] = [[], [], [], []];
   const plant = (x: number, z: number, palette: number): void => {
@@ -219,8 +242,7 @@ export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: 
   else {
     // One clump shape for every palette, coloured per instance: a single mesh and shader build instead of four. The cpu tier keeps
     // four vertex-coloured kinds, as its Lambert copies (cpu-detail.ts) carry no colour node.
-    const petal = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: .94, side: THREE.DoubleSide });
-    petal.colorNode = mix(vec3(1), attribute('petalColor', 'vec3'), attribute('petal', 'float'));
+    const petal = plantMaterial(wind ? FLOWER_SWAY : null, positionLocal, mix(vec3(1), attribute('petalColor', 'vec3'), attribute('petal', 'float')));
     const palette = PETALS.map((hex) => new THREE.Color(hex));
     result.push(kind(root, 'Flower borders', flowers.flatMap((sites, i) => sites.map((site) => ({ ...site, petal: palette[i] }))), flowerGeometry(400, mobile, true), petal, false));
   }
@@ -231,6 +253,6 @@ export function createPlanting(root: THREE.Group, details: THREE.Group, mobile: 
     if (!plantingAllowed(x, z, .55 * scale) || Math.abs(z - river(x)) < 7.4) continue;
     grass.push({ x, y: height(x, z) + .012, z, scale, angle: rand() * TAU });
   }
-  result.push(kind(details, 'Meadow grass', grass, grassGeometry(mobile), grassRadius > 0 ? tuftMaterial(grassRadius) : material, false));
+  result.push(kind(details, 'Meadow grass', grass, grassGeometry(mobile), wind || grassRadius > 0 ? tuftMaterial(grassRadius, wind) : material, false));
   return new Planting(result);
 }

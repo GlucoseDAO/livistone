@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { diffuseColor, float, fwidth, positionLocal } from 'three/tsl';
 import { BUDGET_OFF } from '../game/render-budget';
+import { WIND_ROOT, addWindRoots, treeSway, windRoots } from './wind';
 
 const NEAR = 36;
 /** Layer of the shadow-only tree meshes; the sun's shadow camera renders it (main.ts), the view cameras do not. */
@@ -65,8 +67,37 @@ export function dropTwigs(geo: THREE.BufferGeometry, size = 2): THREE.BufferGeom
   copy.setIndex(kept); return copy;
 }
 
-/** Whether distant views drop the twigs; ?budget=off (and the budget script's comparison) keep them. Read at load. */
-export const FOREST_DETAIL = { twigless: !BUDGET_OFF };
+/**
+ * Read at load. `twigless`: distant views drop the twigs; ?budget=off (and the budget script's comparison) keep them.
+ * `coverage`: leaf cards use alpha-to-coverage; main.ts turns it on where the renderer multisamples (fine pointers).
+ */
+export const FOREST_DETAIL = { twigless: !BUDGET_OFF, coverage: false };
+/** Height of both tree models at scale 1, from their GLB bounds. */
+const TREE_HEIGHT = 12;
+
+/**
+ * A tree part's material, swaying in the wind (wind.ts): a node copy of the GLB's material, as three's own conversion makes
+ * it, with the sway as its position. Shadow casters keep the rest pose: the sun's shadow map is baked once and refreshed only
+ * when visibility changes, so a swaying caster would freeze a random wind pose into it and jump at every re-bake. The wind
+ * blows almost square to the sun's azimuth, so the moving cards hardly change depth against that rest-pose map. `far`: the
+ * crown's lean only, for the reduced detail (wind.ts treeSway).
+ */
+export function swayingTreeMaterial(source: THREE.MeshStandardMaterial, foliage: boolean, coverage = FOREST_DETAIL.coverage, far = false): THREE.MeshStandardNodeMaterial {
+  const material = new THREE.MeshStandardNodeMaterial();
+  for (const key in source) (material as unknown as Record<string, unknown>)[key] = (source as unknown as Record<string, unknown>)[key];
+  material.positionNode = treeSway(TREE_HEIGHT, foliage, far); material.castShadowPositionNode = positionLocal;
+  // With MSAA the cards' cut-out edges cover a share of the samples instead of stepping at the .45 cutoff; the shadow pass
+  // keeps the plain alpha test (three copies alphaTest, not alphaToCoverage, to its shadow material). three ramps coverage
+  // over the pixel above the cutoff, which thinned every crown; centring the ramp on the cutoff keeps the alpha test's density.
+  if (foliage && coverage && source.alphaTest > 0) { material.alphaToCoverage = true; material.alphaTestNode = float(source.alphaTest).sub(fwidth(diffuseColor.a).mul(.5)); }
+  return material;
+}
+/** The same vertices and index under a geometry of its own, so a second view mesh can carry its own per-instance windRoot. */
+function twin(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  const copy = new THREE.BufferGeometry(); copy.setIndex(geometry.index);
+  for (const [name, attribute] of Object.entries(geometry.attributes)) copy.setAttribute(name, attribute);
+  copy.boundingSphere = geometry.boundingSphere; return copy;
+}
 
 /**
  * A cell's trees: a slice of its species' instance arrays, and a sphere that bounds them all. A cell that straddles the reach
@@ -78,6 +109,7 @@ interface Cell { species: number; center: THREE.Vector3; first: number; count: n
  * shadow mesh's cells when they differ from the view's.
  */
 interface Part { species: number; view: THREE.InstancedMesh; shadow: THREE.InstancedMesh | null; colors: Float32Array; shows: (state: number) => boolean; casts?: (state: number) => boolean }
+// A view mesh's windRoot attribute sits on its geometry; shadow meshes share that geometry but draw the rest pose and never read it.
 // Cell states: hidden, trunks only (map), trunks with reduced foliage, trunks with full foliage.
 const HIDDEN = 0, TRUNKS = 1, REDUCED = 2, FULL = 3;
 const frustum = new THREE.Frustum(), viewProjection = new THREE.Matrix4();
@@ -98,8 +130,10 @@ export class Forest extends THREE.Group {
   private spheres: Float32Array[] = [];
   private readonly reachFrom = new THREE.Vector3(Infinity, 0, 0);
   private reach = Infinity;
+  private roots: Float32Array[] = [];
   private warm = false;
-  async load(mobile: boolean, shadows = true): Promise<void> {
+  /** `wind`: the trees sway (gpu and mobile; the cpu tier keeps the GLB materials and geometry untouched). */
+  async load(mobile: boolean, shadows = true, wind = false): Promise<void> {
     const loader = new GLTFLoader();
     const models = await Promise.all(['oak', 'ash'].map((name) => loader.loadAsync(import.meta.env.BASE_URL + 'models/trees/' + name + '.glb')));
     const planned = forestCells(this.sites);
@@ -129,21 +163,24 @@ export class Forest extends THREE.Group {
         }
         this.cells.push(cell);
       }
-      this.matrices[species] = matrices; this.spheres[species] = spheres;
+      this.matrices[species] = matrices; this.spheres[species] = spheres; if (wind) this.roots[species] = windRoots(matrices);
       parts.forEach((source, i) => {
-        const material = source.material as THREE.MeshStandardMaterial;
-        material.envMapIntensity = .35;
-        if (material.map) material.map.anisotropy = 4;
+        const original = source.material as THREE.MeshStandardMaterial;
+        original.envMapIntensity = .35;
+        if (original.map) original.map.anisotropy = 4;
         const foliage = source.name === 'foliage', reduced = foliage ? thinFoliage(geometries[i]) : null;
+        // Each detail is its own instanced mesh and shader build anyway; the distant one sways more cheaply.
+        const material = wind ? swayingTreeMaterial(original, foliage) : original, far = wind ? swayingTreeMaterial(original, foliage, FOREST_DETAIL.coverage, true) : original;
         // Mobile always draws the thinned foliage; desktop thins it beyond NEAR metres. Distant views drop the twigs (sub-plan 25)
         // through one extra view-only mesh; the map's bare trunks and every shadow keep them.
         const twigless = !foliage && FOREST_DETAIL.twigless;
-        const details: [THREE.BufferGeometry, (state: number) => boolean, boolean, ((state: number) => boolean)?][] = !foliage
-          ? twigless ? [[geometries[i], (state) => state === FULL || state === TRUNKS, true, (state) => state >= TRUNKS], [dropTwigs(geometries[i]), (state) => state === REDUCED, false]] : [[geometries[i], (state) => state >= TRUNKS, true]]
-          : [[mobile ? reduced! : geometries[i], (state) => state === FULL, true], [reduced!, (state) => state === REDUCED, true]];
-        for (const [geometry, shows, casts, castShows] of details) {
+        const details: [THREE.BufferGeometry, THREE.Material, (state: number) => boolean, boolean, ((state: number) => boolean)?][] = !foliage
+          ? twigless ? [[geometries[i], material, (state) => state === FULL || state === TRUNKS, true, (state) => state >= TRUNKS], [dropTwigs(geometries[i]), far, (state) => state === REDUCED, false]] : [[geometries[i], material, (state) => state >= TRUNKS, true]]
+          : [[mobile ? reduced! : geometries[i], material, (state) => state === FULL, true], [mobile && wind ? twin(reduced!) : reduced!, far, (state) => state === REDUCED, true]];
+        for (const [geometry, look, shows, casts, castShows] of details) {
+          if (wind) addWindRoots(geometry, total);
           const instanced = (castShadow: boolean): THREE.InstancedMesh => {
-            const mesh = new THREE.InstancedMesh(geometry, material, total);
+            const mesh = new THREE.InstancedMesh(geometry, look, total);
             mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(total * 3), 3);
             mesh.count = 0; mesh.visible = false; mesh.castShadow = castShadow; mesh.receiveShadow = !castShadow; mesh.name = source.name; this.add(mesh);
             if (castShadow) mesh.layers.set(SHADOW_LAYER);
@@ -211,21 +248,26 @@ export class Forest extends THREE.Group {
   }
   private fill(part: Part, mesh: THREE.InstancedMesh, include: (cell: Cell) => boolean): void {
     const matrices = this.matrices[part.species], target = mesh.instanceMatrix.array as Float32Array, colors = mesh.instanceColor!.array as Float32Array, sphere = new THREE.Sphere(new THREE.Vector3(), -1);
+    const roots = mesh === part.view ? mesh.geometry.getAttribute(WIND_ROOT) as THREE.InstancedBufferAttribute | undefined : undefined, source = this.roots[part.species];
     let count = 0;
     for (const cell of this.cells) {
       if (cell.species !== part.species || !include(cell)) continue;
       if (cell.partial && !this.warm) {
         for (let i = 0; i < cell.count; i++) if (cell.inside[i]) {
           target.set(matrices.subarray((cell.first + i) * 16, (cell.first + i + 1) * 16), count * 16);
-          colors.set(part.colors.subarray((cell.first + i) * 3, (cell.first + i + 1) * 3), count * 3); count++;
+          colors.set(part.colors.subarray((cell.first + i) * 3, (cell.first + i + 1) * 3), count * 3);
+          if (roots) (roots.array as Float32Array).set(source.subarray((cell.first + i) * 4, (cell.first + i + 1) * 4), count * 4);
+          count++;
         }
       } else {
         target.set(matrices.subarray(cell.first * 16, (cell.first + cell.count) * 16), count * 16);
         colors.set(part.colors.subarray(cell.first * 3, (cell.first + cell.count) * 3), count * 3);
+        if (roots) (roots.array as Float32Array).set(source.subarray(cell.first * 4, (cell.first + cell.count) * 4), count * 4);
         count += cell.count;
       }
       if (sphere.radius < 0) sphere.copy(cell.sphere); else sphere.union(cell.sphere);
     }
+    if (roots) { roots.clearUpdateRanges(); roots.addUpdateRange(0, count * 4); roots.needsUpdate = true; }
     mesh.count = count; mesh.visible = count > 0; mesh.boundingSphere = count > 0 ? sphere : null;
     mesh.instanceMatrix.clearUpdateRanges(); mesh.instanceMatrix.addUpdateRange(0, count * 16); mesh.instanceMatrix.needsUpdate = true;
     mesh.instanceColor!.clearUpdateRanges(); mesh.instanceColor!.addUpdateRange(0, count * 3); mesh.instanceColor!.needsUpdate = true;

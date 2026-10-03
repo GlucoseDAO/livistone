@@ -1,6 +1,6 @@
 import { paintPosterText } from './poster-text';
 import * as THREE from 'three';
-import { instancedBufferAttribute, length, uniform, uv, vec2 } from 'three/tsl';
+import { instancedBufferAttribute, length, positionLocal, uniform, uv, vec2 } from 'three/tsl';
 import { lakeWaterMaterial } from './water-material';
 import { displayMaterial, paperPhotoMaterial } from '../render/output';
 import { createPlaceSign, paintPlaceSign } from './place-sign';
@@ -22,6 +22,7 @@ import { WALKING_NETWORK } from './landscape';
 import { KERB_WIDTH } from './path-kerbs';
 import type { GroundDisc } from './grass-field';
 import { mergeStatic } from './static-batch';
+import { addWindRoots, plantSway, windRoots } from './wind';
 
 /** A culvert headwall's centre, past the outer face of the path kerb (it is 0.3 m thick, so it clears the kerb by 0.15 m). */
 const CULVERT_SET = .3;
@@ -60,7 +61,8 @@ export class LivingWaters {
   private readonly rain: THREE.Points;
   private readonly drips: THREE.Points;
   private readonly drainage: THREE.Curve<THREE.Vector3>[] = [];
-  constructor(private mobile: boolean, private readonly pathMaterial: THREE.Material = new THREE.MeshStandardMaterial({ color: '#d4cfbc', roughness: .91 })) {
+  /** `wind`: the reeds sway (gpu and mobile tiers); the cpu tier keeps them still and their geometry unchanged. */
+  constructor(private mobile: boolean, private readonly pathMaterial: THREE.Material = new THREE.MeshStandardMaterial({ color: '#d4cfbc', roughness: .91 }), private readonly wind = false) {
     this.root.name = 'Living Waters · town gardens'; this.root.position.set(GARDENS.x, 0, GARDENS.z);
     // The eyes keep clear of the garden paths' paving and kerbs (lake-eyes.ts), so their stone lips never cross a path.
     const network = shape(LAKE_OUTLINE); waterEyes().forEach((eye) => network.holes.push(new THREE.Path(eye.outline.map(([x, z]) => new THREE.Vector2(x, -z)))));
@@ -165,8 +167,12 @@ export class LivingWaters {
       const x = lake ? Math.cos(a) * r : 54 + rand() * 48, z = lake ? Math.sin(a) * r : -30 + rand() * 61;
       if (rainPlantAllowed(x, z, .55)) sites.push(new THREE.Vector3(x, gardenHeight(x, z), z));
     }
-    const reeds = new THREE.InstancedMesh(geometry, new THREE.MeshStandardMaterial({ color: '#466347', roughness: .9, side: THREE.DoubleSide }), sites.length), matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion();
+    // Reeds bend about as far as the meadow's blades (wind.ts), from roots given in town coordinates so the gusts run on across the garden.
+    const reedParameters = { color: '#466347', roughness: .9, side: THREE.DoubleSide };
+    const material = this.wind ? Object.assign(new THREE.MeshStandardNodeMaterial(reedParameters), { positionNode: plantSway(positionLocal, .7, .4), userData: { wind: true } }) : new THREE.MeshStandardMaterial(reedParameters);
+    const reeds = new THREE.InstancedMesh(geometry, material, sites.length), matrix = new THREE.Matrix4(), rotation = new THREE.Quaternion();
     sites.forEach((p, i) => { const scale = .4 + rand() * .5; matrix.compose(p, rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * Math.PI * 2), new THREE.Vector3(scale, scale, scale)); reeds.setMatrixAt(i, matrix); }); reeds.computeBoundingSphere(); this.root.add(reeds);
+    if (this.wind) { const roots = windRoots(reeds.instanceMatrix.array); for (let i = 0; i < roots.length; i += 4) { roots[i] += GARDENS.x; roots[i + 2] += GARDENS.z; } addWindRoots(geometry, sites.length).array.set(roots); }
     const pads: { x: number; y: number; z: number; angle: number; scale: number }[] = [], jitter = random(4417);
     largestEyes().forEach(({ center: [x, z] }) => {
       const count = 1 + (jitter() < .45 ? 1 : 0) + (jitter() < .2 ? 1 : 0);

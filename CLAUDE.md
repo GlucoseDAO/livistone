@@ -101,7 +101,7 @@ src/
     railway.ts       Textured rail geometry, Dark Nut portals, lined bores and matching colliders
     planting.ts      Spatially batched leafy shrubs, blossoms, blade grass, distance cull
     grass-field.ts   Near-player grass: one instanced draw of world-anchored blade patches over a baked 2 m lookup
-    wind.ts          Shared wind clock (game time, still under reduced motion) and plant sway
+    wind.ts          Shared wind clock (game time, still under reduced motion); grass, tree, shrub, flower and reed sway
     bridge.ts        Solid arch bridge, deck, rails, and matching colliders
     gateway.ts       King's Chapel entrance arch, faceted tourmaline, raised lettering and colliders
     gateway-materials.ts Procedural silver, limestone and colour-zoned gem materials
@@ -174,8 +174,12 @@ docs/3d-game-plan.md Technology decision, scope, milestones, acceptance criteria
   one draw (gpu 52k blades to 22 m, mobile 19k to 12 m, none on cpu), lives in the details group so map mode hides it, shades
   the ground between its blades, takes the terrain's baked crown and wall occlusion (`groundShadeField`) as its own aoNode,
   and sinks `planting.ts` tufts inside its radius. Animate plants only through `wind.ts`
-  (`windTime`: the game's elapsed time, frozen by `?capture=1`, still under reduced motion), never TSL's `time`. Dev switches:
-  `?grass=off`, and `?eye=<metres>` for low captures.
+  (`windTime`: the game's elapsed time, frozen by `?capture=1`, still under reduced motion), never TSL's `time`. Trees
+  (`treeSway`; the distant detail only leans), shrubs, flowers, tufts and lake reeds (`plantSway`) read a per-instance `windRoot` (the instance matrix's
+  translation and scale) that is refilled with the matrices, so every view mesh needs a geometry of its own; shadow casters
+  keep the rest pose (`castShadowPositionNode`) in the cached sun shadow map. Leaf cards use alpha-to-coverage where the frame
+  is multisampled (`FOREST_DETAIL.coverage`). The cpu tier gets neither. Dev switches: `?grass=off`, `?wind=off` (plants still,
+  plain alpha test), `?wind=<seconds>` (pinned wind clock), and `?eye=<metres>` for low captures.
 - **The bridge gateway follows the approved King's Chapel ring concept.** Keep its paired
   inward-facing silver tips, fan-spoked bezel, long green tourmaline and raised LIVISTONE
   letters above the stone. `gateway-layout.ts` reserves the side abutments and paved approach;

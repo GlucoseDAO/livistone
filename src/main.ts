@@ -26,7 +26,7 @@ import type { PostMode } from './game/graphics';
 import { parseTimeOfDay, readTimeOfDay, resolveNight, saveTimeOfDay } from './game/daylight';
 import type { TimeOfDay } from './game/daylight';
 import { NightLighting } from './world/night-lighting';
-import { SHADOW_LAYER } from './world/forest';
+import { FOREST_DETAIL, SHADOW_LAYER } from './world/forest';
 import { shadowFrame } from './game/shadow-frame';
 import { installShadowFade, shadowFade } from './world/shadow-fade';
 import type { Physics } from './game/physics';
@@ -229,6 +229,8 @@ class Game {
     this.drawGroups.set(object, group); return group;
   }
   async load(): Promise<void> {
+    // Leaf cards smooth their cut-out edges by alpha-to-coverage wherever the frame is multisampled (fine pointers).
+    FOREST_DETAIL.coverage = this.renderer.samples > 1;
     this.town = await Town.create(this.reduced, loadingStage, this.graphics.tier); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
     await loadingStage(70, 'Loading gallery images and woodland…');
     const assets = this.town.loadAssets();

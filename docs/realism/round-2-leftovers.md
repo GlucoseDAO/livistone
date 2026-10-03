@@ -64,8 +64,8 @@ Status at wrap-up: see "Sub-plan 21 at wrap-up" at the end of this file. To fini
 
 In order of expected visible change:
 
-1. **18 Ambient occlusion and restrained bloom.** GTAO node at half resolution in the output pipeline; skip `display` pixels; bloom only above 1 (night halos, neon, glints). Also try `?post=gi` (SSGI) if affordable. *Built on `realism/18-post` (gpu tier only; SSGI measured too expensive and kept dev-only), awaiting review: see [18](18-gpu-post.md#result-3-october-2026-branch-realism18-post).*
-2. **17 Wind and foliage.** Reuse the shared wind clock in `src/world/wind.ts` (13).
+1. **18 Ambient occlusion and restrained bloom.** Merged into `main` (`b41c688`, `619a902`).
+2. **17 Wind and foliage.** Merged into `main`: trees, shrubs, flowers, tufts and reeds sway on the shared wind clock; leaf cards use alpha-to-coverage. See [17-wind.md](17-wind.md#outcome-round-2-realism17-wind-3-october-2026).
 3. **05 Golden hour.** A TSL sky preset; `HORIZON_HAZE.golden` and `HORIZON_RADIANCE.golden`.
 4. **07 Reflection probes → 08 building materials.** 08 uses the local reference photos.
 5. **12 Gallery posters.** Real paper colour, frames, residency.
