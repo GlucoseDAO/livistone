@@ -6,9 +6,9 @@ import type { ColliderSpec } from '../game/physics';
 import { createMaglevTrain, createTrainCabinGraphics } from './train';
 import { RAILWAY_LOCAL as RAILWAY, STATION_BENCHES, STATION_FITTINGS as FITTINGS, STATION_LOCAL as STATION, stationClassic } from './station-layout';
 import { stationRingGeometry, stationRingAnchor } from './station-ring';
-import { stationAmberGeometry, stationAmberMaterial, stationAmberPoint, stationAmberSoffit } from './station-amber';
+import { stationAmberCore, stationAmberCoreMaterial, stationAmberGeometry, stationAmberMaterial, stationAmberPoint, stationAmberSoffit } from './station-amber';
 import { activeSurfaces, bakeMasonry } from './surfaces';
-import { nightEmission } from './night-lighting';
+import { addGlow, nightEmission } from './night-lighting';
 
 /** The southern placement (world.ts): a half-turn and x = -16. bakeMasonry() weathers the stone against the ground it stands on. */
 const PLACEMENT = new THREE.Matrix4().makeRotationY(Math.PI).setPosition(-16, 0, 0);
@@ -111,13 +111,18 @@ function stationStone(station: THREE.Group, colliders: ColliderSpec[]): void {
   add(station, stone, material, 'Dressed station coping, footings and threshold');
 }
 
-/** Lamp posts as on the town bridge, brass litter bins and the map panel's posts (sub-plan 28); the panel's faces are in createStation. */
+/**
+ * Lamp posts as on the town bridge, brass litter bins and the map panel's posts (sub-plan 28); the panel's faces are in
+ * createStation. Each lamp is a night halo and light source as the bridge's are (round 2): the nearest join NightLighting's
+ * fixed pool of lights, so the platform gets pools of lamplight without a light of its own that WebGPU would build in.
+ */
 function stationFittings(station: THREE.Group, colliders: ColliderSpec[], trim: THREE.BufferGeometry[], mobile: boolean): void {
   const floor = STATION.floor, globes: THREE.BufferGeometry[] = [];
   for (const [x, z] of FITTINGS.lamps) {
     trim.push(new THREE.CylinderGeometry(.045, .065, 2.8, 10).translate(x, floor + 1.4, z), new THREE.CylinderGeometry(.075, .05, .1, 12).translate(x, floor + 2.74, z));
     globes.push(new THREE.SphereGeometry(.23, mobile ? 12 : 18, mobile ? 8 : 12).translate(x, floor + 2.92, z));
     colliders.push({ type: 'box', position: [x, floor + 1.4, z], size: [.08, 1.4, .08] });
+    addGlow(station, new THREE.Vector3(x, floor + 2.92, z), '#ffcf79', 4.5, 36, 10, .7);
   }
   const globe = new THREE.MeshStandardMaterial({ color: '#f3e8c9', emissive: '#e4c881', emissiveIntensity: .35, roughness: .6 });
   nightEmission(globe, '#ffcf79', 3); add(station, merge(globes), globe, 'Platform lamp globes').castShadow = false;
@@ -209,13 +214,10 @@ export function createStationStructure(root: THREE.Group, colliders: ColliderSpe
   const silver = new THREE.MeshStandardMaterial({ color: '#eee7db', metalness: .82, roughness: .23, envMapIntensity: 1.05, userData: { heroEnv: true } });
   const white = new THREE.MeshStandardMaterial({ color: '#ede9dc', metalness: .18, roughness: .43, side: THREE.DoubleSide });
   const brass = new THREE.MeshStandardMaterial({ color: '#b28d42', metalness: .65, roughness: .3 });
-  const amber = stationAmberMaterial(mobile), roof = stationAmberGeometry(mobile);
+  const amber = stationAmberMaterial(mobile, classic), roof = stationAmberGeometry(mobile);
   const stone = add(station, roof, amber, 'Sculpted amber body'); stone.castShadow = false; solid(colliders, roof);
-  // A recessed resin core gives the transparent surface depth and warm internal reflections.
-  if (!mobile) {
-    // Sub-plan 28: a brighter heart, so the resin core reads through the stone from below and from the meadow.
-    const core = add(station, stationAmberGeometry(true, .14), new THREE.MeshStandardMaterial({ color: '#fff3ad', map: amber.map, bumpMap: amber.bumpMap, bumpScale: .3, roughness: .28, emissive: '#ffda3d', emissiveMap: amber.map, emissiveIntensity: classic ? .2 : .34 }), 'Amber resin core'); core.castShadow = false;
-  }
+  // A recessed resin core gives the transparent surface depth and warm internal reflections; its glow reads through the stone.
+  if (!mobile) { const core = add(station, stationAmberCore(classic), stationAmberCoreMaterial(amber, classic), 'Amber resin core'); core.castShadow = false; }
   const floor = box(STATION.x, .015, -68.1, 58, .33, 16.2);
   const floorUV = floor.getAttribute('uv'), floorPosition = floor.getAttribute('position');
   for (let i = 0; i < floorUV.count; i++) floorUV.setXY(i, floorPosition.getX(i) / 4, floorPosition.getZ(i) / 4);

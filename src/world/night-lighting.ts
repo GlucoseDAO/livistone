@@ -36,6 +36,9 @@ export function addGlow(parent: THREE.Object3D, position: THREE.Vector3, color: 
   glow.userData.nightGlow = true; glow.userData.lightSource = { color, intensity, distance }; parent.add(glow); return glow;
 }
 
+/** Metres over which a pooled light fades before it passes to a nearer source (NightLighting.update). */
+export const POOL_FADE = 4;
+
 export function nightEmission(material: THREE.MeshStandardMaterial | THREE.MeshStandardNodeMaterial, color: string, intensity: number): void {
   material.userData.dayEmission = { color: material.emissive.getHex(), intensity: material.emissiveIntensity };
   material.userData.nightEmission = { color, intensity };
@@ -73,6 +76,13 @@ export class NightLighting {
     // Place the halo just in front of its own opaque opal, retaining depth tests against intervening scenery.
     for (const halo of this.surfaceHalos) { this.direction.copy(camera.position).sub(halo.center).normalize().multiplyScalar(halo.offset).add(halo.center); halo.sprite.position.copy(halo.sprite.parent!.worldToLocal(this.direction)); }
     const sorted = [...this.sources].sort((a, b) => a.position.distanceToSquared(camera.position) - b.position.distanceToSquared(camera.position));
-    this.lights.forEach((light, i) => { const source = sorted[i]; if (!source) { light.intensity = 0; return; } light.position.copy(source.position); light.color.set(source.color); light.intensity = source.intensity; light.distance = source.distance; });
+    // A source about to hand its light to the nearest one without a light fades out over the last POOL_FADE metres, and that one
+    // fades in, so walking past a swap never pops a light pool on or off (the station's lamps put seven candidates on the platform).
+    const next = sorted[this.lights.length], reach = next ? next.position.distanceTo(camera.position) : Infinity;
+    this.lights.forEach((light, i) => {
+      const source = sorted[i]; if (!source) { light.intensity = 0; return; }
+      light.position.copy(source.position); light.color.set(source.color); light.distance = source.distance;
+      light.intensity = source.intensity * THREE.MathUtils.smoothstep(reach - source.position.distanceTo(camera.position), 0, POOL_FADE);
+    });
   }
 }

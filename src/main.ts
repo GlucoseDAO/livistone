@@ -14,6 +14,7 @@ import { createSky, HORIZON_HAZE, HORIZON_RADIANCE, MOON_DIR, SKY_EXPOSURE, SUN_
 import type { SkyPhase } from './world/sky';
 import { setGatewayQuality } from './world/gateway-materials';
 import { setMitoringAmberQuality } from './world/mitoring-materials';
+import { setStationAmberQuality } from './world/station-amber';
 import { ShellMaterial } from './render/shell';
 import { COLLECTION } from './game/exhibits';
 import { Town } from './world/world';
@@ -563,17 +564,18 @@ class Game {
     this.scene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of materials) if (material instanceof ShellMaterial) {
+      for (const material of materials) if (material instanceof THREE.MeshPhysicalNodeMaterial && material.userData.stationAmber) setStationAmberQuality(material, low);
+      else if (material instanceof ShellMaterial) {
         if (material.userData.mitoringAmber) setMitoringAmberQuality(material, low);
         if (material.userData.cityHallCrystal) setCityHallCrystalQuality(material, low);
       } else if (material instanceof THREE.MeshPhysicalMaterial) {
         if (material.userData.myceliumOpal) { material.iridescence = low ? .35 : 1; material.needsUpdate = true; continue; }
         if (material.userData.gatewayGem) { setGatewayQuality(material, low); continue; }
         if (material.userData.pavilionGem) { material.transmission = low ? 0 : .42; material.opacity = low ? .45 : .7; material.needsUpdate = true; continue; }
-        // Only hall glazing and station amber follow the generic switch; the river and Future House glass keep their own optics.
-        if (!material.userData.hallGlass && !material.userData.stationAmber) continue;
-        material.transmission = low ? 0 : material.userData.stationAmber ? .8 : .45;
-        material.opacity = material.userData.stationAmber ? 1 : material.userData.clearGallery ? (low ? .18 : .26) : (low ? .32 : .65); if (material.userData.stationAmber) material.emissiveIntensity = low ? .23 : .2; material.needsUpdate = true;
+        // Only hall glazing follows the generic switch; the station amber, river and Future House glass keep their own optics.
+        if (!material.userData.hallGlass) continue;
+        material.transmission = low ? 0 : .45;
+        material.opacity = material.userData.clearGallery ? (low ? .18 : .26) : (low ? .32 : .65); material.needsUpdate = true;
       }
     });
     this.nightLighting.setNight(this.night); this.resize(); this.ui.toast(low ? 'Gentle visual detail enabled.' : 'Rich visual detail enabled.');
