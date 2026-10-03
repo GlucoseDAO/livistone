@@ -18,7 +18,10 @@ export interface RenderView {
   beginFrame(): void;
   /** WebGPU device loss, or the fallback's lost WebGL context. */
   onLost(handler: () => void): void;
+  /** Dev-only: node builds, shader programs and render pipelines created so far (snapshot().shaders); zeros in production. */
+  shaders(): ShaderCounts;
 }
+export interface ShaderCounts { builds: number; programs: number; pipelines: number }
 
 type GPUProbe = { requestAdapter(options?: { powerPreference?: string }): Promise<{ info?: AdapterInfo } | null> };
 
@@ -52,6 +55,16 @@ export async function createRenderer(canvas: HTMLCanvasElement, antialias: boole
   renderer.setTransparentSort(classicTransparentOrder as unknown as Parameters<THREE.WebGPURenderer['setTransparentSort']>[0]);
   const backend = renderer.backend as THREE.Backend & { isWebGPUBackend?: boolean; device?: { adapterInfo?: AdapterInfo }; gl?: WebGL2RenderingContext };
   const webgpu = backend.isWebGPUBackend === true;
+  // Dev-only counts, so a test or timing run can see which step builds shaders: each node build is a synchronous main-thread
+  // cost on first sight of an object, and each pipeline a driver compile.
+  const shaders: ShaderCounts = { builds: 0, programs: 0, pipelines: 0 };
+  if (import.meta.env.DEV) {
+    renderer.debug.onNodeBuilderCreated = () => { shaders.builds++; };
+    const counted = backend as unknown as Record<'createProgram' | 'createRenderPipeline', (...args: unknown[]) => unknown>;
+    for (const [method, key] of [['createProgram', 'programs'], ['createRenderPipeline', 'pipelines']] as const) {
+      const create = counted[method].bind(backend); counted[method] = (...args) => { shaders[key]++; return create(...args); };
+    }
+  }
   return {
     backend: webgpu ? 'webgpu' : 'webgl2-fallback', renderer,
     // The fallback has a live WebGL 2 context, read exactly as the classic renderer's was.
@@ -59,5 +72,6 @@ export async function createRenderer(canvas: HTMLCanvasElement, antialias: boole
     stats: () => ({ calls: renderer.info.render.drawCalls, triangles: renderer.info.render.triangles }),
     beginFrame: () => renderer.info.reset(),
     onLost: (handler) => { const report = renderer.onDeviceLost; renderer.onDeviceLost = (info) => { report.call(renderer, info); handler(); }; },
+    shaders: () => ({ ...shaders }),
   };
 }

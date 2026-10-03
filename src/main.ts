@@ -88,6 +88,8 @@ class Game {
   private probes: ReflectionProbes | null = null;
   /** Dev-only: the probe bakes' main-thread and GPU-complete milliseconds per phase (snapshot().probes). */
   private readonly probeTimes: Record<string, number> = {};
+  /** Dev-only: when each loading step finished, in page milliseconds (snapshot().load); `…Gpu` when the GPU had finished its work. */
+  private readonly loadTimes: Record<string, number> = {};
   /** Stands at each probe while it bakes, so the night lamp pool lights that building. */
   private readonly probeEye = new THREE.PerspectiveCamera();
   private timeOfDay: TimeOfDay = readTimeOfDay();
@@ -222,7 +224,7 @@ class Game {
     this.resize();
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, post: this.post, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined, probes: this.probes ? { ...this.probeTimes, materials: this.probes.materials.size } : null }),
+        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, post: this.post, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined, probes: this.probes ? { ...this.probeTimes, materials: this.probes.materials.size } : null, load: { ...this.loadTimes }, shaders: view.shaders() }),
         teleport: (x: number, z: number, yaw = 0, y = 1.05, pitch = 0) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = pitch; this.accumulator = 0; },
         // The capture harness stands on whatever lies under a view, ground, deck or floor, looking from 2.2 m above the terrain.
         standingHeight: (x: number, z: number) => this.physics?.standingHeight(x, z, terrainHeight(x, z) + 2.2) ?? null,
@@ -245,16 +247,25 @@ class Game {
     group = top.parent ? top.name || object.name || 'Town · unnamed' : 'Frame · ' + (object.name || object.type);
     this.drawGroups.set(object, group); return group;
   }
+  /** Dev-only: note when a loading step finished and, with `gpu`, when the GPU has also finished the work submitted so far. */
+  private mark(step: string, gpu = false): void {
+    if (!import.meta.env.DEV) return;
+    this.loadTimes[step] = Math.round(performance.now());
+    const device = (this.renderer.backend as { device?: { queue: { onSubmittedWorkDone(): Promise<void> } } }).device;
+    if (gpu && device) void device.queue.onSubmittedWorkDone().then(() => { this.loadTimes[step + 'Gpu'] = Math.round(performance.now()); });
+  }
   async load(): Promise<void> {
     // Leaf cards smooth their cut-out edges by alpha-to-coverage wherever the frame is multisampled (fine pointers).
     FOREST_DETAIL.coverage = this.renderer.samples > 1;
+    this.mark('start', true);
     this.town = await Town.create(this.reduced, loadingStage, this.graphics.tier); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
+    this.mark('town');
     await loadingStage(70, 'Loading gallery images and woodland…');
     const assets = this.town.loadAssets();
     const { Physics } = await import('./game/physics');
     await loadingStage(78, 'Preparing walkable paths and interiors…');
     this.physics = await Physics.create(this.town.colliders);
-    await assets;
+    await assets; this.mark('assets');
     if (this.graphics.tier === 'cpu') {
       await loadingStage(86, 'Preparing the CPU graphics profile…');
       const { prepareCpuDetail } = await import('./world/cpu-detail'); this.cpuGeometry = await prepareCpuDetail(this.town.root, this.skyBackground);
@@ -273,14 +284,18 @@ class Game {
     this.walkCamera.position.set(SPAWN.x, this.eyeHeight(SPAWN), SPAWN.z); this.walkCamera.rotation.set(0, SPAWN.yaw, 0, 'YXZ');
     // Build every shader now, culled or not, and the shadow pass with one rendered frame: on WebGPU each shader costs a
     // synchronous node build, which would otherwise stall the first frames that show a new object.
-    this.town.warmUp(true);
+    this.town.warmUp(true); this.mark('prepared', true);
     await this.output.compile(this.walkCamera, [...this.town.root.children, ...this.scene.children.filter(child => child !== this.town.root && !(child as THREE.Light).isLight)]);
+    this.mark('compiled', true);
     if (this.ranges) await this.output.compile(this.syncFar(), [...this.distant.children], 6, this.distant);
     if (this.graphics.shadows) { this.sun.shadow.needsUpdate = true; this.render(this.walkCamera); }
+    this.mark('shadowed', true);
     this.town.warmUp(false); this.bakeProbes(); this.town.update(this.elapsed, this.walkCamera, this.graphics.fog, false, this.sun.shadow);
+    this.mark('baked', true);
     await loadingStage(100, 'Welcome to Livistone');
     this.lastTime = performance.now(); this.frameId = requestAnimationFrame(this.frame);
     this.ui.ready(); this.returnMode = 'walking'; this.setMode('walking'); this.updateWalking(0); this.findInteraction(); this.findLocation(); this.render(this.walkCamera);
+    this.mark('ready', true);
   }
   private get phase(): SkyPhase { return this.night ? 'night' : 'day'; }
   /** The walking eye stands .78 m above the capsule's centre, which is .82 m above its feet. */
