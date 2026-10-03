@@ -64,3 +64,39 @@ The gorge's walls stand at least 6–11 m above its floor, built as a rib where 
 **Tests.** `tests/mountain-trail.test.ts` checks the order (woods, gorge, snow, plateau), rock on both sides of the gorge, the trail on more than 18 m of snow over a metre thick, the plateau above all the snow, the mats' cover and heights, and walks a capsule from the map arrival through the gorge and over the snow onto the plateau without a reset, then pushes it at every edge.
 
 **Review.** `review/27-jepii-mici-2/` (work-in-progress captures and `flowers-progress.jpg`, the owner's photo beside round 1 and round 2).
+
+## Round 2: crags (4 October 2026)
+
+**Why.** "Where are the rocky ones??" The trail should climb through rocky and wooded terrain, but the steep faces were smooth sheets at the terrain's 2 m grid under a stretched, brown rock photo (the big smooth wall in `game-plateau-cacti.jpg`). The 2 m grid cannot draw sheer rock: the gorge's walls lean back to about 60° because steeper ones alias into fins. Branch `realism/27-crags`; review `review/27-crags/` (desktop, touch and software, before = `realism/27-jepii-mici-2` at edc50a8) and `review/27-crags-skyline/`.
+
+**Blocks** (`src/world/crags.ts`, found from the terrain, so they follow the layout):
+- *The gorge's lining.* A block every 2–4 m on both walls from the mouth up the snow gully, its face at the floor's edge, as high as the wall behind it or a little higher (up to 11 m), deep enough to run back into it: the gorge reads as sheer-walled. At the narrow passage the rock closes the floor in to 1.6–2.4 m from the trail on both sides, as in `rocky-gorge-path.jpg`, but stays behind the steel cable; the waterfall keeps a slot about 3 m wide. Rounded conglomerate masses below the waterfall, bedded limestone above it and in the gully.
+- *Boulders on the floor*, thickest under the waterfall (a fallen-rock cone, off its pool and the stream), clear of the trail by `TRAIL_HALF` + 1 m.
+- *The rock zones* (`rockZone` in `mountain-layout.ts`: the gorge's and gully's walls to 14 m past the floor's edge, the mouth's buttresses, the crest band above the plateau) and, at a third of the density, other steep ground of the north ridge: wherever the ground is steeper than about 47°, bedded steps (stacks of 2–5 slabs between bedding planes, standing out of the slope by their height × cot(slope)), ledges hung on near-vertical walls (seated by their back 55%, tipped back 8–13° so the lowest corner is a seated one, their undersides drawn), rounded masses, and talus within 10 m below the faces. Steep cells get up to six candidates, as a 30 m wall is only a few metres wide in plan.
+- *Seated, never floating.* Every block's foot (its full outline where its rounding reaches full width) lies 0.4 m (talus 0.25 m) under the lowest ground mesh at its spot: the collider's 2 m triangles and the rendered tiles' 4 m (gpu) and 8 m (mobile) cells. Blocks keep off the gorge's walkable floor (`cragFloorClear`), the snow, the walkable meadow (inside the plateau's outline and gentle; its outline also takes in the crags' steep foot), the stream and the brook, and every point of a block keeps its trail clearance plus 0.15 m for the rendered lumps.
+- *Contact patches* along the lining's feet, round talus and boulders, at the downhill face of steps on gentle ground (70 patches).
+
+**Limestone** (`src/world/limestone.ts`, shared by the blocks and the ground's steep rock, world-space so their beds line up): the Poly Haven scan turned pale, faintly warm grey (the before was olive-brown), bedding planes at world height whose spacing varies from a metre to many and which dip and wander across the mountain, joints between them staggered from bed to bed, each block between them with its own value and facet tilt (normal on gpu), thin cracks that never thin below a pixel and fade before they alias, rounded grooves, dark water streaks down steep faces, lichen spots and crusts, moss on block ledges. The ground drops the top-down projection on steep triangles (its smoothed normals leaned toward the sky across the grid's folds and the scan streaked down the faces), and steep ground's baked colour takes the stone whole (meadow left in it had greened the rock). The cpu tier takes the pale scan alone: software rendering pays for every noise per pixel (the first software capture, with the full limestone, ran about a third slower).
+
+**Budget** (headless, shared laptop; frame rates are not reported, they swung several-fold between runs):
+
+| | gpu | mobile | cpu |
+| --- | --- | --- | --- |
+| Blocks drawn (of 352) | 352 | 344 | 333 |
+| Triangles | 113k | 42k | 41k |
+| Detail | edges split, bulging beds, normal map and facets | corners only, colour work | corners only, pale scan |
+| Draws | 1 (+1 shadow pass when the cached map re-bakes) | 1 | 1 |
+
+One trimesh collider on every tier: 333 blocks on the walking terrain, 42.6k triangles. Sites, geometry and collider are built at load from the collider grid's heights: about 75 + 65 + 15 ms in Vitest on the development laptop. Every view of the `mountain` set gains exactly one draw (desktop 113k triangles, touch 43k, software 42k); median pixels changed: desktop 44% (gorge-canyon 46%, waterfall 73%, plateau-crags 47%), touch 44%, software 34%. Skyline: `valley-east` and `summit-southwest` 0%, `ridge-north` 3%, `summit-northwest` 16% (the nearer ridge face turns to limestone with ledges); the distant ranges are unchanged.
+
+**Tests.** `tests/crags.test.ts`: blocks line both walls along most of the gorge and close in at the passage; every block's lowest vertex lies under the ground on every tier and re-seating lands where it stands; no rendered vertex comes within its trail clearance (never within `TRAIL_HALF` + 0.9 m), onto the snow, the walkable meadow or the stream; only small boulders and the passage's rock stand inside the floor's edge; every block on the walking terrain collides and is drawn on every tier; gpu under 150k triangles, mobile under 50k, cpu not above mobile; the same sites every time. `tests/mountain-trail.test.ts` walks its capsule through the crags' collider. Playwright `graphics-profile`, `post` and `ground` pass on WebGPU and on the WebGL 2 fallback.
+
+**Switch.** Dev-only `?crags=off`: round 1's rock and no blocks (with `?mountain=off`, nothing of sub-plan 27). `?crags=debug` paints the blocks red, to tell them from the ground's own rock.
+
+**Open.**
+- Up close the blocks still read a little built: stacked slabs with clean bevels, and rounded masses that can look like pillows on the crest band. The photographs' conglomerate is knobbier and its ledges carry grass and dwarf pines.
+- The terrain's own 60° walls between and above the blocks remain smooth at the 2 m grid, now jointed limestone rather than a stretched photo; in the waterfall's slot the fins at the wall's foot still show.
+- The rope fence along the plateau's lip follows `plateauRim(1.3)`, 1.3 m inside the outline, but over the gorge the outline lies on the cut wall: its posts stand on the cliff face 5–9 m above the gorge's floor and 7–11 m below the meadow (e.g. a post at (-28.4, -253.2) on ground at 30.0 m, meadow 41.2 m). The lining hides most of them; the fence belongs on the meadow's real lip, about `gorgeRim(s)` from the axis.
+- The waterfall's water is not on this branch; its slot is bare rock until it is.
+- The crags are one mesh, drawn whole wherever any of it is in view (113k triangles on gpu even from the town).
+- Not verified: physical devices, Safari, Firefox.
