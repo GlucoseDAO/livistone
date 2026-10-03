@@ -25,6 +25,19 @@ The 41 poster photographs show the jewels in their own colours: the catalogue de
 
 Full thumbnails and captions now exist only for the two collections the visitor last approached; the others keep 96 px photographs and 128 px captions for distant views. Captions are 640 px wide on mobile and cpu. Poster texture memory, headless and including mip chains: 223 MiB on every tier before; after, 42 MiB at the station and at most 100 MiB on gpu, 29 MiB and at most 67 MiB on mobile and cpu. Not measured on a physical device. Dev-only `?posters=all` keeps every collection resident.
 
+## Ambient occlusion and bloom (realism 18) — 3 October 2026
+
+On the gpu tier the output pipeline now adds screen-space ambient occlusion and a restrained bloom, both in linear light before tone mapping. GTAO runs at half resolution on a depth and normal copy of the walk camera's frame, then a denoise. It darkens corners, kerbs, stand feet, foliage and the walnut and silver folds, and fades with the fog. Bloom takes only exposed radiance above the tone mapper's near-white, with a per-pixel cap, so the neon gate, lamps and lit signs glow at night without washing out. Paper, photographs, captions and signs keep their exact colours (`tests/post.spec.ts`). Mobile and CPU tiers run neither. The map and the Gentle setting skip the occlusion but keep the bloom.
+
+Measured with WebGPU timestamp queries on the development laptop's integrated GPU in headless Chrome at 1280×800, gpu tier forced, other jobs sharing the GPU. These are informational, not device benchmarks.
+
+| View | GPU ms per frame, off → on | Of which AO (depth copy, GTAO, denoise) | Bloom | Draw calls |
+| --- | --- | --- | --- | --- |
+| arrival-meadow | 2.1–2.3 → 6.8 | 3.8 | 0.7 | 135 → 150 |
+| city-hall-gallery | 3.3–3.5 → 8.7 | 4.6 | 0.7 | 143 → 158 |
+
+The stages also add 1.5–2 ms of main-thread time per frame and 27.8 kB to the main chunk (8.4 kB gzip). Headless frame rates on the shared GPU were too noisy to isolate the cost: 16–24 fps without, 13–16 with. A screen-space GI variant (SSGI, dev-only `?post=gi`) cost 14–20 ms of GPU time and stayed grainy without temporal filtering, so it does not ship. Physical-device cost is unmeasured.
+
 ## Contact shadows (realism 16, WIP) — 3 October 2026
 
 One multiply-blended decal batch, a single extra draw call, grounds trees (a crown-wide patch and a trunk contact), bank rocks, lamp posts, poster and stand feet, place signs, plinths and station benches. Terrain patches lie on the rendered 2 m terrain triangles; tree patches hide with their forest cell, and the batch hides in the map. Bank-rock patches reach past each rock's silhouette and fade out toward the waterline (before the October fix they lay hidden under the rocks on every tier). The gpu tier builds 2,316 patches (51.8k triangles), the mobile and cpu tiers 1,328 (29.2k); only nearby forest cells are drawn. The terrain also bakes a `groundShade` attribute under crowns, beside trunks and along building walls, which the ground material applies as ambient occlusion to indirect light only. Checked in headless Chrome on WebGPU (and earlier on the classic renderer); the WebGL 2 fallback, review captures and physical-device performance are still to come.
