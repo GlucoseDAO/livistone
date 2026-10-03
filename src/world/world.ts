@@ -10,7 +10,7 @@ import type { ColliderSpec } from '../game/physics';
 import { mitoringCage, nanotCage, ENERGY_HALL } from './jewelry';
 import { Forest, forestCells } from './forest';
 import { forestSites } from './forest-layout';
-import { createContactShadows, objectContactSites, rockContactSite, TOWN_SHADE_FOOTPRINTS, treeContactSites, treeShadeDiscs } from './contact-shadows';
+import { createContactShadows, objectContactSites, rockContactSites, TOWN_SHADE_FOOTPRINTS, treeContactSites, treeShadeDiscs } from './contact-shadows';
 import type { ContactShadows } from './contact-shadows';
 import { groundShadeField } from './ground-cover';
 import { createBridge, createGardenBridge } from './bridge';
@@ -390,7 +390,7 @@ export class Town {
   /** One multiply-blended draw grounds trunks, rocks, feet, posts and benches; tree patches follow the forest's own cells. */
   private createContactShadows(): void {
     const trees = forestCells(this.forest.sites).map(cell => cell.sites.flatMap(({ p, index }) => treeContactSites(p, index)));
-    this.contactShadows = createContactShadows([...objectContactSites(), ...this.rocks.map(rockContactSite)], trees);
+    this.contactShadows = createContactShadows([...objectContactSites(), ...rockContactSites(this.rocks)], trees);
     if (!CONTACT_OFF) this.root.add(this.contactShadows.mesh);
     this.forest.onCells = this.contactShadows.showGroups;
   }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { CONTACT_GRID, createContactShadows, objectContactSites, rockContactSite, TOWN_SHADE_FOOTPRINTS, treeContactSites, treeShadeDiscs } from '../src/world/contact-shadows';
+import { CONTACT_GRID, createContactShadows, objectContactSites, rockContactSites, TOWN_SHADE_FOOTPRINTS, treeContactSites, treeShadeDiscs } from '../src/world/contact-shadows';
 import { KEEP_DISPLAY } from '../src/render/output';
 import type { ContactSite } from '../src/world/contact-shadows';
 import { forestCells } from '../src/world/forest';
@@ -14,9 +14,9 @@ import { landscapeHeight } from '../src/world/terrain';
 import { waterDistance } from '../src/world/waterways';
 
 function town(mobile: boolean) {
-  const trees = forestSites(mobile), cells = forestCells(trees), rocks = riverRockSites(mobile), objects = objectContactSites();
+  const trees = forestSites(mobile), cells = forestCells(trees), rocks = riverRockSites(mobile), bankRocks = rockContactSites(rocks), objects = objectContactSites();
   const groups = cells.map(cell => cell.sites.flatMap(({ p, index }) => treeContactSites(p, index)));
-  return { trees, cells, rocks, objects, groups, shadows: createContactShadows([...objects, ...rocks.map(rockContactSite)], groups) };
+  return { trees, cells, rocks, bankRocks, objects, groups, shadows: createContactShadows([...objects, ...bankRocks], groups) };
 }
 const radius = (site: ContactSite): number => Math.max(site.rx, site.rz);
 const pathSamples = PATH_CURVES.map((curve, road) => curve.getPoints(400).map(p => ({ x: p.x, z: p.z, half: (curve.points.every(q => q.x === 0 && q.z >= 40) ? gatewayApproachWidth(p.z) : PATH_WIDTH) / 2 })));
@@ -30,7 +30,7 @@ describe('contact shadows', () => {
     const triangles = new Set<string>();
     for (let i = 0; i < p.count; i += 3) triangles.add([0, 1, 2].map(k => key(p.getX(i + k), p.getY(i + k), p.getZ(i + k))).sort().join('|'));
     terrain.dispose();
-    const ground = [...gpu.objects.filter(site => site.floor === undefined), ...gpu.rocks.map(rockContactSite), ...gpu.groups.flat()];
+    const ground = [...gpu.objects.filter(site => site.floor === undefined), ...gpu.bankRocks, ...gpu.groups.flat()];
     const { mesh } = createContactShadows(ground), position = mesh.geometry.getAttribute('position'), index = mesh.geometry.index!;
     const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
     for (let i = 0; i < position.count; i++) {
@@ -57,7 +57,7 @@ describe('contact shadows', () => {
   });
 
   it('keeps tree and rock patches off the paths and out of the water', () => {
-    for (const site of [...gpu.groups.flat(), ...mobile.groups.flat(), ...gpu.rocks.map(rockContactSite), ...mobile.rocks.map(rockContactSite)]) {
+    for (const site of [...gpu.groups.flat(), ...mobile.groups.flat(), ...gpu.bankRocks, ...mobile.bankRocks]) {
       expect(pathGap(site.x, site.z)).toBeGreaterThan(radius(site));
       expect(waterDistance(site.x, site.z)).toBeGreaterThan(radius(site));
     }
@@ -72,7 +72,9 @@ describe('contact shadows', () => {
     for (const tier of [gpu, mobile]) {
       expect(tier.groups.flat()).toHaveLength(tier.trees.length * 2);
       expect(tier.cells.reduce((sum, cell) => sum + cell.sites.length, 0)).toBe(tier.trees.length);
-      expect(tier.shadows.patches).toBe(tier.trees.length * 2 + tier.rocks.length + tier.objects.length);
+      expect(tier.shadows.patches).toBe(tier.trees.length * 2 + tier.bankRocks.length + tier.objects.length);
+      // Rocks standing in the stream get no ground patch; every bank rock still does.
+      expect(tier.bankRocks.length).toBeGreaterThan(tier.rocks.length * .9); expect(tier.bankRocks.length).toBeLessThan(tier.rocks.length);
       expect(tier.shadows.mesh).toBeInstanceOf(THREE.Mesh);
       expect(Array.isArray(tier.shadows.mesh.material)).toBe(false);
     }
@@ -83,8 +85,8 @@ describe('contact shadows', () => {
   });
 
   it('draws a forest cell’s patches only while its trees are shown', () => {
-    const { shadows, groups, objects, rocks } = mobile, geometry = shadows.mesh.geometry, all = Array.from(geometry.index!.array);
-    const fixed = createContactShadows([...objects, ...rocks.map(rockContactSite)]).mesh.geometry.index!.count;
+    const { shadows, groups, objects, bankRocks } = mobile, geometry = shadows.mesh.geometry, all = Array.from(geometry.index!.array);
+    const fixed = createContactShadows([...objects, ...bankRocks]).mesh.geometry.index!.count;
     // Until the forest reports its cells, no tree patch is drawn, so nothing floats where trees have not loaded.
     expect(geometry.drawRange.count).toBe(fixed);
     shadows.showGroups(groups.map(() => false));

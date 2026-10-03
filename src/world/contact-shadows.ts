@@ -18,7 +18,7 @@ import { STATION, STATION_BENCHES, stationPoint } from './station-layout';
 import { landscapeHeight } from './terrain';
 import { LAMP_POSTS } from './town-layout';
 import type { RockSite } from './water-surface';
-import { TIME_TOWER } from './waterways';
+import { TIME_TOWER, waterDistance } from './waterways';
 
 /** One soft footprint. Radii run along the decal's own axes and yaw follows Object3D.rotation.y. `floor` seats it on a level
  *  paved floor; otherwise it follows the rendered terrain. Strength is the darkening at its centre. */
@@ -108,6 +108,11 @@ export function treeContactSites(p: { x: number; z: number }, index: number): Co
 /** Bank boulders. The patch stays inside each rock's planting clearance (s × 1.45 plus 0.3–0.35 m), so it never reaches water or a path. */
 export function rockContactSite({ x, z, s, yaw }: RockSite): ContactSite {
   return { x, z, rx: s * 1.45 + .25, rz: s * 1.15 + .25, yaw, strength: .85 };
+}
+/** Only rocks whose patch stays on dry ground. A boulder standing in the stream is grounded by its foam ring and wet foot, and a
+ *  patch there would darken the riverbed through the transparent water. */
+export function rockContactSites(rocks: readonly RockSite[]): ContactSite[] {
+  return rocks.map(rockContactSite).filter(site => waterDistance(site.x, site.z) > Math.max(site.rx, site.rz));
 }
 
 const feet = (x: number, z: number, yaw: number, width: number, depth: number, floor?: number): ContactSite => ({ x, z, yaw, rx: width / 2 + .55, rz: depth / 2 + .55, floor, strength: .8 });
