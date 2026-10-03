@@ -1,12 +1,15 @@
 // The frame's single output pass. WebGPURenderer ignores `material.toneMapped` and mixes fog in linear light before its own
 // output pass, so the game renders through a RenderPipeline instead. The scene writes an 8-bit `display` attachment next to
-// its colour: red is a mask for paper, photographs, captions and signs (displayMaterial), green each surface's fog factor.
+// its colour: red is a mask for paper, photographs, captions and signs (displayMaterial), green each surface's fog factor, blue
+// how far ambient occlusion reaches the pixel (opaque surfaces 1, display and transparent ones 0, blended by their coverage).
 // The output tone-maps all but the masked pixels, encodes sRGB, then mixes in the fog toward the displayed horizon, as the
 // classic renderer fogged after encoding; cream paper stays #f4f0e5 by day and night. Ambient occlusion and bloom (sub-plan
-// 18) belong before this mix, and must leave display pixels alone.
+// 18, render/post.ts) act on the linear radiance before tone mapping and leave display pixels alone.
 import * as THREE from 'three';
 import { Fn, abs, float, mat3, materialReference, max, min, mix, mrt, output, positionView, renderGroup, sRGBTransferEOTF, sRGBTransferOETF, smoothstep, sqrt, texture, toneMappingExposure, uniform, vec3, vec4 } from 'three/tsl';
 import type { Node, NodeBuilder } from 'three/webgpu';
+import type { PostMode } from '../game/graphics';
+import { AO, ScreenSpace } from './post';
 
 // @types/three r186 leaves these untyped; the casts only restore the shader types three itself infers.
 const exposure = toneMappingExposure as unknown as Node<'float'>;
@@ -32,30 +35,55 @@ export const displayed = (radiance: Node<'vec3'>): Node<'vec3'> => toSRGB(acesFi
 export const displayFog = { color: uniform(new THREE.Color()).setGroup(renderGroup), near: uniform(0).setGroup(renderGroup), far: uniform(1).setGroup(renderGroup) };
 // Each surface's range-fog factor, or none for the background and other unfogged materials (decided per material at build).
 const FOG = Fn((builder: NodeBuilder) => (builder.material as { fog?: boolean } | null)?.fog === false ? float(0) : smoothstep(displayFog.near, displayFog.far, positionView.z.negate()))();
+// Occlusion is found on the depth buffer, which water, glass and other transparent surfaces leave to what lies behind them;
+// they write 0 and so keep their own light from that surface's occlusion in proportion to their opacity. A material's
+// `userData.occlusion` (0–1) lowers it where screen-space occlusion overstates thin geometry.
+const SOLID = Fn((builder: NodeBuilder) => {
+  const material = builder.material as { transparent?: boolean; userData?: { occlusion?: number } } | null;
+  return float(!material || material.transparent ? 0 : material.userData?.occlusion ?? 1);
+})();
 const DISPLAY = mrt({ display: vec4(1, smoothstep(displayFog.near, displayFog.far, positionView.z.negate()), 0, 1) });
 
 export class OutputPipeline {
   private readonly target: THREE.RenderTarget;
   private readonly targets: ReturnType<typeof mrt>;
-  private readonly pipeline: THREE.RenderPipeline;
+  private readonly post: ScreenSpace;
+  // One output pass with occlusion (the walk camera) and one without (the map, gentle detail); both carry the bloom.
+  private readonly pipelines = new Map<boolean, THREE.RenderPipeline>();
   private readonly size = new THREE.Vector2();
-  constructor(private readonly renderer: THREE.WebGPURenderer, private readonly scene: THREE.Scene) {
+  constructor(private readonly renderer: THREE.WebGPURenderer, private readonly scene: THREE.Scene, post: PostMode, walkCamera: THREE.PerspectiveCamera) {
     // The scene renders at top level into its own half-float target, with an 8-bit `display` attachment. A pass() node would
     // render it nested inside the output quad, whose deeper render context keys every shader apart from compile()'s.
-    this.target = new THREE.RenderTarget(1, 1, { count: 2, type: renderer.getOutputBufferType(), samples: renderer.samples });
+    this.target = new THREE.RenderTarget(1, 1, { count: 2, type: renderer.getOutputBufferType(), samples: renderer.samples, depthTexture: new THREE.DepthTexture(1, 1) });
     this.target.textures[0].name = 'output'; this.target.textures[1].name = 'display'; this.target.textures[1].type = THREE.UnsignedByteType;
     // Other surfaces write a zero mask and their fog with their own alpha, under their own blending: opaque ones replace both,
     // glass over a poster tone-maps its share. MRT outputs besides `output` would otherwise be written unblended.
-    this.targets = mrt({ output, display: vec4(0, FOG, 0, output.a) }); this.targets.setBlendMode('display', new THREE.BlendMode(THREE.MaterialBlending));
-    const colour = texture(this.target.textures[0]), display = texture(this.target.textures[1]);
-    const shown = mix(acesFilmic(colour.rgb, exposure), colour.rgb, display.r);
-    // Linear sRGB working space to the sRGB canvas: same primaries, so only the transfer curve applies; fog mixes after it.
-    this.pipeline = new THREE.RenderPipeline(renderer, vec4(mix(toSRGB(shown), toSRGB(displayFog.color as unknown as Node<'vec3'>), display.g), 1));
-    this.pipeline.outputColorTransform = false;
+    this.targets = mrt({ output, display: vec4(0, FOG, SOLID, output.a) }); this.targets.setBlendMode('display', new THREE.BlendMode(THREE.MaterialBlending));
+    this.post = new ScreenSpace(post, { colour: this.target.textures[0], display: this.target.textures[1], depth: this.target.depthTexture! }, walkCamera, exposure);
   }
-  render(camera: THREE.Camera): void {
+  /** Occlusion follows the walk camera's depth and projection; the map's far view and gentle detail go without it. */
+  render(camera: THREE.Camera, occlusion = true): void {
     this.bind(); this.renderer.render(this.scene, camera); this.unbind();
-    this.pipeline.render();
+    const ao = occlusion && camera === this.post.camera && !!this.post.occlusion;
+    if (ao) this.post.prepare(this.renderer);
+    this.pipeline(ao).render();
+  }
+  private pipeline(occlusion: boolean): THREE.RenderPipeline {
+    let pipeline = this.pipelines.get(occlusion); if (pipeline) return pipeline;
+    const colour = texture(this.target.textures[0]), display = texture(this.target.textures[1]), open = display.r.oneMinus();
+    let radiance = colour.rgb as unknown as Node<'vec3'>;
+    if (occlusion && this.post.occlusion) {
+      // A fogged surface fades toward the horizon after tone mapping; its occlusion fades with it, so haze is not darkened.
+      const reach = display.b.mul(display.g.oneMinus()).mul(AO.strength);
+      radiance = radiance.mul(mix(float(1), this.post.occlusion, reach));
+      if (this.post.bounce) radiance = radiance.add(this.post.bounce.mul(reach));
+    }
+    if (this.post.glow) radiance = radiance.add(this.post.glow.rgb.mul(open).div(exposure));
+    const shown = mix(acesFilmic(radiance, exposure), colour.rgb, display.r);
+    // Linear sRGB working space to the sRGB canvas: same primaries, so only the transfer curve applies; fog mixes after it.
+    pipeline = new THREE.RenderPipeline(this.renderer, vec4(mix(toSRGB(shown as unknown as Node<'vec3'>), toSRGB(displayFog.color as unknown as Node<'vec3'>), display.g), 1));
+    pipeline.outputColorTransform = false; this.pipelines.set(occlusion, pipeline);
+    return pipeline;
   }
   /**
    * Compile `parts` (the scene's main groups) for this target before the first frame. r186's compileAsync builds one object at
@@ -81,6 +109,8 @@ export class OutputPipeline {
       for (const material of twoPass.keys()) material.side = THREE.BackSide;
       for (const mesh of new Set([...twoPass.values()].flat())) await this.renderer.compileAsync(mesh, camera, this.scene);
     } finally { for (const material of twoPass.keys()) material.side = THREE.DoubleSide; this.unbind(); }
+    // The output passes and their screen-space stages build their shaders on first use: build both now, not on the first map.
+    for (const occlusion of [true, false]) { if (occlusion && this.post.occlusion) this.post.prepare(this.renderer); this.pipeline(occlusion && !!this.post.occlusion).render(); }
   }
   private bind(): void {
     this.renderer.getDrawingBufferSize(this.size);

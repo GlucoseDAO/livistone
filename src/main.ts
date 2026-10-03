@@ -21,6 +21,7 @@ import { Input } from './game/input';
 import { Ambience } from './game/audio';
 import { LANDMARKS, DISCOVERIES, SPAWN, readProgress, writeProgress } from './game/content';
 import { graphicsProfile } from './game/graphics';
+import type { PostMode } from './game/graphics';
 import { parseTimeOfDay, readTimeOfDay, resolveNight, saveTimeOfDay } from './game/daylight';
 import type { TimeOfDay } from './game/daylight';
 import { NightLighting } from './world/night-lighting';
@@ -45,6 +46,8 @@ const EYE_LEAD = .002;
 // Dev-only ?look=a keeps the old hemisphere-heavy fill (sun and haze coherence only). b, the default, lets the baked sky
 // carry more of the ambient light and gives heroEnv materials their own reflection strength.
 const LOOK = import.meta.env.DEV && new URLSearchParams(location.search).get('light') === 'a' ? 'a' : 'b';
+// Dev-only ?post=off|ao|gi overrides the tier's screen-space stages (sub-plan 18): none, occlusion with bloom, or the SSGI experiment.
+const POST = ((value: string | null) => import.meta.env.DEV && (value === 'off' || value === 'ao' || value === 'gi') ? value : null)(new URLSearchParams(location.search).get('post'));
 const FILL: Record<'a' | 'b', Record<SkyPhase, { environment: number; hemi: number }>> = {
   a: { day: { environment: .5, hemi: 1.2 }, night: { environment: .2, hemi: .28 } }, b: { day: { environment: .9, hemi: .55 }, night: { environment: .3, hemi: .22 } } };
 // The map shadow box stays on the town centre; walking boxes follow the player.
@@ -97,6 +100,7 @@ class Game {
   private frames = 0;
   private cpuGeometry = { before: 0, after: 0 };
   private readonly reduced: boolean;
+  private readonly post: PostMode;
   private night: boolean;
   private readonly hemi: THREE.HemisphereLight;
   private physics?: Physics;
@@ -151,7 +155,7 @@ class Game {
     this.scene.environmentIntensity = this.fill.environment;
     // The town and sun are static; refresh shadows only when scene visibility changes. WebGPU schedules shadows per light.
     this.sun.shadow.autoUpdate = false; this.sun.shadow.needsUpdate = true;
-    this.output = new OutputPipeline(this.renderer, this.scene);
+    this.post = POST ?? this.graphics.post; this.output = new OutputPipeline(this.renderer, this.scene, this.post, this.walkCamera);
     this.mapCamera.position.set(62, 44, 69); this.mapCamera.lookAt(0, 2, -13);
     this.orbit = new OrbitControls(this.mapCamera, ui.canvas); this.orbit.target.set(0, 1, -12); this.orbit.enabled = false;
     this.orbit.enableDamping = true; this.orbit.dampingFactor = 0.08; this.orbit.minDistance = 30; this.orbit.maxDistance = 410;
@@ -178,7 +182,7 @@ class Game {
     this.resize();
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined }),
+        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, post: this.post, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined }),
         teleport: (x: number, z: number, yaw = 0, y = 1.05, pitch = 0) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = pitch; this.accumulator = 0; },
         // The capture harness stands on whatever lies under a view, ground, deck or floor, looking from 2.2 m above the terrain.
         standingHeight: (x: number, z: number) => this.physics?.standingHeight(x, z, terrainHeight(x, z) + 2.2) ?? null,
@@ -227,7 +231,8 @@ class Game {
   private get phase(): SkyPhase { return this.night ? 'night' : 'day'; }
   /** The walking eye stands .78 m above the capsule's centre, which is .82 m above its feet. */
   private eyeHeight(p: { x: number; y: number; z: number }): number { return this.eye === null ? p.y + .78 : Math.max(p.y - .82, terrainHeight(p.x, p.z)) + this.eye; }
-  private render(camera: THREE.Camera): void { this.view.beginFrame(); this.output.render(camera); }
+  // Gentle visual detail goes without ambient occlusion; bloom stays so night looks the same at either setting.
+  private render(camera: THREE.Camera): void { this.view.beginFrame(); this.output.render(camera, !this.lowQuality); }
   /** The output pass fogs every surface toward the displayed horizon after tone mapping, as the classic renderer did. */
   private setFog(range: { near: number; far: number }): void {
     displayFog.color.value.copy(HORIZON_HAZE[this.phase]); displayFog.near.value = range.near; displayFog.far.value = range.far;

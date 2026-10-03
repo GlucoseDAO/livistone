@@ -70,4 +70,7 @@ describe('three world graphics profiles', () => {
     }
     expect(cpu.reduced && mobile.reduced).toBe(true); expect(gpu.reduced).toBe(false);
   });
+  it('keeps screen-space occlusion and bloom to the gpu tier', () => {
+    expect(graphicsProfile('gpu').post).toBe('ao'); expect(graphicsProfile('mobile').post).toBe('off'); expect(graphicsProfile('cpu').post).toBe('off');
+  });
 });

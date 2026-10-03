@@ -254,6 +254,9 @@ function grassMaterial(spec: Spec, bake: GrassBake, look: GroundLook): THREE.Mes
   const material = new THREE.MeshStandardNodeMaterial({ side: THREE.DoubleSide, roughness: .72, metalness: 0 });
   material.name = 'Near grass field'; material.positionNode = position; material.colorNode = colour; material.aoNode = occlusion; material.userData.tints = tints;
   material.normalNode = normalize(cameraViewMatrix.mul(vec4(normalize(normal), 0)).xyz);
+  // The blades already take the terrain's baked occlusion; at full strength the screen-space pass (render/post.ts) reads a
+  // dense, sunlit blade field as one deep crease and turns the meadow murky.
+  material.userData.occlusion = .4;
   return material;
 }
 
