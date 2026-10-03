@@ -75,16 +75,9 @@ Done on 3 October 2026:
 - Worktrees removed: `13-grass`, `14-shore`, `20-webgpu`, `24-surfaces`, `25-budget`, `25-part1`, `25-part2`, `round-2`, `webgpu-baseline`. None had uncommitted work. Their git-ignored captures (`output/testing/`) moved to `~/sources/livistone-realism/worktree-output/<name>/`. Kept: `16-contact`, `21-contrast` and `review/`.
 - Every branch below was checked before listing it for deletion. The four `wip/*` snapshots are superseded by their sub-plan commits (the only line missing from `main` is a `// TEMP-DEBUG` window hook in `wip/20-webgpu`), and `realism/25-budget` was rebased as `f308232` on `main`.
 
-Left for the owner (the agent's permission mode blocks branch deletion and remote changes):
+- The owner ran the branch and remote steps: `origin` is `git@github.com:GlucoseDAO/livistone.git`; the `wip/*` backups and the merged `realism/*` branches are deleted on origin and locally. The older local branches `realism/13-grass`, `realism/21-contrast` (pre-rebase copies), `realism/20-webgpu-rebased` (every commit on `main` as a patch) and `codex/before-stl-push-cleanup` (its only extra content was the two STLs, identical to the git-ignored copies in `data/models/`) are deleted too.
 
-```bash
-git remote set-url origin git@github.com:GlucoseDAO/livistone.git
-git push origin --delete wip/20-webgpu wip/14-shore wip/24-surfaces wip/25-budget realism/20-webgpu realism/round-2 realism/14-shore realism/24-surfaces realism/25-budget
-git branch -d realism/13-on-round-2 realism/14-shore realism/20-webgpu realism/24-surfaces realism/25-on-round-2 realism/round-2
-git branch -D realism/25-budget
-```
-
-`realism/13-on-round-2` and `realism/25-on-round-2` never reached origin. Keep `realism/16-contact` until its note is merged and `realism/21-on-round-2` until 21 is decided. Older local branches outside this plan: `realism/13-grass` and `realism/21-contrast` (pre-rebase versions of 13 and 21), `realism/20-webgpu-rebased` (every commit already on `main` as a patch), `codex/before-stl-push-cleanup` (September, not on `main`), and the Codex worktree `~/.codex/worktrees/city-hall-realism` (merged).
+Still kept: `realism/16-contact` until its note is merged, `realism/21-on-round-2` until 21 is decided, and `city-hall-realism` (merged, but checked out in the Codex worktree `~/.codex/worktrees/city-hall-realism`).
 
 ## Sub-plan 21 at wrap-up
 
