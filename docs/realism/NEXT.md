@@ -1,90 +1,95 @@
-# Realism round 2 — brief
+# Realism round 3 — brief
 
-Start here in a fresh session in `~/sources/livistone`. Read [README.md](README.md) and a sub-plan only when the task needs it.
+Start here in a fresh session in `~/sources/livistone`. Read [README.md](README.md) and a sub-plan only when the task needs it; the rules for agents below are binding. Round 2's plan is kept in [round-2.md](round-2.md).
 
-> **Status, 3 October 2026 (end of the overnight run):** `main` (`ce434dd`) is on WebGPU, with sub-plans 13, 14, 16, 24 and 25 merged. **Continue from [round-2-leftovers.md](round-2-leftovers.md)**: verify `main` on both backends, fix the known issues, finish 21, then start 18, 17, 05, 07/08, 12 and 15. The plan below is kept as the round's record.
+> **Status, 3 October 2026 (evening):** `main` (`77d7a8f` plus this brief, pushed) carries round 2 and the owner's evening requests. The owner reviews everything visual: report after the first capture (rule 3) and wait.
 
-## Owner direction (3 October 2026)
+## What landed on 3 October 2026
 
-1. **WebGPU first.** The Phase A spike convinced the owner: on the development laptop WebGPU rendered the same views at 2–5× the headless frame rate with half the draw calls (table in [20](20-webgpu-spike.md)). [20 Phase B](20-webgpu-spike.md#phase-b--migration-approved-3-october-2026) migrates the game to WebGPURenderer, with its WebGL 2 backend as the fallback. Fog, paper colour, night lighting and every other look must survive; parity is a gate.
-2. **Then every task that needs no new files from Livia.** 09, 10, 11 and 19 (piece models, vitrines, viewer, AI reconstructions) wait for her exports. 08 uses reference photos that are already local, so it is in scope.
-3. **Before/after side by side for every task.** `build-realism-comparison.ts` opens in Side-by-side mode. Link each page from `review/index.html`.
-4. **Overnight runs are autonomous.** The orchestrating session plays the owner at checkpoints (visible-change gate, parity, budgets), merges gated branches into `main` and pushes. Pushing does not deploy.
-
-## Where things stand
-
-Round 1 merged 00–04 (`a16ad0d`): the capture harness, working sun shadows that follow the player, sun/sky/fog coherence, the rebuilt ground and the transparent river. Owner verdict: shadows and river are clear wins, 02 is mostly plumbing, the ground still reads as a texture close up, and the whole is still stylized. Records: `concepts/14-realism/round-1.md`, `02-light-sky.md`, `04-river.md`.
-
-Since then: [22](22-igpu-detection.md) is done (newer Intel and AMD iGPUs probe as the mobile tier; desktop captures force `?graphics=gpu`).
-
-## What the round-1 captures still show
-
-From `review/combined-all` (desktop day unless noted):
-
-| Cue that reads as stylized | Where | Sub-plan |
+| Commit | What | Owner decision |
 | --- | --- | --- |
-| Flat ambient light, no ambient occlusion; shadows only where the sun is blocked | every exterior and interior | 21, 18 |
-| Near-white linear haze from 42 to 130 m bleaches trees and hills that are not far away | arrival-meadow, north-meadow, garden-path, woodland-edge | 21 |
-| Bare colour on large architecture: bridge, gateway abutments, plinths, interior floors, station platform | gateway-front, bridge-crossing, shore-closeup, energy-inside | 24 (new) |
-| Faceted grey rocks, all on the dry bank | bridge-bank, shore-closeup, woodland-edge | 14 |
-| The ground is a texture under the camera; grass tufts are sparse single blades | meadow-ground, science-front, garden-path | 13 |
-| Foliage cards are flat-lit and motionless | north-meadow, arrival-meadow | 17 |
+| `ba1a352` | Lake water eyes kept clear of the garden paving (`lake-eyes.ts`); Vittoria and Dewdrop stands two-sided | Option A: 0.3 m silver strip past the kerb, every split pool kept |
+| `dce22d2` | [21](21-contrast-aerial.md) contrast a, aerial haze complete at `graphics.fog`, Neutral tone mapping | Contrast a + Neutral; b, AgX and ACES deleted |
+| `4da8463` | The opal rill runs square across the Mycelium paths through a culvert with stone headwalls | Owner report |
+| `d18e10c` | [17](17-wind.md) wind on trees, shrubs, flowers, tufts and reeds | "Merge if it does not kill performance": +0.3–2 ms GPU per frame, headless |
+| `c8128e9` | [07](07-reflection-probes.md) reflection probes per building-piece and hall | Merged as is, knowing the load cost in task 1 |
+| `d145480` | 28 Embryo station detail: footed ring threshold, ashlar coping, slatted benches, curtain-wall glazing, amber setting, lamps, bins, clock, departures board, map panel | First pass merged; round 2 questions in task 3 |
+| `77d7a8f` | [27](27-mountain-trail.md) Jepii Mici trail, signs, walkable rhododendron plateau, snow couloir, map stop 11 | Merged after four passes |
 
-Budgets are already exceeded on classic WebGL: the gpu tier draws 540–1040 calls and 5.8–7.3M triangles per frame, and the mobile tier 260–520 calls and 1.4–1.6M triangles, against documented budgets of about 250 calls (desktop) and 120 calls with 200–400k triangles (mobile). About half of that is classic's transmission re-render, which WebGPU removes; [25](25-frame-budget.md) handles the rest before the heavier realism work lands.
+Review pages (outside git, served on 5199): `review/fix-lake-posters`, `review/21-final`, `review/fix-intersections`, `review/07-final`, `review/28-station`, `review/27-mountain-trail`.
 
-## Plan
+## Round 3 tasks, in order
 
-### Stage A — WebGPU migration (one agent, alone on the rendering code)
+### 1. Bake the reflection probes after load (07 follow-up)
 
-[20 Phase B](20-webgpu-spike.md): rebase the spike, port the six GLSL patches to TSL (ground, river, shadow fade, sky, rock, lake), add the output pipeline with a `display` mask for paper and signs, fix fog with the pre-tone-mapped horizon radiance, pass the parity gate on WebGPU and on the WebGL 2 fallback, then delete classic.
+Measured after the rebase (headless, loaded machine, `?probes=off` interleaved): time to ready +2.3–3.6 s on gpu and +3.9 s on mobile (about 11 s instead of 7); the first switch to night settles in 3.9–5.4 s instead of 1.7–2.2 s; texture memory +50 MB at load and +99 MB once both phases are baked; on the WebGL 2 fallback, ready to the tenth frame takes 7–12 s instead of 5–7 s. The bake itself is only 135–280 ms of main thread (330–810 ms on the fallback). Most of the cost is suspected to be about 22 extra shader builds for the per-building material copies and the first frame waiting 1.4–2.2 s on the bake's GPU work. That is unproven: measure first (WebGPU timestamp queries, `snapshot()` timings, a count of pipeline builds with and without probes).
 
-While Stage A runs, other agents may only develop renderer-independent parts (geometry, placement, offline texture bakes, tests) and must not merge before Stage A. Their before/after captures are taken on the WebGPU `main`.
+Goal: time to ready within about 300 ms of `?probes=off` on gpu and mobile, and no hitch over about 100 ms after ready.
+- Open with sky reflections (today's `?probes=off` look) and bake after ready, one probe face or one probe per idle frame, then swap each site's `pmremTexture` node value; nothing rebuilds, since the node already exists.
+- Make the per-building material copies cheap or unnecessary: compile them inside `OutputPipeline.compile`/`warmUp` at load if they must exist, or share one material per class if three allows switching the probe texture per draw.
+- Night: bake the other phase in the background after the day bake, not on the first switch; the switch then only swaps textures.
+- Consider gpu only (mobile pays the most and gains the least); ask the owner if the numbers stay high.
+- Gates: `tests/post.spec.ts`, `tests/night.spec.ts`, `tests/graphics-profile.spec.ts` on both backends; readyMs and the first night switch measured with and without `?probes=off`, three interleaved pairs each, written into [07](07-reflection-probes.md) and `docs/3d-game-plan.md`.
 
-### Stage B — realism on WebGPU, ordered by visible change per token
+### 2. Haze and ghost shapes (21 follow-up)
 
-All shader code is TSL. Animate with the game's own time uniforms so `?capture=1` freezes them.
+The aerial haze in `render/aerial.ts` settles on a brighter colour than the distant ranges' valley mist (`DISTANT_DISPLAY`, sub-plan 26) behind it, so fully hazed things read as pale cut-outs:
+- far trees on the horizon (worst on touch at 110 m; `review/21-final` arrival-meadow)
+- the violet Enhancement hill from `vittoria-lake`, which becomes a flat pale shape
+- from the Jepii Mici plateau (`plateau-view`), the whole town about 250 m away, which is a flat pale band
 
-| Order | Sub-plan | Why now | Runs in parallel with |
-| --- | --- | --- | --- |
-| 1 | [25 Frame budget and adaptive resolution](25-frame-budget.md) (folds in 06) | Headroom before AO and grass add cost | 24, 14 geometry |
-| 2 | [21 Contrast, aerial perspective, tone mapping](21-contrast-aerial.md) | Global; fixes the white haze and pale shade | 13 |
-| 3 | [18 Ambient occlusion and restrained bloom](18-gpu-post.md) (promoted from experiment) | Global grounding; plugs into Stage A's output pipeline | 13, 24 |
-| 4 | [13 Near-player grass field](13-near-player-grass.md) | The remaining ground complaint | 21, 18 |
-| 5 | [24 Architectural surfaces](24-architecture-surfaces.md) (new) | Large bare-colour surfaces in key views | any |
-| 6 | [14 Shore, riverbed and rocks](14-shore-riverbed-rocks.md) | River banks and faceted rocks | 24 |
-| 7 | [16 Contact shadows](16-contact-shadows.md) + [17 Wind and foliage](17-wind.md) | Grounding where AO is off (cpu), and life | 14 |
-| 8 | [05 Golden hour](05-golden-hour.md) | Mood; low risk after 21 | 12 |
-| 9 | [07 Reflection probes](07-reflection-probes.md) → [08 Building materials](08-building-materials.md) | Metal and amber fidelity; 08 uses local reference photos | 12 |
-| 10 | [12 Gallery posters](12-gallery-posters.md) | Fidelity and mobile memory | 05, 07 |
-| 11 | [15 Water reflections](15-water-reflections.md) | Experiment: TSL screen-space reflections or a planar pass | — |
+Make the walking haze and the distant mist one colour where they meet (or let the haze fade toward what the distant pass drew behind), and hide trees a little before they are entirely haze. Trees drawn until full haze also raised desktop triangles by about a third (median 2.0M → 2.7M); win some back. For the plateau, decide with the owner whether an elevated viewpoint may see further (a longer `graphics.fog` above some height costs frame rate) or whether the haze should read as valley mist. Minor: the Mitoring amber's brightest spots turn peach-white at night under Neutral (`energy-front`, clipped pixels 0.93% → 1.91%).
 
-Tasks that edit `main.ts` or `sky.ts` (21, 18, 05, 25) merge one after another; rebase before each capture.
+### 3. Station round 2 (28)
 
-### After round 2 (owner request, 3 October 2026)
+The first pass is merged. The owner's questions are still open; ask before building:
+1. The amber canopy barely changed from below (5.8% of pixels). Options: a wider, flatter silver bezel; a deeper honey colour with a darker underside and a stronger core glow; or silver prongs gripping its edge like a ring setting. Recommended: prongs.
+2. Threshold: keep the pierced silver floor plate, or a stone collar with the paving cut round the ring. Recommended: stone collar.
+3. Inside the ring the gold frame grid and the gallery behind it dominate the view from the path: thin the grid or simplify the gallery rails?
+4. The departures and timetable copy, and where the clock and board hang, were the agent's choices.
+5. Night was not captured; the lamp globes glow but add no point lights.
 
-- [27 Jepii Mici trail, alpine plateau and snow couloir](27-mountain-trail.md): a forested trailhead with Romanian trail signs, a benched climb to a walkable plateau of rhododendrons and moss campion below limestone crags, and old snow in a shaded couloir between two peaks; view set `mountain`, switch `?mountain=off`.
-- [26 Physical sky and distant mountains](26-sky-mountains.md): a baked single-scattering sky with ray-marched cumulus, distant ranges in a second camera pass, eroded ridges and limestone strata. Edits `sky.ts`, `main.ts` and `render/output.ts`, so it merges in turn with 21, 18 and 05; 05 builds its golden sky on this atmosphere.
+Also write `docs/realism/28-station.md` (the sub-plan has no doc yet; CLAUDE.md records its rules), and add 27 and 28 to [README.md](README.md).
 
-### Done or small
+### 4. Mountain follow-ups (27)
 
-- [22 iGPU detection](22-igpu-detection.md): done (`9f30cf2`).
-- [23 Flaky Living Waters spec](23-flaky-living-waters-spec.md): the spec waits on `snapshot().interaction` before checking the label.
+- From the plateau, most of the snow couloir hides behind the big rock wall (`snow-gully`): turn or move it toward the plateau, or lower the shoulder in front. From town it is faint in the haze (task 2 helps).
+- The crag faces are smooth at the terrain's 2 m grid: add detail (normal map, triplanar rock, a few rock meshes) without new draw-heavy systems.
+- An oak's leaves cover the danger board's left edge in `trailhead-signs`.
+- The plateau stands about 33 m up, below higher crags, because walkable terrain ends at z = -270; reaching the summit means extending the near grid and its collider.
+- Faint dark lines in the sky in `ridge-north` and `trail-from-path` also appear with `?mountain=off`, so they come from `main` (sky or distant pass); find them.
+- The sun's direction shades only about a third of the snow; the rest is baked shade (`couloirShade`).
 
-### Parked
+### 5. Tests and verification
 
-09, 10, 11, 19: waiting for Livia's exports.
+- `tests/station.spec.ts` does not load: it imports `train.ts` → `render/output.ts`, and under `tsconfig.playwright.json` (empty `paths`) `three` resolves to the classic build, so `MeshBasicNodeMaterial` is undefined. This already happens on `main`. Fix the Playwright resolution or the import chain without weakening the spec.
+- The full Playwright suite has not run on the combined result; only targeted specs did (living-waters, post, night, graphics-profile, entrances, railway, poster-text). Run the whole suite on WebGPU and on `LIVISTONE_BACKEND=webgl`.
+- Software tier: no `software quick day` capture of the combined result yet.
+- Physical devices, Safari 26 (macOS and iOS), Firefox and an Android phone remain untested. Record `snapshot().backend`, fps and time to ready on each.
+
+### 6. Resume parked work
+
+- **08 building materials:** WIP commit `5d893ca` on `realism/08-materials` (worktree `~/sources/livistone-realism/07-08-materials`): Nanot piece textures and per-piece maps, built on the old 07. Rebase onto `main`, finish, review.
+- **15 water reflections:** uncommitted work in `~/sources/livistone-realism/15-reflections` (`game/graphics.ts`, `main.ts`, `render/output.ts`, `render/post.ts`, `render/renderer.ts`, `world/water-material.ts`), based on `36eca2b`, before 21. Commit it as WIP on its branch first, then rebase; expect conflicts with 21 in `output.ts` and `main.ts`.
+- **05 golden hour:** not started; it builds on 26's atmosphere and 21's haze.
+
+### 7. Housekeeping
+
+- Remove the worktrees whose branches are merged: `07-merge`, `17-wind`, `21-contrast`, `27-mountain-trail`, `28-station`, `fix-intersections`, and the detached `main-baseline` (stop its server on 5194 first). Keep `07-08-materials` (08) and `15-reflections` (15). Delete their merged local branches.
+- Stale remote branches `origin/realism/16-contact` and `origin/realism/21-on-round-2`: delete only with the owner's approval.
+- The main checkout `~/sources/livistone` was left at `32e3e7e` with another session's uncommitted documentation edits (CLAUDE.md, README, `concepts/02-jewelry-models/notes.md`, `docs/jewelry-stl-catalogue.md`), so its `main` is behind `origin/main`. Run `git pull --rebase` once that work is committed or set aside, never over it.
+- Pushing does not deploy; the live site at livistone.liviazaharia.com follows its own deployment.
 
 ## Open owner decisions
 
-1. **Ground look** a (default) or b: both survive the port as uniforms; pick on `review/combined-04-03`.
-2. **River look**: re-check a against b after 14.
-3. **Tone mapping** (21): decided 3 October 2026, Neutral with contrast a; built on `realism/21-on-round-2`, see [21](21-contrast-aerial.md#owner-decision-and-rebase-onto-main-3-october-2026).
-4. **Classic fallback**: Stage A deletes classic WebGL. Revisit only if the WebGL 2 fallback measures clearly worse than classic on touch or software.
+1. **Ground look** a (default) or b (`review/combined-04-03`), and **river look** a or b: still unconfirmed.
+2. **Grass colour** (13): the near blades read slightly lighter and yellower than the ground texture.
+3. The station round-2 questions (task 3) and the plateau's view distance (task 2).
 
 ## Rules for agents (binding)
 
 1. **One sub-plan per agent, one worktree, one dev-server port.**
-   - Worktrees go in `~/sources/livistone-realism/NN-slug`; ports start at 5181 (5185 is Stage A's).
+   - Worktrees go in `~/sources/livistone-realism/NN-slug`; ports start at 5181. Check `ss -ltn` for free ones; 5194 serves a detached baseline of `main` and 5199 the review pages.
    - Never touch the owner's dev server on 5173.
    - **Stop each dev server as soon as its branch is merged or parked.**
 2. **Capture budget per agent:**
@@ -110,11 +115,11 @@ Tasks that edit `main.ts` or `sky.ts` (21, 18, 05, 25) merge one after another; 
 bun run dev                                   # 5173, the owner's server
 bun --bun vite --host 127.0.0.1 --port 5181 --strictPort   # a worktree's server
 LIVISTONE_BENCHMARK_URL=http://127.0.0.1:5181 bun scripts/screenshot-realism.ts <out>/after desktop ground day
-LIVISTONE_PARAMS=backend=webgl …              # capture the WebGL 2 fallback (after Stage A)
+LIVISTONE_PARAMS=backend=webgl …              # capture the WebGL 2 fallback
 bun scripts/build-realism-comparison.ts <reviewDir> --title "…"
 LIVISTONE_BASE_URL=http://127.0.0.1:5181 npx playwright test tests/<spec>.spec.ts
 ```
 
-View sets: `quick`, `exteriors`, `ground`, `water`, `galleries`, `all`, `fixes` (the October 2026 owner reports, outside `all`), `skyline` (sub-plan 26, outside `all`; a view's optional sixth element is the teleport height) and `mountain` (sub-plan 27, outside `all`). Times: `day`, `golden` (after 05), `night`. Headless WebGPU on Linux needs `--enable-unsafe-webgpu --enable-features=Vulkan --use-webgpu-power-preference=force-low-power`; Stage A puts these in the harness and Playwright config.
+View sets: `quick`, `exteriors`, `ground`, `water`, `galleries` and `all`; outside `all` (listed in `REVIEWED_ALONE` in the script) `fixes` (October 2026 owner reports), `skyline` (26; a view's optional sixth element is the teleport height), `lake` (water eyes and stand backs), `intersections` (the rill culvert), `materials` (07/08), `station` (28) and `mountain` (27). Times: `day`, `golden` (after 05), `night`. Headless WebGPU on Linux needs `--enable-unsafe-webgpu --enable-features=Vulkan --use-webgpu-power-preference=force-low-power`; Stage A puts these in the harness and Playwright config.
 
 Review pages are served from `~/sources/livistone-realism/review/` with `python3 -m http.server 5199 --bind 127.0.0.1`; `combined-all/` and `baseline-76104be/` hold the round-1 result and the original look. These files live outside git.
