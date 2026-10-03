@@ -3,6 +3,7 @@ import { displayMaterial } from '../render/output';
 import type { ColliderSpec } from '../game/physics';
 import { COLLECTION, photoSize, photoURL } from '../game/exhibits';
 import { GATEWAY_POSTER } from './gateway-layout';
+import { activeSurfaces } from './surfaces';
 import { paintPosterText } from './poster-text';
 import { terrainHeight } from './terrain';
 
@@ -21,7 +22,7 @@ function caption(): THREE.CanvasTexture {
 export function createGatewayPoster(parent: THREE.Group, colliders: ColliderSpec[]): { panels: THREE.Mesh[]; position: THREE.Vector3; ready: Promise<void> } {
   const site = GATEWAY_POSTER, ground = terrainHeight(site.x, site.z), group = new THREE.Group();
   group.name = 'King’s Chapel source poster'; group.position.set(site.x, ground, site.z); group.rotation.y = site.yaw; parent.add(group);
-  const paper = displayMaterial({ color: '#f4f0e5' }), metal = new THREE.MeshStandardMaterial({ color: '#c2aa77', roughness: .4, metalness: .5 });
+  const paper = displayMaterial({ color: '#f4f0e5' }), metal = activeSurfaces()?.stand ?? new THREE.MeshStandardMaterial({ color: '#c2aa77', roughness: .4, metalness: .5 });
   const frame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.05, .1), paper); frame.position.y = 1.78; group.add(frame);
   const foot = new THREE.Mesh(new THREE.BoxGeometry(1.45, .16, .48), metal); foot.position.y = .23; group.add(foot);
   colliders.push({ type: 'box', position: [site.x, ground + 1.78, site.z], size: [1.1, 1.525, .05], yaw: site.yaw });
