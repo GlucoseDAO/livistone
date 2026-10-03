@@ -5,7 +5,10 @@ const out = process.argv[2] ?? 'output/testing/city-hall', profile = process.arg
 if (!['desktop', 'touch', 'software'].includes(profile)) throw new Error('Choose desktop, touch or software.');
 mkdirSync(out, { recursive: true });
 const gpu = profile === 'software' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : process.platform === 'win32' ? ['--use-angle=d3d11', '--ignore-gpu-blocklist'] : ['--use-gl=angle', '--use-angle=gl', '--ignore-gpu-blocklist'];
-const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', ...gpu] });
+// Headless Linux Chrome offers a hardware WebGPU adapter only with these flags (the integrated GPU; see playwright.config.ts);
+// software runs keep no adapter and render through the WebGL 2 fallback, as the realism harness does.
+const webgpu = profile === 'software' || process.platform !== 'linux' ? [] : ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-webgpu-power-preference=force-low-power'];
+const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', ...gpu, ...webgpu] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, isMobile: profile === 'touch', hasTouch: profile === 'touch', reducedMotion: 'reduce' });
 const errors = [], captures = [];
 page.on('pageerror', error => errors.push(error.message));
