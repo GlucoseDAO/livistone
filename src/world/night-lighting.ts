@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { float, materialOpacity, materialReference, texture, vec4 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { graphicsProfile } from '../game/graphics';
-import { fromSRGB, toSRGB, untoneMapped } from '../render/output';
+import { KEEP_DISPLAY, fromSRGB, toSRGB, untoneMapped } from '../render/output';
 import type { GraphicsTier } from '../game/graphics';
 
 let halo: THREE.DataTexture | undefined;
@@ -24,7 +24,7 @@ let haloNode: Node<'vec4'> | undefined;
 export function addGlow(parent: THREE.Object3D, position: THREE.Vector3, color: string, size: number, intensity = 0, distance = 12, opacity = .45): THREE.Sprite {
   haloNode ??= vec4(untoneMapped(fromSRGB(toSRGB(materialReference('color', 'color') as unknown as Node<'vec3'>).mul(texture(haloTexture()).a.mul(materialOpacity)))), 1);
   const material = new THREE.SpriteNodeMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false });
-  material.colorNode = haloNode; material.opacityNode = float(1);
+  material.colorNode = haloNode; material.opacityNode = float(1); material.mrtNode = KEEP_DISPLAY;
   const glow = new THREE.Sprite(material); glow.position.copy(position); glow.scale.setScalar(size); glow.name = 'Night halo';
   glow.userData.nightGlow = true; glow.userData.lightSource = { color, intensity, distance }; parent.add(glow); return glow;
 }

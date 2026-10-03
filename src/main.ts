@@ -49,8 +49,6 @@ const SHADOW = { walk: 50, walkReduced: 40, map: 160, lead: .3, fade: [.72, .9],
 class Game {
   private readonly renderer: THREE.WebGPURenderer;
   private readonly output: OutputPipeline;
-  /** One fog for the whole session: WebGPU builds its node from the object, so later changes only update its values. */
-  private readonly fog = new THREE.Fog(0, 1, 2);
   private readonly scene = new THREE.Scene();
   private skyBackground: THREE.CubeTexture;
   private readonly skies = new Map<boolean, ReturnType<typeof createSky>>();
@@ -121,7 +119,7 @@ class Game {
     this.renderer.shadowMap.enabled = this.graphics.shadows; this.renderer.shadowMap.type = THREE.PCFShadowMap;
     // The output pass (render/output.ts) applies the classic ACES fit at this exposure, except to display materials.
     this.renderer.toneMapping = THREE.NoToneMapping; this.renderer.toneMappingExposure = SKY_EXPOSURE[this.phase];
-    this.scene.fog = this.fog; this.setFog(MAP_FOG);
+    this.setFog(MAP_FOG);
     this.hemi = new THREE.HemisphereLight(this.night ? '#8ea4c6' : '#e9f4f0', this.night ? '#121820' : '#73805c', this.fill.hemi);
     this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(this.night ? '#c9d6ee' : '#fff0ce', this.night ? .32 : 2.4); this.sun.castShadow = true;
@@ -196,9 +194,8 @@ class Game {
   }
   private get phase(): SkyPhase { return this.night ? 'night' : 'day'; }
   private render(camera: THREE.Camera): void { this.view.beginFrame(); this.output.render(camera); }
-  /** Fog mixes the pre-tone-mapping horizon radiance, so full fog lands on the displayed sky; display materials fog toward its mapped colour. */
+  /** The output pass fogs every surface toward the displayed horizon after tone mapping, as the classic renderer did. */
   private setFog(range: { near: number; far: number }): void {
-    this.fog.color.copy(HORIZON_RADIANCE[this.phase]); this.fog.near = range.near; this.fog.far = range.far;
     displayFog.color.value.copy(HORIZON_HAZE[this.phase]); displayFog.near.value = range.near; displayFog.far.value = range.far;
   }
   // CPU has no PMREM environment to take over the fill, so its hemisphere keeps the full share.

@@ -1,11 +1,12 @@
 // The frame's single output pass. WebGPURenderer ignores `material.toneMapped` and mixes fog in linear light before its own
-// output pass, so the game renders through a RenderPipeline instead: the scene pass writes an MRT `display` mask, and the
-// output mixes the ACES-mapped colour with the untouched one by that mask before encoding sRGB. Paper, photographs, captions
-// and signs set the mask (displayMaterial), so cream paper stays #f4f0e5 by day and night. Ambient occlusion and bloom
-// (sub-plan 18) belong between the scene pass and this mix, and must leave display pixels alone.
+// output pass, so the game renders through a RenderPipeline instead. The scene writes an 8-bit `display` attachment next to
+// its colour: red is a mask for paper, photographs, captions and signs (displayMaterial), green each surface's fog factor.
+// The output tone-maps all but the masked pixels, encodes sRGB, then mixes in the fog toward the displayed horizon, as the
+// classic renderer fogged after encoding; cream paper stays #f4f0e5 by day and night. Ambient occlusion and bloom (sub-plan
+// 18) belong before this mix, and must leave display pixels alone.
 import * as THREE from 'three';
-import { Fn, float, mat3, max, min, mix, mrt, output, positionView, sRGBTransferEOTF, sRGBTransferOETF, smoothstep, sqrt, texture, toneMappingExposure, uniform, vec3, vec4 } from 'three/tsl';
-import type { Node } from 'three/webgpu';
+import { Fn, float, mat3, max, min, mix, mrt, output, positionView, renderGroup, sRGBTransferEOTF, sRGBTransferOETF, smoothstep, sqrt, texture, toneMappingExposure, uniform, vec3, vec4 } from 'three/tsl';
+import type { Node, NodeBuilder } from 'three/webgpu';
 
 // @types/three r186 leaves these untyped; the casts only restore the shader types three itself infers.
 const exposure = toneMappingExposure as unknown as Node<'float'>;
@@ -22,6 +23,14 @@ const acesFilmic = Fn(([radiance, exposure]: [Node<'vec3'>, Node<'float'>]) => {
   return mat3(ACES_OUT).mul(v.mul(v.add(.0245786)).sub(.000090537).div(v.mul(v.mul(.983729).add(.432951)).add(.238081))).clamp(0, 1);
 });
 
+/** The fog: main.ts keeps it at the walking or map range, toward the displayed horizon (HORIZON_HAZE). */
+// In the render group, as three's own fog: between frames a material without node properties refreshes only the shared
+// groups, so an object-group uniform reaching it through the MRT keeps its first value (the map range the town loads in).
+export const displayFog = { color: uniform(new THREE.Color()).setGroup(renderGroup), near: uniform(0).setGroup(renderGroup), far: uniform(1).setGroup(renderGroup) };
+// Each surface's range-fog factor, or none for the background and other unfogged materials (decided per material at build).
+const FOG = Fn((builder: NodeBuilder) => (builder.material as { fog?: boolean } | null)?.fog === false ? float(0) : smoothstep(displayFog.near, displayFog.far, positionView.z.negate()))();
+const DISPLAY = mrt({ display: vec4(1, smoothstep(displayFog.near, displayFog.far, positionView.z.negate()), 0, 1) });
+
 export class OutputPipeline {
   private readonly target: THREE.RenderTarget;
   private readonly targets: ReturnType<typeof mrt>;
@@ -32,13 +41,13 @@ export class OutputPipeline {
     // render it nested inside the output quad, whose deeper render context keys every shader apart from compile()'s.
     this.target = new THREE.RenderTarget(1, 1, { count: 2, type: renderer.getOutputBufferType(), samples: renderer.samples });
     this.target.textures[0].name = 'output'; this.target.textures[1].name = 'display'; this.target.textures[1].type = THREE.UnsignedByteType;
-    // Other surfaces write a zero mask with their own alpha, under their own blending: opaque ones clear it, glass over a poster
-    // tone-maps its share, additive halos leave it alone. MRT outputs besides `output` would otherwise be written unblended.
-    this.targets = mrt({ output, display: vec4(0, 0, 0, output.a) }); this.targets.setBlendMode('display', new THREE.BlendMode(THREE.MaterialBlending));
-    const colour = texture(this.target.textures[0]), display = texture(this.target.textures[1]).r;
-    const shown = mix(acesFilmic(colour.rgb, exposure), colour.rgb, display);
-    // Linear sRGB working space to the sRGB canvas: same primaries, so only the transfer curve applies.
-    this.pipeline = new THREE.RenderPipeline(renderer, vec4(toSRGB(shown), 1));
+    // Other surfaces write a zero mask and their fog with their own alpha, under their own blending: opaque ones replace both,
+    // glass over a poster tone-maps its share. MRT outputs besides `output` would otherwise be written unblended.
+    this.targets = mrt({ output, display: vec4(0, FOG, 0, output.a) }); this.targets.setBlendMode('display', new THREE.BlendMode(THREE.MaterialBlending));
+    const colour = texture(this.target.textures[0]), display = texture(this.target.textures[1]);
+    const shown = mix(acesFilmic(colour.rgb, exposure), colour.rgb, display.r);
+    // Linear sRGB working space to the sRGB canvas: same primaries, so only the transfer curve applies; fog mixes after it.
+    this.pipeline = new THREE.RenderPipeline(renderer, vec4(mix(toSRGB(shown), toSRGB(displayFog.color as unknown as Node<'vec3'>), display.g), 1));
     this.pipeline.outputColorTransform = false;
   }
   render(camera: THREE.Camera): void {
@@ -63,19 +72,14 @@ export class OutputPipeline {
   private unbind(): void { this.renderer.setRenderTarget(null); this.renderer.setMRT(null); }
 }
 
-/** Display-space fog for display materials; main.ts keeps it equal to scene.fog's range with the tone-mapped HORIZON_HAZE. */
-export const displayFog = { color: uniform(new THREE.Color()), near: uniform(0), far: uniform(1) };
-const DISPLAY = mrt({ display: float(1) });
-// The classic renderer fogged these after encoding sRGB, toward the displayed haze; doing the same and decoding back to
-// linear lets the output pass encode it again unchanged.
-const DISPLAY_OUTPUT = vec4(fromSRGB(mix(toSRGB(output.rgb), toSRGB(displayFog.color as unknown as Node<'vec3'>), smoothstep(displayFog.near, displayFog.far, positionView.z.negate()))), output.a);
-
-/** The former `toneMapped: false` MeshBasicMaterial: exact colours, untouched by tone mapping, fogged as before. */
+/** The former `toneMapped: false` MeshBasicMaterial: exact colours, untouched by tone mapping, fogged in the output pass. */
 export function displayMaterial(parameters: THREE.MeshBasicMaterialParameters = {}): THREE.MeshBasicNodeMaterial {
   const material = new THREE.MeshBasicNodeMaterial({ ...parameters, fog: false });
-  material.mrtNode = DISPLAY; material.outputNode = DISPLAY_OUTPUT; material.userData.display = true;
+  material.mrtNode = DISPLAY; material.userData.display = true;
   return material;
 }
+/** For additive sprites: no mask and no fog of their own, so the surface behind them keeps both. */
+export const KEEP_DISPLAY = mrt({ display: vec4(0) });
 
 const ACES_IN_INVERSE = ACES_IN.clone().invert(), ACES_OUT_INVERSE = ACES_OUT.clone().invert();
 // The fit maps this small radiance (per channel, after the input matrix) to zero; subtracting it keeps black at zero.

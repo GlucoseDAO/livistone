@@ -19,15 +19,13 @@ export function acesFilmic(radiance: readonly number[], exposure: number): THREE
   const [r, g, b] = radiance.map(v => v * exposure / .6), x = fit(.59719 * r + .35458 * g + .04823 * b), y = fit(.076 * r + .90834 * g + .01566 * b), z = fit(.0284 * r + .13383 * g + .83777 * b);
   return new THREE.Color().setRGB(unit(1.60475 * x - .53108 * y - .07367 * z, 0, 1), unit(-.10208 * x + 1.10813 * y - .00605 * z, 0, 1), unit(-.00327 * x - .07276 * y + 1.07602 * z, 0, 1), THREE.LinearSRGBColorSpace);
 }
-/**
- * Fog and map-background radiance per phase: the painted sky just above the horizon, before tone mapping. Fog mixes in linear
- * light ahead of the output pass, so full fog and the flat map background tone-map to exactly the displayed horizon.
- */
+/** Map-background radiance per phase: the painted sky just above the horizon, before tone mapping, so the flat map background
+ *  tone-maps to exactly the displayed horizon. */
 export const HORIZON_RADIANCE: Record<SkyPhase, THREE.Color> = {
   day: new THREE.Color().setRGB(HORIZON.day[0], HORIZON.day[1], HORIZON.day[2], THREE.LinearSRGBColorSpace),
   night: new THREE.Color().setRGB(HORIZON.night[0], HORIZON.night[1], HORIZON.night[2], THREE.LinearSRGBColorSpace),
 };
-/** That horizon as displayed (tone-mapped, linear): display materials still fog toward it after the mapping. */
+/** That horizon as displayed (tone-mapped, linear): the output pass fogs every surface toward it after the mapping (render/output.ts). */
 export const HORIZON_HAZE: Record<SkyPhase, THREE.Color> = { day: acesFilmic(HORIZON.day, SKY_EXPOSURE.day), night: acesFilmic(HORIZON.night, SKY_EXPOSURE.night) };
 
 // Star and cloud hashes use sin() of large arguments, whose precision is driver-specific: their exact placement can differ

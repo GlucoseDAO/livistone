@@ -66,6 +66,19 @@ const settle = async (count: number) => {
   const start = await page.evaluate(() => ((window as unknown as { __livistone: Hook }).__livistone.snapshot().frames));
   await page.waitForFunction(([from, n]) => (window as unknown as { __livistone: Hook }).__livistone.snapshot().frames >= from + n, [start, count], { timeout: frameTimeout, polling: 100 });
 };
+// A teleported capsule drops or steps onto the ground over several physics steps (one per frame under ?capture=1). Wait until
+// it has held its position for a few frames, so no view depends on how long the network took (bridge-bank was caught mid-drop).
+const still = async (frames: number) => {
+  await page.evaluate(() => { delete (window as unknown as { __still?: unknown }).__still; });
+  await page.waitForFunction((n) => {
+    const w = window as unknown as { __livistone: Hook; __still?: { at: string; since: number } };
+    const s = w.__livistone.snapshot(), p = s.position as { x: number; y: number; z: number } | undefined;
+    if (!p) return false;
+    const at = [p.x, p.y, p.z].map((v) => v.toFixed(3)).join();
+    if (w.__still?.at !== at) { w.__still = { at, since: s.frames }; return false; }
+    return s.frames - w.__still.since >= n;
+  }, frames, { timeout: frameTimeout, polling: 100 });
+};
 let readyMs: number | null = null;
 try {
   const loadStart = performance.now();
@@ -79,7 +92,7 @@ try {
     await page.evaluate(([x, z, yaw, pitch]) => (window as unknown as { __livistone: Hook }).__livistone.teleport(x, z, yaw, 1.05, pitch), [x, z, yaw, pitch] as const);
     await settle(software ? 3 : 8);
     // Thumbnails and lazily built galleries finish asynchronously; give the network a moment, then settle again.
-    await page.waitForLoadState('networkidle').catch(() => undefined); await settle(software ? 2 : 6);
+    await page.waitForLoadState('networkidle').catch(() => undefined); await still(software ? 2 : 4); await settle(software ? 2 : 6);
     await page.screenshot({ path: `${dir}/${name}.png` });
     captures.push({ name, view, snapshot: await page.evaluate(() => (window as unknown as { __livistone: Hook }).__livistone.snapshot()) });
     console.log(`  ${profile}/${time}/${name}`);

@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { PCFShadowFilter, mix, positionView, smoothstep, uniform } from 'three/tsl';
+import { PCFShadowFilter, mix, positionView, renderGroup, smoothstep, uniform } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 
 /** View-distance band (start, end) in metres over which sun shadows fade out; an end of 0 keeps them at every distance. */
-export const shadowFade = uniform(new THREE.Vector2());
+// The render group, because a material without node properties refreshes only shared uniform groups between frames.
+export const shadowFade = uniform(new THREE.Vector2()).setGroup(renderGroup);
 
 // ShadowNode calls a light's filterNode with one object; @types/three r186 declares neither the property nor that argument.
 type FilterInputs = { depthTexture: unknown; shadowCoord: Node<'vec3'>; shadow: THREE.LightShadow; depthLayer: number };
