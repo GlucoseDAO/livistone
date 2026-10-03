@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { mergeStatic } from '../src/world/static-batch';
 import { SURFACE_SETS, bakeMasonry, surfaceFiles, surfaceTint } from '../src/world/surfaces';
 import { terrainHeight } from '../src/world/terrain';
 import { WATER_LEVEL } from '../src/world/water-surface';
@@ -42,6 +43,29 @@ describe('architectural surface maps', () => {
     // Interior pieces stay clean of the weathering bands.
     const rim = new THREE.TorusGeometry(6, .2, 8, 36); bakeMasonry(rim, undefined, true);
     expect(Math.min(...rim.getAttribute('surfaceClearance').array)).toBeGreaterThan(5);
+  });
+
+  it('keeps every merged part of an object-space material in its own frame', () => {
+    // Poster feet merge per collection (sub-plan 25): without their own frames the brass brushing ran across them at each foot's yaw.
+    const parent = new THREE.Group(), brass = new THREE.MeshStandardMaterial(), plain = new THREE.MeshStandardMaterial(); brass.userData.objectSpace = true;
+    const parts = [[2, .3, 1.5, .4], [-3, -1.2, .8, 2.3]].map(([x, z, yaw]) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.4, .16, .48), brass), holder = new THREE.Group();
+      holder.position.set(x, .3, z); holder.rotation.y = yaw; mesh.position.y = .23; holder.add(mesh); parent.add(holder); return mesh;
+    });
+    const source = parts.map(part => part.geometry.clone()), [merged] = mergeStatic(parts, 'Feet', Infinity, parent), g = merged.geometry;
+    const own = g.getAttribute('surfacePosition'), ownNormal = g.getAttribute('surfaceNormal'), rotation = g.getAttribute('surfaceRotation'), normal = g.getAttribute('normal');
+    const q = new THREE.Quaternion(), n = new THREE.Vector3(), count = source[0].getAttribute('position').count;
+    expect(own.count).toBe(count * 2);
+    for (let i = 0; i < own.count; i++) {
+      const original = source[Math.floor(i / count)].getAttribute('position');
+      expect([own.getX(i), own.getY(i), own.getZ(i)]).toEqual([original.getX(i % count), original.getY(i % count), original.getZ(i % count)]);
+      // The rotation carries the part's own normal onto the merged one, for the relief.
+      n.fromBufferAttribute(ownNormal, i).applyQuaternion(q.fromArray([rotation.getX(i), rotation.getY(i), rotation.getZ(i), rotation.getW(i)]));
+      expect(n.distanceTo(new THREE.Vector3().fromBufferAttribute(normal, i))).toBeLessThan(1e-6);
+    }
+    // Other materials merge without the extra attributes.
+    const others = [0, 1].map(i => { const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), plain); mesh.rotation.y = i; parent.add(mesh); return mesh; });
+    expect(mergeStatic(others, 'Plain')[0].geometry.getAttribute('surfacePosition')).toBeUndefined();
   });
 
   it('projects each triangle of a merged, non-indexed mesh along one axis', () => {

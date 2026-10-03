@@ -4,8 +4,8 @@
 // variation. gpu: albedo, normal and roughness; mobile: albedo and roughness; cpu: the stone albedos alone on mesh UVs,
 // through cpu-detail.ts's Lambert copies. Dev-only `?surfaces=off` keeps the flat colours for comparison.
 import * as THREE from 'three';
-import { abs, attribute, clamp, dot, float, mix, normalLocal, normalMap, normalWorld, positionLocal, pow, smoothstep, texture, transformNormalToView, uniform, uv, vec2, vec3 } from 'three/tsl';
-import type { Node } from 'three/webgpu';
+import { Fn, abs, attribute, clamp, cross, dot, float, mix, normalLocal, normalMap, normalWorld, positionLocal, pow, smoothstep, texture, transformNormalToView, uniform, uv, vec2, vec3 } from 'three/tsl';
+import type { Node, NodeBuilder } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
 import { nightEmission } from './night-lighting';
 import { terrainHeight } from './terrain';
@@ -63,13 +63,28 @@ export function bakeMasonry(geometry: THREE.BufferGeometry, placement: THREE.Mat
 
 interface Maps { albedo: THREE.Texture; nrh: THREE.Texture }
 /**
+ * The object space a triplanar map reads. mergeStatic() bakes each part of an `objectSpace` material's batch with its own
+ * position, normal and rotation (`surfacePosition`, `surfaceNormal`, `surfaceRotation`), so brushing and tiling follow every
+ * part after its transform is merged away; an unmerged mesh reads its local frame. The choice is made per build, and three
+ * builds a material once per vertex layout, so both kinds of mesh can share one material.
+ */
+const framed = (builder: NodeBuilder): boolean => !!builder.geometry?.hasAttribute('surfacePosition');
+const framePosition = Fn((builder: NodeBuilder) => framed(builder) ? attribute<'vec3'>('surfacePosition', 'vec3') : positionLocal);
+const frameNormal = Fn((builder: NodeBuilder) => framed(builder) ? attribute<'vec3'>('surfaceNormal', 'vec3') : normalLocal);
+/** A part-frame direction in the merged mesh's local space: rotated by the part's unit quaternion. */
+const frameToLocal = Fn(([v]: [V3], builder: NodeBuilder) => {
+  if (!framed(builder)) return v;
+  const q = attribute<'vec4'>('surfaceRotation', 'vec4');
+  return v.add(cross(q.xyz, cross(q.xyz, v).add(v.mul(q.w))).mul(2));
+});
+/**
  * Object-space triplanar with v up on every side face, so masonry courses stay level and brushing runs along: three's
  * triplanarTexture reads X-facing faces by (y, z), which would stand the courses on end. X faces read (z, y), Z faces (x, y),
  * top and bottom (x, z), the axes bakeMasonry() boxes the cpu UVs onto; |n|⁴ weights blend them only across curves. Relief is
  * added to the surface normal in each projection's plane (UDN blending); `level` samples a coarse mip instead of the detail.
  */
 function triplanar(maps: Maps, tile: number, relief: boolean, level?: number): { albedo: V3; nrh: V4; normal: V3 | null } {
-  const p = positionLocal.div(tile).toVar(), n = normalLocal.normalize().toVar(), k = pow(abs(n), vec3(4)), w = k.div(dot(k, vec3(1))).toVar();
+  const p = (framePosition() as V3).div(tile).toVar(), n = (frameNormal() as V3).normalize().toVar(), k = pow(abs(n), vec3(4)), w = k.div(dot(k, vec3(1))).toVar();
   const read = (map: THREE.Texture, at: V2): V4 => (level === undefined ? texture(map, at) : texture(map, at).level(float(level))) as unknown as V4;
   const at = [vec2(p.z, p.y), vec2(p.x, p.y), vec2(p.x, p.z)], weight = [w.x, w.z, w.y];
   const albedo = at.map((a, i) => read(maps.albedo, a).rgb.mul(weight[i])).reduce((sum, value) => sum.add(value));
@@ -77,7 +92,7 @@ function triplanar(maps: Maps, tile: number, relief: boolean, level?: number): {
   const packed = nrh.map((value, i) => value.mul(weight[i])).reduce((sum, value) => sum.add(value));
   if (!relief) return { albedo, nrh: packed, normal: null };
   const [x, z, y] = nrh.map(value => value.xy.mul(2).sub(1));
-  return { albedo, nrh: packed, normal: n.add(vec3(0, x.y, x.x).mul(w.x)).add(vec3(z.x, z.y, 0).mul(w.z)).add(vec3(y.x, 0, y.y).mul(w.y)).normalize() };
+  return { albedo, nrh: packed, normal: frameToLocal(n.add(vec3(0, x.y, x.x).mul(w.x)).add(vec3(z.x, z.y, 0).mul(w.z)).add(vec3(y.x, 0, y.y).mul(w.y)).normalize()) as V3 };
 }
 
 /**
@@ -111,7 +126,8 @@ function brassMaterial(tier: GraphicsTier, maps: Maps, approved: string, roughne
   material.colorNode = sample.albedo.mul(uniform(material.color) as unknown as V3);
   material.roughnessNode = clamp(sample.nrh.z.mul(roughness / SURFACE_SETS.brass.roughness), .04, 1);
   if (sample.normal) material.normalNode = transformNormalToView(sample.normal);
-  material.userData.surface = 'brass'; return material;
+  // Brushing runs along each part: merged batches keep every part's own frame (framePosition).
+  material.userData.surface = 'brass'; material.userData.objectSpace = true; return material;
 }
 
 /** Honed terrazzo on the floor's own UVs (world metres over 4, centred on its hall), relief through their derivative frame. */

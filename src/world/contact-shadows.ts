@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { attribute, smoothstep } from 'three/tsl';
 import { CIVIC_LANDMARKS } from '../game/content';
 import { COLLECTION } from '../game/exhibits';
 import { FUTURE_HOUSE, TOWER_WALK } from './elevated-layout';
@@ -10,13 +11,16 @@ import { contactFalloff } from './ground-cover';
 import type { ShadeDisc, ShadeFootprint } from './ground-cover';
 import { INTRODUCTION_SCALE, INTRODUCTION_SITE } from './introduction-layout';
 import { ENERGY_HALL } from './jewelry';
+import { layoutAllows } from './landscape';
 import { GARDEN_PANELS, GARDENS } from './living-waters-layout';
 import { PLACE_SIGN } from './place-sign';
 import { posterLayout } from './poster-layout';
 import { KEEP_DISPLAY } from '../render/output';
+import { ROCK_STRETCH, rockReach } from './river-rocks';
 import { STATION, STATION_BENCHES, stationPoint } from './station-layout';
 import { landscapeHeight } from './terrain';
 import { LAMP_POSTS } from './town-layout';
+import { WATER_EDGE } from './water-surface';
 import type { RockSite } from './water-surface';
 import { TIME_TOWER, waterDistance } from './waterways';
 
@@ -35,6 +39,9 @@ export const CONTACT_GRID = { step: 2, minX: -240, maxX: 240, minZ: -264, maxZ: 
 /** What a full-strength decal multiplies the ground by at its centre: a cool, sky-occluded grey. */
 const SHADE = [.3, .33, .35];
 const SIZE = 64;
+/** Channel distance (waterDistance) over which every patch fades out toward the river: none at the waterline, full 0.25 m up the
+ *  bank. Rock feet stand at least 0.35 m up it (their planting clearance), so they keep their full contact. */
+export const CONTACT_WATER_FADE: readonly [number, number] = [WATER_EDGE, .25];
 
 /** The shared radial falloff in a small texture. The profile ends on the outermost texel centres, so the clamped rim is exactly clear. */
 export function contactShadowTexture(): THREE.DataTexture {
@@ -49,15 +56,18 @@ export function contactShadowMaterial(): THREE.MeshBasicNodeMaterial {
   // the ground's display mask and fog factor (a zero `display` leaves them unchanged under this blend), so the output pass fogs
   // the shaded ground exactly as before and far decals fade into the haze. Polygon offset wins against the coplanar ground.
   const material = new THREE.MeshBasicNodeMaterial({ name: 'Contact shadows', map: contactShadowTexture(), vertexColors: true, transparent: true, premultipliedAlpha: true, blending: THREE.MultiplyBlending, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
-  material.mrtNode = KEEP_DISPLAY; return material;
+  material.mrtNode = KEEP_DISPLAY;
+  // Each vertex carries its waterDistance, which is linear across a 2 m bank cell; the fade itself is per fragment.
+  material.opacityNode = smoothstep(CONTACT_WATER_FADE[0], CONTACT_WATER_FADE[1], attribute<'float'>('water', 'float'));
+  return material;
 }
 
-interface Buffers { position: number[]; uv: number[]; color: number[]; index: number[] }
+interface Buffers { position: number[]; uv: number[]; color: number[]; water: number[]; index: number[] }
 function addPatch(site: ContactSite, ground: (x: number, z: number) => number, out: Buffers): void {
   const c = Math.cos(site.yaw ?? 0), s = Math.sin(site.yaw ?? 0), color = SHADE.map(shade => 1 - (1 - shade) * site.strength), indices = out.index;
   const vertex = (x: number, y: number, z: number): number => {
     const dx = x - site.x, dz = z - site.z;
-    out.position.push(x, y, z); out.uv.push((dx * c - dz * s) / (2 * site.rx) + .5, (dx * s + dz * c) / (2 * site.rz) + .5); out.color.push(...color);
+    out.position.push(x, y, z); out.uv.push((dx * c - dz * s) / (2 * site.rx) + .5, (dx * s + dz * c) / (2 * site.rz) + .5); out.color.push(...color); out.water.push(waterDistance(x, z));
     return out.position.length / 3 - 1;
   };
   if (site.floor !== undefined) {
@@ -79,12 +89,12 @@ function addPatch(site: ContactSite, ground: (x: number, z: number) => number, o
 
 /** One draw call for every decal. Group patches stay out of the index until showGroups() reports them. */
 export function createContactShadows(fixed: readonly ContactSite[], groups: readonly (readonly ContactSite[])[] = [], ground: (x: number, z: number) => number = landscapeHeight): ContactShadows {
-  const out: Buffers = { position: [], uv: [], color: [], index: [] }, indices = out.index;
+  const out: Buffers = { position: [], uv: [], color: [], water: [], index: [] }, indices = out.index;
   for (const site of fixed) addPatch(site, ground, out);
   const always = indices.length, ranges = groups.map((sites): [number, number] => { const start = indices.length; for (const site of sites) addPatch(site, ground, out); return [start, indices.length - start]; });
   const all = Uint32Array.from(indices), geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(out.position, 3)); geometry.setAttribute('uv', new THREE.Float32BufferAttribute(out.uv, 2)); geometry.setAttribute('color', new THREE.Float32BufferAttribute(out.color, 3));
-  geometry.setIndex(new THREE.BufferAttribute(all.slice(), 1)); geometry.setDrawRange(0, always); geometry.computeBoundingSphere();
+  geometry.setAttribute('water', new THREE.Float32BufferAttribute(out.water, 1)); geometry.setIndex(new THREE.BufferAttribute(all.slice(), 1)); geometry.setDrawRange(0, always); geometry.computeBoundingSphere();
   const mesh = new THREE.Mesh(geometry, contactShadowMaterial()); mesh.name = 'Contact shadows';
   // Drawn with the river, before other transparent surfaces, so they blend over ground that is already shaded. Each patch is
   // coplanar with the ground, so the CPU tier's simplifier must leave the vertices alone (cpu-detail.ts).
@@ -105,14 +115,24 @@ export function treeContactSites(p: { x: number; z: number }, index: number): Co
   const scale = treeScale(index), crown = TREE_CANOPY[index % 2] * scale * .85, trunk = 1.3 * scale;
   return [{ x: p.x, z: p.z, rx: crown, rz: crown, strength: .3 }, { x: p.x, z: p.z, rx: trunk, rz: trunk, strength: .7 }];
 }
-/** Bank boulders. The patch stays inside each rock's planting clearance (s × 1.45 plus 0.3–0.35 m), so it never reaches water or a path. */
+/** How far a bank boulder's patch reaches past its silhouette (ROCK_STRETCH × s), growing with the rock as its shade would. */
+export function rockHalo(s: number): number { return .55 * s + .15; }
+/**
+ * Bank boulders. The patch reaches past the rock's silhouette by its halo, so the falloff's dark shoulder lies at the foot;
+ * stopped at the planting clearance, as sub-plan 16 first had it, the whole patch lay hidden under the stone on every tier.
+ * The halo shrinks only where a route or authored ground is near, so the patch stays off the paving, and toward the river
+ * the material fades it out (CONTACT_WATER_FADE).
+ */
 export function rockContactSite({ x, z, s, yaw }: RockSite): ContactSite {
-  return { x, z, rx: s * 1.45 + .25, rz: s * 1.15 + .25, yaw, strength: .85 };
+  let halo = rockHalo(s);
+  // layoutAllows keeps PATH_CLEARANCE (0.3 m past the paving) beyond its radius; the extra 0.1 m covers the route sampling.
+  while (halo > .05 && !layoutAllows(x, z, ROCK_STRETCH[0] * s + halo - .2)) halo -= .05;
+  return { x, z, rx: ROCK_STRETCH[0] * s + halo, rz: ROCK_STRETCH[2] * s + halo, yaw, strength: .9 };
 }
-/** Only rocks whose patch stays on dry ground. A boulder standing in the stream is grounded by its foam ring and wet foot, and a
- *  patch there would darken the riverbed through the transparent water. */
+/** Only rocks whose whole footprint stands on dry ground. A boulder standing in the stream is grounded by its foam ring and wet
+ *  foot, and a patch there would darken the riverbed through the transparent water. */
 export function rockContactSites(rocks: readonly RockSite[]): ContactSite[] {
-  return rocks.map(rockContactSite).filter(site => waterDistance(site.x, site.z) > Math.max(site.rx, site.rz));
+  return rocks.filter(rock => waterDistance(rock.x, rock.z) > rockReach(rock.s)).map(rockContactSite);
 }
 
 const feet = (x: number, z: number, yaw: number, width: number, depth: number, floor?: number): ContactSite => ({ x, z, yaw, rx: width / 2 + .55, rz: depth / 2 + .55, floor, strength: .8 });

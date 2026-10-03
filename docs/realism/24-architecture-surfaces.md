@@ -3,6 +3,8 @@
 **Needs:** 20 Phase B (TSL). Texture bakes can start earlier. **Tiers:** all, graded. **Branch:** `realism/24-surfaces`.
 See [README](README.md) and the rules in [NEXT.md](NEXT.md).
 
+Follow-up (October 2026, `fix/round-2-known-issues`): after sub-plan 25 merged the poster feet per collection, the brass brushing on each foot's top ran at that foot's yaw. Brass is now `userData.objectSpace`, and `mergeStatic` bakes each part's own frame for it; see [round-2-leftovers.md](round-2-leftovers.md), section 2.
+
 ## Why
 
 The round-1 captures show large surfaces in plain colour: the white bridge deck and arch, the gateway's stone abutments, poster plinths and stands, the grey interior floors of the halls, and the station platform. Next to the textured paving and kerbs they read as untextured CG. This is architecture that is not one of Livia's pieces; 08 covers the piece-buildings.

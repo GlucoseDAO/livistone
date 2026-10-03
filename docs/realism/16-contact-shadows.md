@@ -44,6 +44,20 @@ Branch `realism/16-contact`, rebased onto Stage A (`realism/20-webgpu`).
 
 Still to do: the before/after captures on the merged `main`.
 
+### Software-tier review and the rock fix (3 October 2026)
+
+The software captures changed almost nowhere. A black-decal diagnostic on the WebGL 2 fallback and on WebGPU (first recorded on `realism/16-contact`, `dc48e0d`) found:
+
+- Tree patches do render on the cpu tier. `Forest.onCells` reports there and the index updates reach the GPU. In `arrival-meadow` the nearest tree stands just behind the meadow crest, which hides its pool. The quick views simply have few trees inside the cpu tier's 58 m forest range.
+- The patches under the bank rocks were not a cpu bug: on every tier they lay entirely under the rocks. Their radius was capped at the rock's planting clearance (s × 1.45 + 0.25 m), while the rock's silhouette reaches about 1.57 × s.
+
+Fixed on `fix/round-2-known-issues` (see [round-2-leftovers.md](round-2-leftovers.md), section 2):
+
+- Each bank-rock patch now reaches past the silhouette (1.4 s by 1.0 s, `ROCK_STRETCH`) by `rockHalo(s)` = 0.55 s + 0.15 m, so the silhouette sits on the falloff's dark shoulder (at least 0.6 of full strength); strength is 0.9. Only one gpu rock beside a route gives up part of its halo, so no patch reaches the paving.
+- The patches now cross the planting clearance onto the wet bank but stop short of the water's outline. Every decal vertex carries its `waterDistance` (`water` attribute, linear across a 2 m bank cell) and the material fades each patch per fragment from nothing at the waterline to full strength 0.25 m above the channel line (`CONTACT_WATER_FADE`). Rocks standing in the stream still get no patch.
+- Counts: gpu 2,316 patches (43k vertices, 51.8k triangles), mobile and cpu 1,328 (29.2k triangles); still one draw.
+- Not done: a stronger crown patch on the cpu tier, which has no sun shadows.
+
 ## On WebGPU (round 2)
 
 On the gpu tier, try r186's screen-space shadow node (`sss` in `three/addons/tsl/display/SSSNode.js`, blurred) inside Stage A's output pipeline for fine contact shadows under small objects. Decals and the baked ground shade stay the mobile and cpu path, and the decals' material is a plain node material with multiply blending.

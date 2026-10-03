@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { PEBBLE_CELL, PEBBLE_COUNT, PEBBLE_RING, SHORE_BAND, createPebbles, pebbleGeometry, pebbleMatrix, pebbleSites } from '../src/world/pebbles';
+import { BLADE_CLEARANCE } from '../src/world/grass-field';
+import { PEBBLE_BED, PEBBLE_CELL, PEBBLE_COUNT, PEBBLE_RING, SHORE_BAND, createPebbles, pebbleGeometry, pebbleMatrix, pebbleSites } from '../src/world/pebbles';
 import { riverRockSites } from '../src/world/stone';
-import { PATH_CURVES, PATH_WIDTH } from '../src/world/landscape';
+import { PATH_CURVES, PATH_WIDTH, WATER_CLEARANCE } from '../src/world/landscape';
 import { GARDEN_BRIDGES, waterDistance } from '../src/world/waterways';
 import { WATER_EDGE } from '../src/world/water-surface';
 import { terrainSurfaceHeight, terrainSurfaceNormal } from '../src/world/terrain';
@@ -25,6 +26,19 @@ describe('shore pebbles', () => {
       expect(under).toBeGreaterThan(sites.length * .15); expect(under).toBeLessThan(sites.length * .5);
     }
   });
+  it('gathers small pebbles into drifts along the waterline, never out on the meadow', () => {
+    for (const sites of [gpu, mobile]) {
+      const near = sites.filter(p => Math.abs(waterDistance(p.x, p.z) - WATER_EDGE) < .35).length;
+      expect(near).toBeGreaterThan(sites.length * .9);
+      // Grass roots start at WATER_CLEARANCE + BLADE_CLEARANCE up the bank (grass-field.ts); every pebble ends short of them.
+      for (const p of sites) expect(waterDistance(p.x, p.z) + p.size).toBeLessThan(WATER_CLEARANCE + BLADE_CLEARANCE);
+      // Small stones, a few larger ones; most within a hand's breadth of another in the same drift.
+      const sizes = sites.map(p => p.size).sort((a, b) => a - b);
+      expect(sizes[sizes.length >> 1]).toBeLessThan(.03); expect(sizes.at(-1)!).toBeLessThan(.085);
+      const neighbours = sites.filter((p, i) => sites.some((q, j) => j !== i && Math.hypot(q.x - p.x, q.z - p.z) < .4)).length;
+      expect(neighbours).toBeGreaterThan(sites.length * .85);
+    }
+  });
   it('keeps every pebble in the shore band, off routes and bridges and out of every rock', () => {
     let violations = 0;
     for (const [sites, rocks] of [[gpu, gpuRocks], [mobile, mobileRocks]] as const) for (const p of sites) {
@@ -41,15 +55,15 @@ describe('shore pebbles', () => {
     }
     expect(violations).toBe(0);
   });
-  it('lies each pebble on the walking ground, aligned with its slope and mostly sunk into it', () => {
+  it('beds each pebble in the walking ground, aligned with its slope, with only its crown showing', () => {
     const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), rotation = new THREE.Quaternion(), scale = new THREE.Vector3();
     for (let i = 0; i < gpu.length; i += 37) {
       const p = gpu[i]; pebbleMatrix(p, matrix).decompose(position, rotation, scale);
       const normal = terrainSurfaceNormal(p.x, p.z), up = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation);
       expect(p.y).toBeCloseTo(terrainSurfaceHeight(p.x, p.z), 6); expect(up.dot(normal)).toBeGreaterThan(.9999);
-      // The centre stands above the ground by less than half the pebble's own height, so its foot is buried.
+      // The centre lies below the ground, so with the flattened underside (0.7) over half the pebble is buried; the crown shows.
       const lift = position.clone().sub(new THREE.Vector3(p.x, p.y, p.z)).dot(normal);
-      expect(lift).toBeGreaterThan(0); expect(lift).toBeLessThan(scale.y * .5);
+      expect(lift).toBeCloseTo(-PEBBLE_BED * scale.y, 6); expect((.7 + PEBBLE_BED) / 1.7).toBeGreaterThan(.5); expect(lift + scale.y).toBeGreaterThan(scale.y * .7);
       expect(scale.x).toBeCloseTo(p.size, 5); expect(scale.y).toBeLessThan(scale.x); expect(scale.z).toBeLessThanOrEqual(scale.x + 1e-6);
     }
   });

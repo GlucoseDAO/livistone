@@ -7,6 +7,8 @@ See [README](README.md) for the shared workflow.
 
 Implemented on `realism/14-shore`, rebased on the WebGPU branch and not merged: every step. Steps 1 and 3's moss are TSL (`src/world/shore-nodes.ts`); pebbles refill from the cells near the camera; the lake material is `lakeWaterMaterial` in `water-material.ts`. Captures wait for the WebGPU merge.
 
+Follow-up on `fix/round-2-known-issues` ([round-2-leftovers.md](round-2-leftovers.md), section 2): the pebbles read as scattered marbles on the grass. They are now fewer (1,800 gpu, 600 mobile), smaller (median half-length 2.6 cm), bedded below the ground and in the bank's own browns, and lie in drifts along the waterline that end short of the grass. `tests/shore.test.ts` now evaluates `channelDistance`'s node graph against `waterDistance` at about 90k points, so the duplicated channel formulas cannot drift apart.
+
 ## Steps
 
 1. **Terrain shader near water** (`mountains.ts`, using `waterDistance` and the 04 depth). The ground darkens and its roughness drops in a wet band at the waterline, plus:

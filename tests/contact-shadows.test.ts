@@ -1,16 +1,18 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { CONTACT_GRID, createContactShadows, objectContactSites, rockContactSites, TOWN_SHADE_FOOTPRINTS, treeContactSites, treeShadeDiscs } from '../src/world/contact-shadows';
+import { CONTACT_GRID, CONTACT_WATER_FADE, createContactShadows, objectContactSites, rockContactSites, rockHalo, TOWN_SHADE_FOOTPRINTS, treeContactSites, treeShadeDiscs } from '../src/world/contact-shadows';
 import { KEEP_DISPLAY } from '../src/render/output';
 import type { ContactSite } from '../src/world/contact-shadows';
 import { forestCells } from '../src/world/forest';
 import { forestSites } from '../src/world/forest-layout';
 import { gatewayApproachWidth } from '../src/world/gateway-layout';
 import { contactFalloff, GROUND_SHADE_MIN, groundShadeField } from '../src/world/ground-cover';
-import { PATH_CURVES, PATH_WIDTH } from '../src/world/landscape';
+import { PATH_CURVES, PATH_WIDTH, WATER_CLEARANCE } from '../src/world/landscape';
 import { mountainGeometry, terrainTiles } from '../src/world/mountains';
+import { ROCK_STRETCH, rockReach } from '../src/world/river-rocks';
 import { riverRockSites } from '../src/world/stone';
 import { landscapeHeight } from '../src/world/terrain';
+import { WATER_EDGE } from '../src/world/water-surface';
 import { waterDistance } from '../src/world/waterways';
 
 function town(mobile: boolean) {
@@ -62,15 +64,44 @@ describe('contact shadows', () => {
   });
 
   it('keeps tree and rock patches off the paths and out of the water', () => {
-    for (const site of [...gpu.groups.flat(), ...mobile.groups.flat(), ...gpu.bankRocks, ...mobile.bankRocks]) {
+    for (const site of [...gpu.groups.flat(), ...mobile.groups.flat()]) {
       expect(pathGap(site.x, site.z)).toBeGreaterThan(radius(site));
       expect(waterDistance(site.x, site.z)).toBeGreaterThan(radius(site));
+    }
+    // Rock patches reach past the planting clearance onto the wet bank, but never over the water's outline.
+    for (const site of [...gpu.bankRocks, ...mobile.bankRocks]) {
+      expect(pathGap(site.x, site.z)).toBeGreaterThan(radius(site));
+      expect(waterDistance(site.x, site.z) - radius(site)).toBeGreaterThan(WATER_EDGE);
     }
     // Feet and posts may stand at a path edge, where the raised paving hides the overlap, but never on the paving or in water.
     for (const site of gpu.objects.filter(site => site.floor === undefined)) {
       expect(pathGap(site.x, site.z)).toBeGreaterThan(0);
       expect(waterDistance(site.x, site.z)).toBeGreaterThan(radius(site));
     }
+  });
+
+  it('reaches past every bank rock’s silhouette and fades out toward the river', () => {
+    for (const { rocks, bankRocks } of [gpu, mobile]) {
+      const dry = rocks.filter(rock => waterDistance(rock.x, rock.z) > rockReach(rock.s));
+      expect(bankRocks).toHaveLength(dry.length);
+      let full = 0;
+      bankRocks.forEach((site, i) => {
+        const { s, x, z } = dry[i], edge = [ROCK_STRETCH[0] * s, ROCK_STRETCH[2] * s];
+        expect([site.x, site.z]).toEqual([x, z]);
+        expect(site.rx).toBeGreaterThan(edge[0] + .05); expect(site.rz).toBeGreaterThan(edge[1] + .05);
+        if (site.rx - edge[0] < rockHalo(s) - 1e-9) return;
+        // With its whole halo, the silhouette lies on the falloff's dark shoulder, well inside the clear rim.
+        expect(contactFalloff(edge[0] / site.rx)).toBeGreaterThan(.6); expect(contactFalloff(edge[1] / site.rz)).toBeGreaterThan(.6); full++;
+      });
+      // Only a rock beside a route gives up part of its halo.
+      expect(full).toBeGreaterThan(bankRocks.length * .98);
+    }
+    // Every vertex carries its own waterDistance; the material fades from nothing at the waterline to full strength before the
+    // planting clearance, where the rock feet stand.
+    expect(CONTACT_WATER_FADE[0]).toBe(WATER_EDGE); expect(CONTACT_WATER_FADE[1]).toBeLessThan(WATER_CLEARANCE);
+    const { mesh } = gpu.shadows, position = mesh.geometry.getAttribute('position'), water = mesh.geometry.getAttribute('water');
+    expect(water.count).toBe(position.count); expect(mesh.material.opacityNode?.isNode).toBe(true);
+    for (let i = 0; i < water.count; i += 7) expect(water.getX(i)).toBeCloseTo(waterDistance(position.getX(i), position.getZ(i)), 4);
   });
 
   it('batches every tier into one draw, with a crown and a trunk patch per tree', () => {

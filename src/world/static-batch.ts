@@ -11,6 +11,17 @@ function relativeMatrix(mesh: THREE.Object3D, ancestor: THREE.Object3D): THREE.M
   return matrix;
 }
 /**
+ * A part of an object-space mapped material (surfaces.ts brass) keeps its own frame through the merge: its position and normal
+ * before the transform, and the transform's rotation for the relief, so the map lands on every part as it did unmerged.
+ */
+function bakeFrame(part: THREE.BufferGeometry, matrix: THREE.Matrix4): void {
+  const rotation = new THREE.Quaternion(); matrix.decompose(new THREE.Vector3(), rotation, new THREE.Vector3());
+  const count = part.getAttribute('position').count, q = new Float32Array(count * 4);
+  for (let i = 0; i < count; i++) rotation.toArray(q, i * 4);
+  part.setAttribute('surfacePosition', part.getAttribute('position').clone()); part.setAttribute('surfaceNormal', part.getAttribute('normal').clone());
+  part.setAttribute('surfaceRotation', new THREE.BufferAttribute(q, 4));
+}
+/**
  * Static meshes sharing a parent (or the ancestor `into`), material, shadow flags and vertex layout draw as one mesh, with
  * their transforms baked. Take colliders from the separate parts first. Meshes carrying interaction tags in userData stay
  * separate; `maxIndices` splits a large batch. Returns the meshes that now draw the parts.
@@ -33,7 +44,9 @@ export function mergeStatic(meshes: THREE.Mesh[], name: string, maxIndices = Inf
       parent.add(mesh); result.push(mesh);
     };
     for (const mesh of group) {
-      const part = mesh.geometry.clone().applyMatrix4(relativeMatrix(mesh, parent)), count = part.index?.count ?? part.getAttribute('position').count;
+      const matrix = relativeMatrix(mesh, parent), part = mesh.geometry.clone();
+      if ((first.material as THREE.Material).userData.objectSpace) bakeFrame(part, matrix);
+      part.applyMatrix4(matrix); const count = part.index?.count ?? part.getAttribute('position').count;
       if (parts.length && size + count > maxIndices) flush();
       parts.push(part); size += count; mesh.removeFromParent();
     }

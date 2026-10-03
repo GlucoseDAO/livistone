@@ -12,7 +12,8 @@ export const shoreTime = uniform(0);
 export function shoreTextureFiles(tier: GraphicsTier): string[] { return tier === 'cpu' ? [] : ['gravel-albedo-512.webp', 'gravel-nrh-256.webp']; }
 export interface ShoreMaps { albedo: THREE.Texture; nrh: THREE.Texture }
 
-/** waterDistance (waterways.ts) as nodes: signed metres to the nearest river or tributary bank, negative inside the channel. */
+/** waterDistance (waterways.ts) as nodes: signed metres to the nearest river or tributary bank, negative inside the channel.
+ *  tests/shore.test.ts evaluates this graph against waterDistance, so change both together. */
 export const channelDistance = Fn(([xz]: [V2]) => {
   const x = xz.x, z = xz.y;
   const centre = float(26).add(sin(x.mul(.036)).mul(4)).add(sin(x.mul(.075)).mul(3).mul(min(abs(x).div(35), 1)));
