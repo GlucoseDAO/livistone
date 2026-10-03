@@ -471,12 +471,14 @@ export function cragColliders(sites: readonly CragSite[]): ColliderSpec {
   return { type: 'mesh', vertices: new Float32Array(out.positions), indices: new Uint32Array(out.index) };
 }
 
-/** Contact patches where blocks on the walking terrain meet ground gentle enough to read as their foot (not on sheer faces). */
+/**
+ * Contact patches where blocks on the walking terrain meet ground gentle enough to read as their foot: the gorge's lining along its
+ * front on the floor, a talus block all round, a step at its downhill face; none on sheer faces, none past the near grid.
+ */
 export function cragContactSites(sites: readonly CragSite[]): ContactSite[] {
-  return sites.filter(s => s.collider && s.slope < 52 && s.z > -264).map(s => {
-    // A step's visible foot is its downhill face; a talus block's is all round it.
-    const front = s.kind === 'talus' ? 0 : s.depth * .35;
-    return { x: s.x + Math.sin(s.yaw) * front, z: s.z + Math.cos(s.yaw) * front, yaw: s.yaw, rx: s.width / 2 + .55, rz: s.kind === 'talus' ? s.depth / 2 + .55 : 1.1, strength: s.kind === 'talus' ? .85 : .6 };
+  return sites.filter(s => s.collider && s.z > -263 && (s.slope < 52 || s.trail < 1.6)).map(s => {
+    const lining = s.trail < 1.6 && s.kind !== 'talus', front = s.kind === 'talus' ? 0 : s.depth * (lining ? .5 : .35);
+    return { x: s.x + Math.sin(s.yaw) * front, z: s.z + Math.cos(s.yaw) * front, yaw: s.yaw, rx: s.width / 2 + .45, rz: s.kind === 'talus' ? s.depth / 2 + .55 : lining ? .9 : 1.1, strength: s.kind === 'talus' ? .85 : lining ? .55 : .6 };
   });
 }
 /** Discs that keep the near grass out of blocks standing where it could grow (grass gives way to rock above about 35°). */
