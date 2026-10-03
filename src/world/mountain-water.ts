@@ -224,7 +224,7 @@ export function waterfallGeometry(spec: WaterfallSpec, tier: GraphicsTier): THRE
       return new THREE.Vector3(px, y, pz).addScaledVector(normal, .06);
     };
     high.forEach((row, i) => {
-      const share = Math.min(row.drop / f.height, 1), spread = 2.1 * (1 + .35 * share);
+      const share = Math.min(row.drop / f.height, 1), spread = 1.7 * (1 + .3 * share);
       for (let c = 0; c <= film; c++) {
         const e = (c / film * 2 - 1) * spread, across = e * row.width / 2, p = row.centre.clone().addScaledVector(f.side, across), wet = rock(p.x, p.z, p.y);
         // No rock behind (past the lip's ends): the vertex stays on the sheet's line, outside the film's fade.
