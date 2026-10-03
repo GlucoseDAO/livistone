@@ -11,6 +11,7 @@ import { createSky, HORIZON_HAZE, HORIZON_RADIANCE, MOON_DIR, SKY_EXPOSURE, SUN_
 import type { SkyPhase } from './world/sky';
 import { setGatewayQuality } from './world/gateway-materials';
 import { setMitoringAmberQuality } from './world/mitoring-materials';
+import { ShellMaterial } from './render/shell';
 import { COLLECTION } from './game/exhibits';
 import { Town } from './world/world';
 import { UI } from './ui/ui';
@@ -392,11 +393,12 @@ class Game {
     this.scene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of materials) if (material instanceof THREE.MeshPhysicalMaterial) {
+      for (const material of materials) if (material instanceof ShellMaterial) {
+        if (material.userData.mitoringAmber) setMitoringAmberQuality(material, low);
+        if (material.userData.cityHallCrystal) setCityHallCrystalQuality(material, low);
+      } else if (material instanceof THREE.MeshPhysicalMaterial) {
         if (material.userData.myceliumOpal) { material.iridescence = low ? .35 : 1; material.needsUpdate = true; continue; }
         if (material.userData.gatewayGem) { setGatewayQuality(material, low); continue; }
-        if (material.userData.cityHallCrystal) { setCityHallCrystalQuality(material, low); continue; }
-        if (material.userData.mitoringAmber) { setMitoringAmberQuality(material, low); continue; }
         if (material.userData.pavilionGem) { material.transmission = low ? 0 : .42; material.opacity = low ? .45 : .7; material.needsUpdate = true; continue; }
         // Only hall glazing and station amber follow the generic switch; the river and Future House glass keep their own optics.
         if (!material.userData.hallGlass && !material.userData.stationAmber) continue;

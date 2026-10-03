@@ -23,6 +23,9 @@ const acesFilmic = Fn(([radiance, exposure]: [Node<'vec3'>, Node<'float'>]) => {
   return mat3(ACES_OUT).mul(v.mul(v.add(.0245786)).sub(.000090537).div(v.mul(v.mul(.983729).add(.432951)).add(.238081))).clamp(0, 1);
 });
 
+/** The colour the output pass shows for a linear radiance, before fog: the classic ACES fit at the exposure, sRGB-encoded. */
+export const displayed = (radiance: Node<'vec3'>): Node<'vec3'> => toSRGB(acesFilmic(radiance, exposure) as unknown as Node<'vec3'>);
+
 /** The fog: main.ts keeps it at the walking or map range, toward the displayed horizon (HORIZON_HAZE). */
 // In the render group, as three's own fog: between frames a material without node properties refreshes only the shared
 // groups, so an object-group uniform reaching it through the MRT keeps its first value (the map range the town loads in).
@@ -60,9 +63,24 @@ export class OutputPipeline {
    * target and MRT as they go, so both stay set until every part is done; nothing else renders while the town loads.
    */
   async compile(camera: THREE.Camera, parts: THREE.Object3D[], parallel = 6): Promise<void> {
+    // A double-sided transmissive material renders a back pass and then a front pass. compileAsync sets each side while it
+    // collects the two passes but builds them after restoring DoubleSide, so both would keep a double-sided shader and
+    // pipeline (the hall glass drawn four layers deep). Compile them one side at a time instead: the cache keys hold the side.
+    const twoPass = new Map<THREE.Material, THREE.Mesh[]>();
+    for (const part of parts) part.traverse((object) => {
+      const mesh = object as THREE.Mesh; if (!mesh.isMesh) return;
+      for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        const physical = material as THREE.MeshPhysicalNodeMaterial;
+        if (material.side === THREE.DoubleSide && !material.forceSinglePass && (physical.transmission > 0 || physical.transmissionNode)) twoPass.set(material, [...twoPass.get(material) ?? [], mesh]);
+      }
+    });
     const queue = [...parts]; this.bind();
-    try { await Promise.all(Array.from({ length: parallel }, async () => { for (let part = queue.shift(); part; part = queue.shift()) await this.renderer.compileAsync(part, camera, this.scene); })); }
-    finally { this.unbind(); }
+    try {
+      for (const material of twoPass.keys()) material.side = THREE.FrontSide;
+      await Promise.all(Array.from({ length: parallel }, async () => { for (let part = queue.shift(); part; part = queue.shift()) await this.renderer.compileAsync(part, camera, this.scene); }));
+      for (const material of twoPass.keys()) material.side = THREE.BackSide;
+      for (const mesh of new Set([...twoPass.values()].flat())) await this.renderer.compileAsync(mesh, camera, this.scene);
+    } finally { for (const material of twoPass.keys()) material.side = THREE.DoubleSide; this.unbind(); }
   }
   private bind(): void {
     this.renderer.getDrawingBufferSize(this.size);

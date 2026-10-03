@@ -31,6 +31,17 @@ async function softwareAdapter(): Promise<boolean> {
   try { return (await (navigator as Navigator & { gpu?: GPUProbe }).gpu?.requestAdapter({ powerPreference: 'high-performance' }))?.info?.isFallbackAdapter === true; } catch { return false; }
 }
 
+type SortItem = { groupOrder: number; renderOrder: number; z: number; id: number; material: THREE.Material & { transmission?: number; transmissionNode?: unknown } };
+const transmissive = (item: SortItem): number => (item.material.transmission ?? 0) > 0 || item.material.transmissionNode ? 1 : 0;
+/**
+ * The classic renderer drew every transmissive surface before any transparent one; WebGPURenderer sorts both by distance in
+ * one list. Without that order a night halo inside the Mitoring, farther than the cup's centre, drew first and the amber then
+ * covered it. Within each group, three's own back-to-front order.
+ */
+function classicTransparentOrder(a: SortItem, b: SortItem): number {
+  return transmissive(b) - transmissive(a) || a.groupOrder - b.groupOrder || a.renderOrder - b.renderOrder || b.z - a.z || a.id - b.id;
+}
+
 export async function createRenderer(canvas: HTMLCanvasElement, antialias: boolean): Promise<RenderView> {
   const forceWebGL = (import.meta.env.DEV && new URLSearchParams(location.search).get('backend') === 'webgl') || await softwareAdapter();
   const renderer = new THREE.WebGPURenderer({ canvas, antialias, powerPreference: 'high-performance', forceWebGL });
@@ -38,6 +49,7 @@ export async function createRenderer(canvas: HTMLCanvasElement, antialias: boole
   await renderer.init();
   // WebGPURenderer's own animation loop would reset these on every display frame, including ones the game skips.
   renderer.info.autoReset = false;
+  renderer.setTransparentSort(classicTransparentOrder as unknown as Parameters<THREE.WebGPURenderer['setTransparentSort']>[0]);
   const backend = renderer.backend as THREE.Backend & { isWebGPUBackend?: boolean; device?: { adapterInfo?: AdapterInfo }; gl?: WebGL2RenderingContext };
   const webgpu = backend.isWebGPUBackend === true;
   return {
