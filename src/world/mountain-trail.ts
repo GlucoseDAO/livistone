@@ -5,14 +5,13 @@
 // canvas atlas every sign face, trunk, root, rope, fence and fern maps into, so all of that is a single draw.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { atan, attribute, cameraPosition, cos, distance, float, floor, fract, length, mix, mx_cell_noise_float, mx_noise_float, mx_worley_noise_float, positionWorld, smoothstep, step, vec2, vec3 } from 'three/tsl';
 import type { ColliderSpec } from '../game/physics';
 import type { GraphicsTier } from '../game/graphics';
 import type { RockSite } from './water-surface';
 import type { ContactSite } from './contact-shadows';
 import { terrainSurfaceHeight, terrainSurfaceNormal } from './terrain';
 import { rockColliders, rockReach, seatedHeight } from './river-rocks';
-import { PLATEAU, TRAILHEAD, TRAILHEAD_TRUNKS, TRAIL_BARRIER, TRAIL_CURVE, TRAIL_ENTRY, TRAIL_HALF, TRAIL_SAMPLES, bloomDensity, plateauHeight, plateauMask, plateauRadius, trailDistance, trailheadPoint } from './mountain-layout';
+import { PLATEAU, STAGE, TRAILHEAD, TRAILHEAD_TRUNKS, TRAIL_BARRIER, TRAIL_CURVE, TRAIL_HALF, TRAIL_SAMPLES, gorgeHalf, plateauRadius, plateauRim, snowCover, trailDistance, trailLevel, trailheadPoint } from './mountain-layout';
 
 const UP = new THREE.Vector3(0, 1, 0), TAU = Math.PI * 2;
 function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
@@ -37,7 +36,8 @@ const BARRIER_HALF = 1.75;
 export function trailBoulders(mobile: boolean): TrailBoulder[] {
   const rand = random(2717), boulders: TrailBoulder[] = [], length = TRAIL_CURVE.getLength();
   const clear = (x: number, z: number, s: number): boolean => trailDistance(x, z) > TRAIL_HALF + .45 + rockReach(s) && boulders.every(b => Math.hypot(b.site.x - x, b.site.z - z) > rockReach(b.site.s) + rockReach(s) + .4);
-  for (const [k, distance] of [44, 60, 76, 92, 108, 124, 140, 156, 172].entries()) {
+  // Blazed rocks every 12–16 m from the woods up the gorge (the snow gully's blazes are on its walls) and on the plateau.
+  for (const [k, distance] of [44, 60, 76, 92, 108, 124, 138, 150, 163, 177, 191, 240].entries()) {
     const u = distance / length, p = TRAIL_CURVE.getPointAt(u), tangent = TRAIL_CURVE.getTangentAt(u), s = .38 + rand() * .3;
     for (const side of k % 2 ? [1, -1] : [-1, 1]) {
       const offset = TRAIL_HALF + .55 + rockReach(s), x = p.x - tangent.z * side * offset, z = p.z + tangent.x * side * offset;
@@ -54,6 +54,17 @@ export function trailBoulders(mobile: boolean): TrailBoulder[] {
     const x = TRAIL_BARRIER.x + Math.cos(TRAIL_BARRIER.yaw) * side * (BARRIER_HALF + .25 + rockReach(s)), z = TRAIL_BARRIER.z - Math.sin(TRAIL_BARRIER.yaw) * side * (BARRIER_HALF + .25 + rockReach(s));
     boulders.push({ site: seat(x, z, s, rand() * TAU), blaze: null });
   }
+  // Boulders fallen onto the old snow and half sunk in it, as in the gully photograph, and stones scattered on it, off the tread.
+  for (const [s, side, size] of [[STAGE.snout + 7, 1, 1.15], [STAGE.snout + 15, -1, .9], [STAGE.snout + 23, 1, 1.25], [STAGE.snout + 4, -1, .55], [STAGE.snout + 19, 1, .5]] as const) {
+    const p = TRAIL_SAMPLES[s], q = TRAIL_SAMPLES[s + 1], l = Math.hypot(q.x - p.x, q.z - p.z), offset = Math.min(gorgeHalf(s) * .62, TRAIL_HALF + .8 + rockReach(size));
+    const x = p.x - (q.z - p.z) / l * side * offset, z = p.z + (q.x - p.x) / l * side * offset;
+    if (clear(x, z, size)) boulders.push({ site: seat(x, z, size, rand() * TAU), blaze: null });
+  }
+  for (let i = 0, placed = 0; i < 300 && placed < (mobile ? 5 : 10); i++) {
+    const s = STAGE.snout + 2 + Math.floor(rand() * (STAGE.head - STAGE.snout - 6)), p = TRAIL_SAMPLES[s], size = .14 + rand() * .16, a = rand() * TAU, r = gorgeHalf(s) * rand() * .7;
+    const x = p.x + Math.cos(a) * r, z = p.z + Math.sin(a) * r;
+    if (snowCover(x, z) > .9 && clear(x, z, size)) { boulders.push({ site: seat(x, z, size, rand() * TAU), blaze: null }); placed++; }
+  }
   return boulders;
 }
 
@@ -65,7 +76,7 @@ const ATLAS = { width: 2048, height: 1536 };
 /** Canvas pixels of each painted face or swatch (x0, y0, x1, y1). */
 const REGION = {
   danger: [0, 0, 1280, 720], back: [0, 736, 500, 1016], pointer: [1296, 0, 2032, 216], pointerBack: [1296, 232, 2032, 448],
-  closed: [520, 736, 880, 908], blaze: [1296, 656, 1424, 784], paint: [1440, 656, 1568, 784], wood: [1584, 656, 1712, 784], rope: [1728, 656, 1856, 784],
+  closed: [520, 736, 880, 908], blaze: [1296, 656, 1424, 784], paint: [1440, 656, 1568, 784], wood: [1584, 656, 1712, 784], rope: [1728, 656, 1856, 784], steel: [1872, 656, 2000, 784],
   warning: [0, 1040, 640, 1420], winter: [656, 1040, 1216, 1340], bark: [1232, 1040, 1360, 1536], butterbur: [1376, 1040, 1696, 1360], fern: [1712, 1040, 1872, 1536],
 } as const satisfies Record<string, Region>;
 /** Texture coordinates of (s, t) ∈ [0, 1]² inside a region; the canvas texture's flipY puts t = 1 at the region's top edge. */
@@ -243,14 +254,13 @@ export function createTrailSigns(colliders: ColliderSpec[], boulders: readonly T
     const at = new THREE.Vector3(x, terrainSurfaceHeight(x, z), z);
     if (isFern) { parts.push(fern(at, size, mobile ? 5 : 7, rand)); ferns++; } else { parts.push(butterbur(at, size, rand)); leaves++; }
   }
-  // The rope fence round the plateau's open edges: posts where no crag closes it, gaps for the trail and at the barrier.
-  const posts: (THREE.Vector3 | null)[] = [], wobble = (a: number): number => 1 + .07 * Math.sin(3 * a + 1) + .05 * Math.sin(5 * a + 2.3);
-  for (let k = 0, count = 44; k < count; k++) {
-    const a = k / count * TAU, rim = (r: number): { x: number; z: number } => ({ x: PLATEAU.x + Math.cos(a) * PLATEAU.a * r * wobble(a), z: PLATEAU.z + Math.sin(a) * PLATEAU.b * r * wobble(a) });
-    const p = rim(.86), beyond = rim(1.14), crag = terrainSurfaceHeight(beyond.x, beyond.z) - plateauHeight(p.x, p.z) > 7.5;
-    const gap = trailDistance(p.x, p.z) < 1.5 || Math.hypot(p.x - TRAIL_BARRIER.x, p.z - TRAIL_BARRIER.z) < BARRIER_HALF + 1;
-    posts.push(crag || gap ? null : new THREE.Vector3(p.x, terrainSurfaceHeight(p.x, p.z), p.z));
-  }
+  // The rope fence along the plateau's lip, where the ground beyond falls away (the gorge below, the gully's side); open where the
+  // trail comes up from the gully and at the barrier. Posts stand 1.3 m in from the edge.
+  const rim = plateauRim(1.3), posts = rim.map((p) => {
+    const beyond = terrainSurfaceHeight(p.x + p.out.x * 3, p.z + p.out.z * 3), here = terrainSurfaceHeight(p.x, p.z);
+    const gap = trailDistance(p.x, p.z) < 2.2 || Math.hypot(p.x - TRAIL_BARRIER.x, p.z - TRAIL_BARRIER.z) < BARRIER_HALF + 1.2;
+    return here - beyond > 3.5 && !gap ? new THREE.Vector3(p.x, here, p.z) : null;
+  });
   posts.forEach((p, k) => {
     if (!p) return;
     parts.push(post(.05, -.4, 1.1).translate(p.x, p.y, p.z)); contacts.push({ x: p.x, z: p.z, rx: .3, rz: .3, strength: .6 });
@@ -259,6 +269,26 @@ export function createTrailSigns(colliders: ColliderSpec[], boulders: readonly T
     const low = Math.min(p.y, q.y) - .2, high = Math.max(p.y, q.y) + 1.1, mid = p.clone().lerp(q, .5);
     colliders.push({ type: 'box', position: [mid.x, (low + high) / 2, mid.z], size: [p.distanceTo(q) / 2 + .05, (high - low) / 2, .08], yaw: -Math.atan2(q.z - p.z, q.x - p.x) });
   });
+  // A steel cable along the narrow passage's left wall, as the real trail has its chains: anchors leaded into the rock.
+  const cable: THREE.Vector3[] = [];
+  for (let i = STAGE.passage - 5; i <= STAGE.passage + 7; i++) {
+    const p = TRAIL_SAMPLES[i], q = TRAIL_SAMPLES[i + 1], l = Math.hypot(q.x - p.x, q.z - p.z), off = gorgeHalf(i) - .2;
+    cable.push(new THREE.Vector3(p.x - (q.z - p.z) / l * off, trailLevel(i) + .95, p.z + (q.x - p.x) / l * off));
+  }
+  parts.push(mapInto(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cable), 40, .009, 5, false), swatch(REGION.steel)));
+  for (let k = 0; k < cable.length; k += 3) parts.push(mapInto(new THREE.CylinderGeometry(.018, .018, .12, 6).rotateZ(Math.PI / 2).rotateY(rand() * .3).translate(cable[k].x, cable[k].y, cable[k].z), swatch(REGION.steel)));
+  // Dead branches carried down onto the snow and the gorge's floor by avalanches, lying where they fell, off the tread.
+  for (let k = 0, laid = 0; k < 120 && laid < (mobile ? 8 : 16); k++) {
+    const onSnow = laid < (mobile ? 6 : 12), s = onSnow ? STAGE.snout + 2 + rand() * (STAGE.head - STAGE.snout - 6) : STAGE.mouth + 6 + rand() * (STAGE.snout - STAGE.mouth - 8);
+    const p = TRAIL_SAMPLES[Math.floor(s)], a = rand() * TAU, r = gorgeHalf(Math.floor(s)) * (.25 + rand() * .6), x = p.x + Math.cos(a) * r, z = p.z + Math.sin(a) * r, length = .7 + rand() * 1.6, turn = rand() * TAU;
+    const dir = new THREE.Vector3(Math.cos(turn), 0, Math.sin(turn)), ok = [0, .5, 1].every(u => trailDistance(x + dir.x * length * u, z + dir.z * length * u) > TRAIL_HALF + .5);
+    if (!ok || (onSnow && snowCover(x, z) < .8)) continue;
+    const radius = .025 + rand() * .03, at = (u: number, lift = 0): THREE.Vector3 => { const px = x + dir.x * length * u, pz = z + dir.z * length * u; return new THREE.Vector3(px, terrainSurfaceHeight(px, pz) + radius * .6 + lift, pz); };
+    parts.push(barkTube([0, .33, .66, 1].map(u => at(u, Math.sin(u * Math.PI) * .03)), (u) => radius * (1 - u * .6), 5, .2, .55));
+    const fork = at(.4), side = new THREE.Vector3(-dir.z, 0, dir.x).multiplyScalar(rand() < .5 ? 1 : -1).add(dir).normalize();
+    parts.push(barkTube([fork, fork.clone().addScaledVector(side, length * .25).setY(fork.y + .02), fork.clone().addScaledVector(side, length * .45).setY(fork.y + .01)], (u) => radius * .6 * (1 - u * .7), 4, .3, .45));
+    laid++;
+  }
   // The barrier that ends the walkable trail at the plateau's crags: two posts, two log rails and a small board, one collider.
   const fence = new THREE.Matrix4().makeRotationY(TRAIL_BARRIER.yaw).setPosition(TRAIL_BARRIER.x, 0, TRAIL_BARRIER.z), at = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, y, z).applyMatrix4(fence);
   const feet = [-1, 1].map(side => { const p = at(side * BARRIER_HALF, 0, 0); return terrainSurfaceHeight(p.x, p.z); });
@@ -368,6 +398,7 @@ export function paintTrailSigns(signs: TrailSigns, tier: GraphicsTier): void {
   // Weathered spruce and a cream rope, in swatches the posts and ropes map into.
   const w = REGION.wood; ctx.fillStyle = '#6d5539'; ctx.fillRect(w[0], w[1], w[2] - w[0], w[3] - w[1]);
   for (let i = 0; i < 60; i++) { ctx.fillStyle = `rgba(${rand() < .5 ? '40,28,16' : '150,128,96'},${.15 + rand() * .25})`; ctx.fillRect(w[0] + rand() * 128, w[1], 1 + rand() * 2, 128); }
+  const st = REGION.steel; ctx.fillStyle = '#5d6062'; ctx.fillRect(st[0], st[1], st[2] - st[0], st[3] - st[1]); for (let i = 0; i < 40; i++) { ctx.fillStyle = `rgba(${rand() < .5 ? '30,30,32' : '140,140,138'},.3)`; ctx.fillRect(st[0] + rand() * 128, st[1], 2, 128); }
   const r = REGION.rope; ctx.fillStyle = '#e4dcc5'; ctx.fillRect(r[0], r[1], r[2] - r[0], r[3] - r[1]);
   for (let i = -128; i < 128; i += 9) { ctx.strokeStyle = 'rgba(150,135,105,.35)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(r[0] + i, r[1]); ctx.lineTo(r[0] + i + 128, r[3]); ctx.stroke(); }
   // Fir bark: grey-brown plates split by dark vertical furrows, mossy toward the foot (the bottom of the strip).
@@ -392,138 +423,3 @@ export function paintTrailSigns(signs: TrailSigns, tier: GraphicsTier): void {
   const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = tier === 'gpu' ? 8 : 4;
   signs.mesh.material.map = map; signs.mesh.material.color.set('#ffffff'); signs.mesh.material.needsUpdate = true;
 }
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Rhododendron shrubs and moss campion on the plateau
-
-export interface ShrubSite { x: number; z: number; radius: number; height: number }
-/**
- * Rhododendron shrubs in loose groups on the plateau (gpu 80, mobile 44), 1–2.8 m across and 0.4–0.7 m tall, off the trail,
- * the boulders and each other, and a few strays on the verges of the climb's top.
- */
-export function shrubSites(mobile: boolean, rocks: readonly RockSite[]): ShrubSite[] {
-  const rand = random(4409), sites: ShrubSite[] = [], target = mobile ? 44 : 80, stones = rocks.filter(r => plateauRadius(r.x, r.z) < 1.2);
-  const free = (x: number, z: number, radius: number): boolean => terrainSurfaceNormal(x, z).y > .86 && trailDistance(x, z) > TRAIL_HALF + .4 + radius * .9 && stones.every(r => Math.hypot(r.x - x, r.z - z) > rockReach(r.s) + radius * .8) && sites.every(s => Math.hypot(s.x - x, s.z - z) > (s.radius + radius) * .92);
-  for (let attempt = 0; attempt < 6000 && sites.length < target; attempt++) {
-    const x = PLATEAU.x + (rand() - .5) * PLATEAU.a * 1.7, z = PLATEAU.z + (rand() - .5) * PLATEAU.b * 1.7, density = bloomDensity(x, z);
-    if (rand() > density) continue;
-    const radius = .5 + rand() * .55 * (.6 + density * .7), height = Math.min(.4 + rand() * .3, .3 + radius * .32);
-    if (free(x, z, radius)) sites.push({ x, z, radius, height });
-  }
-  for (let i = TRAIL_ENTRY - 22; i < TRAIL_ENTRY; i += 7) {
-    const p = TRAIL_SAMPLES[i], q = TRAIL_SAMPLES[i + 1], l = Math.hypot(q.x - p.x, q.z - p.z), side = i % 2 ? 1 : -1, radius = .45 + rand() * .2;
-    const x = p.x - (q.z - p.z) / l * side * (TRAIL_HALF + 1.2 + radius), z = p.z + (q.x - p.x) / l * side * (TRAIL_HALF + 1.2 + radius);
-    if (free(x, z, radius)) sites.push({ x, z, radius, height: .4 });
-  }
-  return sites;
-}
-/** Shrubs as one merged mesh: dark glossy leaf clumps with a red-brown cast, magenta trusses on top, fewer down the sides. */
-function shrubGeometry(sites: readonly ShrubSite[], mobile: boolean): THREE.BufferGeometry {
-  const rand = random(3203), positions: number[] = [], normals: number[] = [], colors: number[] = [], bloom: number[] = [], index: number[] = [];
-  const blossom = [new THREE.Color('#c8378f'), new THREE.Color('#e05ab0')], leafColours = [new THREE.Color('#2b4523'), new THREE.Color('#40592e')], cast = new THREE.Color('#5a3626'), colour = new THREE.Color();
-  const ico = new THREE.IcosahedronGeometry(1, 0), unit = ico.getAttribute('position'), faces = Array.from({ length: (ico.index?.count ?? unit.count) / 3 }, (_, f) => [0, 1, 2].map(k => ico.index ? ico.index.getX(f * 3 + k) : f * 3 + k));
-  // Icosahedron(1, 0) is not indexed in three; weld its corners so each clump is 12 vertices.
-  const corners: THREE.Vector3[] = [], corner = (i: number): number => { const v = new THREE.Vector3().fromBufferAttribute(unit, i); let k = corners.findIndex(c => c.distanceToSquared(v) < 1e-6); if (k < 0) k = corners.push(v) - 1; return k; };
-  const tris = faces.map(f => f.map(corner)).filter(f => f.some(k => corners[k].y > -.35));
-  const vertex = (p: THREE.Vector3, n: THREE.Vector3, c: THREE.Color, b: number): number => { positions.push(p.x, p.y, p.z); normals.push(n.x, n.y, n.z); colors.push(c.r, c.g, c.b); bloom.push(b); return positions.length / 3 - 1; };
-  const v = new THREE.Vector3(), n = new THREE.Vector3(), dome = new THREE.Vector3();
-  for (const site of sites) {
-    const phase = [rand() * TAU, rand() * TAU], rim = (a: number): number => site.radius * (.86 + .12 * Math.sin(3 * a + phase[0]) + .08 * Math.sin(5 * a + phase[1]));
-    const g = (x: number, z: number): number => terrainSurfaceHeight(x, z), mound = (q: number): number => site.height * Math.pow(Math.max(0, 1 - q * q), .6);
-    const clumps = Math.round(mobile ? 12 + site.radius * 14 : 28 + site.radius * 36);
-    for (let k = 0; k < clumps; k++) {
-      const a = k * 2.399 + rand() * .6, q = Math.min(1.02, Math.sqrt((k + .5) / clumps) * (1 + rand() * .08)), r = q * rim(a), x = site.x + Math.cos(a) * r, z = site.z + Math.sin(a) * r;
-      const size = (mobile ? .2 : .14) + rand() * (mobile ? .08 : .07), y = g(x, z) + Math.max(size * .45, mound(q) - size * .2);
-      const tint = colour.copy(leafColours[0]).lerp(leafColours[1], rand()).lerp(cast, rand() * rand() * .5).clone();
-      dome.set(Math.cos(a) * q * .8, 1, Math.sin(a) * q * .8).normalize();
-      const first = positions.length / 3;
-      corners.forEach(c => { const s = .82 + rand() * .36; v.copy(c).multiplyScalar(s); n.copy(c).lerp(dome, .55).normalize(); vertex(new THREE.Vector3(x + v.x * size, y + v.y * size * .75, z + v.z * size), n, colour.copy(tint).multiplyScalar(c.y < 0 ? .62 : .9 + .15 * c.y), 0); });
-      for (const t of tris) index.push(first + t[0], first + t[1], first + t[2]);
-    }
-    // Trusses at the branch tips: dense over the top, a few lone ones low on the sides.
-    const trusses = Math.round((mobile ? 46 : 92) * site.radius * site.radius + 4), size = mobile ? .09 : .07;
-    for (let k = 0, placed = 0; k < trusses * 3 && placed < trusses; k++) {
-      const a = rand() * TAU, q = Math.sqrt(rand()) * 1.02; if (rand() > (q < .72 ? .95 : .28)) continue;
-      // On the outer leaves, not among them: the clumps reach about 10 cm above the mound.
-      const x = site.x + Math.cos(a) * q * rim(a), z = site.z + Math.sin(a) * q * rim(a), y = g(x, z) + Math.max(.16, mound(q) + .11);
-      const tone = colour.copy(blossom[0]).lerp(blossom[1], rand()).clone(), up = new THREE.Vector3(Math.cos(a) * q * .9, 1, Math.sin(a) * q * .9).normalize(), side = new THREE.Vector3().crossVectors(up, new THREE.Vector3(Math.sin(a), 0, -Math.cos(a))).normalize(), across = new THREE.Vector3().crossVectors(up, side);
-      const top = vertex(new THREE.Vector3(x, y, z).addScaledVector(up, size * .75), up, colour.copy(tone).multiplyScalar(1.12), 1), turn = rand() * TAU;
-      const ring = Array.from({ length: 6 }, (_, j) => { const b = turn + j / 6 * TAU, s = size * (.85 + rand() * .3), p = new THREE.Vector3(x, y, z).addScaledVector(side, Math.cos(b) * s).addScaledVector(across, Math.sin(b) * s); return vertex(p, p.clone().sub(new THREE.Vector3(x, y, z)).normalize().lerp(up, .5).normalize(), colour.copy(tone).multiplyScalar(.82), 1); });
-      ring.forEach((_, j) => index.push(top, ring[j], ring[(j + 1) % 6]));
-      placed++;
-    }
-  }
-  ico.dispose();
-  const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geometry.setAttribute('bloom', new THREE.Float32BufferAttribute(bloom, 1)); geometry.setIndex(index); geometry.computeBoundingSphere(); return geometry;
-}
-/** Leaves as small glossy cells and every truss as a cluster of funnel blooms, from world-space Worley cells. */
-function shrubMaterial(): THREE.MeshStandardNodeMaterial {
-  const material = new THREE.MeshStandardNodeMaterial({ vertexColors: true }), b = attribute<'float'>('bloom', 'float');
-  const blooms = mix(1.16, .7, smoothstep(.1, .62, mx_worley_noise_float(positionWorld.mul(34)))), leaves = mix(1.18, .58, smoothstep(0, .78, mx_worley_noise_float(positionWorld.mul(26))));
-  material.colorNode = vec3(mix(leaves, blooms, b)); material.roughnessNode = mix(.5, .62, b);
-  return material;
-}
-export interface CampionSite { x: number; z: number; radius: number }
-/** Moss campion cushions (gpu 110, mobile 55): between the shrubs on the plateau and along the verges of the climb's top. */
-export function campionSites(mobile: boolean, shrubs: readonly ShrubSite[], rocks: readonly RockSite[]): CampionSite[] {
-  const rand = random(6151), sites: CampionSite[] = [], target = mobile ? 55 : 110, stones = rocks.filter(r => plateauRadius(r.x, r.z) < 1.5);
-  const free = (x: number, z: number, radius: number): boolean => terrainSurfaceNormal(x, z).y > .88 && trailDistance(x, z) > TRAIL_HALF + .2 + radius && shrubs.every(s => Math.hypot(s.x - x, s.z - z) > s.radius + radius * .6) && stones.every(r => Math.hypot(r.x - x, r.z - z) > rockReach(r.s) + radius) && sites.every(s => Math.hypot(s.x - x, s.z - z) > s.radius + radius + .15);
-  for (let attempt = 0; attempt < 5000 && sites.length < target; attempt++) {
-    const verge = rand() < .3, radius = .15 + rand() * rand() * .45;
-    let x: number, z: number;
-    if (verge) {
-      const i = TRAIL_ENTRY - 40 + Math.floor(rand() * (TRAIL_BARRIER.index - TRAIL_ENTRY + 40)), p = TRAIL_SAMPLES[i], q = TRAIL_SAMPLES[i + 1], l = Math.hypot(q.x - p.x, q.z - p.z), side = rand() < .5 ? -1 : 1, offset = TRAIL_HALF + .35 + radius + rand() * 1.8;
-      x = p.x - (q.z - p.z) / l * side * offset; z = p.z + (q.x - p.x) / l * side * offset;
-    } else { x = PLATEAU.x + (rand() - .5) * PLATEAU.a * 1.7; z = PLATEAU.z + (rand() - .5) * PLATEAU.b * 1.7; if (plateauRadius(x, z) > .84) continue; }
-    if (free(x, z, radius)) sites.push({ x, z, radius });
-  }
-  return sites;
-}
-/** Campion as one merged mesh hugging the ground: each cushion a low, irregular dome a few centimetres high, edge buried. */
-function campionGeometry(sites: readonly CampionSite[]): THREE.BufferGeometry {
-  const rand = random(733), positions: number[] = [], normals: number[] = [], index: number[] = [];
-  for (const site of sites) {
-    const first = positions.length / 3, ground = terrainSurfaceNormal(site.x, site.z), lift = .03 + site.radius * .04;
-    const add = (x: number, z: number, y: number, out: number): void => { positions.push(x, terrainSurfaceHeight(x, z) + y, z); const n = ground.clone().add(new THREE.Vector3(x - site.x, 0, z - site.z).normalize().multiplyScalar(out)).normalize(); normals.push(n.x, n.y, n.z); };
-    add(site.x, site.z, lift, 0);
-    for (const [ring, height, out] of [[.55, lift * .85, .15], [1, -.012, .5]] as const) for (let k = 0; k < 10; k++) { const a = k / 10 * TAU + (ring === 1 ? .31 : 0), r = site.radius * ring * (ring === 1 ? .8 + rand() * .35 : 1); add(site.x + Math.cos(a) * r, site.z + Math.sin(a) * r, height, out); }
-    for (let k = 0; k < 10; k++) {
-      const a = first + 1 + k, b = first + 1 + (k + 1) % 10, c = first + 11 + k, d = first + 11 + (k + 1) % 10;
-      index.push(first, b, a, a, b, c, b, d, c);
-    }
-  }
-  const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3)); geometry.setIndex(index); geometry.computeBoundingSphere(); return geometry;
-}
-/**
- * Dense bright moss with five-petalled lilac-pink stars (about 1.8 cm) and dark-red buds in 2.6 cm world-space cells; past 12–30 m
- * the stars average into a lilac tint instead of shimmering.
- */
-function campionMaterial(): THREE.MeshStandardNodeMaterial {
-  const material = new THREE.MeshStandardNodeMaterial({ roughness: .9 }), xz = positionWorld.xz, cell = xz.div(.026).toVar(), id = floor(cell);
-  const h1 = mx_cell_noise_float(vec3(id, 1)), h2 = mx_cell_noise_float(vec3(id, 2)), h3 = mx_cell_noise_float(vec3(id, 3));
-  const q = fract(cell).sub(.5).sub(vec2(h2.sub(.5), h3.sub(.5)).mul(.22)).toVar(), r = length(q), angle = atan(q.y, q.x).add(h2.mul(6.2831853));
-  const density = mx_noise_float(vec3(xz.mul(1.8), 0)).mul(.25).add(.42), near = float(1).sub(smoothstep(12, 30, distance(positionWorld, cameraPosition)));
-  const star = float(1).sub(step(density, h1)).mul(float(1).sub(smoothstep(.33, .37, r.div(cos(angle.mul(5)).mul(.26).add(.74))))).mul(near).toVar();
-  const eye = star.mul(float(1).sub(smoothstep(.05, .09, r)));
-  const bud = step(density, h1).mul(step(h1, density.add(.1))).mul(float(1).sub(smoothstep(.08, .12, r))).mul(near);
-  const moss = mix(vec3(.045, .11, .016), vec3(.11, .25, .03), mx_noise_float(vec3(xz.mul(60), 0)).mul(.5).add(.5)).mul(mix(.7, 1.1, smoothstep(0, .6, mx_worley_noise_float(vec3(xz.mul(90), 0)))));
-  const far = mix(moss, vec3(.36, .26, .42), float(1).sub(near).mul(.3));
-  material.colorNode = mix(mix(far, vec3(.28, .03, .07), bud), mix(vec3(.6, .38, .72), vec3(.5, .16, .38), eye), star);
-  return material;
-}
-/**
- * The plateau's plants: rhododendron shrubs and moss campion, two merged draws (none on cpu, where the ground's paint stands in),
- * with contact patches under the shrubs. No wind: shrubs this low and woody, and moss cushions, barely move.
- */
-export function createAlpinePlants(tier: GraphicsTier, rocks: readonly RockSite[]): { meshes: THREE.Mesh[]; contacts: ContactSite[] } {
-  if (tier === 'cpu') return { meshes: [], contacts: [] };
-  const mobile = tier === 'mobile', shrubs = shrubSites(mobile, rocks), campion = campionSites(mobile, shrubs, rocks);
-  const bushes = new THREE.Mesh(shrubGeometry(shrubs, mobile), shrubMaterial()); bushes.name = 'Rhododendron shrubs'; bushes.receiveShadow = true;
-  const cushions = new THREE.Mesh(campionGeometry(campion), campionMaterial()); cushions.name = 'Moss campion'; cushions.receiveShadow = true;
-  // Merged in world space from seeded layouts; cpu-detail.ts never sees them (no cpu tier), but keep their exact shapes anyway.
-  bushes.userData.keepGeometry = cushions.userData.keepGeometry = true;
-  return { meshes: [bushes, cushions], contacts: shrubs.map(s => ({ x: s.x, z: s.z, rx: s.radius * 1.05, rz: s.radius * 1.05, strength: .55 })) };
-}
-/** For tests: plateau ground heights where plants stand must be the plateau's (no shrub on a crag). */
-export function onPlateau(x: number, z: number): boolean { return plateauMask(x, z) > .99; }

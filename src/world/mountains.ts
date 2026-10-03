@@ -55,7 +55,7 @@ function terrainAxes(mobile: boolean, wide: boolean): { xs: number[]; zs: number
   const axis = (start: number, end: number, nearStart: number, nearEnd: number): number[] => {
     const values: number[] = []; for (let value = start; value <= end; value += value >= nearStart && value < nearEnd ? 2 : Math.abs(value) > 520 ? 32 : mobile ? 8 : 4) values.push(value); return values;
   };
-  return wide ? { xs: axis(-1400, 1400, -240, 240), zs: axis(-1280, 1280, -270, 150) } : { xs: axis(-520, 520, -240, 240), zs: axis(-520, 520, -270, 150) };
+  return wide ? { xs: axis(-1400, 1400, -240, 240), zs: axis(-1280, 1280, -296, 150) } : { xs: axis(-520, 520, -240, 240), zs: axis(-520, 520, -296, 150) };
 }
 /** The tiles' outer edge, ordered by angle around its centre: where the distant ranges' first ring starts. */
 export function terrainEdge(mobile: boolean): { x: number; z: number }[] {

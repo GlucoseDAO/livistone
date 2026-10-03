@@ -1,7 +1,7 @@
 import { PATH_CURVES, PATH_WIDTH } from './landscape';
 import { terrainNoise } from './terrain';
 import { waterDistance } from './waterways';
-import { trailWear } from './mountain-layout';
+import { gorgeFloorCover, snowCover, trailWear } from './mountain-layout';
 
 const CELL = 8;
 type Segment = { ax: number; az: number; dx: number; dz: number; length2: number };
@@ -31,8 +31,10 @@ export function groundCover(x: number, z: number): { soil: number; shade: number
   const edge = groundPathDistance(x, z), bank = Math.max(0, 1 - Math.abs(waterDistance(x, z)) / 3.5);
   const wear = Math.max(0, 1 - Math.max(0, edge - PATH_WIDTH / 2) / (1 + patches * 1.6));
   const freshness = Math.min(1, broad * .75 + bank * .25);
-  // The Jepii Mici trail (sub-plan 27) wears through to bare earth, past the paths' .55 cap.
-  return { soil: Math.max(Math.min(.55, .025 + wear * (.16 + patches * .17) + bank * .27 + Math.max(0, .4 - broad) * .3), trailWear(x, z)), shade: .82 + broad * .22 + patches * .09, freshness };
+  // The Jepii Mici trail (sub-plan 27) wears through to bare earth, past the paths' .55 cap; the gorge's floor is bare scree
+  // where no snow lies (on the snow, soil marks only the trail's trampled line, which the snow's shading reads).
+  const scree = gorgeFloorCover(x, z) * (1 - snowCover(x, z)) * .8;
+  return { soil: Math.max(Math.min(.55, .025 + wear * (.16 + patches * .17) + bank * .27 + Math.max(0, .4 - broad) * .3), trailWear(x, z), scree), shade: .82 + broad * .22 + patches * .09, freshness };
 }
 
 /** Radial falloff shared by the contact-shadow decals and the baked ground shade: full inside 45% of the radius, where an object

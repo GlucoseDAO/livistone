@@ -8,7 +8,7 @@ import { addGlow, nightEmission } from './night-lighting';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
 import { mitoringCage, nanotCage, ENERGY_HALL } from './jewelry';
-import { Forest, forestCells } from './forest';
+import { FOREST_DETAIL, Forest, forestCells } from './forest';
 import { forestSites } from './forest-layout';
 import { createContactShadows, objectContactSites, rockContactSites, TOWN_SHADE_FOOTPRINTS, treeContactSites, treeShadeDiscs } from './contact-shadows';
 import type { ContactShadows } from './contact-shadows';
@@ -50,7 +50,8 @@ import { BUDGET_OFF } from '../game/render-budget';
 import { PROBE_SITES } from './probes';
 import type { ProbeScope } from './probes';
 import { MOUNTAIN } from './mountain-layout';
-import { createAlpinePlants, createTrailSigns, paintTrailSigns, trailBoulders } from './mountain-trail';
+import { createTrailSigns, paintTrailSigns, trailBoulders } from './mountain-trail';
+import { createAlpinePlants } from './alpine-plants';
 import type { ContactSite } from './contact-shadows';
 
 /** Culling flags saved while Town.warmUp() draws everything. */
@@ -415,8 +416,8 @@ export class Town {
       // The Jepii Mici trailhead (sub-plan 27): every sign, post, rope and blaze is one mesh on one painted atlas; the cushions one draw.
       const signs = createTrailSigns(this.colliders, trail, this.forest.sites, this.mobile); this.root.add(signs.mesh); paintTrailSigns(signs, this.tier);
       this.researchPanels.push(signs.mesh); this.interactives.push({ id: 'jepii-mici', object: signs.mesh, position: signs.position });
-      // The plateau's rhododendron shrubs and moss campion: two merged draws, none on cpu.
-      const plants = createAlpinePlants(this.tier, rocks); this.root.add(...plants.meshes); this.trailContacts = [...signs.contacts, ...plants.contacts];
+      // The plateau's rhododendron mats, their cards with the turf's flowers and moss campion: three draws, none on cpu.
+      const plants = createAlpinePlants(this.tier, rocks, FOREST_DETAIL.coverage); this.root.add(...plants.meshes); this.trailContacts = [...signs.contacts, ...plants.contacts];
     }
     // Shore pebbles live with the other near-ground details, so map mode hides them; cpu has none. Only nearby cells draw.
     this.pebbles = createPebbles(this.tier, this.rocks); if (this.pebbles) this.details.add(this.pebbles.mesh);

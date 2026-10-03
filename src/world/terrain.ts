@@ -6,7 +6,7 @@ import { GARDENS, gardenHeight } from './living-waters-layout';
 import { RAILWAY, railwayCorridor } from './station-layout';
 import { futureClearing } from './elevated-layout';
 import { FAR_RANGES, farRangeHeight, ridgeErosion } from './far-ranges';
-import { mountainShape } from './mountain-layout';
+import { mountainCalm, mountainShape } from './mountain-layout';
 
 /** Dev-only `?ridges=classic`: the rounds 1–2 landscape, flat beyond about 400 m, with no distant ranges or far pass (sub-plan 26). */
 export type RidgesLook = 'ranges' | 'classic';
@@ -34,6 +34,8 @@ export function landscapeHeightOf(x: number, z: number, ranges: boolean): number
   // eroded ridges only, so the forest's seeded draws, which read the classic heights, stay put.
   return ranges ? mountainShape(x, z, ridgeHeightOf(x, z, ranges)) : ridgeHeightOf(x, z, ranges);
 }
+/** The eroded ridges before sub-plan 27 shapes them (mountain-layout.ts designs against it). */
+export function ridgeHeight(x: number, z: number): number { return ridgeHeightOf(x, z, RANGES); }
 function ridgeHeightOf(x: number, z: number, ranges: boolean): number {
   // Past the near box only the distant ranges stand; the river's carved channel ends there, inside the valley mist.
   if (ranges && Math.max(Math.abs(x), Math.abs(z + 20)) > FAR_RANGES.rise[0]) return farRangeHeight(x, z);
@@ -57,7 +59,7 @@ function ridgeHeightOf(x: number, z: number, ranges: boolean): number {
   // ground over the railway bores and the hills that frame the Dark Nut portals keep their smooth heights.
   const portal = Math.min(Math.abs(Math.abs(x) - RAILWAY.portalX), Math.abs(Math.abs(x) - RAILWAY.exitX)) / 70 + Math.abs(z - RAILWAY.centerZ) / 70;
   const rugged = ranges ? THREE.MathUtils.smoothstep(mass * foothills, 10, 40) * THREE.MathUtils.smoothstep(Math.abs(z - RAILWAY.centerZ), 14, 40) * THREE.MathUtils.smoothstep(portal, .6, 1.1) : 0;
-  const relief = mass * (.7 + .36 * fold * fold + .08 * terrainNoise(x * .12, z * .12) + (rugged && .55 * rugged * ridgeErosion(x, z)));
+  const relief = mass * (.7 + .36 * fold * fold + .08 * terrainNoise(x * .12, z * .12) + (rugged && .55 * rugged * (1 - mountainCalm(x, z)) * ridgeErosion(x, z)));
   const riverValley = THREE.MathUtils.smoothstep(distance, 0, 25);
   // Grade the approaches and far exits into the same hillside that the tunnel bores cut through.
   const railShoulder = 1 - THREE.MathUtils.smoothstep(Math.abs(z - RAILWAY.centerZ), 9, 30);
@@ -91,7 +93,7 @@ export function terrainSurfaceNormal(x: number, z: number): THREE.Vector3 {
   return new THREE.Vector3(-sx / 2, 1, -sz / 2).normalize();
 }
 /** The walking terrain's vertex lattice; the rendered ground near the town shares its 2 m vertices (mountains.ts). */
-export const TERRAIN_GRID = { minX: -240, minZ: -270, columns: 241, rows: 211, step: 2 } as const;
+export const TERRAIN_GRID = { minX: -240, minZ: -296, columns: 241, rows: 224, step: 2 } as const;
 export function townTerrainGeometry(): THREE.BufferGeometry {
   const { minX, minZ, columns, rows, step } = TERRAIN_GRID, width = (columns - 1) * step, depth = (rows - 1) * step;
   const geometry = new THREE.PlaneGeometry(width, depth, columns - 1, rows - 1).rotateX(-Math.PI / 2).translate(minX + width / 2, 0, minZ + depth / 2), p = geometry.getAttribute('position');

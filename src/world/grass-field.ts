@@ -8,7 +8,7 @@ import { landscapeHeight } from './terrain';
 import { groundCover } from './ground-cover';
 import { FRESH, GRASS } from './mountains';
 import { TOWN_BOUNDS } from './town-layout';
-import { MOUNTAIN } from './mountain-layout';
+import { MOUNTAIN, gorgeFloorCover, snowCover } from './mountain-layout';
 import { groundLook, macroField, meadowAverage } from './ground-material';
 import type { GrassShade, GroundLook } from './ground-material';
 import { windSway } from './wind';
@@ -97,7 +97,7 @@ export function grassClearance(x: number, z: number): number {
 export function bakeGrassField(options: { rocks?: readonly RockSite[]; stems?: readonly GroundDisc[]; height?: (x: number, z: number) => number; shade?: (x: number, z: number) => number } = {}): GrassBake {
   const height = options.height ?? landscapeHeight, shade = options.shade ?? ((): number => 1);
   // The walkable town plus the Jepii Mici climb and plateau north of its bound (sub-plan 27), where grass grows too.
-  const minX = STEP * Math.floor(TOWN_BOUNDS.minX / STEP), minZ = STEP * Math.floor(Math.min(TOWN_BOUNDS.minZ, MOUNTAIN ? -262 : 0) / STEP);
+  const minX = STEP * Math.floor(TOWN_BOUNDS.minX / STEP), minZ = STEP * Math.floor(Math.min(TOWN_BOUNDS.minZ, MOUNTAIN ? -284 : 0) / STEP);
   const width = (STEP * Math.ceil(TOWN_BOUNDS.maxX / STEP) - minX) / STEP + 1, depth = (STEP * Math.ceil(TOWN_BOUNDS.maxZ / STEP) - minZ) / STEP + 1;
   const field = new Float32Array(width * depth * 4), tint = new Uint8Array(width * depth * 4), heights = new Float32Array(width * depth);
   for (let j = 0; j < depth; j++) for (let i = 0; i < width; i++) heights[j * width + i] = height(minX + i * STEP, minZ + j * STEP);
@@ -142,7 +142,7 @@ export function bakeGrassField(options: { rocks?: readonly RockSite[]; stems?: r
     field[n * 4 + 3] = shade(x, z);
     // Ground too steep for grass skips its cover, which would only thin the neighbouring blades further.
     if (slope === 0) { tint.set([170, 170, 170, 0], n * 4); continue; }
-    const cover = groundCover(x, z); field[n * 4 + 2] = slope * (1 - THREE.MathUtils.smoothstep(cover.soil, .1, .38) * .9);
+    const cover = groundCover(x, z); field[n * 4 + 2] = slope * (1 - THREE.MathUtils.smoothstep(cover.soil, .1, .38) * .9) * (MOUNTAIN ? 1 - Math.max(snowCover(x, z), gorgeFloorCover(x, z)) : 1);
     // The ground's own vertex colour over its grass baseline (mountains.ts), so blades share its broad shade and freshness.
     colour.copy(GRASS).lerp(FRESH, cover.freshness * .6).multiplyScalar(cover.shade);
     tint.set([colour.r / GRASS.r, colour.g / GRASS.g, colour.b / GRASS.b].map(v => Math.round(THREE.MathUtils.clamp(v / 1.5, 0, 1) * 255)).concat(Math.round(meadowAmount(field[n * 4 + 1], field[n * 4 + 2]) * 255)), n * 4);
