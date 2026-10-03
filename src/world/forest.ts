@@ -18,6 +18,27 @@ function thinFoliage(geo: THREE.BufferGeometry): THREE.BufferGeometry {
   copy.setIndex(reduced); return copy;
 }
 
+/** Foliage half-extent of the oak and ash models at scale 1, from their GLB bounds; even site indices are oaks. */
+export const TREE_CANOPY = [5.4, 5.2];
+/** Per-tree size shared by the instances, their contact shadows and the baked ground shade. */
+export function treeScale(index: number): number { return .66 + ((index * 317) % 100) / 100 * .48; }
+export interface ForestCell { species: number; sites: { p: THREE.Vector3; index: number }[] }
+/** Each species' trees on a 48 m grid, species by species, then in grid order. Contact shadows plan the same cells, so a decal
+ *  hides with its tree when onCells reports the cell. */
+export function forestCells(sites: readonly THREE.Vector3[]): ForestCell[] {
+  const cells: ForestCell[] = [];
+  for (let species = 0; species < TREE_CANOPY.length; species++) {
+    const grouped = new Map<string, { p: THREE.Vector3; index: number }[]>();
+    sites.forEach((p, index) => {
+      if (index % 2 !== species) return;
+      const key = Math.floor(p.x / 48) + ':' + Math.floor(p.z / 48);
+      const cell = grouped.get(key) ?? []; cell.push({ p, index }); grouped.set(key, cell);
+    });
+    for (const members of grouped.values()) cells.push({ species, sites: members });
+  }
+  return cells;
+}
+
 /** A cell's trees: a slice of its species' instance arrays, and a sphere that bounds them all. */
 interface Cell { species: number; center: THREE.Vector3; first: number; count: number; sphere: THREE.Sphere; state: number; seen: boolean; lit: boolean }
 /** One model part of one species in one foliage detail, drawn by a view mesh and, with shadows, a shadow-only mesh. */
@@ -33,7 +54,7 @@ const frustum = new THREE.Frustum(), viewProjection = new THREE.Matrix4();
  */
 export class Forest extends THREE.Group {
   sites: THREE.Vector3[] = [];
-  /** Called with each cell's trunk visibility (species by species, then in grid order) whenever any of them changes. */
+  /** Called with each cell's trunk visibility, in forestCells order, whenever any of them changes. */
   onCells: ((shown: readonly boolean[]) => void) | null = null;
   private cells: Cell[] = [];
   private parts: Part[] = [];
@@ -42,16 +63,11 @@ export class Forest extends THREE.Group {
   async load(mobile: boolean, shadows = true): Promise<void> {
     const loader = new GLTFLoader();
     const models = await Promise.all(['oak', 'ash'].map((name) => loader.loadAsync(import.meta.env.BASE_URL + 'models/trees/' + name + '.glb')));
+    const planned = forestCells(this.sites);
     for (let species = 0; species < models.length; species++) {
       const parts: THREE.Mesh[] = []; models[species].scene.updateMatrixWorld(true);
       models[species].scene.traverse((o) => { if (o instanceof THREE.Mesh) parts.push(o); });
-      const grouped = new Map<string, { p: THREE.Vector3; index: number }[]>();
-      this.sites.forEach((p, index) => {
-        if (index % 2 !== species) return;
-        const key = Math.floor(p.x / 48) + ':' + Math.floor(p.z / 48);
-        const cell = grouped.get(key) ?? []; cell.push({ p, index }); grouped.set(key, cell);
-      });
-      const sites = [...grouped.values()], total = sites.reduce((sum, cell) => sum + cell.length, 0);
+      const sites = planned.filter((cell) => cell.species === species).map((cell) => cell.sites), total = sites.reduce((sum, cell) => sum + cell.length, 0);
       const geometries = parts.map((source) => source.geometry.clone().applyMatrix4(source.matrixWorld));
       const bounds = geometries.reduce((sphere, geo) => { geo.computeBoundingSphere(); return sphere.radius < 0 ? sphere.copy(geo.boundingSphere!) : sphere.union(geo.boundingSphere!); }, new THREE.Sphere(new THREE.Vector3(), -1));
       const matrices = new Float32Array(total * 16), tints = parts.map(() => new Float32Array(total * 3));
@@ -62,7 +78,7 @@ export class Forest extends THREE.Group {
         for (const { p } of cellSites) center.add(p);
         const cell: Cell = { species, center: center.multiplyScalar(1 / cellSites.length), first: next, count: cellSites.length, sphere: new THREE.Sphere(new THREE.Vector3(), -1), state: -1, seen: false, lit: false };
         for (const { p, index } of cellSites) {
-          const scale = .66 + ((index * 317) % 100) / 100 * .48;
+          const scale = treeScale(index);
           quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), index * 2.399);
           matrix.compose(p, quaternion, new THREE.Vector3(scale, scale * (1 + (index % 3) * .035), scale)); matrix.toArray(matrices, next * 16);
           scaled.copy(bounds).applyMatrix4(matrix); if (cell.sphere.radius < 0) cell.sphere.copy(scaled); else cell.sphere.union(scaled);

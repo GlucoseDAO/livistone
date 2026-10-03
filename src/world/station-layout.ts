@@ -4,6 +4,9 @@ export const STATION_LOCAL = {
   entranceX: -16, entranceZ: -60, trackZ: -79, railHalfLength: 412,
 } as const;
 
+/** Waiting-bench centres in the authored station frame; contact shadows place their footprints from the same list. */
+export const STATION_BENCHES: readonly (readonly [number, number])[] = [[-25, -70.2], [5, -70.2], [19, -70.2]];
+
 export const RAILWAY_LOCAL = { centerZ: -82, tracks: [-79, -85], portalX: 155, exitX: 370, boreHalfWidth: 7.1, boreSpring: 3.15, boreRise: 5.25, clearanceHeight: 9.6 } as const;
 
 // The authored station remains in its original coordinates; one rigid placement turns its exit toward the bridge.
