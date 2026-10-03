@@ -571,12 +571,16 @@ class Game {
   /** Every surface reflects the phase's sky, and each building its own probe once that phase's probe exists. */
   private showProbes(): void {
     if (!this.environment) return;
-    const probes = this.probes?.has(this.phase) ? this.probes.probes(this.phase) : this.bake?.phase === this.phase ? this.bake.finished() : new Map<string, THREE.Texture>();
+    // A bake of the shown phase replaces its provisional probes site by site.
+    const probes = new Map([...this.probes?.probes(this.phase) ?? [], ...this.bake?.phase === this.phase ? this.bake.finished() : []]);
     this.environment.view = { sky: this.skies.get(this.night)!.environment, probes };
   }
-  /** Bake a phase's probes from the next frames on, if it has none: the shown one after loading or a switch, night after day. */
+  /**
+   * Bake a phase's probes from the next frames on: the shown one after loading or a switch if not yet baked under its own
+   * shadows (a provisional night is baked again), and the night after the day.
+   */
   private startBake(phase = this.phase): void {
-    if (!this.probes || this.probes.has(phase) || this.bake || this.skyBaking) return;
+    if (!this.probes || this.probes.settled(phase) || (phase !== this.phase && this.probes.has(phase)) || this.bake || this.skyBaking) return;
     const night = phase === 'night', sky = this.skies.get(night); this.bakeWait = 2;
     if (sky) this.bake = this.probes.bake(phase, sky, HORIZON_RADIANCE[phase]);
     else this.skyBaking = { night, steps: skyBake(this.renderer, this.reduced, night, this.graphics.tier, LOOK === 'b') };
@@ -598,7 +602,8 @@ class Game {
       this.skies.set(night, step.value); this.skyBaking = null; this.startBake(night ? 'night' : 'day'); this.bakeWait = 0; return;
     }
     const bake = this.bake!;
-    const other = bake.phase !== this.phase; if (other) { this.night = !this.night; this.phaseState(); this.sun.shadow.intensity = 0; }
+    const other = bake.phase !== this.phase, count = bake.count;
+    if (other) { this.night = !this.night; this.phaseState(); this.sun.shadow.intensity = 0; bake.unshadowed = true; }
     const environment = this.environment!, view = environment.view, fade = shadowFade.value.clone();
     // A bake seen from the map's menu would otherwise draw empty halls: the map hides interiors and contact shadows.
     const map = this.mapView; if (map) this.town.setMapMode(false);
@@ -614,17 +619,19 @@ class Game {
       environment.view = view; shadowFade.value.copy(fade); this.setFog(); if (map) this.town.setMapMode(true);
       if (other) { this.sun.shadow.intensity = 1; this.night = !this.night; this.phaseState(); }
     }
-    if (!bake.done) { if (!other && bake.finished().size !== view.probes.size) this.showProbes(); return; }
+    if (!bake.done) { if (!other && bake.count !== count) this.showProbes(); return; }
     this.bake = null; this.showProbes(); if (!other) this.frameShadow(true);
     if (import.meta.env.DEV) {
       const phase = bake.phase, device = (this.renderer.backend as { device?: { queue: { onSubmittedWorkDone(): Promise<void> } } }).device;
       this.probeTimes[phase + 'End'] = Math.round(performance.now());
       if (device) void device.queue.onSubmittedWorkDone().then(() => { this.probeTimes[phase + 'Gpu'] = Math.round(performance.now()); });
     }
-    // Night next, in the background; the day only once shown, because its sun cannot go unshadowed. Both baked, the bake's
-    // targets and generators go.
+    // Night next, in the background and provisional (its moon unshadowed), baked again under the moon once shown; the day only
+    // once shown, because its sun cannot go unshadowed. Nothing more to bake, the bake's targets and generators go (a later
+    // bake makes them again).
     if (!this.probes!.has('night')) this.startBake('night');
-    else if (this.probes!.has('day')) this.probes!.release();
+    else this.startBake();
+    if (!this.bake && !this.skyBaking) this.probes!.release();
   }
   /** r186 gives any material without its own envMap scene.environmentIntensity instead of its envMapIntensity, so heroEnv
    *  materials keep an envMap for their own strength (look b) and sample the environment node, which follows the phase without

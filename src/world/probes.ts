@@ -117,6 +117,8 @@ interface Sized { face: THREE.RenderTarget; cube: THREE.CubeRenderTarget; quad: 
 export class ReflectionProbes {
   /** Per phase, each site's prefiltered cube once the whole phase has baked. */
   private readonly baked = new Map<SkyPhase, Map<string, THREE.RenderTarget>>();
+  /** Phases baked in the background with their light unshadowed, to bake again once shown. */
+  private readonly provisional = new Set<SkyPhase>();
   readonly materials = new Set<PBR>();
   /** Per phase, the bake's main-thread milliseconds over all its steps, and how many frames it took. */
   readonly timings: Partial<Record<SkyPhase, { ms: number; steps: number }>> = {};
@@ -148,6 +150,8 @@ export class ReflectionProbes {
     }
   }
   has(phase: SkyPhase): boolean { return this.baked.has(phase); }
+  /** Baked under its own light's shadows, not provisionally in the background. */
+  settled(phase: SkyPhase): boolean { return this.baked.has(phase) && !this.provisional.has(phase); }
   /** The finished probes of `phase` by site, or none. */
   probes(phase: SkyPhase): ReadonlyMap<string, THREE.Texture> {
     return new Map([...this.baked.get(phase) ?? []].map(([id, target]) => [id, target.texture]));
@@ -157,8 +161,10 @@ export class ReflectionProbes {
     return new ProbeBake(this, phase, sky, haze);
   }
   /** @internal ProbeBake's finished phase. */
-  finish(phase: SkyPhase, results: Map<string, THREE.RenderTarget>, ms: number, steps: number): void {
-    this.baked.get(phase)?.forEach(target => target.dispose()); this.baked.set(phase, results); this.timings[phase] = { ms: Math.round(ms), steps };
+  finish(phase: SkyPhase, results: Map<string, THREE.RenderTarget>, ms: number, steps: number, provisional: boolean): void {
+    this.baked.get(phase)?.forEach(target => target.dispose()); this.baked.set(phase, results);
+    if (provisional) this.provisional.add(phase); else this.provisional.delete(phase);
+    this.timings[phase] = { ms: Math.round(ms), steps };
   }
   /** Release the bake's targets and generators once every phase that will be shown has its probes. */
   release(): void {
@@ -236,6 +242,8 @@ export class ProbeBake {
   private site = 0;
   private face = 0;
   private cancelled = false;
+  /** Some face was drawn with its light unshadowed (a background bake of the phase not shown): bake again once shown. */
+  unshadowed = false;
   private ms = 0;
   private steps = 0;
   private extra: THREE.Object3D[] | null = null;
@@ -246,6 +254,8 @@ export class ProbeBake {
     this.view = { sky: sky.environment, probes: new Map() };
   }
   get done(): boolean { return this.cancelled || this.site >= this.probes.scopes.length; }
+  /** How many sites are finished. */
+  get count(): number { return this.results.size; }
   /** The sites finished so far, for the probes shown while the bake goes on. */
   finished(): ReadonlyMap<string, THREE.Texture> { return new Map([...this.results].map(([id, target]) => [id, target.texture])); }
   /** Bake the next face; true once the phase is complete (and handed to the probes). */
@@ -260,7 +270,7 @@ export class ProbeBake {
     if (this.face === 6) { this.results.set(scope.site.id, this.probes.prefilter(context, scope)); this.face = 0; this.site++; }
     else { this.probes.renderFace(context, scope, this.face, this.haze, this.extra); this.face++; }
     this.ms += performance.now() - start; this.steps++;
-    if (this.site >= this.probes.scopes.length) this.probes.finish(this.phase, this.results, this.ms, this.steps);
+    if (this.site >= this.probes.scopes.length) this.probes.finish(this.phase, this.results, this.ms, this.steps, this.unshadowed);
     return this.done;
   }
   /** Drop a bake that will not finish (the phase changed): its finished sites are disposed. */
