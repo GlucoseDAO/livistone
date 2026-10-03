@@ -72,3 +72,21 @@ describe('forest wind (sub-plan 17)', () => {
     }
   });
 });
+
+describe('forest reach', () => {
+  it('follows a reach that creeps each frame, reselecting trees only once its change and the travel add up to two metres', async () => {
+    const camera = new THREE.PerspectiveCamera(70, 1, .1, 400); camera.position.set(0, 2, 20); camera.lookAt(0, 2, -40);
+    const drawn = (trees: Forest): number => views(trees).reduce((sum, mesh) => sum + mesh.count, 0);
+    const fresh = async (reach: number): Promise<number> => { const trees = await forest(false, false); trees.update(camera, reach, false); return drawn(trees); };
+    // A band where the straddling cells' selection depends on the reach.
+    let low = 0; for (let reach = 20; reach < 70 && !low; reach += .5) if (await fresh(reach) !== await fresh(reach + 4)) low = reach;
+    expect(low).toBeGreaterThan(0);
+    const trees = await forest(false, false), select = (trees as unknown as { select: () => boolean }).select.bind(trees); let selections = 0;
+    (trees as unknown as { select: () => boolean }).select = (...args: unknown[]) => { selections++; return (select as (...a: unknown[]) => boolean)(...args); };
+    trees.update(camera, low, false); const first = selections; expect(first).toBeGreaterThan(0);
+    trees.update(camera, low + .8, false); trees.update(camera, low + 1.6, false);
+    expect(selections).toBe(first);
+    trees.update(camera, low + 4, false);
+    expect(drawn(trees)).toBe(await fresh(low + 4));
+  });
+});

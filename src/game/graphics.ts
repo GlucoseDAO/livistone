@@ -68,7 +68,10 @@ export interface GraphicsProfile {
   tier: GraphicsTier; reduced: boolean; pixelRatio: number; shadows: boolean; skyDay: number; skyNight: number; plants: number;
   /** Walking view: metres at which the fog is complete. The walk camera's far plane and the grove's crown culling stop here. */
   fog: number;
-  /** Trees are drawn while any part of them is nearer. gpu and mobile stop a little short of full fog (TREE_REACH); cpu stops inside its linear fog. */
+  /**
+   * Trees are drawn while any part of them is nearer. gpu and mobile stop a little short of full fog (TREE_REACH of `fog`; walking,
+   * Town.update applies that share to whatever full-fog distance it is given); cpu stops inside its linear fog.
+   */
   forest: number;
   lights: number; post: PostMode;
 }

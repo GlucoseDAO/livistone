@@ -1,4 +1,4 @@
-import { graphicsProfile } from '../game/graphics';
+import { TREE_REACH, graphicsProfile } from '../game/graphics';
 import type { GraphicsTier } from '../game/graphics';
 import { hazeLook } from '../render/aerial';
 import { createIntroduction } from './introduction';
@@ -453,15 +453,15 @@ export class Town {
   }
   /**
    * Returns whether a shadow caster changed detail or visibility this frame. `fullFog` is where the view's fog is complete
-   * (GraphicsProfile.fog walking): grove crowns are culled only beyond it and trees a little short of it (TREE_REACH, where the
-   * haze has faded most of a tree into the distant pass), except on the cpu tier, which stops both at its own forest range
-   * inside its linear fog. Dev-only ?haze=classic draws trees until full fog again.
+   * (GraphicsProfile.fog walking, or a longer distance a high viewpoint is given): grove crowns are culled only beyond it and
+   * trees a little short of it (TREE_REACH of it, where the haze has faded most of a tree into the distant pass), except on the
+   * cpu tier, which stops both at its own forest range inside its linear fog. Dev-only ?haze=classic draws trees until full fog.
    */
   update(time: number, camera?: THREE.Camera, fullFog = 220, mapView = false, shadow?: THREE.LightShadow): boolean {
     this.water.userData.time.value = time; shoreTime.value = time; updateWind(time);
     if (!camera) return false;
     const profile = graphicsProfile(this.tier), cpu = this.tier === 'cpu';
-    const crowns = mapView || !cpu ? fullFog : Math.min(fullFog, profile.forest), reach = mapView || (!cpu && HAZE_CLASSIC) ? fullFog : Math.min(fullFog, profile.forest);
+    const crowns = mapView || !cpu ? fullFog : Math.min(fullFog, profile.forest), reach = mapView || (!cpu && HAZE_CLASSIC) ? fullFog : cpu ? Math.min(fullFog, profile.forest) : fullFog * TREE_REACH;
     const trees = this.forest.update(camera, reach, mapView, shadow);
     // Their light silhouette matches, so a cached shadow map waits for its next re-bake.
     this.gardens.updateDetail(camera, crowns, mapView);

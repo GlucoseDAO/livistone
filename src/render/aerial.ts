@@ -34,9 +34,11 @@ export interface Aerial {
 }
 /** The fade's smoothstep, raised to this power as a linear-light weight, thins out about as evenly as the classic fog did after sRGB encoding. */
 export const FADE_GAMMA = 2.2;
-/** The walk view's haze per tier. The fade spans the outer half of the full-fog distance. */
-export function aerialParams(tier: GraphicsTier): Aerial {
-  const full = graphicsProfile(tier).fog;
+/**
+ * The walk view's haze per tier. The fade spans the outer half of the full-fog distance: the tier's (GraphicsProfile.fog) unless
+ * `full` gives another, so a view that may see further (a high viewpoint) can pass its own each frame; every part is a uniform.
+ */
+export function aerialParams(tier: GraphicsTier, full = graphicsProfile(tier).fog): Aerial {
   return { start: 20, density: .0007, falloff: 24, floor: .3, tint: [.88, 1, 1.15], fade: full * .48, full };
 }
 /**
