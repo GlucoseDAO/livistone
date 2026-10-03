@@ -95,7 +95,8 @@ export function mitoringCage(parent: THREE.Group, mobile: boolean): THREE.MeshSt
   return silver;
 }
 
-export function nanotCage(parent: THREE.Group, radius: number, centerY: number, mobile: boolean): THREE.BufferGeometry {
+/** The Nanot's silver lattice; returns its supporting frame (also its collider) and the one silver it shares with the entrance arch. */
+export function nanotCage(parent: THREE.Group, radius: number, centerY: number, mobile: boolean): { frame: THREE.BufferGeometry; silver: THREE.MeshStandardMaterial } {
   const scale = (radius + .5) / 20, angle = .45, center = new THREE.Vector3(0, centerY, 0), frameRadius = radius + .85;
   const baseY = .22, baseRadius = Math.sqrt(frameRadius ** 2 - (centerY - baseY) ** 2), frame: THREE.BufferGeometry[] = [];
   const silver = new THREE.MeshStandardMaterial({ color: '#d9dfda', metalness: .72, roughness: .3, userData: { heroEnv: true } });
@@ -140,5 +141,5 @@ export function nanotCage(parent: THREE.Group, radius: number, centerY: number, 
     const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(size, mobile ? 1 : 2), dark); orb.position.copy(p); orb.castShadow = true; parent.add(orb);
     const setting = new THREE.Mesh(new THREE.TorusGeometry(size * .91, .1, 6, 32), silver); setting.position.copy(p); setting.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction); parent.add(setting);
   }
-  return frameGeometry;
+  return { frame: frameGeometry, silver };
 }

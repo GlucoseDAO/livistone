@@ -144,7 +144,7 @@ function terrazzoMaterial(tier: GraphicsTier, maps: Maps): THREE.MeshStandardNod
 export interface Surfaces {
   /** Resolves when every map has loaded, or once a failure has reverted the materials to their flat colours. */
   readonly ready: Promise<void>;
-  /** The town's white masonry: bridges, hall rims and the Ministry of Science arch (bakeMasonry() each mesh). */
+  /** The town's white masonry: bridges and hall rims (bakeMasonry() each mesh). */
   readonly masonry: THREE.Material;
   /** The gateway abutments, at their own warmer stone colour. */
   readonly abutments: THREE.Material;

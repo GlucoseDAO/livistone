@@ -291,9 +291,11 @@ export class Town {
     if (this.surfaces) bakeMasonry(rim.geometry, undefined, true); // indoors: no weathering
     this.colliders.push({ type: 'box', position: [x, 0.08, z], size: [floorR * sx * 0.75, 0.08, floorR * sz * 0.75] });
     this.wallRing(exterior, x, z, floorR * sx, floorR * sz, 0.32);
-    this.entranceArch(exterior, floorR * sz, id === 'city-hall' ? this.brass : this.masonry);
+    // City Hall's arch is brass like its clasps, the Nanot's silver like its lattice; the town ashlar is no longer on either.
+    if (id === 'city-hall') this.entranceArch(exterior, floorR * sz, this.brass);
     if (id === 'science') {
-      const frame = nanotCage(exterior, radius, centerY, this.mobile).clone().translate(x, .16, z);
+      const nanot = nanotCage(exterior, radius, centerY, this.mobile), frame = nanot.frame.clone().translate(x, .16, z);
+      this.entranceArch(exterior, floorR * sz, nanot.silver);
       this.colliders.push({ type: 'mesh', vertices: new Float32Array(frame.getAttribute('position').array), indices: new Uint32Array(frame.index!.array) }); frame.dispose();
       const base = new THREE.RingGeometry(floorR - .1, 7.7, 80); base.rotateX(-Math.PI / 2); base.translate(x, .25, z);
       mesh(base, this.paving, this.root);
@@ -320,8 +322,7 @@ export class Town {
   }
   private entranceArch(exterior: THREE.Group, depth: number, material: THREE.Material): void {
     const entrance = new THREE.CatmullRomCurve3([new THREE.Vector3(-2.35, 0, depth + 0.05), new THREE.Vector3(-2.3, 2.4, depth + 0.25), new THREE.Vector3(0, 4.1, depth + 0.3), new THREE.Vector3(2.3, 2.4, depth + 0.25), new THREE.Vector3(2.35, 0, depth + 0.05)]);
-    const arch = mesh(new THREE.TubeGeometry(entrance, 40, 0.22, 8, false), material, exterior);
-    if (material.userData.surface === 'ashlar') bakeMasonry(arch.geometry, new THREE.Matrix4().makeTranslation(exterior.position));
+    mesh(new THREE.TubeGeometry(entrance, 40, 0.22, 8, false), material, exterior);
   }
   /** The Mitoring: an amber cup with a domed lid seated inside the bezel's silver basket, entered through the ring. */
   private createEnergyHall(x: number, z: number): void {

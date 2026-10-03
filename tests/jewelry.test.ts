@@ -72,7 +72,7 @@ describe('architectural jewelry', () => {
   });
 
   it('keeps Nanot silver outside its glazing and grounds the supporting ribs', () => {
-    const group = new THREE.Group(), frame = nanotCage(group, 8.5, 6, false), center = new THREE.Vector3(0, 6, 0), triangle = new THREE.Triangle(), nearest = new THREE.Vector3();
+    const group = new THREE.Group(), { frame, silver } = nanotCage(group, 8.5, 6, false), center = new THREE.Vector3(0, 6, 0), triangle = new THREE.Triangle(), nearest = new THREE.Vector3();
     for (const name of ['Jewelry silver', 'Nanot supporting frame']) {
       const g = (group.getObjectByName(name) as THREE.Mesh<THREE.BufferGeometry>).geometry, p = g.getAttribute('position'), indices = g.index!;
       for (let i = 0; i < indices.count; i += 3) {
@@ -81,6 +81,8 @@ describe('architectural jewelry', () => {
       }
     }
     frame.computeBoundingBox(); expect(frame.boundingBox!.min.y).toBeLessThan(.4); expect(frame.boundingBox!.max.y).toBeGreaterThan(15);
+    // The Ministry of Science entrance arch (world.ts) is cast in this same silver, not the town masonry.
+    expect((group.getObjectByName('Nanot supporting frame') as THREE.Mesh).material).toBe(silver); expect(silver.metalness).toBeGreaterThan(.5); expect(silver.userData.surface).toBeUndefined();
     group.traverse((object) => { if (object instanceof THREE.Mesh) { object.geometry.dispose(); object.material.dispose(); } });
   });
 });
