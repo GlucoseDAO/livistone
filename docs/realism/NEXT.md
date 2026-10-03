@@ -2,6 +2,8 @@
 
 Start here in a fresh session in `~/sources/livistone`. Read [README.md](README.md) and a sub-plan only when the task needs it.
 
+> **Status, 3 October 2026 (end of the overnight run):** `main` (`ce434dd`) is on WebGPU, with sub-plans 13, 14, 16, 24 and 25 merged. **Continue from [round-2-leftovers.md](round-2-leftovers.md)**: verify `main` on both backends, fix the known issues, finish 21, then start 18, 17, 05, 07/08, 12 and 15. The plan below is kept as the round's record.
+
 ## Owner direction (3 October 2026)
 
 1. **WebGPU first.** The Phase A spike convinced the owner: on the development laptop WebGPU rendered the same views at 2–5× the headless frame rate with half the draw calls (table in [20](20-webgpu-spike.md)). [20 Phase B](20-webgpu-spike.md#phase-b--migration-approved-3-october-2026) migrates the game to WebGPURenderer, with its WebGL 2 backend as the fallback. Fog, paper colour, night lighting and every other look must survive; parity is a gate.

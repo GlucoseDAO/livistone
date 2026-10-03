@@ -1,0 +1,102 @@
+# Round 2 leftovers — test and finish plan
+
+Open a fresh Claude Code session in `~/sources/livistone` and point it at this file. It is self-contained; read [NEXT.md](NEXT.md) for the binding agent rules (worktree per sub-plan, capture budget, side-by-side review page) before starting any sub-plan.
+
+## State on 3 October 2026 (`main` @ `ce434dd`, pushed)
+
+Merged into `main` at the owner's request, as is:
+
+| Sub-plan | What landed |
+| --- | --- |
+| 20 WebGPU (Phase B complete) | `WebGPURenderer` with its WebGL 2 fallback; every shader in TSL; output pipeline with a `display` mask so paper and signs keep their exact colours; display-space fog; per-light static shadows; B7 docs with the measured table in `docs/3d-game-plan.md` |
+| 13 Grass field | One instanced draw of blades to 22 m (12 m, 19.2k blades on mobile), seated on the rendered ground; old tufts sink inside it |
+| 14 Shore and rocks | Rounded morph-blended boulders with trimesh colliders, in-stream rocks, pebbles refilled near the camera, wet band, gravel, riverbed silt, caustics (gpu), rock moss, lake on `water-material.ts` |
+| 16 Contact shadows | One multiply decal batch on terrain triangles, `groundShade` as the ground's indirect occlusion, `userData.keepGeometry` cpu opt-out |
+| 24 Surfaces | Generated ashlar, terrazzo and brass maps (no downloads); hall paving at its true 4 m scale |
+| 25 Frame budget | Mycelium detail levels, static batches, terrain tiles, far plane at the fog end, hidden far interiors, twigless far trees, one flower mesh, adaptive resolution, `snapshot().budget` |
+
+WebGPU checkpoint 2 (headless, development laptop, informational): time to ready desktop 15.5 s classic → 12.4 s WebGPU (15.4 s fallback); touch 9.5 → 9.4 s (10.5 s fallback); software 8.9 → 11.7 s (fallback). Playwright 47/47 on WebGPU and 47/47 on the fallback, on `realism/20-webgpu` before the round-2 tasks were merged. Parity: median changed pixels desktop 1.9% day, 1.0% night, touch 0.4%.
+
+Round-2 effect against the WebGPU baseline (desktop day, 33 views): draw calls 296 → about 145, triangles 3.0M → about 1.6M.
+
+Review pages: `~/sources/livistone-realism/review/index.html`. Serve them with `python3 -m http.server 5199 --bind 127.0.0.1` from that folder and open http://127.0.0.1:5199/.
+
+## 1. Verify `main` first
+
+1. `bun install --frozen-lockfile`, `bun run build`, `bun run test` (Vitest; 163 tests passed at merge).
+2. Browser suites on `main`, both backends. Start a dev server on a free port (never 5173 if the owner runs one):
+   ```bash
+   bun --bun vite --host 127.0.0.1 --port 5181 --strictPort
+   LIVISTONE_BASE_URL=http://127.0.0.1:5181 npx playwright test
+   LIVISTONE_BACKEND=webgl LIVISTONE_BASE_URL=http://127.0.0.1:5181 npx playwright test
+   ```
+   - The combined round-2 tasks (13, 14, 16, 24, 25) had no completed Playwright run at merge time. See "Browser suite at merge" at the end of this file.
+   - Commit `0d99aa5` (cpu-tier eye lead) had no Playwright run.
+   - Fix failures without weakening assertions; a timing failure needs a written reason before any timeout is raised.
+3. Software tier: `LIVISTONE_BENCHMARK_URL=http://127.0.0.1:5181 bun scripts/screenshot-realism.ts <out> software quick day`. Three software views were 10–12% away from classic at checkpoint 2; look at them.
+4. Not verified anywhere yet: physical devices, Safari 26 (macOS and iOS), Firefox, an Android phone. Record `snapshot().backend`, fps and time to ready on each, and say plainly what is untested.
+
+## 2. Known issues to fix
+
+1. **16, rock patches hidden under rocks (every tier).** The patch radius stops at the planting clearance (`s × 1.45 + 0.25 m`), but rocks are about `1.57 × s` wide, so the patch is entirely covered. Widen the patches and fade them toward the water. Keep `rockContactSites`: rocks standing in the stream get no patch. The diagnosis is on `realism/16-contact` (`dc48e0d`, a docs note not on `main`). Tree decals do work on the cpu tier; in `arrival-meadow` the tree base sits behind the meadow crest.
+2. **14, pebbles on the grass read as scattered marbles.** Fewer, smaller, more embedded, clustered at the waterline. The shore shader in `shore-nodes.ts` duplicates the channel formulas of `waterways.ts`; keep them in step or bake the channel field into a texture.
+3. **24, brass on merged poster feet.** The brass maps by local position, so on the merged feet the pattern lands at different spots. Check up close; fix the mapping if it shows.
+4. **25, far plane at the fog end.** It hides fully fogged silhouettes between 130 and 150 m (the Enhancement hill in four views). Revisit together with 21's single full-fog distance. Headless fps for 25 alone read lower (18 → 14) while other captures shared the GPU; re-measure on a quiet machine.
+5. **20, fallback speed on the mobile tier.** Headless fps on the WebGL 2 fallback's mobile tier is about 25% below classic. Measure on a real older device before optimising (for example a lighter output pipeline on the fallback).
+6. **13, grass colour.** The blades read slightly lighter and yellower than the ground texture; ask the owner.
+7. **Harness.** `north-meadow`'s capsule sinks into a meadow roll, so its standing eye is about 1.1 m. Teleports use a fixed height; consider a ground-relative one, and recapture baselines afterwards.
+
+## 3. Sub-plan 21 (contrast, aerial perspective, tone mapping) — not merged
+
+Status at wrap-up: see "Sub-plan 21 at wrap-up" at the end of this file. To finish:
+
+1. Rebase `realism/21-on-round-2` onto `main`. Expect conflicts with 13: `main.ts` (`?eye` and the far plane), `ground-material.ts`, and forest culling against the twigless far trees and contact-decal cells. The walk camera's far plane should follow 21's single full-fog distance (`graphics.fog`).
+2. `bun run build`, `bun run test`, then the sub-plan's Playwright specs on both backends.
+3. Capture with `before` = `main`, and `after-a` and `after-b` with `LIVISTONE_PARAMS=contrast=a|b`: desktop `all` day and night, touch `quick` day. Add tone variants (`tone=agx`, `tone=neutral`) on 3–4 views, and software `quick` once. Build `review/21-contrast` and link it from `review/index.html`.
+4. The owner picks contrast a or b and the tone mapping. Then delete the losing variants and merge.
+
+## 4. Not started (no files from Livia needed)
+
+In order of expected visible change:
+
+1. **18 Ambient occlusion and restrained bloom.** GTAO node at half resolution in the output pipeline; skip `display` pixels; bloom only above 1 (night halos, neon, glints). Also try `?post=gi` (SSGI) if affordable.
+2. **17 Wind and foliage.** Reuse the shared wind clock in `src/world/wind.ts` (13).
+3. **05 Golden hour.** A TSL sky preset; `HORIZON_HAZE.golden` and `HORIZON_RADIANCE.golden`.
+4. **07 Reflection probes → 08 building materials.** 08 uses the local reference photos.
+5. **12 Gallery posters.** Real paper colour, frames, residency.
+6. **15 Water reflections.** The `ssr()` node first.
+
+09, 10, 11 and 19 stay parked until Livia sends exports.
+
+## 5. Housekeeping
+
+- Delete the backup branches:
+  ```bash
+  git push origin --delete wip/20-webgpu wip/14-shore wip/24-surfaces wip/25-budget
+  ```
+- Delete merged branches on origin if wanted: `realism/20-webgpu`, `realism/round-2`, `realism/13-on-round-2`, `realism/25-on-round-2`, `realism/14-shore`, `realism/24-surfaces`, `realism/25-budget`. Keep `realism/16-contact` until its note is merged.
+- Remove worktrees under `~/sources/livistone-realism/` once their branches are merged: `git worktree list`, then `git worktree remove <path>`. Keep the `review/` folder; it is outside git.
+- GitHub reports the repository moved to `git@github.com:GlucoseDAO/livistone.git`; update `origin` when convenient.
+- Update the status lines in `docs/realism/NEXT.md` and `docs/realism/README.md` as items close.
+
+## Sub-plan 21 at wrap-up
+
+- Branch `realism/21-on-round-2`, commit `4367395`, pushed. It is built on round-2 at `f308232`, so it predates 13's grass field and the WebGPU wrap-up commits. Build and Vitest pass (166 tests).
+- Captures in `review/21-contrast/` (`before` = round-2 at `f308232`):
+  - `after-a` and `after-b`: desktop `all` day and night, touch `quick` day
+  - `after-agx` and `after-neutral`: four desktop views
+- Medians, share of pixels changed by more than 20 levels:
+  - a: day 12.2% (key views 14.5%, just under the gate), night 0.5%, touch 8.7%
+  - b: day 19.2% (key views 22.6%), night 0.6%, touch 14.6%
+  - tone variants: agx 45%, neutral 49%
+  - Paper stays exactly `#f4f0e5`; night emissions are unchanged.
+- Full-fog distance: 130 m on gpu, 110 m on mobile. 150/120 cost about 21% of desktop fps. Desktop triangles rise to 2.3–2.8M on the wooded views, against round-2's 1.6–2.0M, because trees now draw out to full fog; mobile stays at or under 1.23M.
+- Not done:
+  - the software `quick` capture
+  - the rebase onto `main`
+- Watch: the Enhancement hill now fades out of `vittoria-lake`, where the old fog still showed it pale, and mobile is hazier from about 80 to 110 m.
+- Any culling in 13's grass field tied to `WALK_FOG` or the forest range must switch to `graphics.fog`.
+
+## Browser suite at merge
+
+A full Playwright run on WebGPU against `realism/round-2` was in progress when `main` was merged; its result is recorded below if it finished during the session. Otherwise run it as step 1.2 above.
