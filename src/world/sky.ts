@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { graphicsProfile } from '../game/graphics';
 import type { GraphicsTier } from '../game/graphics';
+import { nodes } from '@livistone/render';
+import type { SceneRenderer, Sky } from '../render/types';
 
 export type SkyPhase = 'day' | 'night';
 /** Unit vectors toward the painted sun and moon; the directional light and its shadows come from the same place. */
@@ -25,7 +27,9 @@ export const HORIZON_HAZE: Record<SkyPhase, THREE.Color> = {
 /** Bake the sky once: the background and the jewelry reflections see the same cubemap.
  *  darkGround shades the lower hemisphere, hidden behind terrain, like shaded surroundings: polished metal then shows a
  *  dark-below, bright-above horizon line instead of a flat sky tint, until reflection probes capture the real town. */
-export function createSky(renderer: THREE.WebGLRenderer, mobile: boolean, night = false, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', darkGround = false): { background: THREE.CubeTexture; environment: THREE.Texture } {
+export function createSky(renderer: SceneRenderer, mobile: boolean, night = false, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', darkGround = false): Sky {
+  if (nodes) return nodes.createSky(renderer, mobile, night, tier, darkGround);
+  const gl = renderer as THREE.WebGLRenderer; // Only the classic renderer reaches the GLSL bake.
   const profile = graphicsProfile(tier), scene = new THREE.Scene();
   const material = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false,
@@ -75,9 +79,9 @@ export function createSky(renderer: THREE.WebGLRenderer, mobile: boolean, night 
   });
   const geometry = new THREE.SphereGeometry(10, 24, 16); scene.add(new THREE.Mesh(geometry, material));
   const target = new THREE.WebGLCubeRenderTarget(night ? profile.skyNight : profile.skyDay, { type: tier === 'cpu' ? THREE.UnsignedByteType : THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
-  new THREE.CubeCamera(.1, 20, target).update(renderer, scene);
+  new THREE.CubeCamera(.1, 20, target).update(gl, scene);
   if (tier === 'cpu') { geometry.dispose(); material.dispose(); return { background: target.texture, environment: target.texture }; }
-  const pmrem = new THREE.PMREMGenerator(renderer), environment = pmrem.fromCubemap(target.texture).texture;
+  const pmrem = new THREE.PMREMGenerator(gl), environment = pmrem.fromCubemap(target.texture).texture;
   pmrem.dispose(); geometry.dispose(); material.dispose();
   return { background: target.texture, environment };
 }

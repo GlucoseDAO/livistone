@@ -2,6 +2,8 @@
 // Needs a dev server: the ?capture=1 freeze and the __livistone hook exist only in dev builds.
 // Usage: bun scripts/screenshot-realism.ts <outDir> <desktop|touch|software> [viewSet] [day|golden|night]
 // Writes <outDir>/<profile>/<time>/<view>.png and captures.json. LIVISTONE_BENCHMARK_URL selects the server.
+// WebGPU build (docs/realism/20-webgpu-spike.md): LIVISTONE_WEBGPU_FLAGS=1 exposes WebGPU to headless Chrome on Linux;
+// LIVISTONE_BACKEND=webgl appends ?backend=webgl, forcing WebGPURenderer's WebGL 2 fallback.
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
@@ -47,9 +49,15 @@ if (process.env.LIVISTONE_LOOK) url.searchParams.set('look', process.env.LIVISTO
 // Desktop captures review the full gpu tier even on an iGPU laptop that would now probe as mobile (sub-plan 22).
 if (profileArg === 'desktop') url.searchParams.set('graphics', 'gpu');
 for (const [key, value] of new URLSearchParams(process.env.LIVISTONE_PARAMS ?? '')) url.searchParams.set(key, value);
+if (process.env.LIVISTONE_BACKEND) url.searchParams.set('backend', process.env.LIVISTONE_BACKEND);
 const software = profile === 'software', frameTimeout = software ? 240_000 : 60_000;
 const gpu = software ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : process.platform === 'win32' ? ['--use-angle=d3d11', '--ignore-gpu-blocklist'] : ['--use-gl=angle', '--use-angle=gl', '--ignore-gpu-blocklist'];
-const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', '--headless=new', ...gpu] });
+// Vulkan gives headless Chrome a hardware WebGPU adapter; WebGL keeps its flags above. The low-power (integrated) adapter is
+// forced because headless canvas presentation fails on the NVIDIA dGPU here, and it is the GPU the WebGL captures use anyway;
+// LIVISTONE_WEBGPU_FLAGS=high-performance skips that. Software keeps its SwiftShader-only fallback adapter.
+const flags = process.env.LIVISTONE_WEBGPU_FLAGS;
+const webgpu = !flags ? [] : software ? ['--enable-unsafe-webgpu'] : ['--enable-unsafe-webgpu', '--enable-features=Vulkan', ...(flags === 'high-performance' ? [] : ['--use-webgpu-power-preference=force-low-power'])];
+const browser = await chromium.launch({ channel: 'chrome', args: ['--disable-dev-shm-usage', '--headless=new', ...gpu, ...webgpu] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, isMobile: profile === 'touch', hasTouch: profile === 'touch', reducedMotion: 'reduce' });
 const errors: string[] = [], captures: { name: string; view: View; snapshot: Record<string, unknown> }[] = [];
 page.on('pageerror', error => errors.push(error.message));
@@ -76,7 +84,7 @@ try {
     console.log(`  ${profile}/${time}/${name}`);
   }
 } finally {
-  writeFileSync(`${dir}/captures.json`, JSON.stringify({ profile, time, set: setArg, url: url.href, commit, browser: browser.version(), viewport: { width: 1280, height: 800 }, capturedAt: new Date().toISOString(), errors, captures }, null, 2) + '\n');
+  writeFileSync(`${dir}/captures.json`, JSON.stringify({ profile, time, set: setArg, url: url.href, commit, backend: captures[0]?.snapshot.backend ?? null, webgpuFlags: !!webgpu.length, browser: browser.version(), viewport: { width: 1280, height: 800 }, capturedAt: new Date().toISOString(), errors, captures }, null, 2) + '\n');
   await browser.close();
 }
 console.log(`${dir}: ${captures.length}/${names.length} captures; errors: ${errors.length ? JSON.stringify(errors) : 'none'}`);

@@ -3,6 +3,7 @@ import { plantingAllowed } from './landscape';
 import { terrainHeight } from './terrain';
 import { riverCenter, tributaryCenter } from './waterways';
 import type { RockSite } from './water-surface';
+import { nodes } from '@livistone/render';
 
 /** One four-metre tile, with separate colour and relief so mortar stays recessed. */
 export function pavingMaterial(mobile = false): THREE.MeshStandardMaterial {
@@ -66,6 +67,7 @@ export function rockGeometry(): THREE.BufferGeometry {
 }
 
 export function rockMaterial(mobile: boolean): THREE.MeshStandardMaterial {
+  if (nodes) return nodes.rockMaterial(mobile);
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
   // Retain scanned mineral detail, but remove the source map's rusty brown cast.
   material.onBeforeCompile = (shader) => {

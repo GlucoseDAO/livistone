@@ -18,13 +18,15 @@ import type { Mode } from './ui/ui';
 import { Input } from './game/input';
 import { Ambience } from './game/audio';
 import { LANDMARKS, DISCOVERIES, SPAWN, readProgress, writeProgress } from './game/content';
-import { graphicsProfile, probeGraphics } from './game/graphics';
+import { graphicsProfile } from './game/graphics';
 import { parseTimeOfDay, readTimeOfDay, resolveNight, saveTimeOfDay } from './game/daylight';
 import type { TimeOfDay } from './game/daylight';
 import { NightLighting } from './world/night-lighting';
 import { shadowFrame } from './game/shadow-frame';
 import { installShadowFade, shadowFade } from './world/shadow-fade';
 import type { Physics } from './game/physics';
+import { createRenderer, nodes } from '@livistone/render';
+import type { RenderView, SceneRenderer } from './render/types';
 
 const WALK_FOG = { near: 42, far: 130 }, MAP_FOG = { near: 240, far: 630 };
 // Dev-only ?look=a keeps the old hemisphere-heavy fill (sun and haze coherence only). b, the default, lets the baked sky
@@ -42,7 +44,7 @@ const SUN_DISTANCE = 400;
 const SHADOW = { walk: 50, walkReduced: 40, map: 160, lead: .3, fade: [.72, .9], bias: .05, normalBias: .6 };
 
 class Game {
-  private readonly renderer: THREE.WebGLRenderer;
+  private readonly renderer: SceneRenderer;
   private readonly scene = new THREE.Scene();
   private skyBackground: THREE.CubeTexture;
   private readonly skies = new Map<boolean, ReturnType<typeof createSky>>();
@@ -65,7 +67,7 @@ class Game {
   private readonly raycaster = new THREE.Raycaster();
   private readonly direction = new THREE.Vector3();
   private readonly point = new THREE.Vector3();
-  private readonly graphics: ReturnType<typeof probeGraphics>;
+  private readonly graphics: RenderView['graphics'];
   private renderScale: number;
   // Dev-only ?capture=1: frozen animation time and render scale so before/after screenshots match.
   private readonly capture = import.meta.env.DEV && new URLSearchParams(location.search).has('capture');
@@ -95,13 +97,11 @@ class Game {
   private selection: string | null = null;
   private hoverPointer: { x: number; y: number; buttons: number } | null = null;
   private cursorDirty = false;
-  constructor(private ui: UI) {
+  constructor(private ui: UI, private readonly view: RenderView) {
     this.ambience.onStateChange = enabled => this.ui.setSound(enabled);
     this.ui.setSound(this.ambience.enabled);
     this.ambience.start();
-    const coarse = matchMedia('(pointer: coarse)').matches;
-    this.renderer = new THREE.WebGLRenderer({ canvas: ui.canvas, antialias: !coarse, powerPreference: 'high-performance' });
-    this.graphics = probeGraphics(this.renderer.getContext() as WebGL2RenderingContext);
+    this.renderer = view.renderer; this.graphics = view.graphics;
     if (import.meta.env.DEV) {
       const override = new URLSearchParams(location.search).get('graphics');
       if (override === 'cpu' || override === 'mobile' || override === 'gpu') Object.assign(this.graphics, graphicsProfile(override));
@@ -141,14 +141,14 @@ class Game {
       if (document.hidden) { this.input.clear(); this.ambience.suspend(); }
       else this.ambience.resume();
     });
-    ui.canvas.addEventListener('webglcontextlost', (event) => {
-      event.preventDefault(); this.input.active = false; this.input.clear(); cancelAnimationFrame(this.frameId);
+    view.onLost(() => {
+      this.input.active = false; this.input.clear(); cancelAnimationFrame(this.frameId);
       ui.error('The graphics connection was interrupted. Reload to return to the town. Your discoveries are saved.');
     });
     this.resize();
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames }),
+        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend }),
         teleport: (x: number, z: number, yaw = 0, y = 1.05, pitch = 0) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = pitch; this.accumulator = 0; },
       } });
     }
@@ -163,11 +163,11 @@ class Game {
     await assets;
     if (this.graphics.tier === 'cpu') {
       await loadingStage(86, 'Preparing the CPU graphics profile…');
-      const { prepareCpuDetail } = await import('./world/cpu-detail'); this.cpuGeometry = await prepareCpuDetail(this.town.root, this.skyBackground);
+      const { prepareCpuDetail } = await import('./world/cpu-detail'); this.cpuGeometry = await prepareCpuDetail(this.town.root, this.skyBackground, nodes);
     }
     this.pointReflections(this.skies.get(this.night)!);
     this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced, this.graphics.tier); this.nightLighting.setNight(this.night);
-    document.querySelector<HTMLElement>('#graphics-profile')!.textContent = 'Device profile: ' + ({ gpu: 'GPU', mobile: 'Mobile / integrated GPU', cpu: 'CPU software renderer' }[this.graphics.tier]);
+    document.querySelector<HTMLElement>('#graphics-profile')!.textContent = 'Device profile: ' + ({ gpu: 'GPU', mobile: 'Mobile / integrated GPU', cpu: 'CPU software renderer' }[this.graphics.tier]) + ({ classic: '', webgpu: ' · WebGPU', 'webgl2-fallback': ' · WebGL 2 fallback' }[this.view.backend]);
     await loadingStage(92, 'Preparing your first view…');
     this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true);
     this.frameShadow(true);
@@ -477,7 +477,7 @@ let game: Game | undefined;
 const ui = new UI((action) => { if (action === 'reload') location.reload(); else void game?.action(action); });
 try {
   await loadingStage(12, 'Preparing the sky and light…');
-  game = new Game(ui);
+  game = new Game(ui, await createRenderer(ui.canvas, !matchMedia('(pointer: coarse)').matches));
   game.load().catch((error: unknown) => { console.error('Town initialization failed', error); ui.error('The town could not finish loading. Check your connection and try again.'); });
 } catch (error) {
   console.error('Graphics initialization failed', error);

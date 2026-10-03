@@ -13,6 +13,7 @@ import { addGlow, nightEmission } from './night-lighting';
 import { createLakePlants } from './lake-plants';
 import { pathKerbs } from './path-kerbs';
 import { PATH_WIDTH, pathJoin } from './path-surface';
+import { nodes } from '@livistone/render';
 
 function shape(points: Point[]): THREE.Shape { return new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, -z))); }
 function random(seed: number): () => number { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
@@ -41,6 +42,7 @@ export class LivingWaters {
         normal = normalize(normal + mat3(viewMatrix)*vec3(ripple.x,0.,ripple.y));`);
     };
     this.water.customProgramCacheKey = () => 'living-waters-ripples-v1';
+    if (nodes) this.water = nodes.lakeWater(this.water, this.waterTime);
     const network = shape(LAKE_OUTLINE); WATER_EYES.forEach((cell) => network.holes.push(new THREE.Path(cell.map(([x, z]) => new THREE.Vector2(x, -z)))));
     this.mesh(new THREE.ShapeGeometry(network).rotateX(-Math.PI / 2), this.silver, true, 0, .12);
     WATER_EYES.forEach((cell, index) => {
@@ -96,6 +98,7 @@ export class LivingWaters {
     const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.BufferAttribute(rain, 3)); this.rain = new THREE.Points(geometry, new THREE.PointsMaterial({ color: '#e1f3ef', size: .09, transparent: true, opacity: .7 })); this.root.add(this.rain);
     const dripGeo = new THREE.BufferGeometry(); dripGeo.setAttribute('position', new THREE.BufferAttribute(drips, 3)); this.drips = new THREE.Points(dripGeo, new THREE.PointsMaterial({ color: '#c7eeef', size: .16 })); this.root.add(this.drips);
     for (const particles of [this.rain, this.drips]) (particles.material as THREE.PointsMaterial).onBeforeCompile = (shader) => { shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\nif (length((gl_PointCoord - .5) * vec2(1.8, .8)) > .45) discard;'); };
+    if (nodes) for (const particles of [this.rain, this.drips]) nodes.sizedPoints(particles);
   }
   private waterEye(cell: Point[]): THREE.BufferGeometry {
     const center = cell.reduce(([x, z], p) => [x + p[0] / cell.length, z + p[1] / cell.length] as Point, [0, 0] as Point), vertices = [center[0], 0, center[1]], colors = [.37, .65, .65], indices: number[] = [];
