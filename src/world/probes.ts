@@ -258,7 +258,7 @@ export class ProbeBake {
   get count(): number { return this.results.size; }
   /** The sites finished so far, for the probes shown while the bake goes on. */
   finished(): ReadonlyMap<string, THREE.Texture> { return new Map([...this.results].map(([id, target]) => [id, target.texture])); }
-  /** Bake the next face; true once the phase is complete (and handed to the probes). */
+  /** Bake the next face, or prefilter the site whose six faces are in; true once the phase is complete (and handed to the probes). */
   step(context: BakeContext): boolean {
     if (this.done) return true;
     const start = performance.now();

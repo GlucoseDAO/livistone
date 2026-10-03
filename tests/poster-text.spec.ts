@@ -63,6 +63,8 @@ test('full poster textures stay with the two collections last approached and swa
   expect((await posters(page)).collections['city-hall']).toBeGreaterThan(distant * 10);
   // Every hall seen once builds whatever its first view needs; after that, coming back only swaps poster maps.
   for (const hall of ['science', 'timeface', 'future-house', 'station']) await visit(page, hall);
+  // The reflection probes bake after ready in the background (sub-plan 07) and build their own shaders: count after them.
+  await page.waitForFunction(() => !(window as unknown as { __livistone: { snapshot(): { probes: { baking: string | null } | null } } }).__livistone.snapshot().probes?.baking, null, { timeout: 240000, polling: 250 });
   const settled = (await posters(page)).gpu;
   for (const hall of ['city-hall', 'energy', 'science', 'station', 'city-hall']) await visit(page, hall);
   await expect.poll(async () => (await posters(page)).resident.length).toBe(2);

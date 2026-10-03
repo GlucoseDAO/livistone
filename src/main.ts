@@ -612,10 +612,15 @@ class Game {
     shadowFade.value.set(0, 0); environment.view = bake.view;
     // The output pipeline's scene target and MRT (render/output.ts), so the bake reuses every compiled shader.
     const { target, targets } = this.output as unknown as { target?: THREE.RenderTarget; targets?: Parameters<THREE.WebGPURenderer['setMRT']>[0] };
+    // The frame's draw counts (snapshot().calls, triangles and budget) stay the walking view's; the call counters, which three
+    // keys per-render caches by, run on.
+    const info = this.renderer.info.render, counts = { drawCalls: info.drawCalls, triangles: info.triangles, points: info.points, lines: info.lines };
+    const budget = this.drawBudget?.(), kept = budget && structuredClone(budget);
     try {
       bake.step({ renderer: this.renderer, scene: this.scene, source: target ? { target, mrt: targets ?? null } : null, hidden: [this.town.details], distant: { scene: this.distant, far: FAR_VIEW, ranges: this.distantRanges },
         visit: position => { this.probeEye.position.copy(position); this.nightLighting.update(this.probeEye); this.town.surround(position); } });
     } finally {
+      Object.assign(info, counts); if (budget && kept) { for (const group of Object.keys(budget)) if (!(group in kept)) delete budget[group]; Object.assign(budget, kept); }
       environment.view = view; shadowFade.value.copy(fade); this.setFog(); if (map) this.town.setMapMode(true);
       if (other) { this.sun.shadow.intensity = 1; this.night = !this.night; this.phaseState(); }
     }
