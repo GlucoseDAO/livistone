@@ -19,7 +19,7 @@ for (const mobile of [false, true]) test(`map labels arrive outside walkable ent
       const arrived = await snapshot(page);
       expect(arrived.zone).toBe(landmark.zone ?? 'town'); expect(arrived.journey).toBeNull();
       expect(arrived.position.x).toBeCloseTo(arrival.x, 2); expect(arrived.position.z).toBeCloseTo(arrival.z, 2);
-      expect(arrived.yaw).toBe(arrival.yaw); expect(arrived.pitch).toBe(0);
+      expect(arrived.yaw).toBeCloseTo(arrival.yaw, 12); expect(arrived.pitch).toBe(0);
       if (id === 'glucose') await page.screenshot({ path: `output/testing/arrival-glucose-${mobile ? 'mobile' : 'desktop'}.png` });
       // Walk forward from the actual arrival; catches points inside walls, plants or floors.
       const distance = async (): Promise<number> => { const state = await snapshot(page); return Math.hypot(state.position.x - arrival.x, state.position.z - arrival.z); };

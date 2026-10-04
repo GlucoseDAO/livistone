@@ -1,3 +1,4 @@
+import { classicSnow } from './snow-layout';
 /** The Eye's snowfield above the Jepii Mici chimney. No terrain imports: rendering and physics sample the same field. */
 export const WINTER_PLATEAU = { x: -71.5, z: -282.5, a: 31, b: 11.5, corner: 6, level: 43.5 } as const;
 export const WINTER_SITE = { x: -78, z: -283, base: WINTER_PLATEAU.level } as const;
@@ -16,7 +17,7 @@ export function winterPlateauHeight(x: number, z: number): number {
   const ends = clamp((dx + 22) / 6) * clamp((34 - dx) / 6), t = edge * ends;
   const grade = 4.92 * ramp * rear * smooth(t, 0, 1);
   // Small concentric drifts spread from the eye; they fade out of its footprint and away from the walking approach.
-  const r = Math.hypot(dx, dz), drifts = .28 * Math.pow(Math.sin(r * .42), 2) * smooth(Math.abs(dz), 4, 8) * smooth(r, 9, 16);
+  const r = Math.hypot(dx, dz), drifts = (classicSnow() ? .28 * Math.pow(Math.sin(r * .42), 2) : .12 * Math.pow(Math.sin(r * .16), 2)) * smooth(Math.abs(dz), 4, 8) * smooth(r, 9, 16);
   return WINTER_SITE.base + grade + drifts;
 }
 export const WINTER_APPROACH = [
@@ -28,7 +29,7 @@ export function winterApproachFrame(x: number, z: number): { d: number; along: n
   for (let k = 1; k < WINTER_APPROACH.length; k++) {
     const a = WINTER_APPROACH[k - 1], b = WINTER_APPROACH[k], vx = b.x - a.x, vz = b.z - a.z, l = Math.hypot(vx, vz);
     const t = clamp(((x - a.x) * vx + (z - a.z) * vz) / (l * l)), cx = a.x + vx * t, cz = a.z + vz * t, distance = Math.hypot(x - cx, z - cz);
-    if (distance < d) { d = distance; along = length + l * t; dx = vx / l; dz = vz / l; across = (x - cx) * -dz + (z - cz) * dx; }
+    if (distance < d) { d = distance; along = length + ((x - a.x) * vx + (z - a.z) * vz) / l; dx = vx / l; dz = vz / l; across = (x - cx) * -dz + (z - cz) * dx; }
     length += l;
   }
   return { d, along, across, dx, dz };

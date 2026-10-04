@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { WINTER } from '../src/world/winter-gate-layout';
+import { WINTER, WINTER_ARRIVAL } from '../src/world/winter-gate-layout';
 import { EXPECTED_BACKEND } from './gpu-errors';
 
 test('arrives at Eye of Winter from the map and walks through its iris', async ({ page }) => {
@@ -13,7 +13,7 @@ test('arrives at Eye of Winter from the map and walks through its iris', async (
   await page.locator('#marker-winter-gate').click();
   const state = () => page.evaluate(() => (window as any).__livistone.snapshot());
   await expect.poll(async () => (await state()).mode).toBe('walking');
-  await expect.poll(async () => (await state()).position.x).toBeCloseTo(WINTER.arrivalX, 1);
+  await expect.poll(async () => (await state()).position.x).toBeCloseTo(WINTER_ARRIVAL.x, 1);
   await page.keyboard.down('w');
   try { await expect.poll(async () => (await state()).position.x, { timeout: 15000 }).toBeLessThan(WINTER.quartzX + 1); }
   finally { await page.keyboard.up('w'); }

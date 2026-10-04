@@ -254,7 +254,7 @@ docs/jewelry-stl-inclusion-analysis.md Mesh health, decimation limits and a tier
 - **The loop is fixed-timestep.** `main.ts` accumulates real time and steps physics at
   1/60 s. Rendering is per animation frame. Anything time-dependent takes `dt` explicitly.
 - **Modes drive the UI.** `Mode` is `'welcome' | 'walking' | 'map' | 'lore' | 'journal' |
-  'paused' | 'gallery'`. `welcome` is the loading state; ready opens first person at SPAWN facing the city gate, without an entry gate. The static loading introduction precedes module loading; Town.create yields between construction stages and progress follows completed stages. Mode changes are the single place where input capture, the active camera, and
+  'paused' | 'gallery' | 'teleport'`. `welcome` is the loading state; ready opens first person at SPAWN facing the city gate, without an entry gate. The static loading introduction precedes module loading; Town.create yields between construction stages and progress follows completed stages. Mode changes are the single place where input capture, the active camera, and
   DOM visibility all change together. Do not bypass them with ad-hoc DOM toggling.
   Keep the labeled First person / Map switch (M), journal, and menu usable across
   panels. Dialogs leave navigation accessible and make the scene inert; native control
@@ -270,7 +270,7 @@ docs/jewelry-stl-inclusion-analysis.md Mesh health, decimation limits and a tier
   squeeze the place card), shows a clock, sun or moon, and names the mode in its `aria-label` and
   `title`, for your time with what the clock gives now ("Time of day: your time (night now)"). It and the menu's select
   ("Your time — local clock", Day, Night) follow each other through `UI.setTimeOfDay`. Up to 440 px wide the icon buttons narrow
-  to 40 px (38 px below 380 px) and “First person” takes two lines, so the five tools keep one row in both views from 360 px;
+  to 40 px (38 px below 380 px) and “First person” takes two lines, so icon buttons remain tappable from 360 px; the six tools now use a separate row below the brand up to 440 px;
   from 651 to 760 px the journal shows only its icon, and the centred mode label waits for 1241 px.
   The loading progress bar spans the viewport; larger introduction text and portrait must
   remain fully reachable by scrolling on short screens.
@@ -351,7 +351,7 @@ docs/jewelry-stl-inclusion-analysis.md Mesh health, decimation limits and a tier
   direction. Map labels and list entries use `Landmark.entrance` to arrive just outside
   a clear entrance, then enter walking mode. Embryo Station arrivals look toward the city
   gate (yaw 0); other halls still face inward. Keep these approaches aligned
-  with geometry and colliders. All destinations use the already loaded town scene and physics world. Keep the large
+  with geometry and colliders. The compact compass button beside sound opens `teleport-menu` in `teleport` mode, with all `LANDMARKS` in route order and the same arrival action as map stops. Opening it makes the scene inert and clears input; cancel returns to the previous walking/map view without moving and restores button focus. Keep its scrollable list, keyboard navigation and outside-click dismissal usable on touch and short screens. Creator links in Menu, Journal and the introduction story point to `https://liviazaharia.com/`; individual-work provenance links stay source-specific. All destinations use the already loaded town scene and physics world. Keep the large
   Start / Resume exploring button visible above the map list on desktop and touch screens.
 - **Progress is local only.** `readProgress` / `writeProgress` use the
   `livistone-progress-v1` key and every access is wrapped so that blocked or damaged
@@ -417,6 +417,12 @@ docs/jewelry-stl-inclusion-analysis.md Mesh health, decimation limits and a tier
 
 - **Elevated galleries must remain walkable.** `elevated-layout.ts` owns the 2.5-turn Timeface route and Future House neck. Use the same sampled ribbon for rendering and mesh collision. The neck reaches cabin floor height before the hull threshold; do not reintroduce a floor lip. It runs straight in plan at one eased grade under 34° (the controller climbs 45°), `NECK_WIDTH` wide, and the map arrival faces straight up it; `tests/elevated.test.ts` walks a capsule holding forward from the lake path into the cabin. The middle leather strap springs from above the neck aperture, never through the doorway. The printed cabin has a curved lower hull beneath its flat floor. Keep the gallery under the high roof zone and run `tests/elevated.test.ts` after changing it. Match plant and terrain clearances to `futureClearing`. Copper appendages use closed, lumpy teardrop sections with rounded ends. `poster-layout.ts` carries optional elevated floor heights, and interaction targets must include that height. The dev teleport hook accepts an optional fourth height argument while preserving its existing three-argument behavior.
 - **Presentation images remain original.** Glucose chapters combine the original Romanian AI Days poster with full slides from the supplied presentation folder. Keep provenance and page numbers in `public/images/research/ATTRIBUTION.md`; use `scripts/extend-archive.py` for derivatives. Treat the deck's team and research results as a dated source snapshot. Earlier-work archive images include photographs and original design renders; label them as studio archive images.
+## Eye-building visits and snow review
+
+`gate-posters.ts` places source-photo boards at both eye buildings; clicking photos opens the catalogue viewer, while captions and E open the building stories. `gate-lamps.ts` uses the town's fixed night light pool. The shared eye layouts own their board/lamp sites; ground clearance and contact shadows use those sites. `WINTER.arrivalX` remains the physical threshold; `WINTER_ARRIVAL` is the wider teleport view on the snow ramp. Keep the Eyelense road endpoint at its forecourt, separate from its earlier teleport view.
+
+Snow tracks cover an 8 × 16 m field with wandering hikers across its width. The Winter shelf uses world-aligned coordinates across its snow, while the gully follows the trail frame. Do not restore a narrow central strip or soil-coloured trampled snow. Snow relief and approach grades are broad and rounded; rendering and collision share their height field. Development comparisons: `?snow=classic` and `?gate-fittings=off`. See `docs/realism/29-gate-arrivals-snow.md`.
+
 ## Eyelense E
 
 `eyelense-gate-layout.ts` owns the east-meadow site, level grade, map arrival, passage, forecourt, benches and complete ground/canopy clearances. The gate crescent retains source topology under uniform 1.65× scaling and rigid placement; raised black swirls and brass threading are separate additions. `eyelense-gate.ts` builds a closed rounded red bead with an open-bottom arch through both domed faces, connected tunnel lining and sealed soles, plus an open clear surround. Never replace the aperture with masked glass or a plane. Source crescent, bead, floor, seats and bounded overhead lens use mesh-derived collision. Keep the 4.2 m-wide, 4.4 m-high passage clear of tips and suspension. The lens alone follows resolved daylight through `setEyelenseNight`; its `eyelenseGlass` quality tag stays separate from Winter quartz and station amber, with opaque reflective reduced fallbacks. Eyelense jewellery remains in Future House. `bun scripts/build-eyelense-building.ts` exports the actual building and source comparison under `concepts/15-moon-gates/models/`; `eyelense` is the actual-building capture set in `screenshot-realism.ts` (`PW_HEADED=1` supports graphics adapters that cannot present headless). Run `tests/eyelense-gate.test.ts` and `.spec.ts` after changing this passage.

@@ -18,7 +18,7 @@ export const HOME_SITES: number[][] = [];
 export { PATH_WIDTH } from './path-surface';
 import { PATH_WIDTH } from './path-surface';
 const routes = [
-  [[80, -34], [86, -35], [92, -36], [EYELENSE.arrival.x, EYELENSE.z]],
+  [[80, -34], [86, -35], [92, -36], [EYELENSE.x - EYELENSE.forecourtHalfZ + 2, EYELENSE.z]],
   [[100, -154.617], [108, -159], [112, -170], [111, -178]],
   [[74, -135], [89, -142], [98, -149], [100, -154.617]],
   [[-29, 4], [-44, 2], [-46, -8], [-47.9, -12]],

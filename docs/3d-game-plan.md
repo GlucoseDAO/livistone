@@ -1,5 +1,11 @@
 # Livistone: browser game implementation plan
 
+## Teleport dropdown and creator links — 4 October 2026
+
+A compact compass button beside sound opens a scrollable dropdown of all 13 destinations in visitor-route order, using the same clear entrances and facing directions as map arrivals. Opening it pauses walking and map controls; choosing a stop resumes first-person exploration there. Escape, closing it, pressing its toolbar button again or clicking outside preserves the previous walking or map view and position. Keyboard navigation includes Tab, arrow keys, Home and End, with focus restored to the teleport button when cancelled. On phones up to 440 px wide, the six navigation tools have their own row below the Livistone name. Menu, Journal and the creator story link directly to liviazaharia.com; existing individual-work source links remain available.
+
+Verification: production build and 268 Vitest tests pass. Seven relevant Chrome browser scenarios pass across the final WebGL 2 runs, including desktop/touch navigation, all 13 teleport arrivals, responsive widths from 360 to 1280 px, keyboard dismissal and day/night controls. The headless WebGPU attempt timed out during town loading before navigation was enabled; physical phones and Safari remain unverified.
+
 ## Eyelense E — playable east-meadow passage, 4 October 2026
 
 Eyelense now stands beyond Science at `(106, −36)`: the uniformly enlarged source crescent is glossy black, with raised swirl relief and brass threading. A substantial rounded red bead has a 4.2 m-wide, 4.4 m-high arch with a continuous tunnel lining. Its clear glass surround leaves the route open. Connected paving reaches the level limestone forecourt and benches, with matching solid colliders and full planting clearance. The separate curved smoky lens follows auto/day/night and becomes clearer at night; reduced graphics retain opaque reflective glass and the same passage. Map arrival and a source-backed journal story preserve the original jewellery in Future House. In-world captures, geometry provenance and the exported GLB are recorded under `concepts/15-moon-gates/models/`.
@@ -565,3 +571,7 @@ Players arrive outside the town-facing train door at Embryo Station, with a Livi
 The nearby-story card starts folded on touch and narrow screens so it does not cover the walk view; its button expands the description and story link. The loading introduction and progress bar fill the available viewport width, while the portrait and long text stay at a readable width.
 
 The loading introduction now uses larger type and a larger uncropped portrait; short phone screens can scroll from the opening text to the complete image. A factual King’s Chapel Double Ring photo poster stands to the left of the southern bridge approach, opposite the creator introduction, and identifies the ring as the source of the bridge arch. The nearby card can fold to its labels on desktop as well as touch screens, and its expanded mobile height is capped. Desktop controls can fold to one button; the top navigation uses a compact speaker icon with labeled on/off states.
+
+### Eye-building visits and snow (4 October 2026)
+
+Arrival views for the civic buildings, Materialized Enhancements and both eyes now stand farther back on connected paving or the snow ramp. Source-photo boards beside the two eyes open the full photographs and architectural stories. Shielded lamps share the town’s fixed night light pool. Snow uses cool white shading, wider wandering hiking tracks and rounded terrain grades. Review and verification: [realism sub-plan 29](realism/29-gate-arrivals-snow.md).

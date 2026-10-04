@@ -1,3 +1,4 @@
+import { classicSnow } from './snow-layout';
 // Sub-plan 27: the Jepii Mici trail. Round 2 follows the owner's corrections and their own photographs of the real trail
 // (3 October 2026): from the forbidden-trail board in the woods it climbs forested switchbacks to a rocky gorge cut along the foot
 // of the north ridge's crags, enters it between two rock buttresses, follows its stream west past a waterfall falling from the
@@ -98,6 +99,7 @@ const SPACING = TRAIL_CURVE.getLength() / (TRAIL_SAMPLES.length - 1);
  */
 export function trailFrame(x: number, z: number): { along: number; across: number; dx: number; dz: number } | null {
   if (!MOUNTAIN) return null;
+  if (!classicSnow() && winterPlateauInside(x, z) > -3) return { along: -x, across: -(z + 283), dx: -1, dz: 0 };
   let best = 6, frame: { along: number; across: number; dx: number; dz: number } | null = null;
   nearTrail(x, z, (d, s) => {
     if (d >= best || s < STAGE.snout - 4 || s > STAGE.head + 4) return;
@@ -314,9 +316,11 @@ function gorgeShape(x: number, z: number, h: number): number {
   const g = gorgeCoords(x, z); if (!g) return h;
   const { s, d, side } = g, half = gorgeHalf(s), floor = gorgeFloor(s), run = wallRun(s), depth = snowDepth(s);
   const ends = smooth(s, GORGE_FROM + 2, STAGE.mouth - 1) * (1 - smooth(s, STAGE.head + 1, GORGE_TO - 1));
-  const top = Math.max(h, floor + gorgeWall(s, side) + depth), q = d / half, snowHalf = half * (.88 + .3 * mountainNoise(x * .45 + 3, z * .45));
+  const top = Math.max(h, floor + gorgeWall(s, side) + depth), q = d / half, snowHalf = half * (classicSnow() ? .88 + .3 * mountainNoise(x * .45 + 3, z * .45) : .96 + .045 * mountainNoise(x * .09 + 3, z * .09));
   // Old snow lies as a slab, flat across and ending in a steep, ragged edge short of the walls (the paint's own edge, snowCover).
-  const cross = depth * (1 - smooth(d, snowHalf * .64, snowHalf * .9)) + .25 * (mountainNoise(x * .5, z * .5) - .5) * smooth(q, .4, 1);
+  const cross = classicSnow()
+    ? depth * (1 - smooth(d, snowHalf * .64, snowHalf * .9)) + .25 * (mountainNoise(x * .5, z * .5) - .5) * smooth(q, .4, 1)
+    : depth * (1 - smooth(d, snowHalf * .43, half * .99)) + .055 * (mountainNoise(x * .12, z * .12) - .5) * smooth(q, .4, 1);
   let target: number;
   if (d <= half) target = floor + cross;
   else if (d <= half + run) target = lerp(floor, top, Math.pow(smooth(d, half, half + run), .7));
@@ -437,7 +441,9 @@ export function mountainShape(x: number, z: number, h: number): number {
   const winter = winterPlateauMask(x, z) * (1 - chimney);
   h = lerp(h, winterPlateauHeight(x, z), winter);
   const approach = winterApproachFrame(x, z);
-  const approachWeight = 1 - smooth(approach.d, 1.2, 2.2);
+  const hike = trailNearest(x, z), oldApproach = 1 - smooth(approach.d, 1.2, 2.2);
+  // Preserve the chimney's walking grade, including its neighbouring collision triangles.
+  const approachWeight = classicSnow() ? oldApproach : lerp(oldApproach, 1 - smooth(approach.d, 2.5, 7), smooth(hike?.d ?? 8, 3.5, 7));
   h = lerp(h, winterPlateauHeight(x, z), approachWeight);
   const bench = trailBench(x, z); if (bench.weight > 0) h += (bench.level - h) * bench.weight;
   return h;

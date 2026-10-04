@@ -1,6 +1,6 @@
 # Livistone
 
-Eye of Winter has a first walkable two-stone building study above the Jepii Mici snow chimney, with its original silver geometry, a broad snow plateau, a connected approach and a hexagonal iris that opens as you approach. Stone materials remain a first study; see [the model plan](docs/jewelry-models-plan.md).
+Eye of Winter has a first walkable two-stone building study above the Jepii Mici snow chimney, with its original silver geometry, a broad snow plateau, a connected approach and a hexagonal iris that opens as you approach. Both eye buildings have source-photo boards and night lamps. Teleport views stand farther back, and the snow has broad wandering tracks and smoother drifts; see [the model plan](docs/jewelry-models-plan.md).
 
 **Walk into a town where rings and pendants have become buildings.**
 
@@ -58,9 +58,9 @@ Want the details? The [technical guide](docs/technical-guide.md) covers the arch
 You only need a recent browser with hardware acceleration. The town renders with WebGPU where the browser offers it and with WebGL 2 everywhere else. You don't need to install anything, create an account or log in.
 
 1. While the town loads, a screen introduces Livia with her homepage portrait. On short screens, scroll to see the whole portrait. The town opens in **first person at the station exit, facing the Livistone gate**.
-2. Walk towards the bridge and the city gate. Press **Map** (M) to see the town from above, or pick a named stop to go straight to its entrance.
+2. Walk towards the bridge and the city gate. Use the **Teleport** compass button beside sound to open the destination dropdown and arrive at any of the 13 stops. Press **Map** (M) to see the town from above; its named stops also take you to their entrances.
 3. Approach a display and press **E**, or tap its prompt, to read the story. Click a photograph to enlarge it. The pointer turns into a hand over anything you can click. The posters at Materialized Enhancements open [enhancement.bio](https://enhancement.bio/) in a new tab. Large dark signs in gold lattice frames introduce a place; cream boards show individual pieces.
-4. Open **Journal** to read the stories and browse the jewellery catalogue at any time.
+4. Open **Journal** to read the stories and browse the jewellery catalogue at any time. **Meet Livia Zaharia** in Journal or Menu opens [her website](https://liviazaharia.com/) in a new tab; the creator story also links there.
 
 On the bridge approach, an introduction poster on the right tells how Livia went from architecture to parametric jewellery and citizen science. A photo poster on the left shows the King's Chapel Double Ring that inspired the gate. As you walk, a panel names whatever you're passing in one sentence; choose **Read story**, click the **E** control or press **E** to read more. The line icon folds the panel down to its labels and the square icon restores it. The desktop controls strip folds the same way.
 
@@ -74,6 +74,7 @@ On the bridge approach, an introduction poster on the right tells how Livia went
 | Fold or expand control hints | Line / square icon on the hint strip | Touch controls stay visible |
 | Toggle sound | Speaker button or menu | Speaker button or menu |
 | Your time, day or night | T or the clock / sun / moon button | Clock / sun / moon button |
+| Teleport to a place | Compass button beside sound; choose a destination | Compass button beside sound; tap a destination |
 | Switch map / walking | M or the top-bar view button | The top-bar view button |
 | Move / zoom the map | Drag / scroll | Drag / pinch |
 | Menu | Escape or ☰ | ☰ |
@@ -87,7 +88,7 @@ Jump to clear gallery rails, wade across the river, and climb the copper ramp in
 - **About the music:** these are informal phone recordings of Livia Zaharia playing kalimba, not professional studio recordings. The six included clips were reviewed and approved by Livia.
 - **Performance:** select **Gentle** visual detail if movement is slow. Initial loading can take longer on a phone or a slower connection. The game picks one of three graphics profiles automatically (GPU, mobile/integrated graphics, or CPU software rendering) and shows it in the menu. Resolution then adapts to the frame rate: the GPU profile aims for 50 FPS and the mobile profile for 28. Software rendering on the CPU still runs at only 2–4 FPS, so it is not yet playable.
 - **Progress:** visits and stories read are saved in this browser. They do not sync between devices; clearing site data resets them.
-- **Lost?** Choose a destination on the map, or use the menu’s return-to-entrance action.
+- **Lost?** Open the Teleport dropdown beside sound or choose a destination on the map. Both arrive at a clear entrance facing the place. Escape, the close button or a click outside cancels the dropdown without moving you. On narrow phones, the navigation tools occupy a row below the Livistone name.
 
 
 Production visits use Umami analytics and session replays, loaded only on `livistone.liviazaharia.com`. Localhost, LAN and preview hosts stay untracked; see [deployment details](docs/deployment.md#verify-a-release).

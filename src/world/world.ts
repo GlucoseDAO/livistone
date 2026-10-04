@@ -1,3 +1,7 @@
+import { createGatePoster } from './gate-posters';
+import { gateFittingsEnabled } from './gate-lamps';
+import { EYELENSE_POSTER } from './eyelense-gate-layout';
+import { WINTER_POSTER } from './winter-gate-layout';
 import { loadEyelenseGate } from './eyelense-gate';
 import { TREE_REACH, graphicsProfile } from '../game/graphics';
 import type { GraphicsTier } from '../game/graphics';
@@ -205,11 +209,15 @@ export class Town {
     this.winter = await loadWinterGate(mobile, this.paving);
     this.root.add(this.winter.root); this.colliders.push(...this.winter.colliders);
     this.probeParts.set('winter-gate', { objects: [this.winter.root], hide: [this.winter.root] });
+    const winterPoster = gateFittingsEnabled() ? createGatePoster(this.root, this.colliders, WINTER_POSTER, 'eye-of-winter', 'winter-gate-story', 'Eye of Winter') : null;
+    if (winterPoster) { this.researchPanels.push(...winterPoster.panels); this.interactives.push({ id: 'winter-gate-story', object: winterPoster.panels[0], position: winterPoster.position }); }
     label('Eye of Winter');
     await stage(52, 'Opening the Eyelense red bead passage…');
     const eyelense = await loadEyelenseGate(mobile, this.paving);
     this.root.add(eyelense.root); this.colliders.push(...eyelense.colliders);
     this.probeParts.set('eyelense-gate', { objects: [eyelense.root], hide: eyelense.root.children.filter(part => part instanceof THREE.Mesh && !Array.isArray(part.material) && part.material.userData.heroEnv) });
+    const eyelensePoster = gateFittingsEnabled() ? createGatePoster(this.root, this.colliders, EYELENSE_POSTER, 'eyelense', 'eyelense-gate-story', 'Eyelense') : null;
+    if (eyelensePoster) { this.researchPanels.push(...eyelensePoster.panels); this.interactives.push({ id: 'eyelense-gate-story', object: eyelensePoster.panels[0], position: eyelensePoster.position }); }
     label('Eyelense Gate');
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.masonry, this.paving, this.brass, bridge);
     label('Garden bridges'); let first = this.root.children.length; createTimeTower(this.root, this.colliders, this.mobile); label('Time tower');
@@ -228,7 +236,7 @@ export class Town {
     this.addRoom(this.exhibitions[this.exhibitions.length - 1]);
     label('Glucose Commons');
     const research = createGlucosePavilion(this.root, this.colliders, mobile, this.paving); this.researchPanels.push(...research.panels); this.interactives.push(...research.interactives);
-    this.researchReady = Promise.all([research.ready, enhancementGallery.ready, gatewayPoster.ready]).then(() => undefined);
+    this.researchReady = Promise.all([research.ready, enhancementGallery.ready, gatewayPoster.ready, winterPoster?.ready, eyelensePoster?.ready]).then(() => undefined);
     await stage(62, 'Planting the woodland and mountain slopes…');
     label('Glucose Commons'); this.createTrees(); this.createGardens(); this.createContactShadows(); label('River rocks and lamps');
     for (const landmark of CIVIC_LANDMARKS) {

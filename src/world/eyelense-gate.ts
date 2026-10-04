@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { createGateLamps, gateFittingsEnabled } from './gate-lamps';
+import { nightEmission } from './night-lighting';
+import { EYELENSE_LAMPS } from './eyelense-gate-layout';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { modelURL } from '../game/featured';
@@ -82,11 +85,12 @@ export function createEyelenseGate(source: THREE.BufferGeometry, reduced = false
   const root = new THREE.Group(); root.name = 'Eyelense E · red bead passage';
   const transform = new THREE.Matrix4().makeRotationY(E.yaw).setPosition(E.x, 0, E.z), colliders: ColliderSpec[] = [], parts: THREE.Mesh[] = [];
   const black = new THREE.MeshPhysicalMaterial({ color: '#16151b', metalness: .32, roughness: .2, clearcoat: 1, clearcoatRoughness: .08, userData: { heroEnv: true } });
+  if (gateFittingsEnabled()) nightEmission(black, '#7e8796', .045);
   const brass = new THREE.MeshStandardMaterial({ color: '#c8a45e', metalness: .9, roughness: .23, userData: { heroEnv: true } });
   const stone = paving ?? new THREE.MeshStandardMaterial({ color: '#e6dfcc', roughness: .72 });
   const glass = (kind: string, color: string, thickness: number): THREE.MeshPhysicalMaterial => {
     const m = new THREE.MeshPhysicalMaterial({ color, ior: 1.48, thickness, clearcoat: 1, attenuationColor: color, attenuationDistance: kind === 'bead' ? 3.5 : 12, userData: { heroEnv: true, eyelenseGlass: kind, eyelenseReduced: reduced } });
-    if (kind === 'bead') { m.emissive.set('#980615'); m.emissiveIntensity = .13; }
+    if (kind === 'bead') { m.emissive.set('#980615'); m.emissiveIntensity = .13; if (gateFittingsEnabled()) nightEmission(m, '#c2152b', .35); }
     setEyelenseQuality(m, reduced); return m;
   };
   const add = (name: string, g: THREE.BufferGeometry, m: THREE.Material, solid = true, keep = false): THREE.Mesh => {
@@ -136,6 +140,7 @@ export function createEyelenseGate(source: THREE.BufferGeometry, reduced = false
     for (const dx of [-1.1, 1.1]) add('Brass bench foot', new THREE.BoxGeometry(.2, .39, .6).translate(seat.x + dx, E.floor + .195, seat.z), brass);
   }
   mergeStatic(parts, 'Eyelense · batched fittings and seats');
+  if (gateFittingsEnabled()) createGateLamps(root, colliders, EYELENSE_LAMPS, '#ffdeb0');
   return { root, colliders, crescent, bead, lens, surround };
 }
 

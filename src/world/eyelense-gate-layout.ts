@@ -6,9 +6,11 @@ export const EYELENSE = {
   doorHalf: 2.1, doorSpring: 2.3, doorTop: 4.4, tunnelHalfDepth: 1.8,
   lensBottom: 7.4, lensTop: 9.5,
   forecourtHalfX: 8.5, forecourtHalfZ: 11,
-  arrival: { x: 97, y: 1.05, z: -36, yaw: -Math.PI / 2 },
+  arrival: { x: 88.5, y: 1.05, z: -35.416667, yaw: Math.atan2(-17.5, .583333) },
   seats: [{ x: -6, z: 5.5 }, { x: 5.3, z: 5.5 }],
 } as const;
+export const EYELENSE_POSTER = { x: 97, y: EYELENSE.floor, z: -42, yaw: -1.1 };
+export const EYELENSE_LAMPS = [-5.1, 4.8].map(x => ({ x: EYELENSE.x - 4.6, y: EYELENSE.floor, z: EYELENSE.z + x }));
 
 export function eyelenseLocal(x: number, z: number): { x: number; z: number } { return { x: z - EYELENSE.z, z: EYELENSE.x - x }; }
 /** Stone platform and the source crescent's complete footprint, including its wider left foot. */

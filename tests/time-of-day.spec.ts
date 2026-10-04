@@ -28,11 +28,11 @@ for (const touch of [false, true]) test(`the top-bar time button cycles your tim
     await page.goto('/'); await ready();
     expect((await snapshot(page)).backend).toBe(EXPECTED_BACKEND);
     await expect(button).toBeVisible(); await expect(button).toBeEnabled(); await expect(button).toHaveAttribute('aria-keyshortcuts', 'T');
-    // Beside the sound button, on the top bar's one row, inside the viewport and big enough to tap.
+    // Beside sound, in the same navigation row, inside the viewport and big enough to tap.
     await expect(page.locator('#tools > #hud-time + #hud-sound')).toHaveCount(1);
     const box = (await button.boundingBox())!, sound = (await page.locator('#hud-sound').boundingBox())!, brand = (await page.locator('.brand').boundingBox())!;
     expect(Math.abs(box.y - sound.y)).toBeLessThan(1); expect(box.height).toBe(sound.height); expect(box.width).toBeGreaterThanOrEqual(38); expect(box.height).toBeGreaterThanOrEqual(44);
-    expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width); expect(box.y).toBeLessThan(brand.y + brand.height);
+    expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width); if (touch) expect(box.y).toBeGreaterThanOrEqual(brand.y + brand.height); else expect(box.y).toBeLessThan(brand.y + brand.height);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
     // A fresh visitor starts on your time, named with what the local clock gives now.

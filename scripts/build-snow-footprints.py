@@ -1,9 +1,9 @@
 """Bake the Jepii Mici snow's boot prints (Pillow + numpy, procedural and seeded, no downloads).
 
 The owner asked for the trail across the old snow to show that people have walked it before (sub-plan 27,
-round 2): a band of boot prints going up and down, fresh ones crisp with their tread, older ones softened
+round 2): several crossing lines of boot prints going up and down, fresh ones crisp with their tread, older ones softened
 and half filled, each walker's line wandering a little, the trampled band between them. The tile is
-1.2 m across the trail by 9.6 m along it and wraps along the trail; across it fades to untouched snow at
+8 m across the snow by 16 m along it and wraps along the trail; across it fades to untouched snow at
 both edges, so the ground shader can lay it on the trail's own frame (its along and across metres).
 
 Channels (linear data, lossless WebP):
@@ -21,9 +21,9 @@ from PIL import Image
 
 output = Path('public/textures/snow')
 output.mkdir(parents=True, exist_ok=True)
-ACROSS, ALONG = 1.2, 9.6          # metres covered by the tile
-W, H = 256, 2048                  # gpu size; mobile halves both
-px = W / ACROSS                   # pixels per metre (213: under 5 mm a pixel)
+ACROSS, ALONG = 8., 16.          # metres covered by the tile
+W, H = 1024, 2048                  # gpu size; mobile halves both
+px = W / ACROSS                   # 128 pixels/metre; 7.8 mm per pixel
 rng = np.random.default_rng(2703)
 ys, xs = np.mgrid[0:H, 0:W]
 u = (xs + .5) / px - ACROSS / 2   # metres across, 0 on the trail's centreline
@@ -64,7 +64,7 @@ def stamp(cx, cy, heading, length, width, depth, age):
         lx, ly = du * c - dv * s, du * s + dv * c
         d = sole(lx, ly, length, width)
         soft = .004 + age * .02               # wall softness (m)
-        inside = 1 / (1 + np.exp(d / soft * 2.2))
+        inside = 1 / (1 + np.exp(np.clip(d / soft * 2.2, -60, 60)))
         tread = lugs(lx, ly, length, width) * (1 - age) * .22
         floor = -depth * (1 - tread) * (1 - .25 * np.clip(ly / length, 0, 1))   # deeper at the heel, where weight lands
         rim = depth * .28 * (1 - age * .6) * np.exp(-(np.maximum(d, 0) / (.012 + age * .02)) ** 2) * (d > 0)
@@ -76,10 +76,10 @@ def stamp(cx, cy, heading, length, width, depth, age):
 
 # Walkers up and down the trail, oldest first, each a wandering line of alternating left and right prints.
 walkers = []
-for k in range(9):
+for k in range(14):
     up = k % 2 == 0
-    walkers.append(dict(up=up, offset=rng.uniform(-.24, .24), wander=rng.uniform(.03, .09), phase=rng.uniform(0, 2 * np.pi),
-                        stride=rng.uniform(.62, .76), size=rng.uniform(.27, .315), age=max(0., 1 - k / 7.5) * rng.uniform(.6, 1)))
+    walkers.append(dict(up=up, offset=rng.uniform(-2.8, 2.8), wander=rng.uniform(.35, .85), phase=rng.uniform(0, 2 * np.pi),
+                        stride=rng.uniform(.95, 1.3), size=rng.uniform(.27, .315), age=max(0., 1 - k / 12) * rng.uniform(.6, 1)))
 for w in walkers:
     step = w['stride'] / 2
     count = int(ALONG / step)
@@ -97,14 +97,14 @@ for w in walkers:
             stamp(lateral, along - .08, heading, w['size'] * 1.4, w['size'] * .3, depth * .5, min(1, w['age'] + .4))
 
 # The trampled band: shallow, broad and uneven between the prints, fading out toward both edges of the tile.
-band = np.exp(-(u / .38) ** 6)
+band = np.exp(-(u / 3.5) ** 12)
 rough = np.zeros((H, W))
 for scale, amp in ((.4, .01), (.12, .005), (.04, .002)):
     n = rng.normal(0, 1, (int(H / (scale * px)) + 2, int(W / (scale * px)) + 2))
     img = Image.fromarray(((n - n.min()) / (n.max() - n.min()) * 255).astype(np.uint8)).resize((W, H), Image.BICUBIC)
     rough += (np.asarray(img) / 255 - .5) * amp
-height = (height - .008 * band + rough * band) * band
-trodden = np.clip(np.maximum(trodden, band * .35) * band, 0, 1)
+height = (height - .002 * trodden + rough * trodden) * band
+trodden = np.clip(trodden * band, 0, 1)
 
 # Pack: height in 1.5 mm units round 128, its normal, and how trodden the snow is.
 unit = .0015
@@ -121,9 +121,16 @@ for name, scale in (('footprints-gpu.webp', 1), ('footprints-mobile.webp', 2)):
     path = output / name
     image.save(path, lossless=True, quality=100, method=6, exact=True)
     files[name] = {'size': list(image.size), 'bytes': path.stat().st_size, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+classic_files = {}
+for tier, size in (('gpu', [256, 2048]), ('mobile', [128, 1024])):
+    legacy = output / f'footprints-classic-{tier}.webp'
+    if legacy.exists():
+        classic_files[legacy.name] = {'size': size, 'bytes': legacy.stat().st_size,
+            'sha256': hashlib.sha256(legacy.read_bytes()).hexdigest(), 'covers_m': [1.2, 9.6],
+            'note': 'Earlier sub-plan 27 procedural bake, retained only for the development comparison.'}
 (output / 'sources.json').write_text(json.dumps({
     'generator': 'scripts/build-snow-footprints.py', 'seed': 2703, 'covers_m': [ACROSS, ALONG], 'height_unit_m': unit,
-    'channels': 'R height (128 = untouched), G/B normal across/along, A trodden', 'files': files,
+    'channels': 'R height (128 = untouched), G/B normal across/along, A trodden', 'files': files, 'classic_files': classic_files,
     'licence': 'Procedural, generated for Livistone; no third-party source.'}, indent=2) + '\n')
 if len(sys.argv) > 1:
     preview = Path(sys.argv[1]); preview.mkdir(parents=True, exist_ok=True)

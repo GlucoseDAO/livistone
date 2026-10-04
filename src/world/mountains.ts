@@ -1,3 +1,4 @@
+import { classicSnow } from './snow-layout';
 import * as THREE from 'three';
 import { RAILWAY, STATION } from './station-layout';
 
@@ -174,7 +175,7 @@ export class Mountains extends THREE.Group {
     });
     const files = groundTextureFiles(tier), shoreFiles = shoreTextureFiles(tier);
     // The snow's boot prints (sub-plan 27): height, normal and wear on the trail's frame, wrapping along it; gpu and mobile only.
-    const prints = MOUNTAIN && tier !== 'cpu' ? load(`textures/snow/footprints-${tier === 'gpu' ? 'gpu' : 'mobile'}.webp`, false).then((t) => { t.wrapS = THREE.ClampToEdgeWrapping; t.flipY = false; t.anisotropy = tier === 'gpu' ? 8 : 4; t.needsUpdate = true; return t; }).catch(() => null) : Promise.resolve(null);
+    const prints = MOUNTAIN && tier !== 'cpu' ? load(`textures/snow/footprints-${classicSnow() ? 'classic-' : ''}${tier === 'gpu' ? 'gpu' : 'mobile'}.webp`, false).then((t) => { t.wrapS = classicSnow() ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping; t.flipY = false; t.anisotropy = tier === 'gpu' ? 8 : 4; t.needsUpdate = true; return t; }).catch(() => null) : Promise.resolve(null);
     // The shore gravel is optional: without it the banks keep their wet band, silt and caustics.
     const shore = Promise.all(shoreFiles.map(file => load(`textures/ground/${file}`, file.includes('-albedo-')))).catch(() => []);
     this.rock = Promise.all([load('textures/mountains/rock-color.jpg', true), tier === 'gpu' ? load('textures/mountains/rock-normal.jpg', false) : Promise.resolve(null)]).then(([rock, rockNormal]) => ({ rock, rockNormal }));

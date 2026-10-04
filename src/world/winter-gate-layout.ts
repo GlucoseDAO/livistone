@@ -7,12 +7,17 @@ export const WINTER = {
   arrivalX: WINTER_SITE.x + 10.7, plazaX: WINTER_SITE.x + 7, plazaRadius: 4,
 } as const;
 
+export const WINTER_ARRIVAL = { x: WINTER.x + 21.5, z: WINTER.z, y: winterPlateauHeight(WINTER.x + 21.5, WINTER.z) + .95, yaw: Math.PI / 2 };
+export const WINTER_POSTER = { x: WINTER.x + 11, z: WINTER.z + 6, y: winterPlateauHeight(WINTER.x + 11, WINTER.z + 6), yaw: 2.09 };
+export const WINTER_LAMPS = [-1, 1].map(side => ({ x: WINTER.plazaX - 1, y: WINTER.floor, z: WINTER.z + side * 3 }));
+
 /** The complete silver assembly, stones and forecourt, including canopy clearance around the trailing rings. */
 export function winterClearing(x: number, z: number, radius = 0): boolean {
   return x > WINTER.x - 16 - radius && x < WINTER.x + 14 + radius && Math.abs(z - WINTER.z) < 8 + radius;
 }
 export function winterGround(x: number, z: number, radius = 0): boolean {
-  return (Math.abs(x - WINTER.quartzX) < 3.4 + radius && Math.abs(z - WINTER.z) < 3.7 + radius)
+  return Math.hypot(x - WINTER_POSTER.x, z - WINTER_POSTER.z) < 1.4 + radius
+    || (Math.abs(x - WINTER.quartzX) < 3.4 + radius && Math.abs(z - WINTER.z) < 3.7 + radius)
     || (x > WINTER.x - 16 - radius && x < WINTER.x + 3 + radius && Math.abs(z - WINTER.z) < 6.5 + radius)
     || Math.hypot(x - WINTER.plazaX, z - WINTER.z) < WINTER.plazaRadius + radius;
 }

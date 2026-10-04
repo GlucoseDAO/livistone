@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { createGateLamps, gateFittingsEnabled } from './gate-lamps';
+import { nightEmission, addGlow } from './night-lighting';
+import { WINTER_LAMPS } from './winter-gate-layout';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { modelURL } from '../game/featured';
 import type { ColliderSpec } from '../game/physics';
@@ -83,6 +86,11 @@ export function createWinterGate(source: THREE.BufferGeometry, mobile = false, p
   const gold = new THREE.MeshStandardMaterial({ color: '#c3a15c', metalness: .85, roughness: .24, userData: { heroEnv: true } });
   const quartzMaterial = new THREE.MeshPhysicalMaterial({ color: '#eaf7ff', roughness: .045, metalness: 0, transmission: mobile ? 0 : .88, thickness: .2, ior: 1.46, transparent: true, opacity: mobile ? .22 : .5, depthWrite: false, side: THREE.DoubleSide, clearcoat: 1, userData: { winterQuartz: true, winterReduced: mobile, heroEnv: true } });
   const blueMaterial = new THREE.MeshPhysicalMaterial({ color: '#237bb4', roughness: .035, metalness: .12, transmission: mobile ? 0 : .35, thickness: .8, ior: 1.62, clearcoat: 1, flatShading: true, emissive: '#0b2942', emissiveIntensity: .22, userData: { heroEnv: true } });
+  if (gateFittingsEnabled()) {
+    nightEmission(silverMaterial, '#9ac6d9', .065); nightEmission(quartzMaterial, '#a0d1ef', .06); nightEmission(blueMaterial, '#2f9dd4', .7);
+    createGateLamps(root, colliders, WINTER_LAMPS, '#d4eaff');
+    addGlow(root, new THREE.Vector3(WINTER.x - 1.5, WINTER.centreY, WINTER.z), '#63bced', 2, 90, 18, .2);
+  }
   const add = (name: string, g: THREE.BufferGeometry, m: THREE.Material, solid = true): THREE.Mesh => {
     const mesh = new THREE.Mesh(g, m); mesh.name = name; mesh.castShadow = mesh.receiveShadow = true; root.add(mesh);
     if (solid) colliders.push({ type: 'mesh', vertices: Float32Array.from(g.getAttribute('position').array), indices: g.index ? Uint32Array.from(g.index.array) : Uint32Array.from({ length: g.getAttribute('position').count }, (_, i) => i) });

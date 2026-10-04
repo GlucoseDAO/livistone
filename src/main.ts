@@ -375,7 +375,7 @@ class Game {
     return this.night || skyLook() === 'classic' ? light : { ...light, environment: light.environment * PHYSICAL_DAY_FILL };
   }
   private get mapView(): boolean {
-    return this.mode === 'map' || this.mode === 'welcome' || (['lore', 'journal', 'paused', 'gallery'].includes(this.mode) && this.returnMode === 'map');
+    return this.mode === 'map' || this.mode === 'welcome' || (['lore', 'journal', 'paused', 'gallery', 'teleport'].includes(this.mode) && this.returnMode === 'map');
   }
   private pixelRatio(): number {
     const cap = this.graphics.tier === 'cpu' ? Math.sqrt(180000 / (window.innerWidth * window.innerHeight)) : Infinity;
@@ -410,9 +410,9 @@ class Game {
       if (next === 'map') this.resetMap();
       this.setMode(next); if (next === 'walking') this.ambience.resume(); return;
     }
-    if (action === 'journal' || action === 'pause') {
-      const next = action === 'journal' ? 'journal' : 'paused';
-      if (this.mode === next) { this.setMode(this.returnMode); return; }
+    if (action === 'journal' || action === 'pause' || action === 'teleport') {
+      const next = action === 'journal' ? 'journal' : action === 'teleport' ? 'teleport' : 'paused';
+      if (this.mode === next) { this.setMode(this.returnMode); if (next === 'teleport') this.ui.focusTeleport(); return; }
       if (this.mode === 'walking' || this.mode === 'map') this.returnMode = this.mode;
       this.loreFromJournal = false; this.setMode(next); return;
     }
@@ -436,12 +436,13 @@ class Game {
     if (action.startsWith('tap:') && this.mode === 'walking') { this.clickPhoto(Number(action.split(':')[1]), Number(action.split(':')[2])); return; }
     if (this.mode === 'gallery' && !['escape', 'close'].includes(action)) return;
     if (action === 'escape') {
-      if (['paused', 'lore', 'journal', 'gallery'].includes(this.mode)) { await this.action('close'); return; }
+      if (['paused', 'lore', 'journal', 'gallery', 'teleport'].includes(this.mode)) { await this.action('close'); return; }
       this.returnMode = this.mode === 'map' ? 'map' : 'walking'; this.setMode('paused');
     } else if (action === 'close') {
+      const teleport = this.mode === 'teleport';
       if (this.mode === 'gallery') { this.setMode(this.galleryReturn); return; }
       if (this.mode === 'lore' && this.loreFromJournal) { this.loreFromJournal = false; this.setMode('journal'); }
-      else { this.setMode(this.returnMode);  }
+      else { this.setMode(this.returnMode); if (teleport) this.ui.focusTeleport(); }
     } else if ((action === 'interact' || action === 'nearby-story') && this.mode === 'walking') {
       const id = action === 'interact' ? this.interaction ?? this.nearby?.id : this.nearby?.id;
       if (id) this.discover(id);
@@ -465,7 +466,7 @@ class Game {
     } else if (action.startsWith('quality:')) this.quality(action.split(':')[1] === 'low');
   }
   private visitLandmark(id: string): void {
-    const landmark = LANDMARKS.find(place => place.id === id); if (!landmark || this.mode !== 'map') return;
+    const landmark = LANDMARKS.find(place => place.id === id); if (!landmark || !['map', 'teleport'].includes(this.mode)) return;
     this.physics!.teleport(landmark.entrance);
     this.input.yaw = landmark.entrance.yaw; this.input.pitch = 0; this.selection = landmark.id;
     this.returnMode = 'walking'; this.loreFromJournal = false; this.setMode('walking'); this.updateWalking(0); this.ambience.resume();

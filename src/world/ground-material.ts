@@ -1,3 +1,4 @@
+import { SNOW_TRACKS, classicSnow } from './snow-layout';
 import * as THREE from 'three';
 import { Fn, If, abs, attribute, sign, cameraViewMatrix, clamp, cos, cross, dFdx, dFdy, dot, float, floor, fract, length, max, mix, normalLocal, normalize, positionLocal, positionView, pow, property, select, sin, smoothstep, sqrt, step, texture, vec2, vec3, vec4, vertexStage } from 'three/tsl';
 import type { Node } from 'three/webgpu';
@@ -199,9 +200,9 @@ const GROUND = {
  */
 function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean, footprints: THREE.Texture | null, pale = true): void {
   const marks = attribute<'vec4'>('groundPaint', 'vec4').xyz.toVar(), tint = max(attribute<'vec3'>('color', 'vec3'), vec3(.05)).toVar();
-  // The boot prints' coordinates on the trail's frame (metres across it over the tile's 1.2 m, along it over 9.6 m), with their
+  // Metres across and along the snow field, with the classic ribbon retained for development comparisons. Their
   // gradients taken here, outside the snow's branch, so the lookup inside it stays legal.
-  const frame = attribute<'vec4'>('trailFrame', 'vec4'), printUV = vec2(frame.y.div(1.2).add(.5), frame.x.div(9.6)).toVar(), printDx = dFdx(printUV).toVar(), printDy = dFdy(printUV).toVar();
+  const frame = attribute<'vec4'>('trailFrame', 'vec4'), printUV = vec2(frame.y.div(classicSnow() ? 1.2 : SNOW_TRACKS.across).add(.5), frame.x.div(classicSnow() ? 9.6 : SNOW_TRACKS.along)).toVar(), printDx = dFdx(printUV).toVar(), printDy = dFdy(printUV).toVar();
   If(marks.x.greaterThan(.01), () => {
     // Bright alpine turf between the plants, as in the owner's photos: the meadow's own grain and value, its hue and level pulled
     // to a fresh green, with no rock or bare soil showing (its flowers are alpine-plants.ts's, on stems).
@@ -222,6 +223,7 @@ function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean, footp
     const crags = float(1).sub(smoothstep(-240, -234, positionLocal.z)).mul(smoothstep(-80, -70, positionLocal.x)).mul(float(1).sub(smoothstep(14, 24, positionLocal.x))).mul(GROUND.rock);
     ground.assign(mix(ground, vec3(dot(ground, LUMA)).mul(vec3(1.32, 1.3, 1.24)), crags.mul(.85)));
   }
+  if (classicSnow()) {
   If(marks.y.greaterThan(.01), () => {
     // Old avalanche snow as in the owner's photographs of the gully: grey-white, never paint-white, with soil streaks down the
     // fall line, dirt patches, needles, twigs and stones lying on it; greyer and banded where its edge stands steep; boot prints
@@ -269,6 +271,34 @@ function mountainPaint(ground: V3, xz: V2, far: F, up: F, plants: boolean, footp
     const glint = step(.992, hash12(floor(xz.div(.006)))).mul(near);
     GROUND.roughness.assign(mix(GROUND.roughness.sub(rim.mul(.3)), mix(.58, .78, dirt).sub(glint.mul(.45)).sub(tramp.mul(.1)), snow));
   });
+  } else {
+  If(marks.y.greaterThan(.01), () => {
+    const edge = marks.y.add(valueNoise(xz.div(1.7)).sub(.5).mul(.24)).toVar();
+    const snow = smoothstep(.35, .48, edge).mul(smoothstep(.58, .8, up)).toVar();
+    const rim = smoothstep(.18, .35, edge).mul(float(1).sub(snow)).toVar();
+    const near = float(1).sub(smoothstep(25, 65, positionView.length())).toVar();
+    // White snow stays cool even in packed tracks; warm debris is confined to the melting margin.
+    const white = vec3(.76, .81, .87).mul(valueNoise(xz.div(7)).mul(.045).add(.975)).toVar();
+    const dirt = float(1).sub(smoothstep(.48, .72, edge)).mul(valueNoise(xz.div(2.5)).mul(.12)).toVar();
+    white.assign(mix(white, vec3(.34, .32, .29), dirt));
+    const printSlope = vec2(0).toVar();
+    const plateauTracks = positionLocal.x.greaterThan(-105).and(positionLocal.x.lessThan(-39)).and(positionLocal.z.greaterThan(-295)).and(positionLocal.z.lessThan(-270));
+    if (footprints) If(abs(frame.y).lessThan(SNOW_TRACKS.across / 2).or(plateauTracks), () => {
+      const print = texture(footprints, printUV).grad(printDx, printDy).toVar();
+      const depth = clamp(float(128 / 255).sub(print.r).mul(255 * .0015 / .055), 0, 1);
+      const band = select(plateauTracks, float(1), float(1).sub(smoothstep(3.5, 4, abs(frame.y)))).mul(near);
+      white.assign(mix(white, vec3(.46, .59, .72), depth.mul(band).mul(.48)).mul(float(1).sub(print.a.mul(.035).mul(band))));
+      const n = print.gb.mul(2).sub(1), along = vec2(frame.z, frame.w), across = vec2(frame.w.negate(), frame.z);
+      printSlope.assign(across.mul(n.x).add(along.mul(n.y)).negate().div(max(float(1).sub(dot(n, n)).sqrt(), .2)).mul(band));
+    });
+    // Low, broad wind ripples replace the soil's coarse grain; print walls supply the close relief.
+    const drift = noiseGradient(xz.div(1.8)).yz.mul(.016).add(noiseGradient(xz.div(.23)).yz.mul(.006));
+    ground.assign(mix(ground.mul(float(1).sub(rim.mul(.25))), white.div(tint), snow));
+    GROUND.rock.mulAssign(float(1).sub(snow)); GROUND.detail.mulAssign(float(1).sub(snow));
+    GROUND.relief.assign(mix(GROUND.relief, printSlope.add(drift).mul(1 / .16), snow));
+    GROUND.roughness.assign(mix(GROUND.roughness, .79, snow));
+  });
+  }
   If(marks.z.greaterThan(.01), () => { ground.mulAssign(float(1).sub(marks.z.mul(.5))); GROUND.roughness.assign(mix(GROUND.roughness, .3, marks.z)); });
 }
 

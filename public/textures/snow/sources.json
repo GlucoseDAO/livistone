@@ -2,28 +2,56 @@
   "generator": "scripts/build-snow-footprints.py",
   "seed": 2703,
   "covers_m": [
-    1.2,
-    9.6
+    8.0,
+    16.0
   ],
   "height_unit_m": 0.0015,
   "channels": "R height (128 = untouched), G/B normal across/along, A trodden",
   "files": {
     "footprints-gpu.webp": {
       "size": [
+        1024,
+        2048
+      ],
+      "bytes": 881388,
+      "sha256": "5987171e06a8028861f225531d4a525990c276b062b25094a33504885de60764"
+    },
+    "footprints-mobile.webp": {
+      "size": [
+        512,
+        1024
+      ],
+      "bytes": 270536,
+      "sha256": "2f618eab4285645ffcdac4345db21f8e8215d943c3c3237ac3e2a2ecb16fa011"
+    }
+  },
+  "licence": "Procedural, generated for Livistone; no third-party source.",
+  "classic_files": {
+    "footprints-classic-gpu.webp": {
+      "size": [
         256,
         2048
       ],
       "bytes": 613974,
-      "sha256": "da57245d1ed79aa86b1569ab263ce2c99f9223f36d4f4842a06102d0237bbbc0"
+      "sha256": "da57245d1ed79aa86b1569ab263ce2c99f9223f36d4f4842a06102d0237bbbc0",
+      "covers_m": [
+        1.2,
+        9.6
+      ],
+      "note": "Earlier sub-plan 27 procedural bake, retained only for the development comparison."
     },
-    "footprints-mobile.webp": {
+    "footprints-classic-mobile.webp": {
       "size": [
         128,
         1024
       ],
       "bytes": 190254,
-      "sha256": "afbfe33bb44cca550d710d719696806ae91e982f40406e68a3900a88169ed8b4"
+      "sha256": "afbfe33bb44cca550d710d719696806ae91e982f40406e68a3900a88169ed8b4",
+      "covers_m": [
+        1.2,
+        9.6
+      ],
+      "note": "Earlier sub-plan 27 procedural bake, retained only for the development comparison."
     }
-  },
-  "licence": "Procedural, generated for Livistone; no third-party source."
+  }
 }

@@ -1,3 +1,6 @@
+import { LANDMARKS } from '../src/game/content';
+import { WINTER_POSTER } from '../src/world/winter-gate-layout';
+import { EYELENSE_POSTER } from '../src/world/eyelense-gate-layout';
 import { WINTER } from '../src/world/winter-gate-layout';
 // Fixed, reproducible captures for realism before/after reviews (docs/realism/00-harness.md).
 // Needs a dev server: the ?capture=1 freeze and the __livistone hook exist only in dev builds.
@@ -58,7 +61,15 @@ const VIEWS: Record<string, View> = Object.fromEntries(([
   ['winter-gate-front', WINTER.x + 20, WINTER.z, Math.PI / 2, .22], ['winter-gate-angle', WINTER.x + 20, WINTER.z + 12, 1.03, .2], ['winter-gate-far', -44, -258, .93, .12, 56], ['winter-plateau', -36, -252, .82, -.24, 70],
   ['eyelense-gate-front', 84, -36, -Math.PI / 2, .26], ['eyelense-gate-angle', 90, -21, -.82, .24], ['eyelense-gate-inside', 106, -36, -Math.PI / 2, .25], ['eyelense-gate-context', 79, -16, -.95, -.38, 20, true], ['eyelense-gate-far', 66, -24, -1.28, .1], ['mycelium-ring-far', 56, -99, -1.05, .12],
 ] as View[]).map(view => [view[0], view]));
+for (const id of ['energy', 'science', 'city-hall', 'enhancement', 'winter-gate', 'eyelense-gate']) {
+  const p = LANDMARKS.find(l => l.id === id)!.entrance;
+  VIEWS['arrival-' + id] = ['Arrival · ' + id, p.x, p.z, p.yaw, 0];
+}
+for (const [id, p] of [['winter', WINTER_POSTER], ['eyelense', EYELENSE_POSTER]] as const) {
+  VIEWS[id + '-poster'] = [id + ' · source photographs', p.x + Math.sin(p.yaw) * 4.5, p.z + Math.cos(p.yaw) * 4.5, p.yaw, .08];
+}
 const SETS: Record<string, string[]> = {
+  review: ['snow-gully', 'snow-prints', 'winter-gate-front', 'eyelense-gate-front', 'winter-poster', 'eyelense-poster', 'arrival-enhancement', 'arrival-energy', 'arrival-science', 'arrival-city-hall', 'arrival-winter-gate', 'arrival-eyelense-gate'],
   quick: ['arrival-meadow', 'city-hall-front', 'energy-front', 'bridge-bank', 'east-tributary', 'meadow-ground', 'city-hall-gallery', 'vittoria-lake'],
   exteriors: ['station-arrival', 'garden-overview', 'gateway-front', 'gateway-side', 'bridge-crossing', 'city-hall-front', 'energy-front', 'energy-side', 'science-front', 'science-side', 'time-tower', 'embryo-station-front', 'glucose-pavilion', 'railway-east-portal'],
   ground: ['arrival-meadow', 'north-meadow', 'meadow-ground', 'path-edge', 'garden-path', 'woodland-edge'],
