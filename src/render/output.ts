@@ -47,8 +47,11 @@ const FOG = Fn((builder: NodeBuilder) => {
 // `userData.occlusion` (0–1) lowers it where screen-space occlusion overstates thin geometry. Surfaces in the aerial haze keep
 // only the clear share of it, as range-fogged ones do in the output pass, so the haze is not darkened.
 const SOLID = Fn((builder: NodeBuilder) => {
-  const material = builder.material as { transparent?: boolean; fog?: boolean; userData?: { occlusion?: number } } | null;
-  const solid = float(!material || material.transparent ? 0 : material.userData?.occlusion ?? 1);
+  const material = builder.material as { transparent?: boolean; depthWrite?: boolean; fog?: boolean; userData?: { occlusion?: number } } | null;
+  // Occlusion follows the depth buffer, so a surface that writes none takes none. The sky background was the case that showed:
+  // the half-resolution occlusion of a far ridge, dark where GTAO rebuilds it against the sky, spread onto the sky beside it in
+  // the output pass's upsampling and drew a dark line along the ridge.
+  const solid = float(!material || material.transparent || material.depthWrite === false ? 0 : material.userData?.occlusion ?? 1);
   return material?.fog === false ? solid : solid.mul(aerialFactor.g.oneMinus());
 })();
 const DISPLAY = mrt({ display: vec4(1, RANGE, 0, 1) });

@@ -8,15 +8,14 @@ Work from a worktree, not the owner's checkout `~/sources/livistone` (it holds a
 
 ### 1. Summit view (owner's decision: "clear view, desktop only") — first look awaiting the owner
 
-Built on branch `realism/summit-view` (pushed, not merged): on the gpu tier, high on the plateau, the walking fog eases from 130 m to 330 m and the far plane, distant pass, haze and town culling follow; far forest cells draw crowns only. Review `review/summit-view/`; numbers and open points in [27](27-mountain-trail.md#summit-view-4-october-2026-branch-realismsummit-view-awaiting-the-owner). `plateau-view`: 131 → 368 calls, 2.41M → 6.75M triangles, headless 11 → about 5 fps. Open: far trees (160–300 m) read as sparse speckles, and a dark dotted line crosses the fog along a ridge. The owner picks: impostor cards for far trees, a shorter summit fog (about 250 m), or merge as is.
+Built on branch `realism/summit-view` (pushed, not merged): on the gpu tier, high on the plateau, the walking fog eases from 130 m to 330 m and the far plane, distant pass, haze and town culling follow; far forest cells draw crowns only. Review `review/summit-view/`; numbers and open points in [27](27-mountain-trail.md#summit-view-4-october-2026-branch-realismsummit-view-awaiting-the-owner). `plateau-view`: 131 → 368 calls, 2.41M → 6.75M triangles, headless 11 → about 5 fps. Open: far trees (160–300 m) read as sparse speckles; the dark dotted line along the ridge was the sky taking ambient occlusion, fixed on `main` (rebase the branch). The owner picks: impostor cards for far trees, a shorter summit fog (about 250 m), or merge as is.
 
 ### 2. Jepii Mici follow-ups (27)
 
 - The crags read as rock now, but up close blocks look built (bevelled slabs) and the crest's rounded masses like pillows; the 60° terrain faces between and above blocks are smooth; a few fins remain at the wall foot in the waterfall slot. The 2 m terrain grid cannot draw sheer walls (they alias into fins): keep sheer rock in meshes.
 - Conifers: the gorge and upper woods have only oak and ash. EZ-Tree (already a dev dependency) has `Pine Small/Medium/Large` presets; a spruce GLB via `scripts/generate-trees.mjs` (hard-coded to port 5173: make the URL configurable) and a mountain species mix above about 15 m would match the owner's photographs (spruce and larch above the gorge, dwarf pine on ledges). Budget the extra forest draws.
 - The waterfall photo has grassy ledges with dwarf pines and larches on the cirque walls; the gully photo has the stream running out under a thick snow lip (the water branch's snow cave).
-- Faint dark lines in the sky in `ridge-north` and `trail-from-path` also appear with `?mountain=off` (from `main`'s sky or distant pass); not investigated.
-- Not captured yet for round 2: touch and software captures of the `mountain` set, night views of the gorge and plateau.
+- Round 2's `mountain` set on touch and software (day) and desktop night is captured in `review/27-mountain-tiers/main/` (no before; for reference).
 
 ### 3. Tests and verification (task 6)
 
