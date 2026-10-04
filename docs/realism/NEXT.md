@@ -6,9 +6,9 @@ Work from a worktree, not the owner's checkout `~/sources/livistone` (it holds a
 
 ## Next, in order
 
-### 1. Summit view (owner's decision: "clear view, desktop only")
+### 1. Summit view (owner's decision: "clear view, desktop only") — first look awaiting the owner
 
-From the plateau (stand at `(-26, -258)` facing south, the `plateau-view` capture) the town is fog today. `Town.update` and `aerialParams(tier, full)` accept a per-frame full-fog distance, and the forest re-selects only after 2 m of camera travel plus reach change. On the gpu tier only, grow the walking full-fog distance from `graphics.fog` (130 m) toward about 330 m as the walker stands high on the plateau (e.g. eye above 38 m and `plateauInside > -4`, eased over a few seconds), and feed it each frame to the walk camera's far plane, the distant pass's near plane (90%), `setFog`'s aerial parameters and `Town.update`. Measure the plateau view's draws, triangles and frame time before and after; mobile and cpu keep today's haze.
+Built on branch `realism/summit-view` (pushed, not merged): on the gpu tier, high on the plateau, the walking fog eases from 130 m to 330 m and the far plane, distant pass, haze and town culling follow; far forest cells draw crowns only. Review `review/summit-view/`; numbers and open points in [27](27-mountain-trail.md#summit-view-4-october-2026-branch-realismsummit-view-awaiting-the-owner). `plateau-view`: 131 → 368 calls, 2.41M → 6.75M triangles, headless 11 → about 5 fps. Open: far trees (160–300 m) read as sparse speckles, and a dark dotted line crosses the fog along a ridge. The owner picks: impostor cards for far trees, a shorter summit fog (about 250 m), or merge as is.
 
 ### 2. Jepii Mici follow-ups (27)
 
@@ -31,10 +31,8 @@ From the plateau (stand at `(-26, -258)` facing south, the `plateau-view` captur
 
 ### 5. Housekeeping (task 8)
 
-- Worktrees whose branches are merged or superseded can go: `07-merge`, `07-probes-after-load`, `17-wind`, `21-contrast`, `21-haze`, `27-mountain-trail`, `27-mountain-water`, `28-station`, `28-station-2`, `r3-time-button`, `27-jepii-mici-2`, `27-crags`, `fix-intersections`. Check each for uncommitted work first; stop any dev server it runs (`ss -ltnp | grep 51`). Keep `integration` and `main-baseline` (detached, port 5194).
-- Local branches merged into `main` can go with them; `backup/27-mountain-water-edc50a8` too.
 - Stale remote branches `origin/realism/16-contact`, `origin/realism/21-on-round-2`: delete only with the owner's approval.
-- The owner's checkout `~/sources/livistone`: `git pull --rebase` once the STL catalogue docs there are committed or set aside, never over them.
+- Worktrees left: `integration` (tracks `origin/main`), `main-baseline` (detached, port 5194), `07-08-materials` and `15-reflections` (parked work above).
 
 ## Open owner decisions
 
