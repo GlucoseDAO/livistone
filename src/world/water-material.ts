@@ -3,6 +3,7 @@ import { Fn, abs, attribute, cameraPosition, cameraViewMatrix, clamp, color, cos
 import { PhysicalLightingModel } from 'three/webgpu';
 import type { Node, NodeBuilder } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
+import { waterSurface } from '../render/output';
 
 /** Review variants (docs/realism/04-river-water.md): a = clear shallow stream, b = deeper green garden river. */
 export type WaterLook = 'a' | 'b';
@@ -101,7 +102,9 @@ export function waterMaterial(tier: GraphicsTier, opts: { look?: WaterLook } = {
     material.userData.time = time; return material;
   }
   const mobile = tier === 'mobile';
-  const material = new WaterNodeMaterial({ color: '#ffffff', roughness: optics.roughness, metalness: 0, ior: 1.333, envMapIntensity: 1, transparent: true, depthWrite: false });
+  // gpu: the river writes its depth, so screen-space reflections (render/post.ts) start at its surface rather than the bed;
+  // it draws after everything it covers, and nothing transparent lies beneath it.
+  const material = new WaterNodeMaterial({ color: '#ffffff', roughness: optics.roughness, metalness: 0, ior: 1.333, envMapIntensity: 1, transparent: true, depthWrite: tier === 'gpu' });
   material.name = 'River water';
   // heroEnv: sub-plan 02 gives tagged materials an explicit envMap so their own envMapIntensity applies.
   material.userData.time = time; material.userData.heroEnv = true; material.userData.look = look; material.userData.layers = mobile ? 1 : 2;
@@ -139,6 +142,8 @@ export function waterMaterial(tier: GraphicsTier, opts: { look?: WaterLook } = {
   })();
   material.normalNode = normalize(cameraViewMatrix.mul(vec4(WATER.normal, 0)).xyz);
   material.roughnessNode = mix(optics.roughness, .75, WATER.foam);
+  // WaterLighting shows the sky reflection (gloss) at (1 - foam) × mix(shore, 1, foam); screen-space hits replace that share.
+  material.mrtNode = waterSurface(material.normalNode as Node<'vec3'>, WATER.foam.oneMinus().mul(mix(WATER.shore, 1, WATER.foam)));
   return material;
 }
 
@@ -155,5 +160,6 @@ export function lakeWaterMaterial(time: Node<'float'>): THREE.MeshPhysicalNodeMa
   material.name = 'Lake water'; material.userData.heroEnv = true;
   const p = positionLocal.xz, ripple = vec2(sin(p.x.mul(2.8).add(p.y.mul(1.7)).sub(time.mul(.8))), cos(p.y.mul(3.1).sub(p.x.mul(1.4)).sub(time.mul(.6)))).mul(.047);
   material.normalNode = normalize(normalView.add(cameraViewMatrix.mul(vec4(ripple.x, 0, ripple.y, 0)).xyz));
+  material.mrtNode = waterSurface(material.normalNode as Node<'vec3'>, float(1));
   return material;
 }

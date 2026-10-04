@@ -66,13 +66,15 @@ export type GraphicsTier = 'gpu' | 'mobile' | 'cpu';
 export type PostMode = 'off' | 'ao' | 'gi';
 export interface GraphicsProfile {
   tier: GraphicsTier; reduced: boolean; pixelRatio: number; shadows: boolean; skyDay: number; skyNight: number; plants: number; forest: number; lights: number; post: PostMode;
+  /** Screen-space reflections on the river and lake (render/post.ts, sub-plan 15). */
+  reflections: boolean;
 }
 export function graphicsTier(input: { coarse: boolean; caveatFailed?: boolean; renderer?: string; integrated?: boolean }): GraphicsTier {
   if (input.caveatFailed || (input.renderer && softwareRenderer(input.renderer))) return 'cpu';
   return input.coarse || input.integrated || (input.renderer && modestRenderer(input.renderer)) ? 'mobile' : 'gpu';
 }
 export function graphicsProfile(tier: GraphicsTier): GraphicsProfile {
-  if (tier === 'cpu') return { tier, reduced: true, pixelRatio: .55, shadows: false, skyDay: 64, skyNight: 128, plants: 18, forest: 80, lights: 2, post: 'off' };
-  if (tier === 'mobile') return { tier, reduced: true, pixelRatio: 1, shadows: true, skyDay: 256, skyNight: 512, plants: 32, forest: 110, lights: 6, post: 'off' };
-  return { tier, reduced: false, pixelRatio: 1.5, shadows: true, skyDay: 512, skyNight: 1024, plants: 38, forest: 130, lights: 10, post: 'ao' };
+  if (tier === 'cpu') return { tier, reduced: true, pixelRatio: .55, shadows: false, skyDay: 64, skyNight: 128, plants: 18, forest: 80, lights: 2, post: 'off', reflections: false };
+  if (tier === 'mobile') return { tier, reduced: true, pixelRatio: 1, shadows: true, skyDay: 256, skyNight: 512, plants: 32, forest: 110, lights: 6, post: 'off', reflections: false };
+  return { tier, reduced: false, pixelRatio: 1.5, shadows: true, skyDay: 512, skyNight: 1024, plants: 38, forest: 130, lights: 10, post: 'ao', reflections: true };
 }

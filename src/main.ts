@@ -48,6 +48,8 @@ const EYE_LEAD = .002;
 const LOOK = import.meta.env.DEV && new URLSearchParams(location.search).get('light') === 'a' ? 'a' : 'b';
 // Dev-only ?post=off|ao|gi overrides the tier's screen-space stages (sub-plan 18): none, occlusion with bloom, or the SSGI experiment.
 const POST = ((value: string | null) => import.meta.env.DEV && (value === 'off' || value === 'ao' || value === 'gi') ? value : null)(new URLSearchParams(location.search).get('post'));
+// Dev-only ?reflect=off|ssr overrides the tier's screen-space water reflections (sub-plan 15).
+const REFLECT = ((value: string | null) => import.meta.env.DEV && (value === 'off' || value === 'ssr') ? value === 'ssr' : null)(new URLSearchParams(location.search).get('reflect'));
 const FILL: Record<'a' | 'b', Record<SkyPhase, { environment: number; hemi: number }>> = {
   a: { day: { environment: .5, hemi: 1.2 }, night: { environment: .2, hemi: .28 } }, b: { day: { environment: .9, hemi: .55 }, night: { environment: .3, hemi: .22 } } };
 // The map shadow box stays on the town centre; walking boxes follow the player.
@@ -101,6 +103,7 @@ class Game {
   private cpuGeometry = { before: 0, after: 0 };
   private readonly reduced: boolean;
   private readonly post: PostMode;
+  private readonly reflections: boolean;
   private night: boolean;
   private readonly hemi: THREE.HemisphereLight;
   private physics?: Physics;
@@ -155,7 +158,8 @@ class Game {
     this.scene.environmentIntensity = this.fill.environment;
     // The town and sun are static; refresh shadows only when scene visibility changes. WebGPU schedules shadows per light.
     this.sun.shadow.autoUpdate = false; this.sun.shadow.needsUpdate = true;
-    this.post = POST ?? this.graphics.post; this.output = new OutputPipeline(this.renderer, this.scene, this.post, this.walkCamera);
+    this.post = POST ?? this.graphics.post; this.reflections = REFLECT ?? this.graphics.reflections;
+    this.output = new OutputPipeline(this.renderer, this.scene, { mode: this.post, reflections: this.reflections }, this.walkCamera);
     this.mapCamera.position.set(62, 44, 69); this.mapCamera.lookAt(0, 2, -13);
     this.orbit = new OrbitControls(this.mapCamera, ui.canvas); this.orbit.target.set(0, 1, -12); this.orbit.enabled = false;
     this.orbit.enableDamping = true; this.orbit.dampingFactor = 0.08; this.orbit.minDistance = 30; this.orbit.maxDistance = 410;
@@ -182,7 +186,7 @@ class Game {
     this.resize();
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, post: this.post, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined }),
+        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, post: this.post, reflections: this.reflections, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined }),
         teleport: (x: number, z: number, yaw = 0, y = 1.05, pitch = 0) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = pitch; this.accumulator = 0; },
         // The capture harness stands on whatever lies under a view, ground, deck or floor, looking from 2.2 m above the terrain.
         standingHeight: (x: number, z: number) => this.physics?.standingHeight(x, z, terrainHeight(x, z) + 2.2) ?? null,
@@ -531,6 +535,7 @@ class Game {
     this.updateExhibitionControls();
     this.clockCheck += rawDt; if (this.clockCheck > 30) { this.clockCheck = 0; if (this.timeOfDay === 'auto') this.applyTimeOfDay(); }
     this.nightLighting.update(camera); this.render(camera);
+    if (new URLSearchParams(location.search).has('gputime')) { const w = window as any; w.__gpu ??= []; void this.renderer.resolveTimestampsAsync().then(() => { const pool = (this.renderer.backend as any).timestampQueryPool?.render; if (!pool) return; const by = new Map<string, number[]>(); for (const [k, v] of pool.timestamps) { const id = String(k).replace(/:f\d+$/, ''); by.set(id, [...by.get(id) ?? [], v as number]); } const parts = [...by.values()].map(v => v.reduce((a, b) => a + b, 0) / v.length); w.__gpu.push({ total: parts.reduce((a, b) => a + b, 0), max: Math.max(...parts), n: parts.length, keys: [...by.entries()].map(([k, v]) => k + '=' + (v.reduce((a, b) => a + b, 0) / v.length).toFixed(2)) }); }); }
     if (this.cursorDirty) { this.cursorDirty = false; this.updateCursor(); }
     this.frames++; this.fpsFrames++; this.fpsTime += rawDt;
     if (this.fpsTime >= 1) { this.fps = Math.round(this.fpsFrames / this.fpsTime);

@@ -44,7 +44,7 @@ function classicTransparentOrder(a: SortItem, b: SortItem): number {
 
 export async function createRenderer(canvas: HTMLCanvasElement, antialias: boolean): Promise<RenderView> {
   const forceWebGL = (import.meta.env.DEV && new URLSearchParams(location.search).get('backend') === 'webgl') || await softwareAdapter();
-  const renderer = new THREE.WebGPURenderer({ canvas, antialias, powerPreference: 'high-performance', forceWebGL });
+  const renderer = new THREE.WebGPURenderer({ canvas, antialias, powerPreference: 'high-performance', forceWebGL, trackTimestamp: new URLSearchParams(location.search).has('gputime') } as any);
   // The sky bake and PMREM need an initialised backend; the node PMREMGenerator throws before it.
   await renderer.init();
   // WebGPURenderer's own animation loop would reset these on every display frame, including ones the game skips.
