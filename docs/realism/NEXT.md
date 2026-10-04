@@ -22,7 +22,6 @@ From the plateau (stand at `(-26, -258)` facing south, the `plateau-view` captur
 
 - Run the full suite on both backends on a quiet machine (the WebGL 2 fallback's post and night specs now allow 240 s, with the reason in each spec).
 - Physical devices, Safari 26 (macOS, iOS), Firefox and an Android phone remain untested.
-- Regenerate the share images (`bun scripts/build-share-images.ts`): the arrival path changed (station, haze).
 
 ### 4. Parked work (task 7)
 

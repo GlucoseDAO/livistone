@@ -1,8 +1,8 @@
 {
-  "commit": "2cd7c29",
+  "commit": "e2703c1",
   "backend": "webgpu",
   "browser": "154.0.8037.97",
-  "capturedAt": "2026-10-03T08:51:41.627Z",
+  "capturedAt": "2026-10-04T00:36:11.789Z",
   "shots": [
     {
       "name": "gateway-card",
@@ -16,7 +16,6 @@
         0,
         0.1
       ],
-      "zoom": 1,
       "outputs": [
         {
           "file": "livistone-gateway.jpg",
@@ -46,7 +45,6 @@
         0.3,
         0.13
       ],
-      "zoom": 1,
       "outputs": [
         {
           "file": "loading-wide.webp",
