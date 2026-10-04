@@ -220,7 +220,8 @@ describe('the gorge water, placed from the layout', () => {
       const x = crag.getX(i), y = crag.getY(i), z = crag.getZ(i), above = y - terrainSurfaceHeight(x, z);
       if (above > -.2 && above < 1.5) { expect(planDistance(gorge, x, z), `gorge stream at ${x.toFixed(1)}, ${z.toFixed(1)}`).toBeGreaterThan(1); expect(planDistance(brook, x, z), `brook at ${x.toFixed(1)}, ${z.toFixed(1)}`).toBeGreaterThan(1); }
       if (above > -.2 && above < 3) expect(Math.hypot(x - SNOW_CAVE.mouth.x, z - SNOW_CAVE.mouth.z)).toBeGreaterThan(2);
-      out.push(x, y, z);
+      // Only blocks near the fall can reach its sheet: within 12 m of its foot in plan.
+      if (Math.hypot(x - GORGE_FALL.foot[0], z - GORGE_FALL.foot[2]) < 12) out.push(x, y, z);
     }
     for (let j = 0; j < sheet.count; j++) {
       if (Math.round(water.getX(j)) === 2) continue;

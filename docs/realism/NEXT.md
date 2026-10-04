@@ -20,9 +20,7 @@ From the plateau (stand at `(-26, -258)` facing south, the `plateau-view` captur
 
 ### 3. Tests and verification (task 6)
 
-- `tests/station.spec.ts` does not load under Playwright (`tsconfig.playwright.json` leaves `three` on the classic build, so `MeshBasicNodeMaterial` is undefined via `train.ts` → `render/output.ts`). Fix the resolution, not the spec.
-- WebGL 2 runs of `tests/post.spec.ts` and `tests/night.spec.ts` time out at 120 s when the machine is loaded (night passed interleaved at 1.2–1.3 min on both; post took 1.9 min alone at load average 8–11 on 4 October). Run the full suite on a quiet machine on both backends; raise a timeout only with a written reason.
-- Vitest under load: heavy files (path-network, railway, grass-field) hit the 5 s default; `--maxWorkers=1 --testTimeout=20000` passes 224/224.
+- Run the full suite on both backends on a quiet machine (the WebGL 2 fallback's post and night specs now allow 240 s, with the reason in each spec).
 - Physical devices, Safari 26 (macOS, iOS), Firefox and an Android phone remain untested.
 - Regenerate the share images (`bun scripts/build-share-images.ts`): the arrival path changed (station, haze).
 

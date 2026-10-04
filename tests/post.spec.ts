@@ -18,6 +18,9 @@ const paperShare = async (page: Page): Promise<number> => page.evaluate(async (p
 // tried, so the gate compares it with the same view under ?post=off (about 16% since the posters gained brass rails and a
 // light pool in their captions, sub-plan 12) rather than with a fixed share.
 test('poster paper stays exactly #f4f0e5 under ambient occlusion and bloom, day and night', async ({ page }) => {
+  // The WebGL 2 fallback builds every shader synchronously at each load and first night switch. This test loads twice (post off, then on) and switches to night once; on a loaded development
+  // laptop (load average 8–11, 4 October 2026) that took up to 1.9 minutes against the 120 s default, with no assertion failing.
+  if (EXPECTED_BACKEND === 'webgl2-fallback') test.setTimeout(240000);
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error' && GPU_ERROR.test(m.text())) errors.push(m.text()); });
   await page.addInitScript(() => { try { localStorage.setItem('livistone-time-of-day', 'day'); } catch { /* the default is still day or night */ } });
