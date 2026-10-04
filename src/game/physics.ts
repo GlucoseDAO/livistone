@@ -2,7 +2,7 @@ import { enhancementClearing } from '../world/enhancement-layout';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { SPAWN } from './content';
 export type ColliderSpec =
-  | { type: 'box'; position: [number, number, number]; size: [number, number, number]; yaw?: number }
+  | { type: 'box'; position: [number, number, number]; size: [number, number, number]; yaw?: number; dynamic?: string }
   | { type: 'mesh'; vertices: Float32Array; indices: Uint32Array; climbable?: boolean };
 export class Physics {
   readonly world: RAPIER.World;
@@ -12,6 +12,7 @@ export class Physics {
   private verticalVelocity = 0;
   private grounded = false;
   private readonly climbable = new Set<number>();
+  private readonly dynamic = new Map<string, RAPIER.Collider>();
   static async create(specs: ColliderSpec[]): Promise<Physics> {
     await RAPIER.init();
     return new Physics(specs);
@@ -23,7 +24,8 @@ export class Physics {
       if (spec.type === 'box') {
         const desc = RAPIER.ColliderDesc.cuboid(...spec.size).setTranslation(...spec.position);
         if (spec.yaw) desc.setRotation({ x: 0, y: Math.sin(spec.yaw / 2), z: 0, w: Math.cos(spec.yaw / 2) });
-        this.world.createCollider(desc);
+        const collider = this.world.createCollider(desc);
+        if (spec.dynamic) this.dynamic.set(spec.dynamic, collider);
       } else { const collider = this.world.createCollider(RAPIER.ColliderDesc.trimesh(spec.vertices, spec.indices)); if (spec.climbable) this.climbable.add(collider.handle); }
     }
     this.body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(SPAWN.x, SPAWN.y, SPAWN.z));
@@ -57,6 +59,8 @@ export class Physics {
     if (this.grounded || (vertical > 0 && move.y < vertical * dt - .001)) this.verticalVelocity = -0.3;
   }
   position(): { x: number; y: number; z: number } { return this.body.translation(); }
+  /** Moving doors stay solid until the visible opening is fully clear. */
+  setColliderEnabled(id: string, enabled: boolean): void { this.dynamic.get(id)?.setEnabled(enabled); }
   /** Dev captures: a teleport height just above where the capsule rests (its 2.5 cm skin plus 2.5 cm to settle) when dropped
    *  from (x, fromY, z), or null over nothing. The capsule itself is cast, so a kerb or step under its rim holds it as walking does. */
   standingHeight(x: number, z: number, fromY: number): number | null {

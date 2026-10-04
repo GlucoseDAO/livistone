@@ -1,3 +1,4 @@
+import { winterGrade } from './winter-gate-layout';
 import { meadowRelief } from './meadow-relief';
 import { enhancementClearing, ENHANCEMENT } from './enhancement-layout';
 import * as THREE from 'three';
@@ -32,7 +33,9 @@ const ridges = [
 export function landscapeHeightOf(x: number, z: number, ranges: boolean): number {
   // Sub-plan 27 shapes the north ridge (the trailhead's slope, the benched climb, the plateau, the peaks and their couloir) with the
   // eroded ridges only, so the forest's seeded draws, which read the classic heights, stay put.
-  return ranges ? mountainShape(x, z, ridgeHeightOf(x, z, ranges)) : ridgeHeightOf(x, z, ranges);
+  const height = ranges ? mountainShape(x, z, ridgeHeightOf(x, z, ranges)) : ridgeHeightOf(x, z, ranges);
+  const winter = winterGrade(x, z);
+  return THREE.MathUtils.lerp(height, winter.height, winter.weight);
 }
 /** The eroded ridges before sub-plan 27 shapes them (mountain-layout.ts designs against it). */
 export function ridgeHeight(x: number, z: number): number { return ridgeHeightOf(x, z, RANGES); }

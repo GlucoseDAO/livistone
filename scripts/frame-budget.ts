@@ -25,6 +25,7 @@ const { drawCost } = await import('../src/game/render-budget');
 
 // The capture poses of scripts/screenshot-realism.ts (name, x, z, yaw, pitch); keep the two lists in step.
 export const VIEWS: [string, number, number, number, number?][] = [
+  ['winter-gate-front', -92, -30, Math.PI / 2, .2], ['winter-gate-angle', -90, -17, 1, .2], ['winter-gate-inside', -104.8, -30, Math.PI / 2, .3],
   ['station-arrival', 0, 58, 0], ['arrival-meadow', 10, 52, -.9], ['garden-overview', 0, 52, 0], ['gateway-front', 0, 52, 0, .18],
   ['gateway-side', 9, 47, .92, .26], ['bridge-crossing', 0, 36, 0], ['garden-path', -14, 8, 1.2],
   ['city-hall-front', 0, 4, 0], ['energy-front', -29, 12, 0], ['energy-side', -4, -9, Math.PI / 2], ['science-front', 29, 14, 0], ['science-side', 6, -11, -Math.PI / 2],
@@ -101,6 +102,8 @@ async function browserlessGroups(tier: GraphicsTier): Promise<Group[]> {
     }
     return { scene } as unknown as Awaited<ReturnType<InstanceType<typeof GLTFLoader>['loadAsync']>>;
   };
+  const winter = await import('../src/world/winter-gate').then(({ loadWinterGate }) => loadWinterGate(mobile, new THREE.MeshStandardMaterial()));
+  groups.push({ name: 'Eye of Winter', root: winter.root, classify: o => o.name.startsWith('Original Eye') ? 'original silver' : o.name.includes('stone') || o.name.includes('cabochon') ? 'two stones' : 'room and iris' });
   const { PlanarExhibition } = await import('../src/world/planar-exhibition'), { CIVIC_LANDMARKS } = await import('../src/game/content'), world = await import('../src/world/world');
   // Placed as Town does: hall collections in the halls, the station's in the turned arrival group, the rest in the town.
   const posters = new THREE.Group(), rooms: { center: THREE_TYPES.Vector3; parts: THREE_TYPES.Object3D[] }[] = [], colliders: ColliderSpec[] = [];

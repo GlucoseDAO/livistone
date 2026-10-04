@@ -2,6 +2,12 @@
 
 This brief is for an image-generation model or a concept artist. Please make **concept images** for two new landmarks in Livistone. The owner approves the concepts first; only after that are the landmarks built in the browser game.
 
+## Latest owner direction and approval — 4 October 2026
+
+The Winter requirements below are the original exploration brief; the owner has superseded its two open arches and single blue stone. **Approved:** [Winter G with its shutter open](../concepts/15-moon-gates/images/17-winter-g-model-two-stones-open.png). Preserve the actual ring model's geometry and proportions, using uniform scale and a horizontal rigid orientation. Add the large clear domed front stone and the smaller blue faceted hexagonal stone set behind it, as in the original front/back/side photographs. The building is an enclosed eye, with a lower-front hexagonal camera-style shutter entrance and enough room to stand and walk inside. Do not make a permanent through-hole or turn the entire eye into opaque blue crystal. Implementation is authorized; see [concept decisions](../concepts/15-moon-gates/notes.md).
+
+Eyelense's enlarged red bead as a walk-through doorway is accepted as a direction; no individual variant has been selected.
+
 ## 1. What Livistone is
 
 Livistone is a browser-playable 3D town that you walk through in first person. It is an art-and-science fantasy settlement, and **every landmark is an inhabitable or walk-through interpretation of a real jewelry piece by Livia Zaharia**.

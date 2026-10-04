@@ -1,0 +1,176 @@
+{
+  "date": "2026-10-04",
+  "status": "Winter G approved for implementation on 2026-10-04; previous Winter studies rejected",
+  "generator": "Built-in image_gen tool",
+  "scope": "15 studies; Winter G preserves the original silver model and the two separate stones. Eyelense red doorway direction accepted.",
+  "concepts": [
+    {
+      "id": "03-winter-a-twin-court",
+      "title": "Winter A \u2014 twin court",
+      "image": "../images/03-winter-a-twin-court.png",
+      "prompt": "../prompts/03-winter-a-twin-court.txt",
+      "reference_images": [
+        "concepts/06-town-extension/images/02-winter-moon-gate.png",
+        "concepts/01-garden-town/images/01-town-overview.png",
+        "public/images/jewelry/catalogue/eye-of-winter-1.webp",
+        "public/images/jewelry/catalogue/eye-of-winter-2.webp"
+      ],
+      "description": "Closest to the brief: paired silver portals, central caged topaz, low white wall wings and a winter forecourt.",
+      "review": "Strong jewelry identity and two clear passages; background is denser and more urban than the intended west meadow."
+    },
+    {
+      "id": "04-winter-b-splayed-ribbons",
+      "title": "Winter B \u2014 splayed ribbons",
+      "image": "../images/04-winter-b-splayed-ribbons.png",
+      "prompt": "../prompts/04-winter-b-splayed-ribbons.txt",
+      "reference_images": [
+        "public/images/jewelry/catalogue/eye-of-winter-1.webp",
+        "public/images/jewelry/catalogue/eye-of-winter-2.webp",
+        "docs/images/livistone-centre.jpg"
+      ],
+      "description": "Lighter crossed silver ribbons, outward trumpet terminals and a small winter garden within the summer meadow.",
+      "review": "Strongest figure-eight silhouette and a clear localized winter/summer boundary. Check actual ribbon splay and path rejoining in a later plan view."
+    },
+    {
+      "id": "05-winter-c-winter-courtyard",
+      "title": "Winter C \u2014 winter courtyard",
+      "image": "../images/05-winter-c-winter-courtyard.png",
+      "prompt": "../prompts/05-winter-c-winter-courtyard.txt",
+      "reference_images": [
+        "public/images/jewelry/catalogue/eye-of-winter-1.webp",
+        "public/images/jewelry/catalogue/eye-of-winter-2.webp",
+        "docs/images/livistone-centre.jpg"
+      ],
+      "description": "White masonry crescents with silver inner bands, a flatter topaz crown, seating and a side ice pool.",
+      "review": "Strongest masonry/garden integration. Stone mass is heavier and silver less dominant than the brief; compare that tradeoff before choosing."
+    },
+    {
+      "id": "06-eyelense-a-black-crescent",
+      "title": "Eyelense A \u2014 black crescent",
+      "image": "../images/06-eyelense-a-black-crescent.png",
+      "prompt": "../prompts/06-eyelense-a-black-crescent.txt",
+      "reference_images": [
+        "public/images/jewelry/catalogue/eyelense-1.webp",
+        "public/images/jewelry/catalogue/eyelense-2.webp",
+        "concepts/01-garden-town/images/01-town-overview.png",
+        "docs/images/livistone-centre.jpg"
+      ],
+      "description": "Closest to the pendant: black crescent, threaded brass loops, high tinted lens and a suspended glass ring with red bead.",
+      "review": "Faithful color and motifs, with open lower passage. Right foot becomes a slender brass support and background is too urban for the planned site."
+    },
+    {
+      "id": "07-eyelense-b-folded-canopy",
+      "title": "Eyelense B \u2014 folded canopy",
+      "image": "../images/07-eyelense-b-folded-canopy.png",
+      "prompt": "../prompts/07-eyelense-b-folded-canopy.txt",
+      "reference_images": [
+        "public/images/jewelry/catalogue/eyelense-1.webp",
+        "public/images/jewelry/catalogue/eyelense-2.webp",
+        "docs/images/livistone-centre.jpg"
+      ],
+      "description": "A deeper black curl with the tinted lens acting as a partial overhead canopy; a more sheltered threshold.",
+      "review": "Lens reads as an overhead canopy and the meadow is clearer. Still close to A; right support is again brass, and the lens tint is fairly dark."
+    },
+    {
+      "id": "08-eyelense-c-leaning-wave",
+      "title": "Eyelense C \u2014 leaning wave",
+      "image": "../images/08-eyelense-c-leaning-wave.png",
+      "prompt": "../prompts/08-eyelense-c-leaning-wave.txt",
+      "reference_images": [
+        "public/images/jewelry/catalogue/eyelense-1.webp",
+        "public/images/jewelry/catalogue/eyelense-2.webp",
+        "docs/images/livistone-centre.jpg"
+      ],
+      "description": "A flowing black arch with both feet in black, an overhead lens and a longer bench integrated with the heavier base.",
+      "review": "Both structural feet read in black and seating belongs to the landmark. Most coherent complete Eyelense gate in this pass; camera remains more frontal than requested."
+    },
+    {
+      "id": "09-winter-d-horizontal-eye",
+      "title": "Winter D \u2014 horizontal eye",
+      "image": "../images/09-winter-d-horizontal-eye.png",
+      "prompt": "../prompts/09-winter-d-horizontal-eye.txt",
+      "reference_images": [
+        "concepts/15-moon-gates/images/04-winter-b-splayed-ribbons.png"
+      ],
+      "description": "A large horizontal blue eye wrapped in silver honeycomb; the central opening becomes the walking route.",
+      "review": "Clearly horizontal silhouette and wide open centre. This explores one passage through the blue eye, replacing the earlier two adjacent ring passages.",
+      "round": 2,
+      "status": "Unapproved exploration"
+    },
+    {
+      "id": "10-winter-e-crystal-passage",
+      "title": "Winter E \u2014 crystal passage",
+      "image": "../images/10-winter-e-crystal-passage.png",
+      "prompt": "../prompts/10-winter-e-crystal-passage.txt",
+      "reference_images": [
+        "concepts/15-moon-gates/images/05-winter-c-winter-courtyard.png"
+      ],
+      "description": "A deeper horizontal topaz surround and short crystal-lined passage, integrated with white masonry wings.",
+      "review": "The horizontal outer silhouette is strong, with a narrower rounded inner aperture and visible crystal thickness. A more substantial alternative to D.",
+      "round": 2,
+      "status": "Unapproved exploration"
+    },
+    {
+      "id": "11-eyelense-d-red-ring-door",
+      "title": "Eyelense D \u2014 red ring doorway",
+      "image": "../images/11-eyelense-d-red-ring-door.png",
+      "prompt": "../prompts/11-eyelense-d-red-ring-door.txt",
+      "reference_images": [
+        "concepts/15-moon-gates/images/08-eyelense-c-leaning-wave.png"
+      ],
+      "description": "The enlarged red bead becomes a faceted red ring doorway inside the black crescent, with its clear outer glass rim.",
+      "review": "The broad red ring makes the doorway unmistakable. Clear outer glass ring and brass crest suspension retain the pendant\u2019s layered motif.",
+      "round": 2,
+      "status": "Unapproved exploration"
+    },
+    {
+      "id": "12-eyelense-e-red-bead-passage",
+      "title": "Eyelense E \u2014 passage through the bead",
+      "image": "../images/12-eyelense-e-red-bead-passage.png",
+      "prompt": "../prompts/12-eyelense-e-red-bead-passage.txt",
+      "reference_images": [
+        "concepts/15-moon-gates/images/08-eyelense-c-leaning-wave.png"
+      ],
+      "description": "A thicker rounded red jewel with an arched passage through it, preserving more of the original bead\u2019s volume.",
+      "review": "Most literal passage through the enlarged red bead: more red body around a narrower arched opening. Confirm desired width and depth in later architectural views.",
+      "round": 2,
+      "status": "Unapproved exploration"
+    },
+    {
+      "id": "13-winter-f-hex-shutter-closed",
+      "title": "Winter F \u2014 closed shutter",
+      "image": "../images/13-winter-f-hex-shutter-closed.png",
+      "prompt": "../prompts/13-winter-f-hex-shutter-closed.txt",
+      "review": "Rejected: missed the smaller stone behind the clear outer stone"
+    },
+    {
+      "id": "14-winter-f-hex-shutter-open",
+      "title": "Winter F \u2014 open shutter",
+      "image": "../images/14-winter-f-hex-shutter-open.png",
+      "prompt": "../prompts/14-winter-f-hex-shutter-open.txt",
+      "review": "Rejected: missed the smaller stone behind the clear outer stone"
+    },
+    {
+      "id": "15-winter-f-hexagonal-interior",
+      "title": "Winter F \u2014 interior",
+      "image": "../images/15-winter-f-hexagonal-interior.png",
+      "prompt": "../prompts/15-winter-f-hexagonal-interior.txt",
+      "review": "Rejected: follows the incorrect single-stone exterior"
+    },
+    {
+      "id": "16-winter-g-model-two-stones-closed",
+      "title": "Winter G \u2014 closed two-stone eye",
+      "image": "../images/16-winter-g-model-two-stones-closed.png",
+      "prompt": "../prompts/16-winter-g-model-two-stones-closed.txt",
+      "review": "Companion closed view of the approved geometry"
+    },
+    {
+      "id": "17-winter-g-model-two-stones-open",
+      "title": "Winter G \u2014 approved two-stone eye",
+      "image": "../images/17-winter-g-model-two-stones-open.png",
+      "prompt": "../prompts/17-winter-g-model-two-stones-open.txt",
+      "review": "Owner approved this image and requested 3D implementation"
+    }
+  ],
+  "revision_request": "Owner requested horizontal orientation and larger walk-through Eye of Winter, and enlargement of Eyelense's red part into a doorway."
+}

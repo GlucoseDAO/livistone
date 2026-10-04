@@ -691,6 +691,7 @@ class Game {
         if (material.userData.mitoringAmber) setMitoringAmberQuality(material, low);
         if (material.userData.cityHallCrystal) setCityHallCrystalQuality(material, low);
       } else if (material instanceof THREE.MeshPhysicalMaterial) {
+        if (material.userData.winterQuartz) { const reduced = low || material.userData.winterReduced; material.transmission = reduced ? 0 : .88; material.opacity = reduced ? .22 : .5; material.needsUpdate = true; continue; }
         if (material.userData.myceliumOpal) { material.iridescence = low ? .35 : 1; material.needsUpdate = true; continue; }
         if (material.userData.gatewayGem) { setGatewayQuality(material, low); continue; }
         if (material.userData.pavilionGem) { material.transmission = low ? 0 : .42; material.opacity = low ? .45 : .7; material.needsUpdate = true; continue; }
@@ -708,6 +709,7 @@ class Game {
     this.accumulator = this.capture ? 1 / 60 : Math.min(this.accumulator + dt, 0.1);
     while (this.accumulator >= 1 / 60) {
       this.input.turn(1 / 60); const movement = this.input.direction();
+      this.physics.setColliderEnabled('winter-shutter', this.town.stepWinter(1 / 60, this.physics.position()));
       this.physics.step(movement.x * movement.speed, movement.z * movement.speed, 1 / 60, this.input.consumeJump()); this.accumulator -= 1 / 60;
     }
     const pos = this.physics.position();

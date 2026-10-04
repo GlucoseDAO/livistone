@@ -9,6 +9,7 @@ import { glucoseClearing } from './glucose-layout';
 import { GARDEN_PATHS, GARDEN_PATH_CLEARANCE, GARDENS, gardenFootprint, gardenGround } from './living-waters-layout';
 import { PathNetwork } from './path-network';
 import { futureClearing, futureGround } from './elevated-layout';
+import { WINTER, winterClearing, winterGround } from './winter-gate-layout';
 
 
 // Reserved for future authored homes; the white dome placeholders have been removed.
@@ -35,6 +36,7 @@ const routes = [
   [[-9, -27], [-22, -32], [-27, -43], [-23, -54]],
   [[29, 2], [41, -8], [45, -28], [28, -35], [26, -47], [38, -52]],
 ];
+routes.push([[-78, -32], [-87, -30], [WINTER.arrivalX, WINTER.z]]);
 export const PATH_CURVES = routes.map((path) => new THREE.CatmullRomCurve3(path.map(([x, z]) => new THREE.Vector3(x, .13, z))));
 /** Paved width along a town route: the bridge apron's taper on the gateway approach, PATH_WIDTH elsewhere. */
 export function routeWidth(road: number, p: THREE.Vector3): number {
@@ -73,11 +75,11 @@ export function footprintReserved(x: number, z: number, radius: number): boolean
 }
 /** Clearings kept free of trees, shrubs and flowers but not of grass: the mycelium grove and lake margin, the meadow round the Enhancement hill and the ground under the Future House camel. */
 function canopyReserved(x: number, z: number, radius: number): boolean {
-  return gardenFootprint(x, z, radius) || enhancementClearing(x, z, radius) || futureClearing(x, z, radius);
+  return gardenFootprint(x, z, radius) || enhancementClearing(x, z, radius) || futureClearing(x, z, radius) || winterClearing(x, z, radius);
 }
 /** Ground something stands on or covers, which neither plants nor grass may grow through (grass-field.ts bisects its radius). */
 export function groundReserved(x: number, z: number, radius: number): boolean {
-  if (introductionClearing(x, z, radius)) return true;
+  if (introductionClearing(x, z, radius) || winterGround(x, z, radius)) return true;
   if (futureGround(x, z, radius) || enhancementGround(x, z, radius)) return true;
   if (Math.hypot(x - TIME_TOWER.x, z - TIME_TOWER.z) < TIME_TOWER.radius + radius) return true;
   if (GARDEN_BRIDGES.some((b) => Math.abs(z - b.z) < 2 + radius && Math.abs(x - b.x) < 10 + radius)) return true;

@@ -22,6 +22,7 @@ export interface ProbeSite { id: string; landmark: string; kind: ProbeKind; posi
  * 4.4 m depth), GATEWAY, TIME_TOWER and FUTURE_HOUSE.
  */
 export const PROBE_SITES: readonly ProbeSite[] = [
+  { id: 'winter-gate', landmark: 'winter-gate', kind: 'exterior', position: [-108, 9.12, -30] },
   { id: 'city-hall', landmark: 'city-hall', kind: 'exterior', position: [0, 5.9, -21] },
   { id: 'energy', landmark: 'energy', kind: 'exterior', position: [-29, 4.4, -9] },
   { id: 'science', landmark: 'science', kind: 'exterior', position: [29, 6.2, -11] },

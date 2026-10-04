@@ -25,7 +25,7 @@ This is the working plan for bringing Livia's jewelry STLs into the town as real
 | 0. Offline pipeline `scripts/build-jewelry-models.ts` + manifest `data/catalogue/models.json` | **Done.** 22 models built; provenance (SHA-256, dates, triangles, deviation) in `public/models/jewelry/sources.json` |
 | 1. Hovering featured model per building (`src/game/featured.ts`, `planar-exhibition.ts`) | **Done, desktop-verified** (captures below). Touch and software captures and a Playwright spec are still to do |
 | 2. Mycelium Ring above the opal orb (`living-waters.ts`) | **Done, desktop-verified** |
-| 3a. Eye of Winter Gate (west) | In-engine concept of the raw assembly **rejected**; new concepts to be generated from [moon-gates-concept-brief.md](moon-gates-concept-brief.md) |
+| 3a. Eye of Winter (west) | **Winter G approved 4 October 2026.** First two-stone building model in `winter-gate.ts`; original silver preserved, operable hexagonal iris and connected approach. Material and winter-garden polish remain. |
 | 3b. Eyelense Gate (east) | Same: rejected, regenerate from the brief (the piece is black PLA with brass rings, not brass) |
 | Frame budget | The script now reads jewelry GLBs and classifies "hovering jewelry models". It has not been run to completion: the earlier attempt hung waiting for poster photos under Bun |
 | Docs | This page and AGENTS.md (the never-commit-originals rule). README, the game plan status and the catalogue "In Livistone" column wait until the gates exist |
@@ -104,11 +104,13 @@ LIVISTONE_PARAMS=featured=off bun scripts/screenshot-realism.ts output/testing/j
    - Add a Playwright spec: load `?featured=splash`, check that the mesh exists and that clicking it opens the photo viewer.
    - Take touch and software captures. Run `bun scripts/frame-budget.ts`.
 2. **Gate concepts.** Use `output/testing/jewelry-models/eye-of-winter-*.png` and `eyelense-*.png` with the town overview style to make one concept per gate, record them under `concepts/15-moon-gates/`, and get the owner's approval.
-3. **Eye of Winter Gate**, files `winter-gate.ts` and `winter-gate-layout.ts`, around (−108, −30):
-   - **Path.** Branch off route 3 at (−78, −32) in `landscape.ts`. Split into two level paths through the two openings that rejoin beyond the gate.
-   - **Geometry.** The base stands up so its two finger loops are the openings, at about 0.3 m/mm (12 × 10 m). The honeycomb half-shell sits above the join with a blue stone; follow the gem pattern in `gateway-materials.ts`.
-   - **Frost.** A frozen pond, icicles, and a frost tint baked into the ground through `ground-cover.ts`.
-   - **Colliders.** Built by hand from the skeleton, never from the print mesh.
+3. **Eye of Winter**, files `winter-gate.ts` and `winter-gate-layout.ts`, around (−108, −30):
+   - **Approved concept:** [Winter G, open](../concepts/15-moon-gates/images/17-winter-g-model-two-stones-open.png), with a closed companion. It supersedes the earlier upright double-arch and single-blue-stone directions.
+   - **Source:** `eye-of-winter-gate.glb`, original indices and vertices preserved under uniform scale and rigid rotation. The crossed ring loops trail behind the horizontal eye.
+   - **Two stones:** a clear convex outer envelope and a smaller blue faceted hexagonal stone behind it. A six-leaf iris fills the lower hexagonal entrance when closed and opens on approach.
+   - **First building study:** raised hexagonal floor and side seats, gently graded connected path from route 3, full planting clearance, mesh-matched collision and an opening/closing door collider. A silver strut remains intact behind the usable room.
+   - **Review/export:** [interactive 3D preview](../concepts/15-moon-gates/explorations-2026-10-04/model.html); `bun scripts/build-winter-building.ts` exports the GLB under `concepts/15-moon-gates/models/` with provenance.
+   - **Next art pass:** tune stone reflections and refraction, bezel seating, floor/foundation dressing and the localized winter garden. The image's snow, pond and lights are not implemented in this first building study.
 4. **Eyelense Gate**, files `eyelense-gate.ts` and `eyelense-gate-layout.ts`, around (106, −36):
    - **Path.** Branch off route 5 at (80, −34).
    - **Geometry.** Crescents upright at about 0.14 m/mm (~10 m) in brass, with the screw studs as columns.

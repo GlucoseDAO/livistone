@@ -11,10 +11,10 @@ import { RAILWAY, STATION } from '../src/world/station-layout';
 
 // forestSites on main@47dc3b9: tier, count, first and last site (x, z). Sub-plan 27 then took the trees standing on the Jepii Mici
 // trail, its plateau, the peaks and the couloir out after the draws, so every other site is unchanged, and appended a few round
-// the trailhead (the last site is one of them).
+// the trailhead (the last site is one of them). Winter now clears 20 desktop / 14 mobile trees around its building and approach.
 const FOREST: [boolean, number, [number, number], [number, number]][] = [
-  [false, 910, [-27.918645669706166, -199.93845618027262], [-22.32522038852804, -199.00970863348874]],
-  [true, 517, [-27.918645669706166, -199.93845618027262], [-18.4485683455656, -205.57238135935123]],
+  [false, 890, [-27.918645669706166, -199.93845618027262], [-22.32522038852804, -199.00970863348874]],
+  [true, 503, [-27.918645669706166, -199.93845618027262], [-18.4485683455656, -205.57238135935123]],
 ];
 
 describe('distant ranges (sub-plan 26)', () => {

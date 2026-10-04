@@ -1,5 +1,7 @@
 # Livistone
 
+Eye of Winter has a first walkable two-stone building study west of the town, with its original silver geometry, a connected approach and a hexagonal iris that opens as you approach. Stone materials and the winter garden remain a first study; see [the model plan](docs/jewelry-models-plan.md).
+
 **Walk into a town where rings and pendants have become buildings.**
 
 ![The LIVISTONE city gate: a silver ring holding a long green tourmaline over a stone bridge, with the walnut-and-crystal City Hall framed inside it, the amber Ministry of Energy on the left and the silver-lattice Ministry of Science on the right](docs/images/livistone-gateway.jpg)

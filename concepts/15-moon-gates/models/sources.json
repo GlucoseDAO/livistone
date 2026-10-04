@@ -1,0 +1,11 @@
+{
+  "approvedConcept": "../images/17-winter-g-model-two-stones-open.png",
+  "source": "public/models/jewelry/eye-of-winter-gate.glb",
+  "sourceSha256": "c35627e2305864a0445b4fc901863781b9196ab6bd923f0a61f56fcceb5ea17a",
+  "sourceProvenance": "public/models/jewelry/sources.json",
+  "geometry": "Original source indices and vertices retained; uniform 1.5 scale, -90 degree Z rotation and translation only. Clear quartz envelope, smaller blue faceted hexagonal stone, six iris leaves, room floor, benches and forecourt added.",
+  "origin": "Eye axis at x=z=0; room floor y=0; ring feet extend below the floor.",
+  "generator": "bun scripts/build-winter-building.ts",
+  "runtime": "src/world/winter-gate.ts",
+  "status": "First 3D building study; landscaping and material polish remain."
+}

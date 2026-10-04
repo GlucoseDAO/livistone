@@ -1,6 +1,8 @@
 import { TREE_REACH, graphicsProfile } from '../game/graphics';
 import type { GraphicsTier } from '../game/graphics';
 import { hazeLook } from '../render/aerial';
+import { loadWinterGate } from './winter-gate';
+import type { WinterGate } from './winter-gate';
 import { createIntroduction } from './introduction';
 import { createEnhancementHill, createEnhancementPanel } from './enhancement';
 import { createEnhancementGallery } from './enhancement-gallery';
@@ -144,6 +146,7 @@ export class Town {
   private get wind(): boolean { return this.tier !== 'cpu' && !WIND_OFF; }
   /** Sub-plan 07: per probe site, the parts that reflect it and the envelope hidden while it bakes. */
   private readonly probeParts = new Map<string, { objects: THREE.Object3D[]; hide: THREE.Object3D[] }>();
+  private winter?: WinterGate;
   private constructor(private mobile: boolean, private tier: GraphicsTier) {
     this.water = waterMaterial(tier); this.paving = pavingMaterial(mobile);
     this.surfaces = activateSurfaces(tier); this.masonry = this.surfaces?.masonry ?? this.white; this.brass = this.surfaces?.gold ?? this.gold;
@@ -198,6 +201,11 @@ export class Town {
     this.gardens.addInterpretation('living-mycelium', 'Mycelium Rain Garden', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
     this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
     label('Living Waters · town gardens');
+    await stage(50, 'Building the two-stone Eye of Winter…');
+    this.winter = await loadWinterGate(mobile, this.paving);
+    this.root.add(this.winter.root); this.colliders.push(...this.winter.colliders);
+    this.probeParts.set('winter-gate', { objects: [this.winter.root], hide: [this.winter.root] });
+    label('Eye of Winter');
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.masonry, this.paving, this.brass, bridge);
     label('Garden bridges'); let first = this.root.children.length; createTimeTower(this.root, this.colliders, this.mobile); label('Time tower');
     const tower = this.root.children.slice(first); first = this.root.children.length;
@@ -466,6 +474,8 @@ export class Town {
    * trees a little short of it (TREE_REACH of it, where the haze has faded most of a tree into the distant pass), except on the
    * cpu tier, which stops both at its own forest range inside its linear fog. Dev-only ?haze=classic draws trees until full fog.
    */
+  /** The iris and its collider advance together in the fixed walking loop. */
+  stepWinter(dt: number, position: { x: number; y: number; z: number }): boolean { return this.winter?.step(dt, position) ?? true; }
   update(time: number, camera?: THREE.Camera, fullFog = 220, mapView = false, shadow?: THREE.LightShadow): boolean {
     this.water.userData.time.value = time; shoreTime.value = time; updateWind(time);
     if (!camera) return false;

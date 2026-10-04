@@ -1,3 +1,4 @@
+import { WINTER } from '../world/winter-gate-layout';
 import { TOWN_INTRO } from './introduction';
 import { STATION } from '../world/station-layout';
 import { GLUCOSE_PAVILION } from '../world/glucose-layout';
@@ -10,7 +11,7 @@ import { TIME_TOWER } from '../world/waterways';
 import { NECK_ARRIVAL } from '../world/elevated-layout';
 import { TRAILHEAD, TRAIL_ARRIVAL } from '../world/mountain-layout';
 
-export type LandmarkId = 'city-hall' | 'energy' | 'science' | 'station' | 'glucose' | 'living-waters' | 'mycelium-garden' | 'timeface' | 'future-house' | 'enhancement' | 'jepii-mici';
+export type LandmarkId = 'city-hall' | 'energy' | 'science' | 'station' | 'glucose' | 'living-waters' | 'mycelium-garden' | 'timeface' | 'future-house' | 'enhancement' | 'jepii-mici' | 'winter-gate';
 export interface Landmark {
   id: LandmarkId;
   zone?: 'town' | 'gardens';
@@ -26,6 +27,7 @@ export interface Landmark {
   stretch: { x: number; z: number };
 }
 export const LANDMARKS: Landmark[] = [
+  { id: 'winter-gate', name: 'Eye of Winter', artifact: 'Eye of Winter ring / pendant', x: WINTER.x, z: WINTER.z, color: '#73b7dd', stretch: { x: 1.3, z: .8 }, entrance: { x: WINTER.arrivalX, y: WINTER.floor + .95, z: WINTER.z, yaw: Math.PI / 2 }, description: 'The original silver ring lies on its side around a clear convex eye. A smaller blue hexagonal stone sits behind it. Approach the lower hexagonal iris to enter the glazed Winter room.' },
   { id: 'station', entrance: { x: STATION.entranceX, y: 1.05, z: STATION.entranceZ - 4, yaw: 0 }, name: 'Embryo Station', artifact: 'The Embryo Ring', x: STATION.x, z: STATION.z, color: '#d5a044', stretch: { x: 4.1, z: 1.4 }, description: 'A silver ring opens into an amber-roofed railway station. Arrive at the southern station looking toward the city gate and the Livistone bridge. The train and both railway lines belong to this arrival station.' },
   { id: 'energy', entrance: { x: -29, y: 1.05, z: 3, yaw: 0 }, name: 'Ministry of Energy', artifact: 'The Mitoring', x: -29, z: -9, color: '#c88a38', stretch: { x: 14 / 7.1, z: 6.6 / 7.1 }, description: 'A long amber hall wrapped in folded silver cristae, entered through the ring itself. Explore a garden of energy, inspired by the tiny structures that power living cells.' },
   { id: 'science', entrance: { x: 29, y: 1.05, z: -1, yaw: 0 }, name: 'Ministry of Science', artifact: 'The Nanot of Power', x: 29, z: -11, color: '#819e96', stretch: { x: 1, z: 1 }, description: 'An intricate silver lattice of struts and folded strands shelters a place of curiosity. Inside, small structures reveal extraordinary possibilities.' },
@@ -53,6 +55,7 @@ export interface Discovery {
 }
 const ENHANCEMENT_STORY = 'Materialized Enhancements combines a character-building game, a gene evidence knowledgebase and printable bioart. Pick real genes from real animals, see how far each gene’s evidence reached, then grow a Voronoi crystal from your character. The hill preserves the supplied Voronoi STL, holes and angular cells included, enlarged and coloured like the project’s printed and rendered crystals. The six smaller crystals in front were grown by the project’s pipeline, one from each gene category. The posters show printed pieces, the people holding them and a character report; click any of them to open enhancement.bio. Amber arrows mark an outside climb, and a lit cave leads to an internal ramp and a human figure with a Voronoi chest.';
 export const DISCOVERIES: Discovery[] = [
+  { id: 'winter-gate-story', landmark: 'winter-gate', title: 'Inside the Eye of Winter', category: 'JEWELLERY / NEW ARCHITECTURE', body: 'Livia’s Eye of Winter ring and pendant combines sterling silver, faceted topaz and quartz. This building preserves the supplied silver model, enlarged and laid on its side. The photographs guide the separate clear outer stone and smaller blue hexagonal stone behind it. The inhabitable room, floor, seats and opening camera-like iris are new Livistone architecture based on the approved concept. The original jewellery remains in the Ministry of Energy collection.' },
   { id: 'about-livistone', landmark: 'station', title: 'Livia & Livistone', category: 'MEET THE CREATOR', body: TOWN_INTRO.journey + '. ' + TOWN_INTRO.body + '\n\n' + TOWN_INTRO.music },
   { id: 'materialized-enhancements', landmark: 'enhancement', title: 'Materialized Enhancements', category: 'BIOART / PARTICIPATE', body: ENHANCEMENT_STORY, links: [{ label: 'Join here — create your character', url: ENHANCEMENT_URL }],
     slides: [{ title: 'A game. A knowledgebase. A bioart project.', body: ENHANCEMENT_STORY }, ...ENHANCEMENT_POSTERS.map(p => ({ title: p.title, body: `${p.body} ${p.credit}.`, image: enhancementImage(p.slug), imageAlt: p.alt }))] },
