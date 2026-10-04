@@ -89,13 +89,14 @@ export class UI {
     });
   }
   ready(): void {
+    this.app.querySelector<HTMLElement>('#welcome')!.hidden = true;
     this.app.querySelectorAll<HTMLButtonElement>('#tools button').forEach((button) => { button.disabled = false; });
   }
   setMode(mode: Mode, mapView = mode === 'map' || mode === 'welcome'): void {
     const previousDialog = this.app.querySelector<HTMLElement>('.dialog:not([hidden])');
     if (!previousDialog) this.lastFocus = document.activeElement as HTMLElement;
     const visible: Record<string, boolean> = {
-      welcome: mode === 'welcome', tools: true,
+      welcome: mode === 'welcome' || !!this.app.querySelector<HTMLButtonElement>('#tools button')?.disabled, tools: true,
       'walk-footer': mode === 'walking', crosshair: mode === 'walking', 'touch-controls': mode === 'walking',
       'map-panel': mode === 'map', 'map-controls': mode === 'map', 'map-markers': mode === 'map',
       scrim: ['lore', 'journal', 'paused', 'gallery'].includes(mode), lore: mode === 'lore', journal: mode === 'journal', pause: mode === 'paused', gallery: mode === 'gallery',

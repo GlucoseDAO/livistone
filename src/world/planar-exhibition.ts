@@ -123,6 +123,7 @@ export class PlanarExhibition {
   featuredPiece: string | null = null;
   private featuredBase = 0;
   private featuredLoading: string | null = null;
+  private featuredRetryAt = 0;
   constructor(readonly id: string, private readonly parent: THREE.Group, x: number, z: number, colliders: ColliderSpec[], interactives: Interactive[], private readonly tier: GraphicsTier = 'gpu') {
     this.pieces = COLLECTION.filter((piece) => piece.location === id);
     this.selected = this.pieces.find((piece) => piece.discovery === EXHIBITS.find((anchor) => anchor.landmark === id)?.discovery) ?? this.pieces[0];
@@ -168,10 +169,14 @@ export class PlanarExhibition {
     this.objects.push(...mergeStatic(lit, `Poster frames · ${id}`, Infinity, parent));
     // One shared silver for every building, so changing the hour's piece swaps geometry only and builds no shader.
     featuredSilver ??= new THREE.MeshStandardMaterial({ color: '#e1e5df', metalness: .78, roughness: .29, userData: { heroEnv: true } });
-    this.featured = new THREE.Mesh(new THREE.BufferGeometry(), featuredSilver); this.featured.name = `Featured jewelry · ${id}`; this.featured.visible = false;
+    // Build the collection's silver shader and assign its probe before the GLB arrives.
+    const placeholder = new THREE.BoxGeometry(.001, .001, .001); placeholder.deleteAttribute('uv');
+    this.featured = new THREE.Mesh(placeholder, featuredSilver); this.featured.name = `Featured jewelry · ${id}`; this.featured.visible = false;
+    parent.add(this.featured);
     // The 10k-triangle model is already the reduction; cpu-detail.ts must not simplify it again or batch it.
     Object.assign(this.featured.userData, { keepGeometry: true, photoIndex: 0, exhibition: id }); this.photos.push(this.featured);
-    const first = this.featuredFor(CAPTURE ? 0 : townHour()); if (first) tasks.push(this.feature(first));
+    // Captures keep deterministic, complete models; ordinary visits request them on approach after startup.
+    const first = this.featuredFor(CAPTURE ? 0 : townHour()); if (first && (CAPTURE || PINNED)) tasks.push(this.feature(first));
     this.ready = Promise.all(tasks).then(() => undefined);
   }
   /** The piece this collection hovers in `hour`, or the dev pin when it belongs here. */
@@ -193,7 +198,7 @@ export class PlanarExhibition {
       this.featuredBase = board.y + board.halfHeight + (site.gap ?? HOVER.gap) - box.min.y * scale;
       this.featured.position.set(0, this.featuredBase, site.inward ?? 0); this.featured.userData.piece = piece; this.featuredPiece = piece;
       poster.group.add(this.featured); this.featured.visible = true;
-    } catch { /* The poster stays; the model is an addition. */ } finally { if (this.featuredLoading === piece) this.featuredLoading = null; }
+    } catch { this.featuredRetryAt = performance.now() + 30000; /* Keep the poster and avoid flooding a failed connection. */ } finally { if (this.featuredLoading === piece) this.featuredLoading = null; }
   }
   /**
    * Turn and bob the model on the wind clock (still under reduced motion, frozen by ?capture=1). When the town hour moves on,
@@ -201,10 +206,11 @@ export class PlanarExhibition {
    */
   updateFeatured(position: THREE.Vector3, far: number): void {
     if (this.featuredPiece) { const t = windTime.value as number; this.featured.rotation.y = t * HOVER.spin; this.featured.position.y = this.featuredBase + HOVER.bob * Math.sin(t * .7); }
-    if (this.featuredLoading || CAPTURE || PINNED) return;
+    if (this.featuredLoading || CAPTURE || PINNED || performance.now() < this.featuredRetryAt) return;
     const next = this.featuredFor(townHour());
-    if (next && next !== this.featuredPiece && this.distance(position) > far) void this.feature(next);
+    if (next && next !== this.featuredPiece && (this.featuredPiece ? this.distance(position) > far : this.distance(position) < far + 20)) void this.feature(next);
   }
+  warmUp(on: boolean): void { if (!this.featuredPiece) this.featured.visible = on; }
   select(piece: Exhibit): boolean { if (!this.pieces.includes(piece)) return false; this.selected = piece; return true; }
   turn(direction: number): void { this.selected = this.pieces[(this.pieces.indexOf(this.selected) + direction + this.pieces.length) % this.pieces.length]; }
   /** Horizontal distance from `position` (town space) to the centre of this collection's posters. */

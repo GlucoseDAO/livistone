@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { WINTER } from '../src/world/winter-gate-layout';
+import { EXPECTED_BACKEND } from './gpu-errors';
 
 test('arrives at Eye of Winter from the map and walks through its iris', async ({ page }) => {
   const errors: string[] = [];
@@ -16,6 +17,7 @@ test('arrives at Eye of Winter from the map and walks through its iris', async (
   try { await expect.poll(async () => (await state()).position.x, { timeout: 15000 }).toBeLessThan(WINTER.quartzX + 1); }
   finally { await page.keyboard.up('w'); }
   const inside = await state();
+  expect(inside.backend).toBe(EXPECTED_BACKEND);
   expect(inside.position.y).toBeGreaterThan(WINTER.floor + .7);
   expect(inside.position.y).toBeLessThan(WINTER.floor + 1.1);
   expect(errors).toEqual([]);

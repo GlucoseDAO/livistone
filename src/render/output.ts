@@ -15,6 +15,7 @@ import type { PostMode } from '../game/graphics';
 import { AO, ScreenSpace } from './post';
 import { AERIAL_BEHIND, aerialFactor, aerialMix, aerialSky, aerialTarget, hazeLook, setAerialBehind } from './aerial';
 import { toneMapNode, untoneMapNode } from './tone';
+import { compileParts } from './compile-parts';
 
 // @types/three r186 leaves these untyped; the casts only restore the shader types three itself infers.
 const exposure = toneMappingExposure as unknown as Node<'float'>;
@@ -143,7 +144,7 @@ export class OutputPipeline {
    * a time and waits for each pipeline in turn, so several parts compile side by side. Their node builds read the renderer's
    * target and MRT as they go, so both stay set until every part is done; nothing else renders while the town loads.
    */
-  async compile(camera: THREE.Camera, parts: THREE.Object3D[], parallel = 6, scene = this.scene): Promise<void> {
+  async compile(camera: THREE.Camera, parts: THREE.Object3D[], parallel = 6, scene = this.scene, progress?: (fraction: number) => void): Promise<void> {
     // A double-sided transmissive material renders a back pass and then a front pass. compileAsync sets each side while it
     // collects the two passes but builds them after restoring DoubleSide, so both would keep a double-sided shader and
     // pipeline (the hall glass drawn four layers deep). Compile them one side at a time instead: the cache keys hold the side.
@@ -155,10 +156,11 @@ export class OutputPipeline {
         if (material.side === THREE.DoubleSide && !material.forceSinglePass && (physical.transmission > 0 || physical.transmissionNode)) twoPass.set(material, [...twoPass.get(material) ?? [], mesh]);
       }
     });
-    const queue = [...parts]; this.bind();
+    // Large groups otherwise monopolise one worker while the other five run out of work.
+    const queue = compileParts(parts), total = queue.length; let completed = 0; this.bind();
     try {
       for (const material of twoPass.keys()) material.side = THREE.FrontSide;
-      await Promise.all(Array.from({ length: parallel }, async () => { for (let part = queue.shift(); part; part = queue.shift()) await this.renderer.compileAsync(part, camera, scene); }));
+      await Promise.all(Array.from({ length: parallel }, async () => { for (let part = queue.shift(); part; part = queue.shift()) { await this.renderer.compileAsync(part, camera, scene); progress?.(++completed / total); } }));
       for (const material of twoPass.keys()) material.side = THREE.BackSide;
       for (const mesh of new Set([...twoPass.values()].flat())) await this.renderer.compileAsync(mesh, camera, scene);
     } finally { for (const material of twoPass.keys()) material.side = THREE.DoubleSide; this.unbind(); }

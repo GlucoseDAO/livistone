@@ -10,6 +10,8 @@ Livia Zaharia trained as an architect, became a parametric jewellery designer an
 
 You step off a train at a station roofed in amber, walk under a ring-shaped city gate and cross the river. Ahead of you is a City Hall made from a walnut shell and smoky crystal. Further on you'll find an amber Ministry of Energy wrapped in folded silver, a lake laced with silver walkways, a grove of silver mushrooms, a copper camel whose neck you can climb, and a violet crystal hill with a human figure on its summit.
 
+Loading prepares the arrival view first. Day and night building reflections come from saved HDR files, with distant buildings loaded on approach; the hovering 3D gallery pieces also load as you approach their collections. The introduction stays visible until the first walking frame finishes drawing. If saved reflections are missing or outdated, the town can still prepare them locally.
+
 **[▶ Visit Livistone](https://livistone.liviazaharia.com/)** (a recent browser is all you need) · [Run it locally](#run-it-locally) · [How it's made](#how-its-made) · [Technical guide](docs/technical-guide.md)
 
 ## Eleven stops, each from a real work or place

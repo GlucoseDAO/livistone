@@ -1,7 +1,7 @@
 import { setCityHallCrystalQuality } from './world/city-hall';
 import { nearbyArchitecture, storyFor } from './game/nearby';
 import type { NearbyStory } from './game/nearby';
-import { loadingStage } from './loading';
+import { loadingStage, showLoadingStage } from './loading';
 import './style.css';
 import * as THREE from 'three';
 import { RAILWAY, railwayCorridor } from './world/station-layout';
@@ -109,6 +109,8 @@ class Game {
   /** A phase switch is under way (followTimeOfDay); it follows any later choice before it settles. */
   private switching = false;
   private clockCheck = 0;
+  private probeCheck = 0;
+  private started = false;
   // Past the walking fog's full distance (GraphicsProfile.fog) a surface is only sky, so the walk camera stops there and follows
   // the fog if it lengthens (sub-plans 25 and 21); ?budget=off keeps the earlier 150 m for review. Set once the tier is known.
   private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, 150);
@@ -251,7 +253,7 @@ class Game {
     this.resize();
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: !!this.physics && this.mode !== 'welcome', night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, post: this.post, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined, probes: this.probes ? { ...this.probeTimes, ...Object.fromEntries(Object.entries(this.probes.timings).flatMap(([phase, time]) => [[phase, time.ms], [phase + 'Steps', time.steps]])), materials: this.probes.materials.size, baking: this.bake?.phase ?? (this.skyBaking ? this.skyBaking.night ? 'night' : 'day' : null) } : null, load: { ...this.loadTimes }, shaders: view.shaders() }),
+        snapshot: () => ({ ready: this.started, night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, post: this.post, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined, probes: this.probes ? { ...this.probeTimes, ...Object.fromEntries(Object.entries(this.probes.timings).flatMap(([phase, time]) => [[phase, time.ms], [phase + 'Steps', time.steps]])), materials: this.probes.materials.size, saved: [...this.probes.saved], baking: this.bake?.phase ?? (this.skyBaking ? this.skyBaking.night ? 'night' : 'day' : null) } : null, load: { ...this.loadTimes }, shaders: view.shaders() }),
         teleport: (x: number, z: number, yaw = 0, y = 1.05, pitch = 0) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = pitch; this.accumulator = 0; },
         // The capture harness stands on whatever lies under a view, ground, deck or floor, looking from 2.2 m above the terrain.
         standingHeight: (x: number, z: number) => this.physics?.standingHeight(x, z, terrainHeight(x, z) + 2.2) ?? null,
@@ -265,6 +267,7 @@ class Game {
         return { id: exhibition.id, piece: exhibition.featuredPiece, position: [at.x, at.y, at.z], facing: [facing.x, facing.z], visible: mesh.visible };
       }) });
       Object.assign(window, { __posters: () => this.town && ({ ...this.town.posters.report(), gpu: { textures: this.renderer.info.memory.textures, bytes: this.renderer.info.memory.texturesSize, programs: this.renderer.info.memory.programs, builds: (this.renderer as unknown as { _nodes?: { nodeBuilderCache?: Map<unknown, unknown> } })._nodes?.nodeBuilderCache?.size ?? 0 } }) });
+      Object.assign(window, { __exportProbes: async () => { while (this.bake || this.skyBaking) await new Promise(resolve => requestAnimationFrame(resolve)); return ({ revision: import.meta.env.VITE_PROBE_REVISION, backend: this.view.backend, size: this.graphics.tier === 'gpu' ? 256 : 128, phase: this.phase, probes: await this.probes?.export(this.renderer, this.phase) ?? [] }); } });
     }
   }
   /** Dev-only: the top-level town group of a drawn object, or the frame's own passes outside the town. */
@@ -299,32 +302,36 @@ class Game {
     }
     // Probe surfaces take the environment node before the precompile, so their shaders build once, with every other one.
     if (this.environment && probesEnabled()) this.probes = new ReflectionProbes(this.town.probeScopes(), this.town.root, this.environment, this.graphics.tier === 'gpu' ? 256 : 128);
+    await this.probes?.load(this.renderer, this.phase, this.capture ? undefined : new THREE.Vector3(SPAWN.x, 0, SPAWN.z)); this.showProbes();
     this.pointReflections(this.skies.get(this.night)!); if (this.environment) this.litMaterials = litMaterials(this.scene, this.distant);
     this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced, this.graphics.tier); this.nightLighting.setNight(this.night);
     // The distant pass draws its own copies of the ranges, which the map sees in the town (FAR_LAYER).
     if (this.ranges) for (const mesh of this.town.root.getObjectsByProperty('name', 'Distant ranges') as THREE.Mesh[]) { const copy = new THREE.Mesh(mesh.geometry, mesh.material); copy.name = mesh.name; this.distant.add(copy); this.distantRanges.push(copy); }
     document.querySelector<HTMLElement>('#graphics-profile')!.textContent = 'Device profile: ' + ({ gpu: 'GPU', mobile: 'Mobile / integrated GPU', cpu: 'CPU software renderer' }[this.graphics.tier]) + ({ webgpu: ' · WebGPU', 'webgl2-fallback': ' · WebGL 2' }[this.view.backend]);
-    await loadingStage(92, 'Preparing your first view…');
-    this.frameShadow(true);
+    await loadingStage(92, 'Preparing materials for your first view…');
+    this.bakeCamera.copy(this.mapCamera); this.startBake(); this.frameShadow(true);
     this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true, this.sun.shadow);
     this.walkCamera.position.set(SPAWN.x, this.eyeHeight(SPAWN), SPAWN.z); this.walkCamera.rotation.set(0, SPAWN.yaw, 0, 'YXZ');
     // Build every shader now, culled or not, and the shadow pass with one rendered frame: on WebGPU each shader costs a
     // synchronous node build, which would otherwise stall the first frames that show a new object.
     this.town.warmUp(true); this.mark('prepared', true);
-    await this.output.compile(this.walkCamera, [...this.town.root.children, ...this.scene.children.filter(child => child !== this.town.root && !(child as THREE.Light).isLight)]);
-    this.mark('compiled', true);
+    const shaderStart = performance.now();
+    await this.output.compile(this.walkCamera, [...this.town.root.children, ...this.scene.children.filter(child => child !== this.town.root && !(child as THREE.Light).isLight)], 6, this.scene, fraction => showLoadingStage(92 + Math.floor(fraction * 2), 'Preparing materials for your first view…'));
+    performance.measure('startup · materials', { start: shaderStart }); this.mark('compiled', true);
+    await loadingStage(95, 'Preparing the distant landscape…');
     if (this.ranges) await this.output.compile(this.syncFar(), [...this.distant.children], 6, this.distant);
-    // three leaves needsUpdate set after a first render into a new depth texture, which would draw the map again at the first
-    // walking frame; this one, every tree and building drawn, is the whole-town box a probe bake holds (frameShadow).
-    if (this.graphics.shadows) { this.sun.shadow.needsUpdate = true; this.render(this.walkCamera); this.sun.shadow.needsUpdate = false; }
-    this.mark('shadowed', true);
+    await loadingStage(97, 'Preparing building reflections…');
+    // Saved reflections need no whole-town shadow render; the first walking frame builds only the nearby shadow box.
+    if (this.graphics.shadows && !this.probes?.has(this.phase)) { this.sun.shadow.needsUpdate = true; this.render(this.walkCamera); this.sun.shadow.needsUpdate = false; }
+    this.mark('shadowed', true); this.bakeCamera.copy(this.mapCamera); this.startBake(); this.mark('baked', true);
     this.town.warmUp(false); this.town.update(this.elapsed, this.walkCamera, this.graphics.fog, false, this.sun.shadow);
-    // The probes bake once the town is walkable, from the loading map's view and under the shadow box rendered just now.
-    this.bakeCamera.copy(this.mapCamera); this.startBake();
-    this.mark('baked', true);
+    await loadingStage(99, 'Drawing your first view…');
+    this.returnMode = 'walking'; this.setMode('walking'); this.updateWalking(0); this.findInteraction(); this.findLocation();
+    this.town.update(this.elapsed, this.walkCamera, this.graphics.fog, false, this.sun.shadow); this.nightLighting.update(this.walkCamera); this.render(this.walkCamera);
+    // Resizing clears the canvas; reveal only after a complete walking frame, including its nearby lights, reaches the GPU.
+    await this.gpuFinished(); await new Promise(resolve => requestAnimationFrame(resolve));
     await loadingStage(100, 'Welcome to Livistone');
-    this.lastTime = performance.now(); this.frameId = requestAnimationFrame(this.frame);
-    this.ui.ready(); this.returnMode = 'walking'; this.setMode('walking'); this.updateWalking(0); this.findInteraction(); this.findLocation(); this.render(this.walkCamera);
+    this.started = true; this.input.active = true; this.ui.ready(); this.town.startStreaming(); this.lastTime = performance.now(); this.frameId = requestAnimationFrame(this.frame);
     this.mark('ready', true);
   }
   private get phase(): SkyPhase { return this.night ? 'night' : 'day'; }
@@ -384,7 +391,7 @@ class Game {
     this.mapCamera.updateProjectionMatrix();
   }
   private setMode(mode: Mode): void {
-    this.mode = mode; this.interaction = null; this.input.active = mode === 'walking'; this.input.clear(); this.accumulator = 0;
+    this.mode = mode; this.interaction = null; this.input.active = this.started && mode === 'walking'; this.input.clear(); this.accumulator = 0;
     this.orbit.enabled = mode === 'map';
     this.scene.background = this.mapView ? HORIZON_RADIANCE[this.phase].clone() : this.skyBackground; this.setFog();
     this.ui.setMode(mode, this.mapView); this.town.setMapMode(this.mapView); this.frameShadow(true); this.resize();
@@ -393,7 +400,7 @@ class Game {
   }
   async action(action: string): Promise<void> {
     if (action === 'reload') { location.reload(); return; }
-    if (!this.physics || this.mode === 'welcome') return;
+    if (!this.started) return;
     if (action === 'map' || action === 'open-map' || action === 'walk') {
       const next = action === 'open-map' || (action === 'map' && !this.mapView) ? 'map' : 'walking';
       this.returnMode = next; this.loreFromJournal = false;
@@ -410,10 +417,10 @@ class Game {
       const value = action.split(':')[1], next = value === 'next';
       this.timeOfDay = next ? nextTimeOfDay(this.timeOfDay) : parseTimeOfDay(value); saveTimeOfDay(this.timeOfDay);
       // The menu's select switches within its change event, as it always has; the button and T paint their pending state first.
-      if (!next) this.applyTimeOfDay();
+      if (!next) await this.applyTimeOfDay();
       void this.followTimeOfDay(); return;
     }
-    if (action.startsWith('exhibit-key:') && this.mode === 'walking') {
+    if (action.startsWith('exhibit-key:') && this.mode === 'walking' && this.physics) {
       const p = this.physics.position(), landmark = LANDMARKS.find((l) => Math.hypot((p.x - l.x) / l.stretch.x, (p.z - l.z) / l.stretch.z) < 6.7);
       if (landmark) await this.exhibitionAction(`exhibit:${action.split(':')[1]}:${landmark.id}`); return;
     }
@@ -447,7 +454,7 @@ class Game {
     } else if (action === 'slide-prev' || action === 'slide-next') {
       if (this.mode === 'lore') this.ui.turnSlide(action === 'slide-next' ? 1 : -1);
     } else if (action === 'reset-position') {
-      this.physics.teleport(); this.input.yaw = SPAWN.yaw; this.input.pitch = 0; this.returnMode = 'walking'; this.setMode('walking');  this.ui.toast('Back at the station exit, facing the city gate.');
+      this.physics?.teleport(); this.input.yaw = SPAWN.yaw; this.input.pitch = 0; this.returnMode = 'walking'; this.setMode('walking');  this.ui.toast('Back at the station exit, facing the city gate.');
     } else if (action === 'jump') {
       this.input.requestJump();
     } else if (action === 'sound') {
@@ -526,13 +533,16 @@ class Game {
       while (resolveNight(this.timeOfDay) !== this.night) {
         this.ui.setTimeOfDay(this.timeOfDay, resolveNight(this.timeOfDay), true);
         await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve)));
-        this.applyTimeOfDay(); await this.presented();
+        await this.applyTimeOfDay(); await this.presented();
       }
     } finally { this.switching = false; this.ui.setTimeOfDay(this.timeOfDay, this.night); }
   }
   /** Resolves once a frame rendered after the call has finished on the GPU. */
   private async presented(): Promise<void> {
     const frame = this.frames; while (this.frames === frame) await new Promise(resolve => requestAnimationFrame(resolve));
+    await this.gpuFinished();
+  }
+  private async gpuFinished(): Promise<void> {
     const backend = this.renderer.backend as { device?: { queue: { onSubmittedWorkDone(): Promise<void> } }; gl?: WebGL2RenderingContext };
     if (backend.device) { await backend.device.queue.onSubmittedWorkDone(); return; }
     const gl = backend.gl; if (!gl) return;
@@ -541,7 +551,7 @@ class Game {
     gl.flush(); while (gl.getSyncParameter(sync, gl.SYNC_STATUS) !== gl.SIGNALED && !gl.isContextLost()) await new Promise(resolve => setTimeout(resolve, 16));
     gl.deleteSync(sync);
   }
-  private applyTimeOfDay(): void {
+  private async applyTimeOfDay(): Promise<void> {
     const night = resolveNight(this.timeOfDay); if (night === this.night) return; this.night = night;
     // A sky still baking in the background finishes now (or is dropped if it is the other phase's).
     if (this.skyBaking) { const { night: baking, steps } = this.skyBaking; this.skyBaking = null; if (baking === night) { let step = steps.next(); while (!step.done) step = steps.next(); this.skies.set(night, step.value); } }
@@ -549,7 +559,9 @@ class Game {
     // A bake of the other phase stops; this phase bakes now if it has no probes yet (none prebaked), before the sun re-frames
     // its shadow box, which then holds the whole town for the bake.
     if (this.bake && this.bake.phase !== this.phase) { this.bake.cancel(); this.bake = null; }
-    this.startBake(); this.phaseState(); this.aimSun(); this.showProbes();
+    this.phaseState(); this.showProbes();
+    await this.probes?.load(this.renderer, this.phase, this.capture ? undefined : this.walkCamera.position);
+    if (this.night === night) { this.startBake(); this.aimSun(); this.showProbes(); }
   }
   /**
    * Sky, light, fog, emissions, exposure and the distant pass for the current phase, switched without building a shader. A bake
@@ -580,6 +592,7 @@ class Game {
    * shadows (a provisional night is baked again), and the night after the day.
    */
   private startBake(phase = this.phase): void {
+    if (phase !== this.phase && import.meta.env.DEV && new URLSearchParams(location.search).get('probes') === 'bake') return;
     if (!this.probes || this.probes.settled(phase) || (phase !== this.phase && this.probes.has(phase)) || this.bake || this.skyBaking) return;
     const night = phase === 'night', sky = this.skies.get(night); this.bakeWait = 2;
     if (sky) this.bake = this.probes.bake(phase, sky, HORIZON_RADIANCE[phase]);
@@ -634,7 +647,7 @@ class Game {
     // Night next, in the background and provisional (its moon unshadowed), baked again under the moon once shown; the day only
     // once shown, because its sun cannot go unshadowed. Nothing more to bake, the bake's targets and generators go (a later
     // bake makes them again).
-    if (!this.probes!.has('night')) this.startBake('night');
+    if (!this.probes!.saved.has(this.phase) && !this.probes!.has('night')) this.startBake('night');
     else this.startBake();
     if (!this.bake && !this.skyBaking) this.probes!.release();
   }
@@ -785,6 +798,11 @@ class Game {
     if (this.graphics.tier !== 'cpu') this.town.gardens.update(this.elapsed, this.mode === 'walking' && !this.capture ? dt : 0, matchMedia('(prefers-reduced-motion: reduce)').matches);
     if (this.mode === 'map') { this.orbit.update(); this.updateMarkers(); }
     const camera = this.mapView ? this.mapCamera : this.walkCamera;
+    this.probeCheck += rawDt;
+    if (this.probeCheck > 2 && this.probes?.saved.has(this.phase)) {
+      this.probeCheck = 0; const phase = this.phase;
+      void this.probes.load(this.renderer, phase, this.walkCamera.position).then(() => { if (this.phase === phase) this.showProbes(); });
+    }
     // The shadow box first: the forest picks its shadow casters from the frustum this frame bakes with.
     if (this.graphics.shadows) this.frameShadow();
     // Walking re-bakes when near shrubs or tree detail change, so their shadows appear with them; the map keeps its one bake, and

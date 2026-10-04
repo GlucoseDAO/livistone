@@ -1,4 +1,5 @@
 import { test,expect } from '@playwright/test';
+import { LANDMARKS } from '../src/game/content';
 
 for(const mobile of [false,true])test(`hill participation and optional radio (${mobile?'touch':'desktop'})`,async({browser})=>{
  const context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1280,height:800},isMobile:mobile,hasTouch:mobile});
@@ -7,7 +8,7 @@ for(const mobile of [false,true])test(`hill participation and optional radio (${
   await page.addInitScript(()=>{const Original=window.Audio;window.Audio=class extends Original{constructor(){super();(window as any).__radio=this;}};});
   await page.goto('/');await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
   await expect(page.locator('#sound-toggle')).toHaveAttribute('aria-pressed','true');
-  await expect(page.locator('#map-origins')).toContainText('real, existing');await expect(page.locator('.landmark-item').first()).toHaveAttribute('data-action','landmark:station');await expect(page.locator('.landmark-number').last()).toHaveText('11');
+  await expect(page.locator('#map-origins')).toContainText('real, existing');await expect(page.locator('#map-panel').getByRole('button',{name:'Go to Embryo Station',exact:true})).toHaveAttribute('data-action','landmark:station');await expect(page.locator('.landmark-number').last()).toHaveText(String(LANDMARKS.length));
   await page.locator('#map-panel').getByRole('button',{name:'Go to Materialized Enhancements',exact:true}).click();
   // Three metres in front of the participation sign beside the climb.
   const x=93.4+Math.sin(1)*3,z=-157.5+Math.cos(1)*3,y=1.05;

@@ -4,6 +4,7 @@ import { SPAWN } from '../src/game/content';
 import { GATEWAY_POSTER } from '../src/world/gateway-layout';
 
 for (const touch of [false, true]) test(`walk beneath the gateway and render its materials (${touch ? 'touch' : 'desktop'})`, async ({ browser }) => {
+  const laneX = Math.max(-1.6, Math.min(1.6, SPAWN.x));
   const context = await browser.newContext({ viewport: touch ? { width: 390, height: 844 } : { width: 1440, height: 960 }, isMobile: touch, hasTouch: touch });
   try {
     const page = await context.newPage(), errors: string[] = [];
@@ -13,6 +14,8 @@ for (const touch of [false, true]) test(`walk beneath the gateway and render its
     const snapshot = () => page.evaluate(() => (window as unknown as { __livistone: { snapshot(): { mode: string; position: { x: number; y: number; z: number } } } }).__livistone.snapshot());
     await expect.poll(async () => (await snapshot()).mode).toBe('walking'); expect((await snapshot()).position.z).toBeCloseTo(SPAWN.z);
     await page.waitForTimeout(400); await page.screenshot({ path: `output/testing/gateway/arrival-${touch ? 'mobile' : 'desktop'}.png` });
+    // The train exit is offset from the gateway: use the nearest clear lane (also checked in gateway.test.ts).
+    await page.evaluate(({ x, z, yaw }) => (window as any).__livistone.teleport(x, z, yaw), { ...SPAWN, x: laneX });
     if (!touch) {
       for (const quality of ['low', 'high']) {
         await page.keyboard.press('Escape'); await page.locator('#quality').selectOption(quality); await page.getByRole('button', { name: 'Continue exploring' }).click();
@@ -26,7 +29,7 @@ for (const touch of [false, true]) test(`walk beneath the gateway and render its
       await expect.poll(async () => (await snapshot()).position.z, { timeout: 30000 }).toBeLessThan(38);
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     }
-    expect(Math.abs((await snapshot()).position.x - SPAWN.x)).toBeLessThan(.5); expect((await snapshot()).position.y).toBeGreaterThan(.8); expect(errors).toEqual([]);
+    expect(Math.abs((await snapshot()).position.x - laneX)).toBeLessThan(.5); expect((await snapshot()).position.y).toBeGreaterThan(.8); expect(errors).toEqual([]);
     await page.evaluate(({ x, z }) => (window as any).__livistone.teleport(x, z + 3, 0), GATEWAY_POSTER);
     await expect(page.locator('#interact')).toContainText("King's Chapel Double Ring");
     await page.screenshot({ path: `output/testing/gateway/poster-${touch ? 'mobile' : 'desktop'}.png` });

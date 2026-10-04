@@ -115,6 +115,7 @@ export class Town {
   private researchReady!: Promise<void>;
   private readonly jewelryReady: Promise<void>[] = [];
   private ringReady: Promise<void> = Promise.resolve();
+  private streaming = false;
   private readonly white = new THREE.MeshStandardMaterial({ color: '#f4f0df', roughness: 0.57, metalness: 0.07 });
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#e2e7dd', roughness: 0.26, metalness: 0.65 });
   private readonly gold = new THREE.MeshStandardMaterial({ color: '#b99a55', roughness: 0.3, metalness: 0.7 });
@@ -488,7 +489,7 @@ export class Town {
     this.planting?.update(camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
     this.pebbles?.update(camera);
     // The map's camera is far above the town; residency follows the walking eye only.
-    if (!mapView) { this.posters.update(camera.position); for (const exhibition of this.exhibitions) exhibition.updateFeatured(camera.position, ROOM_RANGE); }
+    if (!mapView) { this.posters.update(camera.position); if (this.streaming) for (const exhibition of this.exhibitions) exhibition.updateFeatured(camera.position, ROOM_RANGE); }
     for (const room of this.rooms) {
       const shown = mapView || BUDGET_OFF || camera.position.distanceTo(room.center) < ROOM_RANGE;
       if (shown !== room.shown) { room.shown = shown; for (const part of room.parts) part.visible = shown; }
@@ -497,6 +498,7 @@ export class Town {
     return trees;
   }
   setMapMode(active: boolean): void { this.interiors.visible = !active; this.details.visible = !active; this.contactShadows.mesh.visible = !active; }
+  startStreaming(): void { this.streaming = true; }
   /** An enclosed collection whose posters hide with distance; `matrix` places its parent in the town. */
   private addRoom(exhibition: PlanarExhibition, matrix?: THREE.Matrix4): void {
     const center = exhibition.center.clone(); if (matrix) center.applyMatrix4(matrix);
@@ -509,6 +511,7 @@ export class Town {
    * now would only move their upload from first sight to loading. Poster maps that arrive later swap onto built materials.
    */
   warmUp(on: boolean): void {
+    for (const exhibition of this.exhibitions) exhibition.warmUp(on);
     this.forest.warmUp(on); this.planting?.warmUp(on); this.pebbles?.warmUp(on); this.gardens.warmUp(on);
     // Rooms draw during the warm-up, so their shaders build now; the next update() hides the distant ones again.
     if (on) for (const room of this.rooms) { room.shown = null; for (const part of room.parts) part.visible = true; }

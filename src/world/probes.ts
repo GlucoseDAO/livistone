@@ -1,7 +1,7 @@
 // Reflection probes (realism sub-plan 07): each building-piece reflects its own surroundings instead of the bare baked sky.
 // One cube per exterior site (with that building's envelope hidden) and one per hall interior is rendered and prefiltered with
 // the node PMREMGenerator, once per sky phase. The bake runs after the town is ready, one cube face per frame (ProbeBake), so
-// loading pays nothing for it; until its site is baked a surface reflects the sky, as with `?probes=off`. gpu bakes 256 px
+// saved sets restore on approach; missing sets bake after ready, so until its site is baked a surface reflects the sky, as with `?probes=off`. gpu bakes 256 px
 // exterior cubes, mobile 128; interiors (rough brass in a closed hall) take half. cpu has none. Dev-only `?probes=off` keeps
 // the sky reflections for comparison.
 import * as THREE from 'three';
@@ -9,6 +9,7 @@ import { mix, texture, uniform } from 'three/tsl';
 import type { Node, NodeFrame } from 'three/webgpu';
 import type { SkyPhase } from './sky';
 import { untoneMapped } from '../render/output';
+import { loadSavedProbes } from './saved-probes';
 
 export type ProbeKind = 'exterior' | 'interior';
 /** Just past the walking full-fog distance (GraphicsProfile.fog, 130 m on gpu, 110 on mobile): beyond it a surface is all sky. */
@@ -123,6 +124,34 @@ export class ReflectionProbes {
   readonly materials = new Set<PBR>();
   /** Per phase, the bake's main-thread milliseconds over all its steps, and how many frames it took. */
   readonly timings: Partial<Record<SkyPhase, { ms: number; steps: number }>> = {};
+  readonly loadedMs: Partial<Record<SkyPhase, number>> = {};
+  readonly saved = new Set<SkyPhase>();
+  private readonly pending = new Set<string>();
+  private readonly retryAt = new Map<string, number>();
+  async load(renderer: THREE.WebGPURenderer, phase: SkyPhase, position?: THREE.Vector3): Promise<void> {
+    if (this.has(phase) && !this.saved.has(phase)) return;
+    const ids = this.scopes.filter(({ site }) => !position || Math.hypot(site.position[0] - position.x, site.position[2] - position.z) < 80).map(scope => scope.site.id)
+      .filter(id => !this.baked.get(phase)?.has(id) && !this.pending.has(`${phase}:${id}`) && performance.now() >= (this.retryAt.get(`${phase}:${id}`) ?? 0));
+    if (!ids.length) return;
+    ids.forEach(id => this.pending.add(`${phase}:${id}`));
+    try {
+      const start = performance.now(), probes = await loadSavedProbes(renderer, this.size, phase, ids);
+      if (probes) {
+        const all = this.baked.get(phase) ?? new Map<string, THREE.RenderTarget>(); for (const [id, target] of probes) all.set(id, target);
+        this.baked.set(phase, all); this.saved.add(phase); this.loadedMs[phase] = Math.round(performance.now() - start);
+      } else for (const id of ids) this.retryAt.set(`${phase}:${id}`, performance.now() + 30000);
+    } finally { ids.forEach(id => this.pending.delete(`${phase}:${id}`)); }
+  }
+  /** Dev generator only: read filtered atlases; ordinary visitors never read GPU pixels. */
+  async export(renderer: THREE.WebGPURenderer, phase: SkyPhase): Promise<{ id: string; width: number; height: number; data: Uint16Array }[]> {
+    const result = [];
+    for (const [id, target] of this.baked.get(phase) ?? []) {
+      const data = await renderer.readRenderTargetPixelsAsync(target, 0, 0, target.width, target.height);
+      if (!(data instanceof Uint16Array)) throw new Error('Expected half-float reflection atlas');
+      result.push({ id, width: target.width, height: target.height, data });
+    }
+    return result;
+  }
   /** Per site, the drawables hidden while it bakes: its envelope's parts that rise above the ground. */
   private readonly envelopes = new Map<string, THREE.Object3D[]>();
   private readonly sizes = new Map<number, Sized>();
@@ -266,7 +295,7 @@ export class ProbeBake {
     // Photographs, captions and painted signs upload on first sight; drawn into a probe, every one in view of any site would
     // upload now. Their plain paper frames and backing stay, as cream panels. Night halos stay out too: each would build its
     // pipeline for the probe target and copy the face behind it.
-    this.extra ??= ((found: THREE.Object3D[]) => { context.scene.traverse(object => { const material = (object as THREE.Mesh).material as THREE.Material & { map?: THREE.Texture | null }; if (((object as THREE.Mesh).isMesh && !Array.isArray(material) && material.userData.display && material.map) || object.userData.nightGlow) found.push(object); }); return found; })([]);
+    this.extra ??= ((found: THREE.Object3D[]) => { context.scene.traverse(object => { const material = (object as THREE.Mesh).material as THREE.Material & { map?: THREE.Texture | null }; if (((object as THREE.Mesh).isMesh && !Array.isArray(material) && material.userData.display && material.map) || object.userData.nightGlow || object.name.startsWith('Featured jewelry · ')) found.push(object); }); return found; })([]);
     const scope = this.probes.scopes[this.site];
     if (this.face === 6) { this.results.set(scope.site.id, this.probes.prefilter(context, scope)); this.face = 0; this.site++; }
     else { this.probes.renderFace(context, scope, this.face, this.haze, this.extra); this.face++; }
