@@ -1,0 +1,774 @@
+{
+  "viewport": {
+    "width": 1536,
+    "height": 1024
+  },
+  "renderer": "Three.js WebGPURenderer, WebGL fallback",
+  "probes": "saved local reflections",
+  "camera": "Held at each requested pose; simulation still advances the iris",
+  "capturedAt": "2026-10-04T16:34:03.000Z",
+  "errors": [],
+  "captures": [
+    {
+      "name": "winter-plateau-overview",
+      "view": [
+        -25,
+        -235,
+        0.88,
+        110,
+        -0.78
+      ],
+      "snapshot": {
+        "ready": true,
+        "night": false,
+        "timeOfDay": "day",
+        "mode": "walking",
+        "position": {
+          "x": -25,
+          "y": 110,
+          "z": -235
+        },
+        "zone": "town",
+        "journey": null,
+        "yaw": 0.88,
+        "pitch": -0.78,
+        "fps": 60,
+        "calls": 90,
+        "triangles": 1350106,
+        "interaction": null,
+        "progress": {
+          "version": 1,
+          "discovered": [],
+          "visited": [
+            "station"
+          ]
+        },
+        "selectedLandmark": null,
+        "reducedGraphics": false,
+        "graphicsTier": "gpu",
+        "renderScale": 1,
+        "cpuGeometry": {
+          "before": 0,
+          "after": 0
+        },
+        "capture": true,
+        "frames": 204,
+        "backend": "webgl2-fallback",
+        "post": "ao",
+        "budget": {
+          "Frame · Background.mesh": {
+            "calls": 1,
+            "triangles": 1984
+          },
+          "Frame · Distant ranges": {
+            "calls": 5,
+            "triangles": 144446
+          },
+          "Frame · Aerial · behind": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Mountain railway": {
+            "calls": 8,
+            "triangles": 37348
+          },
+          "Forest": {
+            "calls": 4,
+            "triangles": 487468
+          },
+          "Meadow grass details": {
+            "calls": 1,
+            "triangles": 261360
+          },
+          "Trail boulders": {
+            "calls": 1,
+            "triangles": 14080
+          },
+          "Living Waters · town gardens": {
+            "calls": 2,
+            "triangles": 1160
+          },
+          "Continuous valley and mountain ridges": {
+            "calls": 6,
+            "triangles": 64080
+          },
+          "Limestone crags": {
+            "calls": 1,
+            "triangles": 110922
+          },
+          "Jepii Mici trail signs": {
+            "calls": 1,
+            "triangles": 10506
+          },
+          "Moss campion": {
+            "calls": 1,
+            "triangles": 2700
+          },
+          "Rhododendron mats": {
+            "calls": 1,
+            "triangles": 21206
+          },
+          "Rhododendron sprigs and meadow flowers": {
+            "calls": 1,
+            "triangles": 66176
+          },
+          "Gorge water and snow cave": {
+            "calls": 2,
+            "triangles": 5114
+          },
+          "Eye of Winter · two-stone pavilion": {
+            "calls": 36,
+            "triangles": 66972
+          },
+          "Contact shadows": {
+            "calls": 1,
+            "triangles": 14572
+          },
+          "River water": {
+            "calls": 1,
+            "triangles": 39995
+          },
+          "Frame · Post · half depth": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · AO": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · RTT": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · Bloom [ High Pass ]": {
+            "calls": 12,
+            "triangles": 12
+          },
+          "Frame · Render Pipeline": {
+            "calls": 1,
+            "triangles": 1
+          }
+        },
+        "probes": {
+          "materials": 50,
+          "saved": [
+            "day"
+          ],
+          "baking": null
+        },
+        "load": {
+          "start": 1169,
+          "town": 9391,
+          "assets": 10171,
+          "prepared": 10913,
+          "compiled": 18785,
+          "shadowed": 18848,
+          "baked": 18848,
+          "ready": 20180
+        },
+        "shaders": {
+          "builds": 222,
+          "programs": 216,
+          "pipelines": 122
+        }
+      }
+    },
+    {
+      "name": "winter-plateau-front",
+      "view": [
+        -57,
+        -283,
+        1.5707963267948966,
+        49,
+        0.22
+      ],
+      "snapshot": {
+        "ready": true,
+        "night": false,
+        "timeOfDay": "day",
+        "mode": "walking",
+        "position": {
+          "x": -57,
+          "y": 48.994998931884766,
+          "z": -283
+        },
+        "zone": "town",
+        "journey": null,
+        "yaw": 1.5707963267948966,
+        "pitch": 0.22,
+        "fps": 60,
+        "calls": 85,
+        "triangles": 837164,
+        "interaction": null,
+        "progress": {
+          "version": 1,
+          "discovered": [],
+          "visited": [
+            "station"
+          ]
+        },
+        "selectedLandmark": null,
+        "reducedGraphics": false,
+        "graphicsTier": "gpu",
+        "renderScale": 1,
+        "cpuGeometry": {
+          "before": 0,
+          "after": 0
+        },
+        "capture": true,
+        "frames": 427,
+        "backend": "webgl2-fallback",
+        "post": "ao",
+        "budget": {
+          "Frame · Background.mesh": {
+            "calls": 1,
+            "triangles": 1984
+          },
+          "Frame · Distant ranges": {
+            "calls": 5,
+            "triangles": 144446
+          },
+          "Frame · Aerial · behind": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Meadow grass details": {
+            "calls": 1,
+            "triangles": 261360
+          },
+          "Mountain railway": {
+            "calls": 8,
+            "triangles": 37348
+          },
+          "Living Waters · town gardens": {
+            "calls": 2,
+            "triangles": 1160
+          },
+          "Forest": {
+            "calls": 4,
+            "triangles": 70076
+          },
+          "Continuous valley and mountain ridges": {
+            "calls": 7,
+            "triangles": 78220
+          },
+          "Limestone crags": {
+            "calls": 1,
+            "triangles": 110922
+          },
+          "Jepii Mici trail signs": {
+            "calls": 1,
+            "triangles": 10506
+          },
+          "Eye of Winter · two-stone pavilion": {
+            "calls": 36,
+            "triangles": 66972
+          },
+          "Contact shadows": {
+            "calls": 1,
+            "triangles": 14158
+          },
+          "River water": {
+            "calls": 1,
+            "triangles": 39995
+          },
+          "Frame · Post · half depth": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · AO": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · RTT": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · Bloom [ High Pass ]": {
+            "calls": 12,
+            "triangles": 12
+          },
+          "Frame · Render Pipeline": {
+            "calls": 1,
+            "triangles": 1
+          }
+        },
+        "probes": {
+          "materials": 50,
+          "saved": [
+            "day"
+          ],
+          "baking": null
+        },
+        "load": {
+          "start": 1169,
+          "town": 9391,
+          "assets": 10171,
+          "prepared": 10913,
+          "compiled": 18785,
+          "shadowed": 18848,
+          "baked": 18848,
+          "ready": 20180
+        },
+        "shaders": {
+          "builds": 224,
+          "programs": 216,
+          "pipelines": 122
+        }
+      }
+    },
+    {
+      "name": "winter-plateau-angle",
+      "view": [
+        -54,
+        -268,
+        1.03,
+        54,
+        0.1
+      ],
+      "snapshot": {
+        "ready": true,
+        "night": false,
+        "timeOfDay": "day",
+        "mode": "walking",
+        "position": {
+          "x": -54,
+          "y": 53.994998931884766,
+          "z": -268
+        },
+        "zone": "town",
+        "journey": null,
+        "yaw": 1.03,
+        "pitch": 0.1,
+        "fps": 60,
+        "calls": 85,
+        "triangles": 862562,
+        "interaction": null,
+        "progress": {
+          "version": 1,
+          "discovered": [],
+          "visited": [
+            "station"
+          ]
+        },
+        "selectedLandmark": null,
+        "reducedGraphics": false,
+        "graphicsTier": "gpu",
+        "renderScale": 1,
+        "cpuGeometry": {
+          "before": 0,
+          "after": 0
+        },
+        "capture": true,
+        "frames": 661,
+        "backend": "webgl2-fallback",
+        "post": "ao",
+        "budget": {
+          "Frame · Background.mesh": {
+            "calls": 1,
+            "triangles": 1984
+          },
+          "Frame · Distant ranges": {
+            "calls": 5,
+            "triangles": 144446
+          },
+          "Frame · Aerial · behind": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Mountain railway": {
+            "calls": 8,
+            "triangles": 37348
+          },
+          "Meadow grass details": {
+            "calls": 1,
+            "triangles": 261360
+          },
+          "Trail boulders": {
+            "calls": 1,
+            "triangles": 14080
+          },
+          "Forest": {
+            "calls": 2,
+            "triangles": 24420
+          },
+          "Living Waters · town gardens": {
+            "calls": 2,
+            "triangles": 1160
+          },
+          "Continuous valley and mountain ridges": {
+            "calls": 6,
+            "triangles": 64080
+          },
+          "Jepii Mici trail signs": {
+            "calls": 1,
+            "triangles": 10506
+          },
+          "Limestone crags": {
+            "calls": 1,
+            "triangles": 110922
+          },
+          "Rhododendron sprigs and meadow flowers": {
+            "calls": 1,
+            "triangles": 66176
+          },
+          "Eye of Winter · two-stone pavilion": {
+            "calls": 36,
+            "triangles": 66972
+          },
+          "Gorge water and snow cave": {
+            "calls": 1,
+            "triangles": 4320
+          },
+          "Contact shadows": {
+            "calls": 1,
+            "triangles": 14776
+          },
+          "River water": {
+            "calls": 1,
+            "triangles": 39995
+          },
+          "Frame · Post · half depth": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · AO": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · RTT": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · Bloom [ High Pass ]": {
+            "calls": 12,
+            "triangles": 12
+          },
+          "Frame · Render Pipeline": {
+            "calls": 1,
+            "triangles": 1
+          }
+        },
+        "probes": {
+          "materials": 50,
+          "saved": [
+            "day"
+          ],
+          "baking": null
+        },
+        "load": {
+          "start": 1169,
+          "town": 9391,
+          "assets": 10171,
+          "prepared": 10913,
+          "compiled": 18785,
+          "shadowed": 18848,
+          "baked": 18848,
+          "ready": 20180
+        },
+        "shaders": {
+          "builds": 224,
+          "programs": 216,
+          "pipelines": 122
+        }
+      }
+    },
+    {
+      "name": "winter-chimney-head",
+      "view": [
+        -53.5,
+        -274.4,
+        1.18,
+        45.3,
+        0.33
+      ],
+      "snapshot": {
+        "ready": true,
+        "night": false,
+        "timeOfDay": "day",
+        "mode": "walking",
+        "position": {
+          "x": -53.5,
+          "y": 45.29999923706055,
+          "z": -274.3999938964844
+        },
+        "zone": "town",
+        "journey": null,
+        "yaw": 1.18,
+        "pitch": 0.33,
+        "fps": 60,
+        "calls": 87,
+        "triangles": 900878,
+        "interaction": null,
+        "progress": {
+          "version": 1,
+          "discovered": [],
+          "visited": [
+            "station"
+          ]
+        },
+        "selectedLandmark": null,
+        "reducedGraphics": false,
+        "graphicsTier": "gpu",
+        "renderScale": 1,
+        "cpuGeometry": {
+          "before": 0,
+          "after": 0
+        },
+        "capture": true,
+        "frames": 863,
+        "backend": "webgl2-fallback",
+        "post": "ao",
+        "budget": {
+          "Frame · Background.mesh": {
+            "calls": 1,
+            "triangles": 1984
+          },
+          "Frame · Distant ranges": {
+            "calls": 6,
+            "triangles": 173306
+          },
+          "Frame · Aerial · behind": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Mountain railway": {
+            "calls": 8,
+            "triangles": 37348
+          },
+          "Meadow grass details": {
+            "calls": 1,
+            "triangles": 261360
+          },
+          "Trail boulders": {
+            "calls": 1,
+            "triangles": 14080
+          },
+          "Forest": {
+            "calls": 2,
+            "triangles": 24420
+          },
+          "Living Waters · town gardens": {
+            "calls": 2,
+            "triangles": 1160
+          },
+          "Continuous valley and mountain ridges": {
+            "calls": 7,
+            "triangles": 73740
+          },
+          "Jepii Mici trail signs": {
+            "calls": 1,
+            "triangles": 10506
+          },
+          "Limestone crags": {
+            "calls": 1,
+            "triangles": 110922
+          },
+          "Rhododendron sprigs and meadow flowers": {
+            "calls": 1,
+            "triangles": 66176
+          },
+          "Eye of Winter · two-stone pavilion": {
+            "calls": 36,
+            "triangles": 66972
+          },
+          "Gorge water and snow cave": {
+            "calls": 1,
+            "triangles": 4320
+          },
+          "Contact shadows": {
+            "calls": 1,
+            "triangles": 14572
+          },
+          "River water": {
+            "calls": 1,
+            "triangles": 39995
+          },
+          "Frame · Post · half depth": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · AO": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · RTT": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · Bloom [ High Pass ]": {
+            "calls": 12,
+            "triangles": 12
+          },
+          "Frame · Render Pipeline": {
+            "calls": 1,
+            "triangles": 1
+          }
+        },
+        "probes": {
+          "materials": 50,
+          "saved": [
+            "day"
+          ],
+          "baking": null
+        },
+        "load": {
+          "start": 1169,
+          "town": 9391,
+          "assets": 10171,
+          "prepared": 10913,
+          "compiled": 18785,
+          "shadowed": 18848,
+          "baked": 18848,
+          "ready": 20180
+        },
+        "shaders": {
+          "builds": 224,
+          "programs": 216,
+          "pipelines": 122
+        }
+      }
+    },
+    {
+      "name": "winter-plateau-inside",
+      "view": [
+        -74.8,
+        -283,
+        1.5707963267948966,
+        49.45,
+        0.3
+      ],
+      "snapshot": {
+        "ready": true,
+        "night": false,
+        "timeOfDay": "day",
+        "mode": "walking",
+        "position": {
+          "x": -74.80000305175781,
+          "y": 49.45000076293945,
+          "z": -283
+        },
+        "zone": "town",
+        "journey": null,
+        "yaw": 1.5707963267948966,
+        "pitch": 0.3,
+        "fps": 60,
+        "calls": 55,
+        "triangles": 798296,
+        "interaction": null,
+        "progress": {
+          "version": 1,
+          "discovered": [],
+          "visited": [
+            "station",
+            "winter-gate"
+          ]
+        },
+        "selectedLandmark": null,
+        "reducedGraphics": false,
+        "graphicsTier": "gpu",
+        "renderScale": 1,
+        "cpuGeometry": {
+          "before": 0,
+          "after": 0
+        },
+        "capture": true,
+        "frames": 1068,
+        "backend": "webgl2-fallback",
+        "post": "ao",
+        "budget": {
+          "Frame · Background.mesh": {
+            "calls": 1,
+            "triangles": 1984
+          },
+          "Frame · Distant ranges": {
+            "calls": 5,
+            "triangles": 144446
+          },
+          "Frame · Aerial · behind": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Meadow grass details": {
+            "calls": 1,
+            "triangles": 261360
+          },
+          "Mountain railway": {
+            "calls": 8,
+            "triangles": 37348
+          },
+          "Living Waters · town gardens": {
+            "calls": 2,
+            "triangles": 1160
+          },
+          "Forest": {
+            "calls": 2,
+            "triangles": 29376
+          },
+          "Continuous valley and mountain ridges": {
+            "calls": 9,
+            "triangles": 94604
+          },
+          "Limestone crags": {
+            "calls": 1,
+            "triangles": 110922
+          },
+          "Eye of Winter · two-stone pavilion": {
+            "calls": 7,
+            "triangles": 63308
+          },
+          "Contact shadows": {
+            "calls": 1,
+            "triangles": 13776
+          },
+          "River water": {
+            "calls": 1,
+            "triangles": 39995
+          },
+          "Frame · Post · half depth": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · AO": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · RTT": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Frame · Bloom [ High Pass ]": {
+            "calls": 12,
+            "triangles": 12
+          },
+          "Frame · Render Pipeline": {
+            "calls": 1,
+            "triangles": 1
+          }
+        },
+        "probes": {
+          "materials": 50,
+          "saved": [
+            "day"
+          ],
+          "baking": null
+        },
+        "load": {
+          "start": 1169,
+          "town": 9391,
+          "assets": 10171,
+          "prepared": 10913,
+          "compiled": 18785,
+          "shadowed": 18848,
+          "baked": 18848,
+          "ready": 20180
+        },
+        "shaders": {
+          "builds": 224,
+          "programs": 216,
+          "pipelines": 122
+        }
+      }
+    }
+  ]
+}

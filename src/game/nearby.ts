@@ -6,7 +6,7 @@ import { GATEWAY } from '../world/gateway-layout';
 export interface NearbyStory { id: string; title: string; sentence: string }
 const stories: Record<string, NearbyStory> = {
   'eyelense-gate-story': { id: 'eyelense-gate-story', title: 'Eyelense Gate', sentence: 'Livia’s broken sunglass lens becomes a black crescent pavilion with a passage through its red glass bead.' },
-  'winter-gate-story': { id: 'winter-gate-story', title: 'Eye of Winter', sentence: 'A clear eye encloses a smaller blue hexagonal stone; its lower iris opens as you approach the Winter room.' },
+  'winter-gate-story': { id: 'winter-gate-story', title: 'Eye of Winter', sentence: 'Above the snow chimney, a clear eye encloses a smaller blue stone. Its iris opens into the Winter room; snow spreads across its plateau.' },
   'kings-chapel': { id: 'kings-chapel', title: 'King’s Chapel Double Ring', sentence: 'The entrance arch enlarges Livia’s two-finger silver ring, with its long green tourmaline held above the bridge.' },
   nut: { id: 'nut', title: 'The Nut of Power', sentence: 'In Livia Lore, this walnut-and-amethyst pendant rules all her artifacts; in Livistone, its two halves become City Hall.' },
   mitoring: { id: 'mitoring', title: 'Mitoring', sentence: 'An amber ring wrapped in silver folds inspired by mitochondria becomes Livistone’s Ministry of Energy.' },

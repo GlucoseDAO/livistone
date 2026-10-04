@@ -9,7 +9,8 @@ test('arrives at Eye of Winter from the map and walks through its iris', async (
   await page.goto('/?graphics=mobile&probes=off' + (process.env.LIVISTONE_BACKEND === 'webgl' ? '&backend=webgl' : ''));
   await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 90000 });
   await page.getByRole('button', { name: 'Map', exact: true }).click();
-  await page.locator('.landmark-item[data-action="landmark:winter-gate"]').click();
+  await expect(page.locator('#marker-winter-gate')).toBeInViewport();
+  await page.locator('#marker-winter-gate').click();
   const state = () => page.evaluate(() => (window as any).__livistone.snapshot());
   await expect.poll(async () => (await state()).mode).toBe('walking');
   await expect.poll(async () => (await state()).position.x).toBeCloseTo(WINTER.arrivalX, 1);

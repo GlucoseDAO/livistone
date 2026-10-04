@@ -10,7 +10,7 @@ import { glucoseClearing } from './glucose-layout';
 import { GARDEN_PATHS, GARDEN_PATH_CLEARANCE, GARDENS, gardenFootprint, gardenGround } from './living-waters-layout';
 import { PathNetwork } from './path-network';
 import { futureClearing, futureGround } from './elevated-layout';
-import { WINTER, winterClearing, winterGround } from './winter-gate-layout';
+import { winterClearing, winterGround } from './winter-gate-layout';
 
 
 // Reserved for future authored homes; the white dome placeholders have been removed.
@@ -38,7 +38,6 @@ const routes = [
   [[-9, -27], [-22, -32], [-27, -43], [-23, -54]],
   [[29, 2], [41, -8], [45, -28], [28, -35], [26, -47], [38, -52]],
 ];
-routes.push([[-78, -32], [-87, -30], [WINTER.arrivalX, WINTER.z]]);
 export const PATH_CURVES = routes.map((path) => new THREE.CatmullRomCurve3(path.map(([x, z]) => new THREE.Vector3(x, .13, z))));
 /** Paved width along a town route: the bridge apron's taper on the gateway approach, PATH_WIDTH elsewhere. */
 export function routeWidth(road: number, p: THREE.Vector3): number {

@@ -53,7 +53,7 @@ export function winterQuartzGeometry(mobile = false): THREE.BufferGeometry {
 
 /** A smaller six-sided cut gem, with a table, crown, girdle and pointed pavilion; distinct from the clear outer stone. */
 export function winterBlueGeometry(): THREE.BufferGeometry {
-  const rings = [{ x: -110.4, r: .08 }, { x: -110.1, r: 2.05 }, { x: -109.55, r: 2.05 }, { x: -109.12, r: 1.12 }];
+  const rings = [{ x: WINTER.x - 2.4, r: .08 }, { x: WINTER.x - 2.1, r: 2.05 }, { x: WINTER.x - 1.55, r: 2.05 }, { x: WINTER.x - 1.12, r: 1.12 }];
   const pts = rings.map(r => hex.map(p => new THREE.Vector3(r.x, WINTER.centreY + p.y * r.r, WINTER.z + p.x * r.r))), tris: Point[][] = [];
   for (let j = 0; j < rings.length - 1; j++) for (let i = 0; i < 6; i++) { const n = (i + 1) % 6; tris.push([pts[j][i], pts[j][n], pts[j + 1][n]], [pts[j][i], pts[j + 1][n], pts[j + 1][i]]); }
   const centre = new THREE.Vector3(rings[3].x, WINTER.centreY, WINTER.z);

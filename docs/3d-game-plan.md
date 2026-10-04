@@ -6,7 +6,7 @@ Eyelense now stands beyond Science at `(106, −36)`: the uniformly enlarged sou
 
 ## Eye of Winter — first building study, 4 October 2026
 
-The approved Winter G concept now has a first 3D building at (−108, −30): source silver preserved, a clear outer quartz envelope, smaller blue faceted stone, six-leaf entrance iris, usable room and connected approach. Rendered and physical door states advance together in the fixed walking loop. Concept images and the derived model carry provenance under `concepts/15-moon-gates/`; the winter garden and material polish remain for review.
+The approved Winter G concept now has a first 3D building on the new snowy shelf above the Jepii Mici chimney, at (−78, −283): source silver preserved, a clear outer quartz envelope, smaller blue faceted stone, six-leaf entrance iris, usable room and connected approach. Rendered and physical door states advance together in the fixed walking loop. Concept images and the derived model carry provenance under `concepts/15-moon-gates/`; the broad snowfield, boot-print approach, terrain collision and rim ropes now connect it to the chimney. Material polish remains for review.
 
 ## Saved reflections and loading — 4 October 2026
 
@@ -157,7 +157,7 @@ The curated gallery expansion replaces the rotating cylinders with **32 permanen
 
 Existing architectural work is preserved: STL-derived Mitoring/Nanot silver, walnut City Hall, the deep pierced Embryo ring and thick amber, two real mountain railway bores, the King’s Chapel entrance gateway, three masonry bridges, tributaries and a walk-through silver hourglass tower. Placeholder dome homes remain removed. Original STLs stay offline; their extracted JSON strands are preserved, and their historical extractor is still missing. The earlier design and implementation history is retained in [concepts/](../concepts/), including [the station](../concepts/06-town-extension/notes.md), [railway](../concepts/08-mountain-railway/notes.md), [river gardens](../concepts/09-river-gardens/notes.md), [rail excursion](../concepts/10-rail-gardens/notes.md), [glucose pavilion](../concepts/11-glucose-pavilion/notes.md) and [curated galleries](../concepts/12-curated-galleries/notes.md).
 
-This is a playable procedural implementation, not a completed production release. Multi-room civic interiors, authored housing/GLB replacements, optional hands-on ministry exhibits, comprehensive resource disposal/context-loss recovery, and measured physical-phone/Safari performance remain open. Sunfinder and the Eye of Winter double moon gate remain design proposals. The milestone table describes acceptance gates; automation and desktop touch emulation do not establish physical-device performance or release readiness.
+This is a playable procedural implementation, not a completed production release. Multi-room civic interiors, authored housing/GLB replacements, optional hands-on ministry exhibits, comprehensive resource disposal/context-loss recovery, and measured physical-phone/Safari performance remain open. Sunfinder remains a design proposal; Eye of Winter has a first walkable building and snowy mountain site. The milestone table describes acceptance gates; automation and desktop touch emulation do not establish physical-device performance or release readiness.
 
 ## 1. Product direction
 

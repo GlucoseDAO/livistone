@@ -11,10 +11,10 @@ This is the working plan for bringing Livia's jewelry STLs into the town as real
   - The budget is deliberately **small**.
 - **Mycelium Ring:** one model floating above the blue opal orb at the centre of the Mycelium grove.
 - **Two new locations, both moon gates:**
-  - **West meadow, beyond the Ministry of Energy:** the **Eye of Winter double moon gate**, the owner's earlier request in `concepts/06-town-extension/notes.md`.
+  - **Snow plateau above the Jepii Mici chimney:** the **Eye of Winter building**, the owner's earlier request in `concepts/06-town-extension/notes.md`.
   - **East strip, beyond the Ministry of Science:** the **Eyelense moon gate**. The two crescent faces stand upright as the frame. The colour-changing lens hangs in the upper eye as a large tinted glass disc that darkens in daylight and clears at night, and visitors walk under it.
 - **Unpublished 2026 work may be used.** Captions say "new work, 2026" and do not invent artist text.
-- **Map numbering follows the route:** … Ministry of Energy → Eye of Winter Gate → Ministry of Science → Eyelense Gate → City Hall …. Save IDs do not change.
+- **Map numbering follows the route:** Eyelense follows Science; the mountain trail follows Enhancement, then Eye of Winter on its snow plateau. Save IDs do not change.
 - **Original print models are never committed.** Only optimized derivatives go into git, through Git LFS. This rule is in AGENTS.md.
 - **Commit intermediate results** as each part works. Show in-game renders, before and after side by side, for every model placed.
 
@@ -25,7 +25,7 @@ This is the working plan for bringing Livia's jewelry STLs into the town as real
 | 0. Offline pipeline `scripts/build-jewelry-models.ts` + manifest `data/catalogue/models.json` | **Done.** 22 models built; provenance (SHA-256, dates, triangles, deviation) in `public/models/jewelry/sources.json` |
 | 1. Hovering featured model per building (`src/game/featured.ts`, `planar-exhibition.ts`) | **Done, desktop-verified** (captures below). Touch and software captures and a Playwright spec are still to do |
 | 2. Mycelium Ring above the opal orb (`living-waters.ts`) | **Done, desktop-verified** |
-| 3a. Eye of Winter (west) | **Winter G approved 4 October 2026.** First two-stone building model in `winter-gate.ts`; original silver preserved, operable hexagonal iris and connected approach. Material and winter-garden polish remain. |
+| 3a. Eye of Winter (mountain) | **Winter G approved 4 October 2026.** First two-stone building model in `winter-gate.ts`; original silver preserved, operable hexagonal iris and a boot-print approach from the chimney to a broad snowy shelf. Material polish remains. |
 | 3b. Eyelense Gate (east) | **E implemented 4 October 2026.** Glossy black source crescent, brass threading, curved day/night lens and a real tunnel through a rounded red bead; connected limestone forecourt, seats, map, story and colliders. [Implementation record](../concepts/15-moon-gates/notes.md). |
 | Frame budget | The script reads jewellery GLBs and includes both gate producers. The Eyelense implementation run completed for GPU/mobile; its group uses eight draws in each tier. These are geometry estimates, not physical-device timings. |
 | Docs | This page and AGENTS.md (the never-commit-originals rule). README, the game plan status and the catalogue "In Livistone" column wait until the gates exist |
@@ -104,7 +104,7 @@ LIVISTONE_PARAMS=featured=off bun scripts/screenshot-realism.ts output/testing/j
    - Add a Playwright spec: load `?featured=splash`, check that the mesh exists and that clicking it opens the photo viewer.
    - Take touch and software captures. Run `bun scripts/frame-budget.ts`.
 2. **Gate concepts.** Use `output/testing/jewelry-models/eye-of-winter-*.png` and `eyelense-*.png` with the town overview style to make one concept per gate, record them under `concepts/15-moon-gates/`, and get the owner's approval.
-3. **Eye of Winter**, files `winter-gate.ts` and `winter-gate-layout.ts`, around (−108, −30):
+3. **Eye of Winter**, files `winter-gate.ts` and `winter-gate-layout.ts`, on the new snow plateau at (−78, −283):
    - **Approved concept:** [Winter G, open](../concepts/15-moon-gates/images/17-winter-g-model-two-stones-open.png), with a closed companion. It supersedes the earlier upright double-arch and single-blue-stone directions.
    - **Source:** `eye-of-winter-gate.glb`, original indices and vertices preserved under uniform scale and rigid rotation. The crossed ring loops trail behind the horizontal eye.
    - **Two stones:** a clear convex outer envelope and a smaller blue faceted hexagonal stone behind it. A six-leaf iris fills the lower hexagonal entrance when closed and opens on approach.

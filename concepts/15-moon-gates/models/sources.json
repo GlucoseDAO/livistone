@@ -7,5 +7,11 @@
   "origin": "Eye axis at x=z=0; room floor y=0; ring feet extend below the floor.",
   "generator": "bun scripts/build-winter-building.ts",
   "runtime": "src/world/winter-gate.ts",
-  "status": "First 3D building study; landscaping and material polish remain."
+  "site": {
+    "x": -78,
+    "z": -283,
+    "floor": 48.55,
+    "landscape": "Snow plateau above the Jepii Mici chimney; src/world/winter-plateau-layout.ts"
+  },
+  "status": "First two-stone building on its snow plateau; material polish remains."
 }

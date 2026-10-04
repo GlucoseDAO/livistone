@@ -1,6 +1,6 @@
 # Livistone
 
-Eye of Winter has a first walkable two-stone building study west of the town, with its original silver geometry, a connected approach and a hexagonal iris that opens as you approach. Stone materials and the winter garden remain a first study; see [the model plan](docs/jewelry-models-plan.md).
+Eye of Winter has a first walkable two-stone building study above the Jepii Mici snow chimney, with its original silver geometry, a broad snow plateau, a connected approach and a hexagonal iris that opens as you approach. Stone materials remain a first study; see [the model plan](docs/jewelry-models-plan.md).
 
 **Walk into a town where rings and pendants have become buildings.**
 
@@ -33,8 +33,8 @@ Every building and garden starts from something Livia actually made: a ring, a p
 | 9 | **Future House** | Camel Dalí: copper, a 3D-printed part and leather | A copper camel drinking from the lake. Climb its neck into the exhibition cabin |
 | 10 | **Mycelium Rain Garden** | The Mycelium ring, whose silver folds let water drain off its opal | Tall silver mushrooms with opal hearts and a visible rain rill |
 | 11 | **Materialized Enhancements** | The [enhancement.bio](https://enhancement.bio/) bioart project | A violet Voronoi hill to climb, with gene-category crystals grown by the project itself |
-| 12 | **Jepii Mici** | A real, steep trail in Romania's Bucegi Mountains, marked with a blue cross and closed in winter | A mountain trail beyond the lake: from a forest trailhead and its warning board, up a rocky gorge with a stream running out of a snow cave, past a gully of old snow and a 17 m waterfall off the plateau's lip, to a plateau of rhododendrons and its brook |
-| 13 | **Eye of Winter** | Eye of Winter ring and pendant: silver, quartz and topaz | A two-stone eye west of the town, with the original silver ring, a connected approach, an opening hexagonal iris and a room |
+| 12 | **Jepii Mici** | A real, steep trail in Romania's Bucegi Mountains, marked with a blue cross and closed in winter | A mountain trail beyond the lake: from a forest trailhead and its warning board, up a rocky gorge with a stream running out of a snow cave, past a gully of old snow and a 17 m waterfall off the plateau's lip, to a rhododendron meadow, its brook and the snowy Eye of Winter shelf |
+| 13 | **Eye of Winter** | Eye of Winter ring and pendant: silver, quartz and topaz | An enclosed two-stone eye above the snow chimney, with the original silver ring, a hexagonal iris and a room. Snow spreads from it across the plateau and into the gully, suggesting its fictional winter power |
 
 The facts, photographs and research come from Livia's work and link to their sources; the Jepii Mici trail is a real place, and everything Livistone builds round it is fiction. The powers the town gives its artifacts (the "Livia Lore") are fiction, and the game labels them that way.
 

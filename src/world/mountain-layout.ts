@@ -6,6 +6,7 @@
 // terrain import, so terrain.ts, ground-cover.ts, forest-layout.ts, main.ts and the tests can all read them; mountain-trail.ts
 // builds the signs, fences and boulders, alpine-plants.ts the meadow's plants, from the same layout.
 import * as THREE from 'three';
+import { winterApproachFrame, winterPlateauInside, winterPlateauMask, winterPlateauHeight, winterPlateauRim } from './winter-plateau-layout';
 
 /** Dev-only `?mountain=off`: the mountains before sub-plan 27, without the trail, its signs, the plateau and the snow. */
 export function mountainLook(): 'trail' | 'off' {
@@ -80,7 +81,7 @@ function nearTrail(x: number, z: number, visit: (distance: number, s: number) =>
 /** Distance in plan from the trail's centreline, capped at 8 m (8 everywhere without the trail). */
 export function trailDistance(x: number, z: number): number {
   if (!MOUNTAIN) return REACH;
-  let nearest = REACH; nearTrail(x, z, (d) => { nearest = Math.min(nearest, d); });
+  let nearest = Math.min(REACH, winterApproachFrame(x, z).d); nearTrail(x, z, (d) => { nearest = Math.min(nearest, d); });
   return nearest;
 }
 /** Nearest trail position (sample index, fractional) and its distance, within 8 m; null further away or without the trail. */
@@ -104,7 +105,8 @@ export function trailFrame(x: number, z: number): { along: number; across: numbe
     const t = s - i, cx = a.x + (b.x - a.x) * t, cz = a.z + (b.z - a.z) * t;
     best = d; frame = { along: s * SPACING, across: (x - cx) * -dz + (z - cz) * dx, dx, dz };
   });
-  return frame;
+  const winter = winterApproachFrame(x, z);
+  return winter.d < best ? winter : frame;
 }
 /** Worn soil along the trail, 0–1, for the ground cover bake: bare at the centre, fraying into the grass, gone past the barrier. */
 export function trailWear(x: number, z: number): number {
@@ -215,7 +217,7 @@ export function plateauRim(inset: number, spacing = 3): { x: number; z: number; 
       points.push({ x: x + gx / g * inset, z: z + gz / g * inset, out: { x: -gx / g, z: -gz / g } });
     }
   }
-  return points;
+  return points.filter(p => winterPlateauInside(p.x, p.z) < -1).concat(winterPlateauRim(inset).filter(p => plateauInside(p.x, p.z) < -1));
 }
 /** Its bounds: centre and half-extents (for sampling), the meadow's level at its lip over the gorge and how much it rises to the crags. */
 export const PLATEAU = { x: -24.5, z: -268.4, a: 26.5, b: 13.6, level: 41, rise: 5.5 } as const;
@@ -242,7 +244,8 @@ export function plateauMask(x: number, z: number): number {
 }
 /** The meadow's level: gently rolling, rising about 5.5 m from its lip over the gorge to the crags at its back. */
 export function plateauHeight(x: number, z: number): number {
-  return PLATEAU.level + PLATEAU.rise * smooth(-(z - PLATEAU.z) / PLATEAU.b, -1, 1) + 1.6 * (mountainNoise(x * .13 + 3, z * .13 - 5) - .5) + .6 * (mountainNoise(x * .4, z * .4 + 2) - .5);
+  const meadow = PLATEAU.level + PLATEAU.rise * smooth(-(z - PLATEAU.z) / PLATEAU.b, -1, 1) + 1.6 * (mountainNoise(x * .13 + 3, z * .13 - 5) - .5) + .6 * (mountainNoise(x * .4, z * .4 + 2) - .5);
+  return lerp(meadow, winterPlateauHeight(x, z), winterPlateauMask(x, z));
 }
 /** First trail sample on the plateau: the gully's head. */
 export const TRAIL_ENTRY = STAGE.head;
@@ -338,9 +341,13 @@ function buttressRaise(x: number, z: number): number {
 
 /** Old snow, 0–1: filling the gully's floor from its snout up to just below its head, with ragged, melting edges. */
 export function snowCover(x: number, z: number): number {
-  const g = gorgeCoords(x, z); if (!g || g.s < STAGE.snout - 2 || g.s > STAGE.head) return 0;
+  if (!MOUNTAIN) return 0;
+  const field = smooth(winterPlateauInside(x, z), 2, 5);
+  const g = gorgeCoords(x, z); if (!g || g.s < STAGE.snout - 2 || g.s > STAGE.head) return field;
   const half = gorgeHalf(g.s) * (.88 + .3 * mountainNoise(x * .45 + 3, z * .45)), ends = smooth(g.s, STAGE.snout - 1 + 2 * mountainNoise(x * .4, z * .4 + 9), STAGE.snout + 1.5) * (1 - smooth(g.s, STAGE.head - 5, STAGE.head - 1.5));
-  return ends * (1 - smooth(g.d, half * .62, half * .86));
+  const chimney = ends * (1 - smooth(g.d, half * .62, half * .86));
+  const join = smooth(g.s, STAGE.head - 8, STAGE.head - 3) * (1 - smooth(g.d, 2, 4));
+  return Math.max(field, chimney, join);
 }
 /** Meltwater, 0–1: a dark wet band along the gorge's floor below the snout, where its stream runs. */
 export function meltwater(x: number, z: number): number {
@@ -365,9 +372,9 @@ export const COULOIR_SHADE_BOX = { minX: -74, maxX: -38, minZ: -284, maxZ: -244 
  * few metres across, at the two-metre grid's limit: cut open by the gorge they stood along its rims as rows of thin fins.
  */
 export function mountainCalm(x: number, z: number): number {
-  if (!MOUNTAIN || z > -205 || z < -305 || x < -95 || x > 35) return 0;
+  if (!MOUNTAIN || z > -205 || z < -305 || x < -112 || x > 35) return 0;
   const g = gorgeCoords(x, z), edge = g ? gorgeHalf(g.s) + wallRun(g.s) : 0, gorge = g ? 1 - smooth(g.d, edge + 9, edge + 19) : 0;
-  return Math.max(gorge * smooth(g?.s ?? 0, STAGE.mouth - 8, STAGE.mouth - 2), smooth(plateauInside(x, z), -16, -5));
+  return Math.max(gorge * smooth(g?.s ?? 0, STAGE.mouth - 8, STAGE.mouth - 2), smooth(plateauInside(x, z), -16, -5), smooth(winterPlateauInside(x, z), -10, -2));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -425,6 +432,13 @@ export function mountainShape(x: number, z: number, h: number): number {
   const band = smooth(-(z + 276), 0, 6) * smooth(x, -62, -50) * (1 - smooth(x, 6, 16)) * smooth(h, PLATEAU.level + 8, PLATEAU.level + 14);
   if (band > 0) h += band * (6 * (mountainNoise(x * .12 - 7, z * .12 + 2) - .5) + 1.4 * Math.sin(h * .5));
   h = gorgeShape(x, z, h);
+  const g = gorgeCoords(x, z);
+  const chimney = g && g.s < STAGE.head ? (1 - smooth(g.d, 2, 5)) : 0;
+  const winter = winterPlateauMask(x, z) * (1 - chimney);
+  h = lerp(h, winterPlateauHeight(x, z), winter);
+  const approach = winterApproachFrame(x, z);
+  const approachWeight = 1 - smooth(approach.d, 1.2, 2.2);
+  h = lerp(h, winterPlateauHeight(x, z), approachWeight);
   const bench = trailBench(x, z); if (bench.weight > 0) h += (bench.level - h) * bench.weight;
   return h;
 }
@@ -434,6 +448,7 @@ export function mountainShape(x: number, z: number, h: number): number {
  * plateau. Walls, crags and the plateau's slopes keep walkers inside it (tests/mountain-trail.test.ts).
  */
 export function trailCorridor(x: number, z: number): boolean {
+  if (MOUNTAIN && winterPlateauInside(x, z) > -1.5) return true;
   if (!MOUNTAIN || z > -215 || z < -290 || x < -72 || x > 14) return false;
   if (plateauInside(x, z) > -3 || trailDistance(x, z) < 6) return true;
   const g = gorgeCoords(x, z); return !!g && g.d < gorgeHalf(g.s) + wallRun(g.s) + 2;
@@ -442,7 +457,7 @@ export function trailCorridor(x: number, z: number): boolean {
 export function mountainClearing(x: number, z: number): boolean {
   if (!MOUNTAIN) return false;
   if (trailDistance(x, z) < TRAIL_HALF + 2.6 || Math.hypot(x - TRAILHEAD.x, z - TRAILHEAD.z) < 4.5) return true;
-  if (plateauInside(x, z) > -6 || (z < -274 && x > -64 && x < 12)) return true;
+  if (winterPlateauInside(x, z) > -6 || plateauInside(x, z) > -6 || (z < -274 && x > -64 && x < 12)) return true;
   if (BUTTRESSES.some(b => Math.hypot(x - b.x, z - b.z) < b.radius * 1.4)) return true;
   const g = gorgeCoords(x, z); return !!g && g.d < gorgeHalf(g.s) + wallRun(g.s) + 4.5;
 }
@@ -450,6 +465,7 @@ export function mountainClearing(x: number, z: number): boolean {
 /** The HUD's place name along the trail, by stage (null off it): the woods, the gorge, the snow gully, the plateau. */
 export function mountainPlace(x: number, z: number): string | null {
   if (!MOUNTAIN || z > -180) return null;
+  if (winterPlateauInside(x, z) > -.5) return 'Jepii Mici · Winter Plateau';
   if (plateauInside(x, z) > -2) return 'Jepii Mici · Rhododendron Plateau';
   const g = gorgeCoords(x, z);
   if (g && g.d < gorgeHalf(g.s) + 4) return g.s >= STAGE.snout - 1 ? 'Jepii Mici · Snow Gully' : g.s >= STAGE.mouth - 2 ? 'Jepii Mici · Rocky Gorge' : 'Jepii Mici · Forest Trail';
@@ -503,7 +519,7 @@ export function cragOnMeadow(x: number, z: number): number {
 // The meadow's plants (alpine-plants.ts) and its turf
 
 /** How strongly the alpine meadow claims a point, 0–1: the plateau, kept free of trees. */
-export function driftEnvelope(x: number, z: number): number { return plateauMask(x, z); }
+export function driftEnvelope(x: number, z: number): number { return plateauMask(x, z) * (1 - winterPlateauMask(x, z)); }
 /**
  * Bright alpine turf, 0–1: the plateau's meadow, never on the trail, which keeps its bare earth. The ground material paints it
  * (`groundPaint.x`) so no soil shows between the plants.
@@ -511,12 +527,12 @@ export function driftEnvelope(x: number, z: number): number { return plateauMask
 export function turfCover(x: number, z: number): number {
   if (!MOUNTAIN) return 0;
   const meadow = smooth(plateauInside(x, z), -.5, 2); if (meadow < .01) return 0;
-  return meadow * smooth(trailDistance(x, z), TRAIL_HALF + .15, TRAIL_HALF + 1);
+  return meadow * (1 - winterPlateauMask(x, z)) * smooth(trailDistance(x, z), TRAIL_HALF + .15, TRAIL_HALF + 1);
 }
 /** Rhododendron density, 0–1: drifts across the meadow, off the trail and back from its edge. */
 export function bloomDensity(x: number, z: number): number {
   if (!MOUNTAIN) return 0;
   const inside = plateauInside(x, z); if (inside < 1.5) return 0;
   const patches = mountainNoise(x * .16 + 4.1, z * .16 - 2.3) * .65 + mountainNoise(x * .55 - 7, z * .55 + 1.7) * .35;
-  return smooth(patches, .3, .62) * smooth(inside, 1.5, 4) * smooth(trailDistance(x, z), TRAIL_HALF + .6, TRAIL_HALF + 1.8) * smooth(brookDistance(x, z), .9, 2);
+  return (1 - winterPlateauMask(x, z)) * smooth(patches, .3, .62) * smooth(inside, 1.5, 4) * smooth(trailDistance(x, z), TRAIL_HALF + .6, TRAIL_HALF + 1.8) * smooth(brookDistance(x, z), .9, 2);
 }

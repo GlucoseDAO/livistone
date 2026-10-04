@@ -18,6 +18,7 @@ const { createGlucoseStructure } = await import('../src/world/glucose-pavilion')
 const { createEnhancementHill } = await import('../src/world/enhancement');
 const { Mountains } = await import('../src/world/mountains');
 const { createPlanting } = await import('../src/world/planting');
+const { WINTER } = await import('../src/world/winter-gate-layout');
 const { terrainHeight } = await import('../src/world/terrain');
 const { riverCenter } = await import('../src/world/waterways');
 const { graphicsProfile } = await import('../src/game/graphics');
@@ -25,7 +26,7 @@ const { drawCost } = await import('../src/game/render-budget');
 
 // The capture poses of scripts/screenshot-realism.ts (name, x, z, yaw, pitch); keep the two lists in step.
 export const VIEWS: [string, number, number, number, number?][] = [
-  ['winter-gate-front', -92, -30, Math.PI / 2, .2], ['winter-gate-angle', -90, -17, 1, .2], ['winter-gate-inside', -104.8, -30, Math.PI / 2, .3],
+  ['winter-gate-front', WINTER.x + 20, WINTER.z, Math.PI / 2, .22], ['winter-gate-angle', WINTER.x + 20, WINTER.z + 12, 1.03, .2], ['winter-gate-inside', WINTER.quartzX + 1, WINTER.z, Math.PI / 2, .3],
   ['eyelense-gate-front', 88, -36, -Math.PI / 2, .25], ['eyelense-gate-angle', 90, -22, -.85, .25], ['eyelense-gate-inside', 106, -36, -Math.PI / 2, .05],
   ['station-arrival', 0, 58, 0], ['arrival-meadow', 10, 52, -.9], ['garden-overview', 0, 52, 0], ['gateway-front', 0, 52, 0, .18],
   ['gateway-side', 9, 47, .92, .26], ['bridge-crossing', 0, 36, 0], ['garden-path', -14, 8, 1.2],

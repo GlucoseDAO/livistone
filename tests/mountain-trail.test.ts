@@ -1,3 +1,5 @@
+import { winterPlateauInside } from '../src/world/winter-plateau-layout';
+import { WINTER } from '../src/world/winter-gate-layout';
 import { describe, expect, it } from 'vitest';
 import { Physics } from '../src/game/physics';
 import type { ColliderSpec } from '../src/game/physics';
@@ -54,8 +56,9 @@ describe('the Jepii Mici trail (sub-plan 27, round 2)', () => {
   });
 
   it('is a map destination after Materialized Enhancements, with a story that keeps the real trail apart from the fiction', () => {
-    const trail = LANDMARKS.at(-1)!; expect(trail.id).toBe('jepii-mici'); expect(CIVIC_LANDMARKS).not.toContain(trail);
-    expect(LANDMARKS.at(-2)!.id).toBe('enhancement');
+    const trail = LANDMARKS.at(-2)!; expect(trail.id).toBe('jepii-mici'); expect(CIVIC_LANDMARKS).not.toContain(trail);
+    expect(LANDMARKS.at(-3)!.id).toBe('enhancement');
+    expect(LANDMARKS.at(-1)!.id).toBe('winter-gate');
     // The arrival stands on the flat forest floor below the board, facing it.
     expect(trail.entrance.y - terrainHeight(trail.entrance.x, trail.entrance.z)).toBeCloseTo(1.05, 1);
     const toSign = Math.atan2(-(TRAILHEAD.x - trail.entrance.x), -(TRAILHEAD.z - trail.entrance.z));
@@ -98,7 +101,7 @@ describe('the Jepii Mici trail (sub-plan 27, round 2)', () => {
     // Above the gorge's floor where it begins, below the plateau where it ends.
     let lowest = Infinity, highest = -Infinity;
     for (let x = -75; x <= -35; x += 1) for (let z = -290; z <= -240; z += 1) if (snowCover(x, z) > .5) { const h = terrainHeight(x, z); lowest = Math.min(lowest, h); highest = Math.max(highest, h); }
-    expect(lowest).toBeGreaterThan(trailLevel(STAGE.mouth) + 5); expect(highest).toBeLessThan(PLATEAU.level + PLATEAU.rise + 1);
+    expect(lowest).toBeGreaterThan(trailLevel(STAGE.mouth) + 5); expect(highest).toBeLessThan(Math.max(PLATEAU.level + PLATEAU.rise + 1, WINTER.floor));
   });
 
   it('walks a capsule from the map arrival under the board, through the gorge and over the snow onto the plateau, where it is held', async () => {
@@ -142,7 +145,7 @@ describe('the Jepii Mici trail (sub-plan 27, round 2)', () => {
         }
         // Toward the crags it stays on the plateau, or goes back down the gully the trail came up by.
         const end = physics.position(), gully = gorgeCoords(end.x, end.z);
-        if (goal.z < PLATEAU.z - 4) expect(plateauRadius(end.x, end.z) < 1.15 || (!!gully && gully.d < gorgeHalf(gully.s) + 3), `toward ${goal.x.toFixed(0)}, ${goal.z.toFixed(0)}: ${JSON.stringify(end)}`).toBe(true);
+        if (goal.z < PLATEAU.z - 4) expect(winterPlateauInside(end.x, end.z) > -1.5 || plateauRadius(end.x, end.z) < 1.15 || (!!gully && gully.d < gorgeHalf(gully.s) + 3), `toward ${goal.x.toFixed(0)}, ${goal.z.toFixed(0)}: ${JSON.stringify(end)}`).toBe(true);
       }
     } finally { physics.dispose(); gardens.dispose(); }
   }, 90000);

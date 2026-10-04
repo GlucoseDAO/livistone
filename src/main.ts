@@ -1,4 +1,5 @@
 import { setEyelenseNight, setEyelenseQuality } from './world/eyelense-gate';
+import { WINTER } from './world/winter-gate-layout';
 import { setCityHallCrystalQuality } from './world/city-hall';
 import { nearbyArchitecture, storyFor } from './game/nearby';
 import type { NearbyStory } from './game/nearby';
@@ -520,7 +521,7 @@ class Game {
   }
   private position(): { x: number; y: number; z: number } | undefined { return this.physics?.position(); }
   private resetMap(): void {
-    this.mapCamera.position.set(160, 224, 192); this.orbit.target.set(0, 1, -53); this.orbit.update();
+    this.mapCamera.position.set(160, 244, 195); this.orbit.target.set(0, 5, -82); this.orbit.update();
   }
   /**
    * Brings the scene to the chosen time of day and shows the choice on the top-bar button and the menu's select. A switch holds
@@ -771,7 +772,7 @@ class Game {
     const width = window.innerWidth, height = window.innerHeight;
     const placed: { x: number; y: number; w: number; h: number }[] = [];
     const markers = LANDMARKS.map(landmark => {
-      this.point.set(landmark.x, 15, landmark.z).project(this.mapCamera);
+      this.point.set(landmark.x, landmark.id === 'winter-gate' ? WINTER.centreY : 15, landmark.z).project(this.mapCamera);
       const marker = document.querySelector<HTMLElement>('#marker-' + landmark.id)!;
       return { marker, x: (this.point.x * .5 + .5) * width, y: (-this.point.y * .5 + .5) * height, hidden: Math.abs(this.point.z) > 1, w: marker.offsetWidth || 44, h: marker.offsetHeight || 44 };
     });
@@ -788,7 +789,7 @@ class Game {
       item.marker.style.left = item.x + 'px'; item.marker.style.top = y + 'px'; item.marker.hidden = item.hidden;
     }
     if (this.physics) {
-      const pos = this.position()!; this.point.set(pos.x, 1, pos.z).project(this.mapCamera);
+      const pos = this.position()!; this.point.set(pos.x, pos.y + .3, pos.z).project(this.mapCamera);
       const marker = document.querySelector<HTMLElement>('#player-marker')!; marker.style.left = (this.point.x * 0.5 + 0.5) * width + 'px'; marker.style.top = (-this.point.y * 0.5 + 0.5) * height + 'px'; marker.hidden = Math.abs(this.point.z) > 1;
     }
   }

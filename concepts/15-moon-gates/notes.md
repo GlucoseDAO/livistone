@@ -58,6 +58,18 @@ Implementation is now authorized. Initial building work belongs in `winter-gate.
 
 Validation for the first study: production build passed; 254 unit tests passed; `tests/winter-gate.spec.ts` passed in Chrome/WebGL, confirming map arrival and walking through the operable iris. Desktop town exterior and interior were rendered and inspected. [First in-town front capture](models/previews/first-building-front.png) shows the actual prototype, not a generated concept.
 
+### Snow plateau above Jepii Mici — 4 October 2026
+
+At the owner's request, the building moved from the west meadow to `(−78, −283)` on a broad rounded snow shelf above the chimney's upper exit. `winter-plateau-layout.ts` owns the roughly 62 × 23 m field, its raised approach and the boot-print branch from the chimney head. Mountain terrain and its collider use the same field; the extended walking corridor prevents town-bound resets here. Rim ropes leave both trail routes open. The eastern rhododendron meadow, waterfall, snow cave and existing climb remain. The old west-meadow path and grading are removed.
+
+The silver geometry, uniform scale, two stones and hexagonal shutter retain the approved design. Snow surrounds the eye and continues into the chimney, suggesting that the building produces it; the journal identifies that as Livistone fiction. The map now places Winter after the mountain trail.
+
+Actual in-world captures: [overview](models/previews/winter-plateau-overview.png), [front](models/previews/winter-plateau-front.png), [three-quarter](models/previews/winter-plateau-angle.png), [chimney approach](models/previews/winter-chimney-head.png), [inside](models/previews/winter-plateau-inside.png). The first meadow screenshot stays as history.
+
+Plateau validation: production build, 33 targeted unit checks (source geometry, snow extent, both mountain routes, paving, grass and probes), and Chrome/WebGL map arrival and iris traversal passed. Captures use `node scripts/screenshot-winter-plateau.mjs`; [capture poses and runtime snapshots](models/previews/winter-plateau-captures.json) record daylight and saved local mountain reflections.
+Final workspace validation: all 267 unit tests passed; the latest Winter/Eyelense gate subset passed after the concurrent material refinement. All 104 saved reflection atlases were regenerated and verified against the current source digest (WebGL/WebGPU, day/night, desktop/mobile), including both gates.
+
+
 ### Eyelense E — playable red bead passage, 4 October 2026
 
 The owner requested implementation of `docs/eyelense-e-implementation-plan.md`, using [E](images/12-eyelense-e-red-bead-passage.png) as the design reference. This is implementation authorization, without claiming a separate image approval. The old brass `?concept=gates` preview has been removed; this structure loads in the playable town.

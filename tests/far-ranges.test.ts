@@ -11,10 +11,10 @@ import { RAILWAY, STATION } from '../src/world/station-layout';
 
 // forestSites on main@47dc3b9: tier, count, first and last site (x, z). Sub-plan 27 then took the trees standing on the Jepii Mici
 // trail, its plateau, the peaks and the couloir out after the draws, so every other site is unchanged, and appended a few round
-// the trailhead (the last site is one of them). Winter clears 20 desktop / 14 mobile trees; Eyelense clears another 20 desktop / 12 mobile trees at its east-meadow site.
+// the trailhead (the last site is one of them). Winter moved from the meadow onto the already treeless mountain shelf; the meadow regains its 20 desktop / 14 mobile trees. Eyelense then clears 20 desktop / 12 mobile trees at its east-meadow site.
 const FOREST: [boolean, number, [number, number], [number, number]][] = [
-  [false, 870, [-27.918645669706166, -199.93845618027262], [-22.32522038852804, -199.00970863348874]],
-  [true, 491, [-27.918645669706166, -199.93845618027262], [-18.4485683455656, -205.57238135935123]],
+  [false, 890, [-27.918645669706166, -199.93845618027262], [-22.32522038852804, -199.00970863348874]],
+  [true, 505, [-27.918645669706166, -199.93845618027262], [-18.4485683455656, -205.57238135935123]],
 ];
 
 describe('distant ranges (sub-plan 26)', () => {
@@ -27,7 +27,7 @@ describe('distant ranges (sub-plan 26)', () => {
   });
 
   it('leave every path, entrance, the spawn and the railway grading exactly as the classic landscape had them', () => {
-    const points: [number, number][] = [[SPAWN.x, SPAWN.z], ...LANDMARKS.map((l): [number, number] => [l.entrance.x, l.entrance.z])];
+    const points: [number, number][] = [[SPAWN.x, SPAWN.z], ...LANDMARKS.filter(l => l.id !== 'winter-gate').map((l): [number, number] => [l.entrance.x, l.entrance.z])];
     for (const curve of PATH_CURVES) for (const p of curve.getPoints(60)) points.push([p.x, p.z]);
     for (let x = -STATION.railHalfLength; x <= STATION.railHalfLength; x += 8) for (const z of RAILWAY.tracks) points.push([x, z]);
     for (const [x, z] of points) expect(landscapeHeightOf(x, z, true), `${x}, ${z}`).toBe(landscapeHeightOf(x, z, false));
