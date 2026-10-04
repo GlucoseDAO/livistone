@@ -1,10 +1,15 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { diffuseColor, float, fwidth, positionLocal } from 'three/tsl';
+import { diffuseColor, float, fwidth, mix, positionLocal, positionView, smoothstep } from 'three/tsl';
 import { BUDGET_OFF } from '../game/render-budget';
 import { WIND_ROOT, addWindRoots, treeSway, windRoots } from './wind';
 
 const NEAR = 36;
+/**
+ * Beyond this distance to its nearest tree a cell draws only its thinned crowns, no branches: only the summit view's longer fog
+ * (main.ts) reaches it, where a trunk is a few pixels wide and the branch tubes would more than double the forest's triangles.
+ */
+const CROWN = 160;
 /** Layer of the shadow-only tree meshes; the sun's shadow camera renders it (main.ts), the view cameras do not. */
 export const SHADOW_LAYER = 1;
 /** Per-tree culling is re-evaluated after the camera moves this far, against a reach grown by the same margin. */
@@ -15,9 +20,9 @@ const REACH_STEP = 2;
  * bounding sphere) lies at or beyond `reach`: the tree reach (TREE_REACH of the full-fog distance), where the haze has faded
  * most of a tree into what lies behind it (render/aerial.ts).
  */
-export function forestLod(distance: number, nearest: number, reach: number): 'full' | 'reduced' | 'hidden' {
+export function forestLod(distance: number, nearest: number, reach: number): 'full' | 'reduced' | 'crown' | 'hidden' {
   if (nearest >= reach) return 'hidden';
-  return distance < NEAR ? 'full' : 'reduced';
+  return distance < NEAR ? 'full' : nearest >= CROWN ? 'crown' : 'reduced';
 }
 
 function thinFoliage(geo: THREE.BufferGeometry): THREE.BufferGeometry {
@@ -91,6 +96,9 @@ export function swayingTreeMaterial(source: THREE.MeshStandardMaterial, foliage:
   // keeps the plain alpha test (three copies alphaTest, not alphaToCoverage, to its shadow material). three ramps coverage
   // over the pixel above the cutoff, which thinned every crown; centring the ramp on the cutoff keeps the alpha test's density.
   if (foliage && coverage && source.alphaTest > 0) { material.alphaToCoverage = true; material.alphaTestNode = float(source.alphaTest).sub(fwidth(diffuseColor.a).mul(.5)); }
+  // Past the usual tree reach (only the summit view draws there) the cards are under a pixel and their alpha mips fall below the
+  // cutoff, which left bare branches: the far detail lowers its cutoff with distance so the crowns stay whole.
+  else if (foliage && far && source.alphaTest > 0) material.alphaTestNode = float(source.alphaTest).mul(mix(1, .3, smoothstep(120, 220, positionView.length())));
   return material;
 }
 /** The same vertices and index under a geometry of its own, so a second view mesh can carry its own per-instance windRoot. */
@@ -111,8 +119,8 @@ interface Cell { species: number; center: THREE.Vector3; first: number; count: n
  */
 interface Part { species: number; view: THREE.InstancedMesh; shadow: THREE.InstancedMesh | null; colors: Float32Array; shows: (state: number) => boolean; casts?: (state: number) => boolean }
 // A view mesh's windRoot attribute sits on its geometry; shadow meshes share that geometry but draw the rest pose and never read it.
-// Cell states: hidden, trunks only (map), trunks with reduced foliage, trunks with full foliage.
-const HIDDEN = 0, TRUNKS = 1, REDUCED = 2, FULL = 3;
+// Cell states: hidden, trunks only (map), trunks with reduced foliage, trunks with full foliage, reduced foliage alone (CROWN).
+const HIDDEN = 0, TRUNKS = 1, REDUCED = 2, FULL = 3, CROWNS = 4;
 const frustum = new THREE.Frustum(), viewProjection = new THREE.Matrix4();
 
 /**
@@ -177,7 +185,7 @@ export class Forest extends THREE.Group {
         const twigless = !foliage && FOREST_DETAIL.twigless;
         const details: [THREE.BufferGeometry, THREE.Material, (state: number) => boolean, boolean, ((state: number) => boolean)?][] = !foliage
           ? twigless ? [[geometries[i], material, (state) => state === FULL || state === TRUNKS, true, (state) => state >= TRUNKS], [dropTwigs(geometries[i]), far, (state) => state === REDUCED, false]] : [[geometries[i], material, (state) => state >= TRUNKS, true]]
-          : [[mobile ? reduced! : geometries[i], material, (state) => state === FULL, true], [mobile && wind ? twin(reduced!) : reduced!, far, (state) => state === REDUCED, true]];
+          : [[mobile ? reduced! : geometries[i], material, (state) => state === FULL, true], [mobile && wind ? twin(reduced!) : reduced!, far, (state) => state === REDUCED || state === CROWNS, true]];
         for (const [geometry, look, shows, casts, castShows] of details) {
           if (wind) addWindRoots(geometry, total);
           const instanced = (castShadow: boolean): THREE.InstancedMesh => {
@@ -209,7 +217,7 @@ export class Forest extends THREE.Group {
     const from = this.reachFrom, grown = this.reach + REACH_STEP;
     for (const cell of this.cells) {
       const centre = from.distanceTo(cell.sphere.center), lod = forestLod(origin.distanceTo(cell.center), centre - cell.sphere.radius, grown);
-      const state = mapView ? TRUNKS : lod === 'hidden' ? HIDDEN : lod === 'full' ? FULL : REDUCED, previous = cell.state;
+      const state = mapView ? TRUNKS : lod === 'hidden' ? HIDDEN : lod === 'full' ? FULL : lod === 'crown' ? CROWNS : REDUCED, previous = cell.state;
       const seen = state !== HIDDEN && frustum.intersectsSphere(cell.sphere), lit = state !== HIDDEN && !!sun?.intersectsSphere(cell.sphere);
       const partial = !mapView && state !== HIDDEN && centre + cell.sphere.radius >= grown, reselected = partial && moved && this.select(cell, grown);
       if (state === previous && seen === cell.seen && lit === cell.lit && partial === cell.partial && !reselected) continue;
@@ -230,7 +238,7 @@ export class Forest extends THREE.Group {
   surround(origin: THREE.Vector3, reach: number): void {
     for (const cell of this.cells) {
       const lod = forestLod(origin.distanceTo(cell.center), origin.distanceTo(cell.sphere.center) - cell.sphere.radius, reach);
-      cell.state = lod === 'hidden' ? HIDDEN : lod === 'full' ? FULL : REDUCED; cell.seen = cell.state !== HIDDEN; cell.partial = false;
+      cell.state = lod === 'hidden' ? HIDDEN : lod === 'full' ? FULL : lod === 'crown' ? CROWNS : REDUCED; cell.seen = cell.state !== HIDDEN; cell.partial = false;
     }
     for (let species = 0; species < this.matrices.length; species++) this.refill(species);
   }
