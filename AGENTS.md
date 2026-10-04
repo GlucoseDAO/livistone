@@ -378,7 +378,8 @@ docs/jewelry-stl-inclusion-analysis.md Mesh health, decimation limits and a tier
   is a step of its own, one PMREMGenerator per size kept until nothing is left to bake), and each site shows when done. The
   shown phase bakes under the whole-town shadow box drawn during loading (the warm-up render; `needsUpdate` is cleared after
   it), which `frameShadow` holds until that bake ends, walking frames taking it at their own fade. Then the night bakes in
-  the background, its sky in steps first (`skyBake`, as `createSky`): around each step `phaseState()` puts the scene in the
+  the background, its sky in steps first (`skyBake`, as `createSky`; both phases' reflections prefilter from the day's
+  `skyDay / 2` cube, the night's stars redrawn for it, so holding both stays 72 MB lighter on gpu): around each step `phaseState()` puts the scene in the
   night's state and back, the moon unshadowed (the shadow map holds the sun's box). Those night probes are provisional
   (`ReflectionProbes.settled`): the first switch to night shows them at once, builds nothing, and bakes the night again
   under the moon's held whole-town box, site by site. A night load bakes the day only once shown, because its sun cannot go

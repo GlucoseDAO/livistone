@@ -99,5 +99,9 @@ Twenty-two probes per tier would ship as files rendered from a dev server, as `s
 
 - Until the shown phase's probes are baked (about 77 frames: 9–12 s on gpu and 3.5–5 s on mobile here), the walking view keeps the whole-town shadow box, 15.6 cm texels instead of 4.9 cm, without re-baking for near trees; then the walking box returns.
 - Every visit now holds both phases' probes and the night sky within half a minute (see the memory row). Prebaking only on gpu, or prefiltering the night's reflections from a 512 px cube as the day's are (the night sky's background stays 1024 px), would cut it; both are the owner's call.
+
+### Night sky memory (owner's choice, 4 October 2026)
+
+Of the three options above the owner chose the 512 px prefilter: the night's reflections now prefilter from the day's reflection size (`skyDay / 2`: 512 px on gpu, 256 on mobile), the background still from the full bake. Stars are redrawn a texel wide at that size with the same light each (`physicalNight(size, haze, starsOf)`), so mirror-like water shows them softer, not missing. Measured headless on gpu (texture bytes from `renderer.info`, the night shown at load): 432 → 360 MB at ready, 489 → 417 MB once both phases had baked (−72 MB); the night's sky bake 891 → 697 ms. `review/07-night-512` (water set, desktop night, before 861c66c, after cad4041): at most 0.02% of pixels change by more than 20 levels. Physical devices remain unmeasured.
 - The prebaked night is provisional until the first switch to night, and the re-bake then costs another 77 frames.
 - Physical devices, Safari and Firefox are unmeasured, and so are the WebGL 2 fallback's timings; it passes the post, night and graphics-profile specs.
