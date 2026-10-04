@@ -134,3 +134,12 @@ The change is local (a ribbon of water and a cave in wide gorge views), so no vi
 - The snow cave's face is cleaner and rounder than the photograph's dirty, scalloped lip.
 - The pool is shallow because the gorge floor at the foot is flat; a basin carved there would give it depth.
 - Physical-device performance is untested.
+
+## Summit view (4 October 2026, branch `realism/summit-view`, awaiting the owner)
+
+**Owner's decision.** A clear view from the plateau, desktop only. On the gpu tier, with the eye above 38 m and at least 4 m inside the plateau's outline (`plateauInside > -4`), the walking full-fog distance eases from `GraphicsProfile.fog` (130 m) to 330 m (`SUMMIT` in `main.ts`, time constant 1.5 s, at once under `?capture=1`) and back on leaving. It drives the walk camera's far plane, the distant pass's near plane (90%), the haze (`aerialParams(tier, full)`) and `Town.update`; probe bakes keep 130 m. Past 160 m from their nearest tree, forest cells draw only their thinned crowns (`CROWN` in `forest.ts`) and the far foliage lowers its alpha cutoff with distance; ordinary views never reach either.
+
+**Cost** (headless, shared iGPU, render scale fixed by `?capture=1`; not device timings), `plateau-view`: 131 → 368 calls, 2.41M → 6.75M triangles (forest 1.32M → 4.22M; crowns-only cells saved 1.6M of it), 11 → about 5 fps. `plateau-crags` and `ridge-north` stand outside the plateau or below 38 m and are unchanged. Review: `review/summit-view/`.
+
+**Open.** The town, the lake and the halls now show from the plateau, but far trees (160–300 m) read as sparse speckled crowns in the haze, and a faint dark dotted line crosses the fog along a ridge (the follow-up already listed for `ridge-north`, more visible with the longer view). Options: impostor cards for far trees, a shorter summit fog (about 250 m), or gpu-only with the frame cost accepted.
+

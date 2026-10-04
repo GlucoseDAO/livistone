@@ -9,7 +9,7 @@ import './style.css';
 import * as THREE from 'three';
 import { RAILWAY, railwayCorridor } from './world/station-layout';
 import { TOWN_BOUNDS, FALL_FLOOR } from './world/town-layout';
-import { mountainPlace, trailCorridor } from './world/mountain-layout';
+import { MOUNTAIN, mountainPlace, plateauInside, trailCorridor } from './world/mountain-layout';
 import { ridgesLook, terrainHeight } from './world/terrain';
 import { FAR_LAYER, FAR_VIEW, setDistantPhase } from './world/far-landscape';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -52,6 +52,9 @@ import type { ProbeBake } from './world/probes';
 import { CPU_FOG_NEAR, LIGHT_COLOUR, LOADING_VIEW, MAP_FOG, MIST, SHADOW, SHADOW_TARGET, SUN_DISTANCE, phaseLight } from './render/scene-light';
 import type { Light } from './render/scene-light';
 
+// The summit view: above this eye height, at least this far inside the plateau's outline (plateauInside), the gpu tier's walking
+// fog eases (time constant in seconds) to this full-fog distance.
+const SUMMIT = { eye: 38, inside: -4, fog: 330, ease: 1.5 } as const;
 // On the cpu tier the eye sits this far ahead of the capsule axis. Standing exactly over a terrain grid vertex (map arrivals
 // and teleports use whole-metre positions) put that vertex on the camera plane, and SwiftShader then smeared its attributes
 // over the adjoining near triangles as one flat colour, in classic as in WebGPU. Two millimetres keep it clipped; hardware
@@ -100,6 +103,8 @@ class Game {
   // Past the walking fog's full distance (GraphicsProfile.fog) a surface is only sky, so the walk camera stops there and follows
   // the fog if it lengthens (sub-plans 25 and 21); ?budget=off keeps the earlier 150 m for review. Set once the tier is known.
   private readonly walkCamera = new THREE.PerspectiveCamera(66, 1, 0.08, 150);
+  /** The walking full-fog distance this frame: GraphicsProfile.fog, or the summit view's longer one (updateWalkFog). */
+  private walkFog = 0;
   private readonly mapCamera = new THREE.PerspectiveCamera(44, 1, 0.2, 800);
   /** The distant pass (render/output.ts): the sky and the ranges, from just inside the walking far plane to the ranges' end. */
   private readonly farCamera = new THREE.PerspectiveCamera(66, 1, 135, FAR_VIEW);
@@ -192,7 +197,7 @@ class Game {
     }
     this.hardwareLight = this.graphics.tier === 'cpu' && !this.graphics.software;
     if (this.hardwareLight) Object.assign(this.graphics, { pixelRatio: .75, skyDay: 512, skyNight: 512 });
-    this.walkCamera.far = BUDGET_OFF ? 150 : this.graphics.fog; this.farCamera.near = this.walkCamera.far * .9;
+    this.walkFog = this.graphics.fog; this.walkCamera.far = BUDGET_OFF ? 150 : this.graphics.fog; this.farCamera.near = this.walkCamera.far * .9;
     this.walkCamera.updateProjectionMatrix(); this.farCamera.updateProjectionMatrix();
     // The night pool, hall and station lamps: room for the pool plus the fixed lamps (render/lighting.ts).
     this.renderer.lighting = new TownLighting({ maxPointLights: this.graphics.lights + 8 });
@@ -409,13 +414,26 @@ class Game {
    * the sky behind it, complete at GraphicsProfile.fog. The map, and the cpu tier while walking, keep a range fog that the output
    * pass mixes toward the displayed horizon after tone mapping, as the classic renderer did. Walking, the distant ranges keep
    * sub-plan 26's valley mist and haze in the output pass; at their distance the town's own fog is complete. `walking` forces
-   * the walking fog for a probe bake step, which also runs while the map is up.
+   * the walking fog for a probe bake step, which also runs while the map is up, at GraphicsProfile.fog (`full`) even on the summit.
    */
-  private setFog(walking = !this.mapView): void {
-    const aerial = walking && this.graphics.tier !== 'cpu', range = walking ? { near: CPU_FOG_NEAR, far: this.graphics.fog } : MAP_FOG;
-    setAerial(this.skies.get(this.night)!.haze, aerial ? aerialParams(this.graphics.tier) : null);
+  private setFog(walking = !this.mapView, full = this.walkFog): void {
+    const aerial = walking && this.graphics.tier !== 'cpu', range = walking ? { near: CPU_FOG_NEAR, far: full } : MAP_FOG;
+    setAerial(this.skies.get(this.night)!.haze, aerial ? aerialParams(this.graphics.tier, full) : null);
     displayFog.amount.value = aerial ? 0 : 1; displayFog.color.value.copy(HORIZON_HAZE[this.phase]); displayFog.near.value = range.near; displayFog.far.value = range.far;
     const mist = this.ranges && walking; displayFog.mist.value.set(mist ? MIST.low : 1e6, mist ? MIST.high : 2e6); displayFog.aerial.value = mist ? MIST.aerial : 0;
+  }
+  /**
+   * The summit view (owner, 4 October 2026: a clear view, desktop only). Standing high on the Jepii Mici plateau, the gpu tier's
+   * walking fog recedes from GraphicsProfile.fog to SUMMIT_FOG over a few seconds, and returns once the walker leaves; the walk
+   * camera's far plane, the distant pass, the haze and the town's culling all follow it. ?capture=1 takes it at once.
+   */
+  private updateWalkFog(dt: number): void {
+    const eye = this.walkCamera.position, high = MOUNTAIN && this.graphics.tier === 'gpu' && eye.y > SUMMIT.eye && plateauInside(eye.x, eye.z) > SUMMIT.inside;
+    const target = high ? SUMMIT.fog : this.graphics.fog, eased = target + (this.walkFog - target) * Math.exp(-dt / SUMMIT.ease);
+    const fog = this.capture || Math.abs(eased - target) < .5 ? target : eased;
+    if (fog === this.walkFog) return;
+    this.walkFog = fog; this.walkCamera.far = BUDGET_OFF ? Math.max(150, fog) : fog; this.farCamera.near = this.walkCamera.far * .9;
+    this.walkCamera.updateProjectionMatrix(); this.farCamera.updateProjectionMatrix(); this.setFog();
   }
   /** Sun (or moon), sky environment and hemisphere strengths for this phase. CPU has no PMREM environment: its hemisphere fills. */
   private get light(): Light {
@@ -713,7 +731,7 @@ class Game {
     // A bake seen from the map's menu would otherwise draw empty halls: the map hides interiors and contact shadows.
     const map = this.mapView; if (map) this.town.setMapMode(false);
     // Game time 0, as loading saw it: the trees' sway and the water's ripples then match from one bake to the next.
-    this.town.update(0, this.bakeCamera, MAP_FOG.far, true, this.graphics.shadows ? this.sun.shadow : undefined); this.setFog(true);
+    this.town.update(0, this.bakeCamera, MAP_FOG.far, true, this.graphics.shadows ? this.sun.shadow : undefined); this.setFog(true, this.graphics.fog);
     shadowFade.value.set(0, 0); environment.view = bake.view;
     // The output pipeline's scene target and MRT (render/output.ts), so the bake reuses every compiled shader.
     const { target, targets } = this.output as unknown as { target?: THREE.RenderTarget; targets?: Parameters<THREE.WebGPURenderer['setMRT']>[0] };
@@ -895,7 +913,8 @@ class Game {
     if (this.graphics.shadows) this.frameShadow();
     // Walking re-bakes when near shrubs or tree detail change, so their shadows appear with them; the map keeps its one bake, and
     // so does a probe bake, whose whole-town box already holds every tree.
-    if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : this.graphics.fog, this.mapView, this.graphics.shadows ? this.sun.shadow : undefined) && !this.mapView && this.graphics.shadows && this.bake?.phase !== this.phase) this.sun.shadow.needsUpdate = true;
+    if (!this.mapView && this.mode === 'walking') this.updateWalkFog(dt);
+    if (this.town.update(this.elapsed, camera, this.mapView ? MAP_FOG.far : this.walkFog, this.mapView, this.graphics.shadows ? this.sun.shadow : undefined) && !this.mapView && this.graphics.shadows && this.bake?.phase !== this.phase) this.sun.shadow.needsUpdate = true;
     this.updateExhibitionControls();
     this.clockCheck += rawDt; if (this.clockCheck > 30) { this.clockCheck = 0; if (this.timeOfDay === 'auto') void this.followTimeOfDay(); }
     this.nightLighting.update(camera); this.render(camera);
