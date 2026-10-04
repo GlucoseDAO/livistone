@@ -478,6 +478,10 @@ When behaviour changes, update the docs in the same commit:
 - **AGENTS.md / CLAUDE.md** — conventions, invariants, and commands (this file).
 - **concepts/** is a record of what was generated and approved. Add to it; do not rewrite
   its history.
+- **docs/realism/NEXT.md** holds next steps only, never a changelog. When a task is merged and
+  pushed, delete it from NEXT.md in the same push; what landed lives in git history, the
+  sub-plan doc and docs/3d-game-plan.md. Keep its rules for agents, commands and open owner
+  decisions current.
 
 Do not claim a milestone is met that has not been verified. If something is untested — for
 example physical-device performance or Safari/iOS — say so plainly.

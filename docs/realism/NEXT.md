@@ -1,35 +1,16 @@
-# Realism round 3 — brief
+# Realism — next steps
 
-Start here in a fresh session in `~/sources/livistone`. Read [README.md](README.md) and a sub-plan only when the task needs it; the rules for agents below are binding. Round 2's plan is kept in [round-2.md](round-2.md).
+Start here in a fresh session in `~/sources/livistone`. Read [README.md](README.md) and a sub-plan only when the task needs it; the rules for agents below are binding. This file lists what is still to do; delete a task here in the same push that merges it (AGENTS.md, Documentation duties). Round 2's plan is kept in [round-2.md](round-2.md).
 
-> **Status, 4 October 2026 (night):** `origin/main` carries round-3 tasks 1 and 4 and the Jepii Mici round 2 with its crags. Three finished or nearly finished branches wait to merge (below); merge them first, one at a time, before starting anything new (owner's instruction). The owner reviews everything visual.
-
-## What landed on 4 October 2026 (pushed to `origin/main`)
-
-| Commit | What |
-| --- | --- |
-| `7358bf6` | Task 1: top-bar time button (your time → day → night, `T`), pending pulse, menu select kept in sync (`tests/time-of-day.spec.ts`) |
-| `dbb28cf`, `995cc9c` | Task 4, station round 2 (owner: deeper honey amber; keep the pierced silver plate; leave the ring view): honey amber with glowing folds, darker underside, warm outline; four platform lamps in the night light pool, which now fades a pooled light over its last 4 m; concourse glows −29%; `docs/realism/28-station.md` |
-| `432f35f` … `da7cddc` | [27](27-mountain-trail.md) Jepii Mici round 2, in the owner's order: forbidden-trail board in the woods → benched forest switchbacks → rocky gorge (buttresses, narrow passage with a steel cable, stream) → gully of old snow the trail crosses (slab up to 1.7 m, boot prints baked by `scripts/build-snow-footprints.py`, boulders and branches on it) → rhododendron plateau on top (`alpine-plants.ts`: mats built from painted flower-cluster cards, buttercups, white flowers, moss campion; the round-1 "cactus" shrubs are gone). Near grid to z = -296, HUD stage names, lip fence on the meadow |
-| `f98d619`-line (6 commits, `d0fb81d`) | 27 crags: `crags.ts` and `limestone.ts`, 352 limestone blocks lining the gorge, gully and crest in one draw (gpu 113k triangles) with one trimesh collider, jointed limestone on steep ground; `?crags=off|debug` |
-
-The owner's reference photos for 27 (they show people: never commit them) are in `~/sources/livistone-realism/references/jepii-mici-2/`.
+Work from a worktree, not the owner's checkout `~/sources/livistone` (it holds another session's uncommitted STL docs). The integration worktree `~/sources/livistone-realism/integration` (branch `integration/round-3`) tracks `origin/main`; other sessions push to `main` too, so fetch and rebase before every push, and push small fixes promptly so their work can rebase on yours.
 
 ## Next, in order
 
-### 1. Merge the waiting branches (each: rebase onto `origin/main`, gates, `git push origin <branch>:main` as a fast-forward)
+### 1. Summit view (owner's decision: "clear view, desktop only")
 
-Merge from a worktree: the owner's checkout `~/sources/livistone` holds another session's uncommitted STL docs and stays at `32e3e7e`; do not pull over it. The integration worktree `~/sources/livistone-realism/integration` (branch `integration/round-3`) is where the pushes above were made.
+From the plateau (stand at `(-26, -258)` facing south, the `plateau-view` capture) the town is fog today. `Town.update` and `aerialParams(tier, full)` accept a per-frame full-fog distance, and the forest re-selects only after 2 m of camera travel plus reach change. On the gpu tier only, grow the walking full-fog distance from `graphics.fog` (130 m) toward about 330 m as the walker stands high on the plateau (e.g. eye above 38 m and `plateauInside > -4`, eased over a few seconds), and feed it each frame to the walk camera's far plane, the distant pass's near plane (90%), `setFog`'s aerial parameters and `Town.update`. Measure the plateau view's draws, triangles and frame time before and after; mobile and cpu keep today's haze.
 
-1. **Haze (task 3), `realism/21-haze`, finished** (4 commits on `0ea11ed`; the branch's `docs/realism/21-contrast-aerial.md` follow-up section has the numbers). The haze fades into what the distant pass drew; trees stop at 90% of full fog (desktop triangles 2.70M → 2.50M); the Mitoring amber keeps its hue at night; `?haze=classic`. Expect conflicts with the station in `night-lighting.ts` (a trial merge was clean) and docs. Gates: build, Vitest, post/night/graphics-profile on both backends.
-2. **Mountain water, `realism/27-mountain-water`, finished, agent says ready** (9 commits, rebased onto `da7cddc`; pre-rebase backup branch `backup/27-mountain-water-edc50a8` to delete after the merge). `mountain-water.ts`: a 17.7 m waterfall from the plateau's lip into the gorge's pool with wet rock and mist, the gorge stream from under the snow (reusing the river's shader), the plateau brook, and the snow cave at the snout (a 1.5 m snow tongue with a 0.7 m lip over a 1.4 × 0.8 m mouth). +4 draws, a few thousand triangles. Full report: `~/sources/livistone-realism/review/27-mountain-water/REPORT.md`. Before merging: rebase onto `main` (the crags are in now), then check that no crag block stands on the waterfall's wall, over the streams or the cave (the crags keep a 3 m slot for the fall); capture the fall from the gorge floor (-17, -243, looking north, pitch 0.55). Also fix the cpu tier's `this.root.add(...plants.meshes)` with an empty array (a one-line length guard) and mention the water in README's Jepii Mici row. The owner may want a bigger, two-tier fall like the cirque photograph.
-3. **Probes after load (task 2), `realism/07-probes-after-load`, finished, agent says ready** (6 commits on `0ea11ed`). Time to ready now matches `?probes=off`; the first night switch builds 1 shader instead of 177; one shared `ProbeEnvironment` node, bake one face a frame after ready, night prebaked in the background then re-baked under the moon. Full report with numbers: `~/sources/livistone-realism/review/07-probes-after-load/REPORT.md`. Before merging: run `tests/railway.spec.ts` and `tests/nearby.spec.ts` (not reached), and ask the owner about memory: both phases are now held within ~25 s of a visit (+213 MB textures on gpu); options are gpu-only prebake, a 512 px night sky prefilter (−75 MB), or a lazy night bake.
-
-### 2. Summit view (owner's decision: "clear view, desktop only")
-
-From the plateau (stand at `(-26, -258)` facing south, the `plateau-view` capture) the town is fog today. After the haze branch is in (its `Town.update` and `aerialParams(tier, full)` accept a per-frame full-fog distance and its forest re-selects only after 2 m of camera travel plus reach change): on the gpu tier only, grow the walking full-fog distance from `graphics.fog` (130 m) toward about 330 m as the walker stands high on the plateau (e.g. eye above 38 m and `plateauInside > -4`, eased over a few seconds), and feed it each frame to the walk camera's far plane, the distant pass's near plane (90%), `setFog`'s aerial parameters and `Town.update`. Measure the plateau view's draws, triangles and frame time before and after; mobile and cpu keep today's haze.
-
-### 3. Jepii Mici follow-ups (27)
+### 2. Jepii Mici follow-ups (27)
 
 - The crags read as rock now, but up close blocks look built (bevelled slabs) and the crest's rounded masses like pillows; the 60° terrain faces between and above blocks are smooth; a few fins remain at the wall foot in the waterfall slot. The 2 m terrain grid cannot draw sheer walls (they alias into fins): keep sheer rock in meshes.
 - Conifers: the gorge and upper woods have only oak and ash. EZ-Tree (already a dev dependency) has `Pine Small/Medium/Large` presets; a spruce GLB via `scripts/generate-trees.mjs` (hard-coded to port 5173: make the URL configurable) and a mountain species mix above about 15 m would match the owner's photographs (spruce and larch above the gorge, dwarf pine on ledges). Budget the extra forest draws.
@@ -37,23 +18,24 @@ From the plateau (stand at `(-26, -258)` facing south, the `plateau-view` captur
 - Faint dark lines in the sky in `ridge-north` and `trail-from-path` also appear with `?mountain=off` (from `main`'s sky or distant pass); not investigated.
 - Not captured yet for round 2: touch and software captures of the `mountain` set, night views of the gorge and plateau.
 
-### 4. Tests and verification (task 6)
+### 3. Tests and verification (task 6)
 
 - `tests/station.spec.ts` does not load under Playwright (`tsconfig.playwright.json` leaves `three` on the classic build, so `MeshBasicNodeMaterial` is undefined via `train.ts` → `render/output.ts`). Fix the resolution, not the spec.
-- WebGL 2 runs of `tests/post.spec.ts` and `tests/night.spec.ts` time out at 120 s when the machine is loaded (main's own source too; night passed interleaved at 1.2–1.3 min on both). Run the full suite on a quiet machine on both backends; raise a timeout only with a written reason.
+- WebGL 2 runs of `tests/post.spec.ts` and `tests/night.spec.ts` time out at 120 s when the machine is loaded (night passed interleaved at 1.2–1.3 min on both; post took 1.9 min alone at load average 8–11 on 4 October). Run the full suite on a quiet machine on both backends; raise a timeout only with a written reason.
 - Vitest under load: heavy files (path-network, railway, grass-field) hit the 5 s default; `--maxWorkers=1 --testTimeout=20000` passes 224/224.
 - Physical devices, Safari 26 (macOS, iOS), Firefox and an Android phone remain untested.
-- Regenerate the share images (`bun scripts/build-share-images.ts`) once the round-3 merges are in: the arrival path changed (station, haze).
+- Regenerate the share images (`bun scripts/build-share-images.ts`): the arrival path changed (station, haze).
 
-### 5. Parked work (task 7)
+### 4. Parked work (task 7)
 
 - **08 building materials:** WIP `5d893ca` on `realism/08-materials` (worktree `07-08-materials`), built on the old 07; rebase onto `main`, finish, review.
 - **15 water reflections:** uncommitted work in worktree `15-reflections` (6 files, based on `36eca2b`); commit as WIP first, then rebase (conflicts with 21 in `output.ts` and `main.ts`).
 - **05 golden hour:** not started; builds on 26's atmosphere and 21's haze.
 
-### 6. Housekeeping (task 8)
+### 5. Housekeeping (task 8)
 
-- Worktrees whose branches are merged or superseded can go: `07-merge`, `17-wind`, `21-contrast`, `27-mountain-trail`, `28-station`, `28-station-2`, `r3-time-button`, `27-jepii-mici-2`, `27-crags`, `fix-intersections`, `main-baseline` (detached) and, after the merges above, `21-haze`, `27-mountain-water`, `07-probes-after-load`, `integration`. Check each for uncommitted work first; stop any dev server it runs (`ss -ltnp | grep 51`).
+- Worktrees whose branches are merged or superseded can go: `07-merge`, `07-probes-after-load`, `17-wind`, `21-contrast`, `21-haze`, `27-mountain-trail`, `27-mountain-water`, `28-station`, `28-station-2`, `r3-time-button`, `27-jepii-mici-2`, `27-crags`, `fix-intersections`. Check each for uncommitted work first; stop any dev server it runs (`ss -ltnp | grep 51`). Keep `integration` and `main-baseline` (detached, port 5194).
+- Local branches merged into `main` can go with them; `backup/27-mountain-water-edc50a8` too.
 - Stale remote branches `origin/realism/16-contact`, `origin/realism/21-on-round-2`: delete only with the owner's approval.
 - The owner's checkout `~/sources/livistone`: `git pull --rebase` once the STL catalogue docs there are committed or set aside, never over them.
 
