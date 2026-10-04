@@ -165,10 +165,13 @@ function physicalDay(darkGround: boolean, tier: GraphicsTier, noise: THREE.Data3
 }
 
 const MILKY_WAY = new THREE.Vector3(.42, .5, -.76).normalize(), GALACTIC_CENTRE = new THREE.Vector3(.66, .28, .7).normalize().projectOnPlane(MILKY_WAY).normalize();
-/** Night: a moonlit gradient, stars of graded brightness and colour, a faint Milky Way with dust lanes, and the moon. */
-function physicalNight(size: number, haze = false): V3 {
+/**
+ * Night: a moonlit gradient, stars of graded brightness and colour, a faint Milky Way with dust lanes, and the moon. `starsOf`: the
+ * bake size whose stars these match in light, when drawn wider for a smaller bake.
+ */
+function physicalNight(size: number, haze = false, starsOf = size): V3 {
   // Star discs about one cube texel wide: smaller ones would fall between texels.
-  const texel = Math.PI / 2 / size;
+  const texel = Math.PI / 2 / size, light = (size / starsOf) ** 2;
   return Fn(() => {
     const d = below(haze).toVar(), elevation = max(d.y, 0), visible = smoothstep(.02, .18, d.y).toVar();
     const dark = mix(vec3(...NIGHT_BASE), vec3(.032, .052, .115), pow(elevation, .5)).toVar();
@@ -183,7 +186,7 @@ function physicalNight(size: number, haze = false): V3 {
       const grid = d.mul(cells).toVar(), cell = floor(grid).toVar(), random = hash33(cell).toVar();
       const position = normalize(cell.add(random.mul(.7).add(.15))), gap = length(d.sub(position)).toVar();
       const inBand = band.mul(cells > 100 ? 1.1 : .3).add(1);
-      const magnitude = pow(hash13(cell.add(41.3)), 7).mul(bright * 3.5).add(bright * .08), colour = mix(vec3(.7, .82, 1), vec3(1, .86, .66), hash13(cell.add(7.7)));
+      const magnitude = pow(hash13(cell.add(41.3)), 7).mul(bright * 3.5 * light).add(bright * .08 * light), colour = mix(vec3(.7, .82, 1), vec3(1, .86, .66), hash13(cell.add(7.7)));
       dark.addAssign(colour.mul(magnitude).mul(exp(gap.mul(gap).div(-(texel * texel * .55)))).mul(step(float(1 - chance).div(inBand), hash13(cell.add(19.1)))).mul(visible));
     }
     const moonLight = max(dot(d, vec3(MOON_DIR)), 0).toVar();
@@ -291,8 +294,12 @@ export function* skyBake(renderer: THREE.WebGPURenderer, mobile: boolean, night 
   const target = yield* bake(size);
   if (tier === 'cpu') { clouds?.dispose(); geometry.dispose(); material.dispose(); return { background: target.texture, environment: target.texture, haze: target.texture }; }
   yield;
-  // The reflections keep the classic bake size: PMREM grows fourfold per doubling of the cube, and every lit surface samples it.
-  const small = size > bakeSize(tier, night, 'classic') ? yield* bake(bakeSize(tier, night, 'classic')) : null;
+  // The reflections prefilter from the classic day bake's size, by night too: PMREM grows fourfold per doubling of the cube, and
+  // every lit surface samples it (the gpu night's 100 MB became 25 MB once the night was prebaked on every visit, sub-plan 07).
+  // The night redraws its stars a texel wide at that size with the same light each: the water shows them softer, not missing.
+  const reflections = graphicsProfile(tier).skyDay / 2;
+  if (size > reflections && night && look === 'physical') { material.colorNode = physicalNight(reflections, false, size); material.needsUpdate = true; }
+  const small = size > reflections ? yield* bake(reflections) : null;
   if (small) yield;
   const pmrem = new THREE.PMREMGenerator(renderer), environment = pmrem.fromCubemap((small ?? target).texture).texture;
   yield;
