@@ -17,6 +17,8 @@ Built on branch `realism/summit-view` (pushed, not merged): on the gpu tier, hig
 - The waterfall photo has grassy ledges with dwarf pines and larches on the cirque walls; the gully photo has the stream running out under a thick snow lip (the water branch's snow cave).
 - Round 2's `mountain` set on touch and software (day) and desktop night is captured in `review/27-mountain-tiers/main/` (no before; for reference).
 
+- Haze (21) against cloud: tall rock 100–130 m away (the north ridge's crags in `ridge-north`) fades into what the distant pass drew behind it, which there is cumulus, so the cliff reads as translucent with clouds through it. Before the haze follow-up it faded to the horizon haze instead (a pale cut-out). Owner to judge; one option is to fade toward the haze cube's blurred sky (no clouds) above the horizon and toward the distant pass only near and below it.
+
 ### 3. Tests and verification (task 6)
 
 - Run the full suite on both backends on a quiet machine (the WebGL 2 fallback's post and night specs now allow 240 s, with the reason in each spec).
