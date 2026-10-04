@@ -14,7 +14,7 @@ Loading prepares the arrival view first. Day and night building reflections come
 
 **[▶ Visit Livistone](https://livistone.liviazaharia.com/)** (a recent browser is all you need) · [Run it locally](#run-it-locally) · [How it's made](#how-its-made) · [Technical guide](docs/technical-guide.md)
 
-## Eleven stops, each from a real work or place
+## Thirteen stops, each from a real work or place
 
 ![The civic centre at street level: the amber Ministry of Energy on the left, the walnut City Hall in the middle and the silver-lattice Ministry of Science on the right, with the spiral gallery of Timeface Tower behind it, among paved paths, flowers and grass](docs/images/livistone-centre.jpg)
 
@@ -25,14 +25,16 @@ Every building and garden starts from something Livia actually made: a ring, a p
 | 1 | **Embryo Station** | The Embryo Ring: raw amber held in silver prongs | You arrive here, under a canopy of deep honey amber that glows from within: a pierced silver ring entrance, a lamplit platform with benches, a clock and a departures board, and a parked maglev train you can board |
 | 2 | **Ministry of Energy** | The Mitoring: amber in silver folds that recall the cristae inside mitochondria | A long amber hall, entered through the ring itself |
 | 3 | **Ministry of Science** | The Nanot of Power pendant | A glass hall inside the pendant's silver lattice |
-| 4 | **City Hall** | The Nut of Power: a walnut shell, amethyst and brass | The heart of the town, joined by brass clasps |
-| 5 | **Timeface Tower** | Timeface and older studio works | A spiral gallery round a silver hourglass, with a terrace above the town |
-| 6 | **Glucose Commons** | Livia's GlucoseDAO research | A walk beneath human insulin, traced from its atomic structure; six chapters of the research |
-| 7 | **Vittoria Lake** | The Vittoria Amazonica pendant and the Dewdrop ring | Silver walkways between water pools and a faceted blue pavilion |
-| 8 | **Future House** | Camel Dalí: copper, a 3D-printed part and leather | A copper camel drinking from the lake. Climb its neck into the exhibition cabin |
-| 9 | **Mycelium Rain Garden** | The Mycelium ring, whose silver folds let water drain off its opal | Tall silver mushrooms with opal hearts and a visible rain rill |
-| 10 | **Materialized Enhancements** | The [enhancement.bio](https://enhancement.bio/) bioart project | A violet Voronoi hill to climb, with gene-category crystals grown by the project itself |
-| 11 | **Jepii Mici** | A real, steep trail in Romania's Bucegi Mountains, marked with a blue cross and closed in winter | A mountain trail beyond the lake: from a forest trailhead and its warning board, up a rocky gorge with a stream running out of a snow cave, past a gully of old snow and a 17 m waterfall off the plateau's lip, to a plateau of rhododendrons and its brook |
+| 4 | **Eyelense Gate** | Eyelense: a broken sunglass lens, black printed crescents, glass and brass | A rounded red bead with a real arched passage, a smoky overhead lens that clears at night, and a limestone meadow forecourt beyond Science |
+| 5 | **City Hall** | The Nut of Power: a walnut shell, amethyst and brass | The heart of the town, joined by brass clasps |
+| 6 | **Timeface Tower** | Timeface and older studio works | A spiral gallery round a silver hourglass, with a terrace above the town |
+| 7 | **Glucose Commons** | Livia's GlucoseDAO research | A walk beneath human insulin, traced from its atomic structure; six chapters of the research |
+| 8 | **Vittoria Lake** | The Vittoria Amazonica pendant and the Dewdrop ring | Silver walkways between water pools and a faceted blue pavilion |
+| 9 | **Future House** | Camel Dalí: copper, a 3D-printed part and leather | A copper camel drinking from the lake. Climb its neck into the exhibition cabin |
+| 10 | **Mycelium Rain Garden** | The Mycelium ring, whose silver folds let water drain off its opal | Tall silver mushrooms with opal hearts and a visible rain rill |
+| 11 | **Materialized Enhancements** | The [enhancement.bio](https://enhancement.bio/) bioart project | A violet Voronoi hill to climb, with gene-category crystals grown by the project itself |
+| 12 | **Jepii Mici** | A real, steep trail in Romania's Bucegi Mountains, marked with a blue cross and closed in winter | A mountain trail beyond the lake: from a forest trailhead and its warning board, up a rocky gorge with a stream running out of a snow cave, past a gully of old snow and a 17 m waterfall off the plateau's lip, to a plateau of rhododendrons and its brook |
+| 13 | **Eye of Winter** | Eye of Winter ring and pendant: silver, quartz and topaz | A two-stone eye west of the town, with the original silver ring, a connected approach, an opening hexagonal iris and a room |
 
 The facts, photographs and research come from Livia's work and link to their sources; the Jepii Mici trail is a real place, and everything Livistone builds round it is fiction. The powers the town gives its artifacts (the "Livia Lore") are fiction, and the game labels them that way.
 

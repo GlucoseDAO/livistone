@@ -26,8 +26,8 @@ This is the working plan for bringing Livia's jewelry STLs into the town as real
 | 1. Hovering featured model per building (`src/game/featured.ts`, `planar-exhibition.ts`) | **Done, desktop-verified** (captures below). Touch and software captures and a Playwright spec are still to do |
 | 2. Mycelium Ring above the opal orb (`living-waters.ts`) | **Done, desktop-verified** |
 | 3a. Eye of Winter (west) | **Winter G approved 4 October 2026.** First two-stone building model in `winter-gate.ts`; original silver preserved, operable hexagonal iris and connected approach. Material and winter-garden polish remain. |
-| 3b. Eyelense Gate (east) | Same: rejected, regenerate from the brief (the piece is black PLA with brass rings, not brass) |
-| Frame budget | The script now reads jewelry GLBs and classifies "hovering jewelry models". It has not been run to completion: the earlier attempt hung waiting for poster photos under Bun |
+| 3b. Eyelense Gate (east) | **E implemented 4 October 2026.** Glossy black source crescent, brass threading, curved day/night lens and a real tunnel through a rounded red bead; connected limestone forecourt, seats, map, story and colliders. [Implementation record](../concepts/15-moon-gates/notes.md). |
+| Frame budget | The script reads jewellery GLBs and includes both gate producers. The Eyelense implementation run completed for GPU/mobile; its group uses eight draws in each tier. These are geometry estimates, not physical-device timings. |
 | Docs | This page and AGENTS.md (the never-commit-originals rule). README, the game plan status and the catalogue "In Livistone" column wait until the gates exist |
 
 ### How it works now
@@ -111,11 +111,13 @@ LIVISTONE_PARAMS=featured=off bun scripts/screenshot-realism.ts output/testing/j
    - **First building study:** raised hexagonal floor and side seats, gently graded connected path from route 3, full planting clearance, mesh-matched collision and an opening/closing door collider. A silver strut remains intact behind the usable room.
    - **Review/export:** [interactive 3D preview](../concepts/15-moon-gates/explorations-2026-10-04/model.html); `bun scripts/build-winter-building.ts` exports the GLB under `concepts/15-moon-gates/models/` with provenance.
    - **Next art pass:** tune stone reflections and refraction, bezel seating, floor/foundation dressing and the localized winter garden. The image's snow, pond and lights are not implemented in this first building study.
-4. **Eyelense Gate**, files `eyelense-gate.ts` and `eyelense-gate-layout.ts`, around (106, −36):
-   - **Path.** Branch off route 5 at (80, −34).
-   - **Geometry.** Crescents upright at about 0.14 m/mm (~10 m) in brass, with the screw studs as columns.
-   - **Lens.** A disc in the upper eye whose tint follows day and night (`daylight.ts`). It is opaque on the low tier.
-   - **Colliders.** Feet and lower rim only.
+4. **Eyelense Gate — implemented**, `eyelense-gate.ts` and `eyelense-gate-layout.ts`, at (106, −36):
+   - **Reference:** [E — passage through the bead](../concepts/15-moon-gates/images/12-eyelense-e-red-bead-passage.png), requested through [the implementation plan](eyelense-e-implementation-plan.md). Generated artwork stays distinct from actual building captures.
+   - **Geometry:** source gate crescent retained under uniform 1.65× scale (16.5 m wide) and rigid placement. Separate glossy black swirls restore raised relief absent from optimization; brass belongs to threading and fittings.
+   - **Passage:** a closed rounded red shell around a 4.2 × 4.4 m arch, continuous front-to-back tunnel lining and sealed soles. The clear surround leaves the passage open. Floors, bead, source crescent, bounded overhead lens and seats have matching colliders.
+   - **Site:** branch from the Science-side route at (80, −34), level limestone forecourt, side benches and complete shared ground/canopy clearances. The terrain grade eases into the east meadow; no winter effects.
+   - **Lens:** smoky grey-brown by day and clearer by night, using the existing resolved daylight state. Its own quality tag preserves opaque reflective reduced fallbacks.
+   - **Review/export:** `bun scripts/build-eyelense-building.ts` writes [the GLB](../concepts/15-moon-gates/models/eyelense-e-building.glb) and [source comparison/provenance](../concepts/15-moon-gates/models/eyelense-e-sources.json). The original physical catalogue entry remains in Future House.
 5. **Shared gate wiring:**
    - In `content.ts`: the `LandmarkId` union, `LANDMARKS` inserted in route order, and `DISCOVERIES` (Eye of Winter lore labelled as Livia Lore fiction; Eyelense uses the artist's broken-lens text).
    - `nearby.ts`, plus `groundReserved` and `canopyReserved` clearances in `landscape.ts`.

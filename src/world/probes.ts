@@ -1,3 +1,4 @@
+import { EYELENSE } from './eyelense-gate-layout';
 // Reflection probes (realism sub-plan 07): each building-piece reflects its own surroundings instead of the bare baked sky.
 // One cube per exterior site (with that building's envelope hidden) and one per hall interior is rendered and prefiltered with
 // the node PMREMGenerator, once per sky phase. The bake runs after the town is ready, one cube face per frame (ProbeBake), so
@@ -23,6 +24,7 @@ export interface ProbeSite { id: string; landmark: string; kind: ProbeKind; posi
  * 4.4 m depth), GATEWAY, TIME_TOWER and FUTURE_HOUSE.
  */
 export const PROBE_SITES: readonly ProbeSite[] = [
+  { id: 'eyelense-gate', landmark: 'eyelense-gate', kind: 'exterior', position: [EYELENSE.x, 5, EYELENSE.z] },
   { id: 'winter-gate', landmark: 'winter-gate', kind: 'exterior', position: [-108, 9.12, -30] },
   { id: 'city-hall', landmark: 'city-hall', kind: 'exterior', position: [0, 5.9, -21] },
   { id: 'energy', landmark: 'energy', kind: 'exterior', position: [-29, 4.4, -9] },

@@ -1,3 +1,4 @@
+import { eyelenseGround } from '../src/world/eyelense-gate-layout';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { PROBE_SITES, ProbeEnvironment, ReflectionProbes, litMaterials, reflective, refreshEnvironment } from '../src/world/probes';
@@ -15,6 +16,7 @@ const at = (id: string) => LANDMARKS.find(landmark => landmark.id === id)!;
 const pmrem = (size: number) => { const texture = new THREE.Texture({ width: 3 * Math.max(size, 112), height: 4 * size }); texture.mapping = THREE.CubeUVReflectionMapping; return texture; };
 /** Each building-piece's footprint and roof height, from the layouts that place it. */
 const FOOTPRINTS: Record<string, (x: number, y: number, z: number) => boolean> = {
+  'eyelense-gate': (x, y, z) => eyelenseGround(x, z) && y < 14,
   'winter-gate': (x, y, z) => ((x - WINTER.quartzX) / WINTER.depth) ** 2 + ((y - WINTER.centreY) / WINTER.radius) ** 2 + ((z - WINTER.z) / WINTER.radius) ** 2 < 1,
   'city-hall': (x, y, z) => Math.hypot(x - at('city-hall').x, z - at('city-hall').z) < CITY_HALL.radius && y < CITY_HALL.centerY + CITY_HALL.radius,
   energy: (x, y, z) => Math.hypot((x - at('energy').x) / ENERGY_HALL.a, (z - at('energy').z) / ENERGY_HALL.b) < 1 && y < ENERGY_HALL.wall + ENERGY_HALL.dome,
@@ -35,7 +37,7 @@ describe('reflection probes', () => {
   });
   it('gives each building-piece an exterior probe and each civic hall and the concourse an interior one', () => {
     const exterior = PROBE_SITES.filter(site => site.kind === 'exterior').map(site => site.landmark), interior = PROBE_SITES.filter(site => site.kind === 'interior').map(site => site.landmark);
-    expect(exterior.sort()).toEqual(['city-hall', 'energy', 'future-house', 'gateway', 'science', 'station', 'timeface', 'winter-gate']);
+    expect(exterior.sort()).toEqual(['city-hall', 'energy', 'eyelense-gate', 'future-house', 'gateway', 'science', 'station', 'timeface', 'winter-gate']);
     expect(interior.sort()).toEqual([...CIVIC_LANDMARKS.map(landmark => landmark.id), 'station'].sort());
     expect(new Set(PROBE_SITES.map(site => site.id)).size).toBe(PROBE_SITES.length);
   });

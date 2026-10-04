@@ -1,0 +1,474 @@
+{
+  "gpu": {
+    "Living Waters": {
+      "static": {
+        "lake, paths, pavilion": {
+          "calls": 40,
+          "triangles": 111131
+        },
+        "mycelium grove": {
+          "calls": 3,
+          "triangles": 1748460
+        }
+      },
+      "perView": {
+        "lake, paths, pavilion": {
+          "calls": 15.179487179487179,
+          "triangles": 65124.38461538462,
+          "views": 39,
+          "maxCalls": 39,
+          "maxTriangles": 111083
+        },
+        "mycelium grove": {
+          "calls": 1.3846153846153846,
+          "triangles": 59162.92307692308,
+          "views": 17,
+          "maxCalls": 6,
+          "maxTriangles": 639786
+        }
+      }
+    },
+    "Glucose Commons": {
+      "static": {
+        "structure and posters": {
+          "calls": 15,
+          "triangles": 17876
+        }
+      },
+      "perView": {
+        "structure and posters": {
+          "calls": 5.923076923076923,
+          "triangles": 7630.7692307692305,
+          "views": 18,
+          "maxCalls": 15,
+          "maxTriangles": 17876
+        }
+      }
+    },
+    "Enhancement hill": {
+      "static": {
+        "shell, ramp, figure": {
+          "calls": 10,
+          "triangles": 45666
+        },
+        "climb markers": {
+          "calls": 2,
+          "triangles": 652
+        }
+      },
+      "perView": {
+        "shell, ramp, figure": {
+          "calls": 0.6153846153846154,
+          "triangles": 2635.641025641026,
+          "views": 6,
+          "maxCalls": 10,
+          "maxTriangles": 45666
+        },
+        "climb markers": {
+          "calls": 0.20512820512820512,
+          "triangles": 81.94871794871794,
+          "views": 5,
+          "maxCalls": 2,
+          "maxTriangles": 652
+        }
+      }
+    },
+    "Terrain": {
+      "static": {
+        "meadow and ridges": {
+          "calls": 31,
+          "triangles": 453462
+        }
+      },
+      "perView": {
+        "meadow and ridges": {
+          "calls": 7.897435897435898,
+          "triangles": 87006.2564102564,
+          "views": 39,
+          "maxCalls": 11,
+          "maxTriangles": 117196
+        }
+      }
+    },
+    "Planting": {
+      "static": {},
+      "perView": {
+        "Meadow grass": {
+          "calls": 0.8205128205128205,
+          "triangles": 107057.43589743589,
+          "views": 32,
+          "maxCalls": 1,
+          "maxTriangles": 181560
+        },
+        "Flower borders": {
+          "calls": 0.7948717948717948,
+          "triangles": 44418.769230769234,
+          "views": 31,
+          "maxCalls": 1,
+          "maxTriangles": 88396
+        },
+        "Leafy shrubs": {
+          "calls": 1.9487179487179487,
+          "triangles": 210705.23076923078,
+          "views": 29,
+          "maxCalls": 3,
+          "maxTriangles": 497808
+        }
+      }
+    },
+    "Eyelense Gate": {
+      "static": {
+        "crescent, bead, lens and forecourt": {
+          "calls": 8,
+          "triangles": 40610
+        }
+      },
+      "perView": {
+        "crescent, bead, lens and forecourt": {
+          "calls": 1.6153846153846154,
+          "triangles": 8240.666666666666,
+          "views": 10,
+          "maxCalls": 8,
+          "maxTriangles": 40610
+        }
+      }
+    },
+    "Eye of Winter": {
+      "static": {
+        "original silver": {
+          "calls": 1,
+          "triangles": 30000
+        },
+        "two stones": {
+          "calls": 2,
+          "triangles": 16655
+        },
+        "room and iris": {
+          "calls": 26,
+          "triangles": 2988
+        }
+      },
+      "perView": {
+        "original silver": {
+          "calls": 0.07692307692307693,
+          "triangles": 2307.6923076923076,
+          "views": 3,
+          "maxCalls": 1,
+          "maxTriangles": 30000
+        },
+        "two stones": {
+          "calls": 0.15384615384615385,
+          "triangles": 1281.1538461538462,
+          "views": 3,
+          "maxCalls": 2,
+          "maxTriangles": 16655
+        },
+        "room and iris": {
+          "calls": 1.4102564102564104,
+          "triangles": 154.35897435897436,
+          "views": 3,
+          "maxCalls": 26,
+          "maxTriangles": 2988
+        }
+      }
+    },
+    "Posters": {
+      "static": {
+        "six collections": {
+          "calls": 156,
+          "triangles": 4416
+        }
+      },
+      "perView": {
+        "six collections": {
+          "calls": 18.102564102564102,
+          "triangles": 923.3333333333334,
+          "views": 28,
+          "maxCalls": 72,
+          "maxTriangles": 2228
+        },
+        "hovering jewelry models": {
+          "calls": 0.3333333333333333,
+          "triangles": 4,
+          "views": 11,
+          "maxCalls": 2,
+          "maxTriangles": 24
+        }
+      }
+    },
+    "Forest, every branch": {
+      "static": {},
+      "perView": {
+        "branches": {
+          "calls": 1.9487179487179487,
+          "triangles": 565681.7435897436,
+          "views": 39,
+          "maxCalls": 2,
+          "maxTriangles": 1405908
+        },
+        "foliage": {
+          "calls": 2.717948717948718,
+          "triangles": 409472,
+          "views": 39,
+          "maxCalls": 4,
+          "maxTriangles": 938496
+        }
+      }
+    },
+    "Forest": {
+      "static": {},
+      "perView": {
+        "branches": {
+          "calls": 2.717948717948718,
+          "triangles": 319825.74358974356,
+          "views": 39,
+          "maxCalls": 4,
+          "maxTriangles": 758676
+        },
+        "foliage": {
+          "calls": 2.717948717948718,
+          "triangles": 409472,
+          "views": 39,
+          "maxCalls": 4,
+          "maxTriangles": 938496
+        }
+      }
+    }
+  },
+  "mobile": {
+    "Living Waters": {
+      "static": {
+        "lake, paths, pavilion": {
+          "calls": 40,
+          "triangles": 83681
+        },
+        "mycelium grove": {
+          "calls": 3,
+          "triangles": 592900
+        }
+      },
+      "perView": {
+        "lake, paths, pavilion": {
+          "calls": 12.333333333333334,
+          "triangles": 44732.64102564102,
+          "views": 39,
+          "maxCalls": 33,
+          "maxTriangles": 83613
+        },
+        "mycelium grove": {
+          "calls": 1.1538461538461537,
+          "triangles": 20535.897435897437,
+          "views": 14,
+          "maxCalls": 6,
+          "maxTriangles": 267140
+        }
+      }
+    },
+    "Glucose Commons": {
+      "static": {
+        "structure and posters": {
+          "calls": 16,
+          "triangles": 8660
+        }
+      },
+      "perView": {
+        "structure and posters": {
+          "calls": 6.282051282051282,
+          "triangles": 3556.5128205128203,
+          "views": 18,
+          "maxCalls": 16,
+          "maxTriangles": 8660
+        }
+      }
+    },
+    "Enhancement hill": {
+      "static": {
+        "shell, ramp, figure": {
+          "calls": 10,
+          "triangles": 45666
+        },
+        "climb markers": {
+          "calls": 2,
+          "triangles": 652
+        }
+      },
+      "perView": {
+        "shell, ramp, figure": {
+          "calls": 0.3333333333333333,
+          "triangles": 1368.820512820513,
+          "views": 4,
+          "maxCalls": 9,
+          "maxTriangles": 42024
+        },
+        "climb markers": {
+          "calls": 0.1282051282051282,
+          "triangles": 49.333333333333336,
+          "views": 3,
+          "maxCalls": 2,
+          "maxTriangles": 652
+        }
+      }
+    },
+    "Terrain": {
+      "static": {
+        "meadow and ridges": {
+          "calls": 31,
+          "triangles": 227099
+        }
+      },
+      "perView": {
+        "meadow and ridges": {
+          "calls": 7.358974358974359,
+          "triangles": 67798.56410256411,
+          "views": 39,
+          "maxCalls": 11,
+          "maxTriangles": 102697
+        }
+      }
+    },
+    "Planting": {
+      "static": {},
+      "perView": {
+        "Meadow grass": {
+          "calls": 0.8205128205128205,
+          "triangles": 16120.51282051282,
+          "views": 32,
+          "maxCalls": 1,
+          "maxTriangles": 29025
+        },
+        "Flower borders": {
+          "calls": 0.7948717948717948,
+          "triangles": 11900.51282051282,
+          "views": 31,
+          "maxCalls": 1,
+          "maxTriangles": 21976
+        },
+        "Leafy shrubs": {
+          "calls": 1.794871794871795,
+          "triangles": 59342.769230769234,
+          "views": 29,
+          "maxCalls": 3,
+          "maxTriangles": 157920
+        }
+      }
+    },
+    "Eyelense Gate": {
+      "static": {
+        "crescent, bead, lens and forecourt": {
+          "calls": 8,
+          "triangles": 30202
+        }
+      },
+      "perView": {
+        "crescent, bead, lens and forecourt": {
+          "calls": 1.2820512820512822,
+          "triangles": 5327.025641025641,
+          "views": 9,
+          "maxCalls": 8,
+          "maxTriangles": 30202
+        }
+      }
+    },
+    "Eye of Winter": {
+      "static": {
+        "original silver": {
+          "calls": 1,
+          "triangles": 30000
+        },
+        "two stones": {
+          "calls": 2,
+          "triangles": 4342
+        },
+        "room and iris": {
+          "calls": 26,
+          "triangles": 2988
+        }
+      },
+      "perView": {
+        "original silver": {
+          "calls": 0.07692307692307693,
+          "triangles": 2307.6923076923076,
+          "views": 3,
+          "maxCalls": 1,
+          "maxTriangles": 30000
+        },
+        "two stones": {
+          "calls": 0.15384615384615385,
+          "triangles": 334,
+          "views": 3,
+          "maxCalls": 2,
+          "maxTriangles": 4342
+        },
+        "room and iris": {
+          "calls": 1.4102564102564104,
+          "triangles": 154.35897435897436,
+          "views": 3,
+          "maxCalls": 26,
+          "maxTriangles": 2988
+        }
+      }
+    },
+    "Posters": {
+      "static": {
+        "six collections": {
+          "calls": 156,
+          "triangles": 4416
+        }
+      },
+      "perView": {
+        "six collections": {
+          "calls": 18.102564102564102,
+          "triangles": 923.3333333333334,
+          "views": 28,
+          "maxCalls": 72,
+          "maxTriangles": 2228
+        },
+        "hovering jewelry models": {
+          "calls": 0.3333333333333333,
+          "triangles": 4,
+          "views": 11,
+          "maxCalls": 2,
+          "maxTriangles": 24
+        }
+      }
+    },
+    "Forest, every branch": {
+      "static": {},
+      "perView": {
+        "branches": {
+          "calls": 1.8717948717948718,
+          "triangles": 217221.84615384616,
+          "views": 37,
+          "maxCalls": 2,
+          "maxTriangles": 547648
+        },
+        "foliage": {
+          "calls": 2.5128205128205128,
+          "triangles": 155008,
+          "views": 37,
+          "maxCalls": 4,
+          "maxTriangles": 384384
+        }
+      }
+    },
+    "Forest": {
+      "static": {},
+      "perView": {
+        "branches": {
+          "calls": 2.5128205128205128,
+          "triangles": 129101.23076923077,
+          "views": 37,
+          "maxCalls": 4,
+          "maxTriangles": 313888
+        },
+        "foliage": {
+          "calls": 2.5128205128205128,
+          "triangles": 155008,
+          "views": 37,
+          "maxCalls": 4,
+          "maxTriangles": 384384
+        }
+      }
+    }
+  }
+}

@@ -133,7 +133,7 @@ One row per work. "Parts" counts the printable bodies of the latest version; **h
 | ["sperecels" spiral dome](#spere-dome) | 2025-26 | multi-part set | (unplaced) | 1 (3 studies) | 485 k | — |
 | [Thunderstone](#thunderstone) | 2026 | multi-part set | (new, not on the site yet) | 3 | 456 k | — |
 | [Eye of Winter Double Ring and Pendant](#eye-of-winter) | 2026 | multi-part set | A world for everyone (RJW 2026) | 4 | 10.26 M | Photo poster (Ministry of Energy hall) |
-| [Eyelense Pendant](#eyelense) | 2025-26 | multi-part set | A world for everyone (RJW 2026) | 2 | 57 k | Photo poster in Future House |
+| [Eyelense Pendant](#eyelense) | 2025-26 | multi-part set | A world for everyone (RJW 2026) | 2 | 57 k | Photo poster in Future House; source crescent also enlarged into the playable Eyelense E gate in the east meadow |
 | [Supernova Ring](#supernova) | 2025 | single body | Shine bright like a star (Osmium 2025) | 1 | 50 k | — |
 | [Deep Sea Pearl (Karmazina) Ring](#deep-sea-pearl) | 2025-26 | single body | A world for everyone (RJW 2026) | 1 | 9.66 M | Photo poster in Future House |
 | [Frog Ring (frog remake)](#frog) | 2025 | single body | — | 1 | 543 k | — |

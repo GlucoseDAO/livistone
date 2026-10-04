@@ -1,0 +1,44 @@
+{
+  "reference": "../../../images/12-eyelense-e-red-bead-passage.png",
+  "type": "Actual playable-town renders; generated artwork is only a design reference.",
+  "sourceSnapshot": "Fixed final source copy at /tmp/livistone-eyelense-final, served on port 5177 to avoid concurrent Vite reloads.",
+  "sourceSha256": "bdaac5c914424f3032e335156e2e911a7dac88c97051d34b4f5f8b33eb425b1c",
+  "captures": [
+    {
+      "profile": "desktop",
+      "time": "day",
+      "record": "desktop/day/captures.json",
+      "backend": "webgl2-fallback",
+      "readyMs": 29766,
+      "probesMs": 66681,
+      "errors": []
+    },
+    {
+      "profile": "desktop",
+      "time": "night",
+      "record": "desktop/night/captures.json",
+      "backend": "webgl2-fallback",
+      "readyMs": 24134,
+      "probesMs": 42313,
+      "errors": []
+    },
+    {
+      "profile": "touch",
+      "time": "day",
+      "record": "touch/day/captures.json",
+      "backend": "webgl2-fallback",
+      "readyMs": 18450,
+      "probesMs": 36306,
+      "errors": []
+    },
+    {
+      "profile": "software",
+      "time": "day",
+      "record": "software/day/captures.json",
+      "backend": "webgl2-fallback",
+      "readyMs": 19541,
+      "probesMs": 19604,
+      "errors": []
+    }
+  ]
+}

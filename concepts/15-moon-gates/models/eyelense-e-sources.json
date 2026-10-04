@@ -1,0 +1,97 @@
+{
+  "concept": "../images/12-eyelense-e-red-bead-passage.png",
+  "status": "Playable building; rendered screenshots are recorded separately from generated concepts.",
+  "generator": "bun scripts/build-eyelense-building.ts",
+  "runtime": "src/world/eyelense-gate.ts",
+  "layout": {
+    "x": 106,
+    "z": -36,
+    "yaw": -1.5707963267948966,
+    "floor": 0.13,
+    "sourceScale": 1.65,
+    "sourceOffsetX": -0.7,
+    "beadRadiusX": 4,
+    "beadRadiusY": 4,
+    "beadCentreY": 2.8,
+    "beadDepth": 2.4,
+    "doorHalf": 2.1,
+    "doorSpring": 2.3,
+    "doorTop": 4.4,
+    "tunnelHalfDepth": 1.8,
+    "lensBottom": 7.4,
+    "lensTop": 9.5,
+    "forecourtHalfX": 8.5,
+    "forecourtHalfZ": 11,
+    "arrival": {
+      "x": 97,
+      "y": 1.05,
+      "z": -36,
+      "yaw": -1.5707963267948966
+    },
+    "seats": [
+      {
+        "x": -6,
+        "z": 5.5
+      },
+      {
+        "x": 5.3,
+        "z": 5.5
+      }
+    ]
+  },
+  "origin": "Passage axis x=z=0, limestone floor y=0. West-facing placement is retained.",
+  "sourceComparison": [
+    {
+      "path": "public/models/jewelry/eyelense-gate.glb",
+      "sha256": "9e10402415725e3960c732fa87bb5e21adc172078781c17f739851f02f7d3114",
+      "min": [
+        -5,
+        0.0003733602643478662,
+        -1.2704591751098633
+      ],
+      "max": [
+        5,
+        8.360930442810059,
+        1.2704591751098633
+      ],
+      "triangles": 19992
+    },
+    {
+      "path": "public/models/jewelry/eyelense-1.glb",
+      "sha256": "86921911f28c9a53f7e471055aaacb7771970115f9074cc02d5f51865e82667b",
+      "min": [
+        -4.999428749084473,
+        -1.200034260749817,
+        -3.812537670135498
+      ],
+      "max": [
+        5,
+        1.1997487545013428,
+        3.8128232955932617
+      ],
+      "triangles": 14982
+    },
+    {
+      "path": "public/models/jewelry/eyelense-2.glb",
+      "sha256": "8818a77c7807cf8450940effccb4ba083e3902e25998ecd576656a21b4a22f72",
+      "min": [
+        -4.999428749084473,
+        -1.1997485160827637,
+        -3.8113949298858643
+      ],
+      "max": [
+        4.998571395874023,
+        1.200034260749817,
+        3.8128232955932617
+      ],
+      "triangles": 15000
+    }
+  ],
+  "sourceGeometry": "Both source faces survive in the gate asset; raised swirls are sparse after optimization. Crescent topology retained, 1.65 uniform scale, translation and -90 degree Y rotation only. Separate black raised swirl tubes are seated on source faces by raycast. Brass rings and fittings, curved lens, round red bead with tunnel, clear glass surround, floor and benches are new architectural elements.",
+  "photographs": [
+    "public/images/jewelry/catalogue/eyelense-1.webp",
+    "public/images/jewelry/catalogue/eyelense-2.webp"
+  ],
+  "reduced": "Opaque reflective glass; doorway and source silhouette retained. Day/night tint belongs only to the lens.",
+  "export": "Static daylight materials. Game daylight/quality behaviour lives in runtime TypeScript. No original STL included."
+}

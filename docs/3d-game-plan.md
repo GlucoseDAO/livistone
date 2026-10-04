@@ -1,5 +1,9 @@
 # Livistone: browser game implementation plan
 
+## Eyelense E — playable east-meadow passage, 4 October 2026
+
+Eyelense now stands beyond Science at `(106, −36)`: the uniformly enlarged source crescent is glossy black, with raised swirl relief and brass threading. A substantial rounded red bead has a 4.2 m-wide, 4.4 m-high arch with a continuous tunnel lining. Its clear glass surround leaves the route open. Connected paving reaches the level limestone forecourt and benches, with matching solid colliders and full planting clearance. The separate curved smoky lens follows auto/day/night and becomes clearer at night; reduced graphics retain opaque reflective glass and the same passage. Map arrival and a source-backed journal story preserve the original jewellery in Future House. In-world captures, geometry provenance and the exported GLB are recorded under `concepts/15-moon-gates/models/`.
+
 ## Eye of Winter — first building study, 4 October 2026
 
 The approved Winter G concept now has a first 3D building at (−108, −30): source silver preserved, a clear outer quartz envelope, smaller blue faceted stone, six-leaf entrance iris, usable room and connected approach. Rendered and physical door states advance together in the fixed walking loop. Concept images and the derived model carry provenance under `concepts/15-moon-gates/`; the winter garden and material polish remain for review.

@@ -1,0 +1,629 @@
+{
+  "profile": "touch",
+  "time": "day",
+  "set": "eyelense",
+  "url": "http://127.0.0.1:5177/?capture=1&backend=webgl",
+  "commit": "2634dc3",
+  "backend": "webgl2-fallback",
+  "webgpuFlags": true,
+  "readyMs": 18450,
+  "probesMs": 36306,
+  "teleport": "standing",
+  "browser": "154.0.8037.97",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "capturedAt": "2026-10-04T16:36:26.630Z",
+  "errors": [],
+  "captures": [
+    {
+      "name": "eyelense-gate-front",
+      "view": [
+        "eyelense-gate-front",
+        84,
+        -36,
+        -1.5707963267948966,
+        0.26
+      ],
+      "snapshot": {
+        "ready": true,
+        "night": false,
+        "timeOfDay": "day",
+        "mode": "walking",
+        "position": {
+          "x": 84,
+          "y": 1.0859243869781494,
+          "z": -35.999900817871094
+        },
+        "zone": "town",
+        "journey": null,
+        "yaw": -1.5707963267948966,
+        "pitch": 0.26,
+        "fps": 5,
+        "calls": 52,
+        "triangles": 1006549,
+        "interaction": null,
+        "progress": {
+          "version": 1,
+          "discovered": [],
+          "visited": [
+            "station"
+          ]
+        },
+        "selectedLandmark": null,
+        "reducedGraphics": true,
+        "graphicsTier": "mobile",
+        "renderScale": 1,
+        "cpuGeometry": {
+          "before": 0,
+          "after": 0
+        },
+        "capture": true,
+        "frames": 233,
+        "backend": "webgl2-fallback",
+        "post": "off",
+        "budget": {
+          "Frame · Background.mesh": {
+            "calls": 1,
+            "triangles": 1984
+          },
+          "Frame · Distant ranges": {
+            "calls": 4,
+            "triangles": 29753
+          },
+          "Frame · Aerial · behind": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Mountain railway": {
+            "calls": 12,
+            "triangles": 14540
+          },
+          "Living Waters · town gardens": {
+            "calls": 2,
+            "triangles": 516
+          },
+          "River rocks": {
+            "calls": 1,
+            "triangles": 43200
+          },
+          "Continuous valley and mountain ridges": {
+            "calls": 7,
+            "triangles": 57890
+          },
+          "Meadow grass details": {
+            "calls": 2,
+            "triangles": 76950
+          },
+          "Flower borders": {
+            "calls": 1,
+            "triangles": 14104
+          },
+          "Forest": {
+            "calls": 8,
+            "triangles": 653616
+          },
+          "Bevelled limestone kerbs": {
+            "calls": 1,
+            "triangles": 13220
+          },
+          "Limestone walking network": {
+            "calls": 1,
+            "triangles": 19013
+          },
+          "Eyelense E · red bead passage": {
+            "calls": 8,
+            "triangles": 30202
+          },
+          "Contact shadows": {
+            "calls": 1,
+            "triangles": 11564
+          },
+          "River water": {
+            "calls": 1,
+            "triangles": 39995
+          },
+          "Frame · Render Pipeline": {
+            "calls": 1,
+            "triangles": 1
+          }
+        },
+        "probes": {
+          "dayStart": 9743,
+          "dayEnd": 22746,
+          "nightStart": 24002,
+          "nightEnd": 36203,
+          "day": 583,
+          "daySteps": 91,
+          "night": 1259,
+          "nightSteps": 91,
+          "materials": 50,
+          "saved": [],
+          "baking": null
+        },
+        "load": {
+          "start": 1830,
+          "town": 8963,
+          "assets": 9700,
+          "prepared": 9749,
+          "compiled": 17033,
+          "shadowed": 17778,
+          "baked": 17778,
+          "ready": 18441
+        },
+        "shaders": {
+          "builds": 248,
+          "programs": 212,
+          "pipelines": 125
+        }
+      }
+    },
+    {
+      "name": "eyelense-gate-angle",
+      "view": [
+        "eyelense-gate-angle",
+        90,
+        -21,
+        -0.82,
+        0.24
+      ],
+      "snapshot": {
+        "ready": true,
+        "night": false,
+        "timeOfDay": "day",
+        "mode": "walking",
+        "position": {
+          "x": 90.00052642822266,
+          "y": 1.1673356294631958,
+          "z": -21.00043296813965
+        },
+        "zone": "town",
+        "journey": null,
+        "yaw": -0.82,
+        "pitch": 0.24,
+        "fps": 5,
+        "calls": 74,
+        "triangles": 1175849,
+        "interaction": null,
+        "progress": {
+          "version": 1,
+          "discovered": [],
+          "visited": [
+            "station"
+          ]
+        },
+        "selectedLandmark": null,
+        "reducedGraphics": true,
+        "graphicsTier": "mobile",
+        "renderScale": 1,
+        "cpuGeometry": {
+          "before": 0,
+          "after": 0
+        },
+        "capture": true,
+        "frames": 258,
+        "backend": "webgl2-fallback",
+        "post": "off",
+        "budget": {
+          "Frame · Background.mesh": {
+            "calls": 1,
+            "triangles": 1984
+          },
+          "Frame · Distant ranges": {
+            "calls": 5,
+            "triangles": 37200
+          },
+          "Frame · Aerial · behind": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Mountain railway": {
+            "calls": 12,
+            "triangles": 14540
+          },
+          "River rocks": {
+            "calls": 1,
+            "triangles": 43200
+          },
+          "Meadow grass details": {
+            "calls": 2,
+            "triangles": 75350
+          },
+          "Flower borders": {
+            "calls": 1,
+            "triangles": 8856
+          },
+          "Forest": {
+            "calls": 8,
+            "triangles": 651404
+          },
+          "Continuous valley and mountain ridges": {
+            "calls": 8,
+            "triangles": 71960
+          },
+          "Limestone walking network": {
+            "calls": 1,
+            "triangles": 19013
+          },
+          "Bevelled limestone kerbs": {
+            "calls": 1,
+            "triangles": 13220
+          },
+          "Living Waters · town gardens": {
+            "calls": 8,
+            "triangles": 132177
+          },
+          "Eyelense E · red bead passage": {
+            "calls": 8,
+            "triangles": 30202
+          },
+          "Enhancement · join here": {
+            "calls": 5,
+            "triangles": 8860
+          },
+          "Materialized Enhancements · original Voronoi shell": {
+            "calls": 1,
+            "triangles": 3740
+          },
+          "Outside ascent · painted arrows": {
+            "calls": 1,
+            "triangles": 32
+          },
+          "Enhancement hill": {
+            "calls": 4,
+            "triangles": 10400
+          },
+          "Enhancement · internal spiral": {
+            "calls": 1,
+            "triangles": 840
+          },
+          "Enhancement · amber marker lamps": {
+            "calls": 1,
+            "triangles": 620
+          },
+          "Enhancement · existing cave entry": {
+            "calls": 1,
+            "triangles": 140
+          },
+          "Contact shadows": {
+            "calls": 1,
+            "triangles": 12114
+          },
+          "River water": {
+            "calls": 1,
+            "triangles": 39995
+          },
+          "Frame · Render Pipeline": {
+            "calls": 1,
+            "triangles": 1
+          }
+        },
+        "probes": {
+          "dayStart": 9743,
+          "dayEnd": 22746,
+          "nightStart": 24002,
+          "nightEnd": 36203,
+          "day": 583,
+          "daySteps": 91,
+          "night": 1259,
+          "nightSteps": 91,
+          "materials": 50,
+          "saved": [],
+          "baking": null
+        },
+        "load": {
+          "start": 1830,
+          "town": 8963,
+          "assets": 9700,
+          "prepared": 9749,
+          "compiled": 17033,
+          "shadowed": 17778,
+          "baked": 17778,
+          "ready": 18441
+        },
+        "shaders": {
+          "builds": 248,
+          "programs": 212,
+          "pipelines": 125
+        }
+      }
+    },
+    {
+      "name": "eyelense-gate-inside",
+      "view": [
+        "eyelense-gate-inside",
+        106,
+        -36,
+        -1.5707963267948966,
+        0.25
+      ],
+      "snapshot": {
+        "ready": true,
+        "night": false,
+        "timeOfDay": "day",
+        "mode": "walking",
+        "position": {
+          "x": 106.00137329101562,
+          "y": 0.9728742837905884,
+          "z": -35.99897003173828
+        },
+        "zone": "town",
+        "journey": null,
+        "yaw": -1.5707963267948966,
+        "pitch": 0.25,
+        "fps": 8,
+        "calls": 48,
+        "triangles": 942040,
+        "interaction": null,
+        "progress": {
+          "version": 1,
+          "discovered": [],
+          "visited": [
+            "station",
+            "eyelense-gate"
+          ]
+        },
+        "selectedLandmark": null,
+        "reducedGraphics": true,
+        "graphicsTier": "mobile",
+        "renderScale": 1,
+        "cpuGeometry": {
+          "before": 0,
+          "after": 0
+        },
+        "capture": true,
+        "frames": 284,
+        "backend": "webgl2-fallback",
+        "post": "off",
+        "budget": {
+          "Frame · Background.mesh": {
+            "calls": 1,
+            "triangles": 1984
+          },
+          "Frame · Distant ranges": {
+            "calls": 4,
+            "triangles": 29753
+          },
+          "Frame · Aerial · behind": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Mountain railway": {
+            "calls": 11,
+            "triangles": 11884
+          },
+          "Living Waters · town gardens": {
+            "calls": 2,
+            "triangles": 516
+          },
+          "Continuous valley and mountain ridges": {
+            "calls": 6,
+            "triangles": 50530
+          },
+          "Meadow grass details": {
+            "calls": 2,
+            "triangles": 59425
+          },
+          "Flower borders": {
+            "calls": 1,
+            "triangles": 6560
+          },
+          "Forest": {
+            "calls": 8,
+            "triangles": 668320
+          },
+          "Bevelled limestone kerbs": {
+            "calls": 1,
+            "triangles": 13220
+          },
+          "Limestone walking network": {
+            "calls": 1,
+            "triangles": 19013
+          },
+          "Eyelense E · red bead passage": {
+            "calls": 7,
+            "triangles": 29730
+          },
+          "Contact shadows": {
+            "calls": 1,
+            "triangles": 11108
+          },
+          "River water": {
+            "calls": 1,
+            "triangles": 39995
+          },
+          "Frame · Render Pipeline": {
+            "calls": 1,
+            "triangles": 1
+          }
+        },
+        "probes": {
+          "dayStart": 9743,
+          "dayEnd": 22746,
+          "nightStart": 24002,
+          "nightEnd": 36203,
+          "day": 583,
+          "daySteps": 91,
+          "night": 1259,
+          "nightSteps": 91,
+          "materials": 50,
+          "saved": [],
+          "baking": null
+        },
+        "load": {
+          "start": 1830,
+          "town": 8963,
+          "assets": 9700,
+          "prepared": 9749,
+          "compiled": 17033,
+          "shadowed": 17778,
+          "baked": 17778,
+          "ready": 18441
+        },
+        "shaders": {
+          "builds": 248,
+          "programs": 212,
+          "pipelines": 125
+        }
+      }
+    },
+    {
+      "name": "eyelense-gate-context",
+      "view": [
+        "eyelense-gate-context",
+        79,
+        -16,
+        -0.95,
+        -0.38,
+        20,
+        true
+      ],
+      "snapshot": {
+        "ready": true,
+        "night": false,
+        "timeOfDay": "day",
+        "mode": "walking",
+        "position": {
+          "x": 79,
+          "y": 20,
+          "z": -16
+        },
+        "zone": "town",
+        "journey": null,
+        "yaw": -0.95,
+        "pitch": -0.38,
+        "fps": 9,
+        "calls": 62,
+        "triangles": 1038251,
+        "interaction": null,
+        "progress": {
+          "version": 1,
+          "discovered": [],
+          "visited": [
+            "station",
+            "eyelense-gate"
+          ]
+        },
+        "selectedLandmark": null,
+        "reducedGraphics": true,
+        "graphicsTier": "mobile",
+        "renderScale": 1,
+        "cpuGeometry": {
+          "before": 0,
+          "after": 0
+        },
+        "capture": true,
+        "frames": 313,
+        "backend": "webgl2-fallback",
+        "post": "off",
+        "budget": {
+          "Frame · Background.mesh": {
+            "calls": 1,
+            "triangles": 1984
+          },
+          "Frame · Distant ranges": {
+            "calls": 5,
+            "triangles": 37200
+          },
+          "Frame · Aerial · behind": {
+            "calls": 1,
+            "triangles": 1
+          },
+          "Mountain railway": {
+            "calls": 12,
+            "triangles": 14540
+          },
+          "Forest": {
+            "calls": 6,
+            "triangles": 533156
+          },
+          "Flower borders": {
+            "calls": 1,
+            "triangles": 8856
+          },
+          "Meadow grass details": {
+            "calls": 2,
+            "triangles": 77550
+          },
+          "River rocks": {
+            "calls": 1,
+            "triangles": 43200
+          },
+          "Continuous valley and mountain ridges": {
+            "calls": 9,
+            "triangles": 78520
+          },
+          "Limestone walking network": {
+            "calls": 1,
+            "triangles": 19013
+          },
+          "Bevelled limestone kerbs": {
+            "calls": 1,
+            "triangles": 13220
+          },
+          "Living Waters · town gardens": {
+            "calls": 8,
+            "triangles": 124497
+          },
+          "Eyelense E · red bead passage": {
+            "calls": 8,
+            "triangles": 30202
+          },
+          "Materialized Enhancements · original Voronoi shell": {
+            "calls": 1,
+            "triangles": 3740
+          },
+          "Enhancement · amber marker lamps": {
+            "calls": 1,
+            "triangles": 620
+          },
+          "Enhancement · existing cave entry": {
+            "calls": 1,
+            "triangles": 140
+          },
+          "Contact shadows": {
+            "calls": 1,
+            "triangles": 11816
+          },
+          "River water": {
+            "calls": 1,
+            "triangles": 39995
+          },
+          "Frame · Render Pipeline": {
+            "calls": 1,
+            "triangles": 1
+          }
+        },
+        "probes": {
+          "dayStart": 9743,
+          "dayEnd": 22746,
+          "nightStart": 24002,
+          "nightEnd": 36203,
+          "day": 583,
+          "daySteps": 91,
+          "night": 1259,
+          "nightSteps": 91,
+          "materials": 50,
+          "saved": [],
+          "baking": null
+        },
+        "load": {
+          "start": 1830,
+          "town": 8963,
+          "assets": 9700,
+          "prepared": 9749,
+          "compiled": 17033,
+          "shadowed": 17778,
+          "baked": 17778,
+          "ready": 18441
+        },
+        "shaders": {
+          "builds": 248,
+          "programs": 212,
+          "pipelines": 125
+        }
+      }
+    }
+  ]
+}

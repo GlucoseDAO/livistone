@@ -1,3 +1,4 @@
+import { loadEyelenseGate } from './eyelense-gate';
 import { TREE_REACH, graphicsProfile } from '../game/graphics';
 import type { GraphicsTier } from '../game/graphics';
 import { hazeLook } from '../render/aerial';
@@ -197,8 +198,6 @@ export class Town {
     await stage(46, 'Growing the lake gardens and elevated galleries…');
     this.gardens = new LivingWaters(mobile, this.paving, this.wind); this.root.add(this.gardens.root);
     this.gardens.presentLakeJewelry(); this.ringReady = this.gardens.presentMyceliumRing();
-    // Dev-only ?concept=gates: the proposed moon gates for approval (docs/jewelry-models-plan.md).
-    if (import.meta.env.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).get('concept') === 'gates') this.jewelryReady.push(import('./gate-concepts').then(({ addGateConcepts }) => addGateConcepts(this.root)));
     this.gardens.addInterpretation('living-mycelium', 'Mycelium Rain Garden', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
     this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
     label('Living Waters · town gardens');
@@ -207,6 +206,11 @@ export class Town {
     this.root.add(this.winter.root); this.colliders.push(...this.winter.colliders);
     this.probeParts.set('winter-gate', { objects: [this.winter.root], hide: [this.winter.root] });
     label('Eye of Winter');
+    await stage(52, 'Opening the Eyelense red bead passage…');
+    const eyelense = await loadEyelenseGate(mobile, this.paving);
+    this.root.add(eyelense.root); this.colliders.push(...eyelense.colliders);
+    this.probeParts.set('eyelense-gate', { objects: [eyelense.root], hide: eyelense.root.children.filter(part => part instanceof THREE.Mesh && !Array.isArray(part.material) && part.material.userData.heroEnv) });
+    label('Eyelense Gate');
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.masonry, this.paving, this.brass, bridge);
     label('Garden bridges'); let first = this.root.children.length; createTimeTower(this.root, this.colliders, this.mobile); label('Time tower');
     const tower = this.root.children.slice(first); first = this.root.children.length;
@@ -414,9 +418,7 @@ export class Town {
   readonly forest = new Forest();
   async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows, this.wind), this.mountains.ready, this.cragsReady, this.researchReady, ...this.jewelryReady, this.ringReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
-    // Dev-only ?concept=gates clears a 24 m meadow round each proposed gate, as their planting clearance would.
-    const concept = import.meta.env.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).get('concept') === 'gates';
-    const sites = forestSites(this.mobile).filter((p) => !concept || [[-108, -30], [106, -36]].every(([x, z]) => Math.hypot(p.x - x, p.z - z) > 24));
+    const sites = forestSites(this.mobile);
     for (const { x, y, z } of sites) this.colliders.push({ type: 'box', position: [x, y + 2, z], size: [0.3, 2, 0.3] });
     this.forest.sites = sites; this.forest.name = 'Forest'; this.root.add(this.forest);
   }

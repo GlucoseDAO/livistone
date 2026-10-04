@@ -25,7 +25,7 @@ export async function prepareCpuDetail(root: THREE.Object3D, reflection: THREE.C
       // The Nut of Power crystal keeps its rim and distance solidity (city-hall.ts): at its bare opacity it vanished against the sky.
       // The station amber keeps its darker outline and its glow from inside (station-amber.ts), without which it is a flat orange.
       if (source.userData.cityHallCrystal || source.userData.stationAmber) { const { colorNode, opacityNode, emissiveNode } = source as unknown as THREE.MeshStandardNodeMaterial; Object.assign(material, { colorNode, opacityNode, emissiveNode }); }
-      if (source.metalness > .4) { material.envMap = reflection; material.reflectivity = .28; }
+      if (source.metalness > .4 || source.userData.eyelenseGlass) { material.envMap = reflection; material.reflectivity = .28; }
       materials.set(source, material); return material;
     };
     mesh.material = Array.isArray(mesh.material) ? mesh.material.map(convert) : convert(mesh.material);

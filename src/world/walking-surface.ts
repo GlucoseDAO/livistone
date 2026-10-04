@@ -1,3 +1,4 @@
+import { eyelenseGround } from './eyelense-gate-layout';
 import { WINTER } from './winter-gate-layout';
 import * as THREE from 'three';
 import { CIVIC_LANDMARKS } from '../game/content';
@@ -20,7 +21,7 @@ export const PAVING_STEP = .5;
 export function pavingHeight(x: number, z: number, group: number): number { return .13 + (group === GARDEN_PAVING ? 0 : terrainHeight(x, z)); }
 /** Where paving runs on into a plaza, platform, hall apron or pavilion floor, or the Jepii Mici trail leaves it, kerbs stay open. */
 export function kerbOpening(x: number, z: number): boolean {
-  return z >= STATION.front - 1
+  return eyelenseGround(x, z, .5) || z >= STATION.front - 1
     || Math.hypot(x - WINTER.plazaX, z - WINTER.z) < WINTER.plazaRadius + .5
     || Math.hypot(x - TIME_TOWER.x, z - TIME_TOWER.z) < TIME_TOWER.radius + .5
     || Math.hypot(x - GLUCOSE_PAVILION.x, z - GLUCOSE_PAVILION.z) < GLUCOSE_PAVILION.radius + .5

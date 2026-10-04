@@ -1,3 +1,4 @@
+import { EYELENSE, eyelenseClearing, eyelenseGround } from './eyelense-gate-layout';
 import { introductionClearing } from './introduction-layout';
 import { enhancementClearing, enhancementGround } from './enhancement-layout';
 import * as THREE from 'three';
@@ -17,6 +18,7 @@ export const HOME_SITES: number[][] = [];
 export { PATH_WIDTH } from './path-surface';
 import { PATH_WIDTH } from './path-surface';
 const routes = [
+  [[80, -34], [86, -35], [92, -36], [EYELENSE.arrival.x, EYELENSE.z]],
   [[100, -154.617], [108, -159], [112, -170], [111, -178]],
   [[74, -135], [89, -142], [98, -149], [100, -154.617]],
   [[-29, 4], [-44, 2], [-46, -8], [-47.9, -12]],
@@ -75,10 +77,11 @@ export function footprintReserved(x: number, z: number, radius: number): boolean
 }
 /** Clearings kept free of trees, shrubs and flowers but not of grass: the mycelium grove and lake margin, the meadow round the Enhancement hill and the ground under the Future House camel. */
 function canopyReserved(x: number, z: number, radius: number): boolean {
-  return gardenFootprint(x, z, radius) || enhancementClearing(x, z, radius) || futureClearing(x, z, radius) || winterClearing(x, z, radius);
+  return gardenFootprint(x, z, radius) || enhancementClearing(x, z, radius) || futureClearing(x, z, radius) || winterClearing(x, z, radius) || eyelenseClearing(x, z, radius);
 }
 /** Ground something stands on or covers, which neither plants nor grass may grow through (grass-field.ts bisects its radius). */
 export function groundReserved(x: number, z: number, radius: number): boolean {
+  if (eyelenseGround(x, z, radius)) return true;
   if (introductionClearing(x, z, radius) || winterGround(x, z, radius)) return true;
   if (futureGround(x, z, radius) || enhancementGround(x, z, radius)) return true;
   if (Math.hypot(x - TIME_TOWER.x, z - TIME_TOWER.z) < TIME_TOWER.radius + radius) return true;

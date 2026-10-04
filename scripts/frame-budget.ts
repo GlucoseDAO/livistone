@@ -26,6 +26,7 @@ const { drawCost } = await import('../src/game/render-budget');
 // The capture poses of scripts/screenshot-realism.ts (name, x, z, yaw, pitch); keep the two lists in step.
 export const VIEWS: [string, number, number, number, number?][] = [
   ['winter-gate-front', -92, -30, Math.PI / 2, .2], ['winter-gate-angle', -90, -17, 1, .2], ['winter-gate-inside', -104.8, -30, Math.PI / 2, .3],
+  ['eyelense-gate-front', 88, -36, -Math.PI / 2, .25], ['eyelense-gate-angle', 90, -22, -.85, .25], ['eyelense-gate-inside', 106, -36, -Math.PI / 2, .05],
   ['station-arrival', 0, 58, 0], ['arrival-meadow', 10, 52, -.9], ['garden-overview', 0, 52, 0], ['gateway-front', 0, 52, 0, .18],
   ['gateway-side', 9, 47, .92, .26], ['bridge-crossing', 0, 36, 0], ['garden-path', -14, 8, 1.2],
   ['city-hall-front', 0, 4, 0], ['energy-front', -29, 12, 0], ['energy-side', -4, -9, Math.PI / 2], ['science-front', 29, 14, 0], ['science-side', 6, -11, -Math.PI / 2],
@@ -102,6 +103,8 @@ async function browserlessGroups(tier: GraphicsTier): Promise<Group[]> {
     }
     return { scene } as unknown as Awaited<ReturnType<InstanceType<typeof GLTFLoader>['loadAsync']>>;
   };
+  const eyelense = await import('../src/world/eyelense-gate').then(({ loadEyelenseGate }) => loadEyelenseGate(mobile, new THREE.MeshStandardMaterial()));
+  groups.push({ name: 'Eyelense Gate', root: eyelense.root, classify: () => 'crescent, bead, lens and forecourt' });
   const winter = await import('../src/world/winter-gate').then(({ loadWinterGate }) => loadWinterGate(mobile, new THREE.MeshStandardMaterial()));
   groups.push({ name: 'Eye of Winter', root: winter.root, classify: o => o.name.startsWith('Original Eye') ? 'original silver' : o.name.includes('stone') || o.name.includes('cabochon') ? 'two stones' : 'room and iris' });
   const { PlanarExhibition } = await import('../src/world/planar-exhibition'), { CIVIC_LANDMARKS } = await import('../src/game/content'), world = await import('../src/world/world');

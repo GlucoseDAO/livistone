@@ -1,3 +1,4 @@
+import { setEyelenseNight, setEyelenseQuality } from './world/eyelense-gate';
 import { setCityHallCrystalQuality } from './world/city-hall';
 import { nearbyArchitecture, storyFor } from './game/nearby';
 import type { NearbyStory } from './game/nearby';
@@ -303,6 +304,7 @@ class Game {
     // Probe surfaces take the environment node before the precompile, so their shaders build once, with every other one.
     if (this.environment && probesEnabled()) this.probes = new ReflectionProbes(this.town.probeScopes(), this.town.root, this.environment, this.graphics.tier === 'gpu' ? 256 : 128);
     await this.probes?.load(this.renderer, this.phase, this.capture ? undefined : new THREE.Vector3(SPAWN.x, 0, SPAWN.z)); this.showProbes();
+    this.scene.traverse(object => { if (object instanceof THREE.Mesh) for (const material of Array.isArray(object.material) ? object.material : [object.material]) setEyelenseNight(material, this.night); });
     this.pointReflections(this.skies.get(this.night)!); if (this.environment) this.litMaterials = litMaterials(this.scene, this.distant);
     this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced, this.graphics.tier); this.nightLighting.setNight(this.night);
     // The distant pass draws its own copies of the ranges, which the map sees in the town (FAR_LAYER).
@@ -569,6 +571,7 @@ class Game {
    */
   private phaseState(): void {
     const night = this.night, sky = this.skies.get(night)!;
+    this.scene.traverse(object => { if (object instanceof THREE.Mesh) for (const material of Array.isArray(object.material) ? object.material : [object.material]) setEyelenseNight(material, night); });
     this.skyBackground = sky.background; if (!this.environment) this.pointReflections(sky);
     this.scene.environmentIntensity = this.light.environment; if (this.environment) refreshEnvironment(this.litMaterials, this.phase);
     this.renderer.toneMappingExposure = SKY_EXPOSURE[this.phase];
@@ -704,6 +707,7 @@ class Game {
         if (material.userData.mitoringAmber) setMitoringAmberQuality(material, low);
         if (material.userData.cityHallCrystal) setCityHallCrystalQuality(material, low);
       } else if (material instanceof THREE.MeshPhysicalMaterial) {
+        if (material.userData.eyelenseGlass) { setEyelenseQuality(material, low); continue; }
         if (material.userData.winterQuartz) { const reduced = low || material.userData.winterReduced; material.transmission = reduced ? 0 : .88; material.opacity = reduced ? .22 : .5; material.needsUpdate = true; continue; }
         if (material.userData.myceliumOpal) { material.iridescence = low ? .35 : 1; material.needsUpdate = true; continue; }
         if (material.userData.gatewayGem) { setGatewayQuality(material, low); continue; }

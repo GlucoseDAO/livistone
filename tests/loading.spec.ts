@@ -11,7 +11,7 @@ test('saved reflections avoid startup baking and distant models wait for approac
   let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
   await page.route('**/models/jewelry/*.glb', async route => {
     const name = route.request().url().split('/').at(-1)!;
-    if (!['mycelium.glb', 'eye-of-winter-gate.glb'].includes(name)) { requests.push(name); await held; }
+    if (!['mycelium.glb', 'eye-of-winter-gate.glb', 'eyelense-gate.glb'].includes(name)) { requests.push(name); await held; }
     await route.continue();
   });
   try {
