@@ -54,7 +54,9 @@ bun install --frozen-lockfile
 bun run build
 ```
 
-`bun run build` fails early if an approved music asset is missing, is still a Git LFS pointer, or differs from its recorded hash. It then type-checks and bundles the site. The output includes the six approved recordings under `dist/audio/kalimba/`; rejected clip 7 is not included.
+`bun run build` prints a banner when the saved reflection probes in `public/probes/` do not match the sources (visitors would then bake reflections live after loading, with a frame-rate dip); `PROBES_STRICT=1 bun run build` fails instead. Probes are baked on a development machine with a GPU (`bun scripts/build-reflection-probes.ts webgpu` and `webgl`, see AGENTS.md), never on the server, and committed through Git LFS. `bun scripts/check-probes.ts` gives the same verdict without building.
+
+`bun run build` also fails early if an approved music asset is missing, is still a Git LFS pointer, or differs from its recorded hash. It then type-checks and bundles the site. The output includes the six approved recordings under `dist/audio/kalimba/`; rejected clip 7 is not included.
 
 Copy **everything inside `dist/`**, preserving its subdirectories. Serve that directory as the website root. Do not expose the source checkout, `.git`, `node_modules` or the local audio-review/model folders.
 
@@ -73,6 +75,7 @@ livistone.liviazaharia.com {
     @html path / /index.html
     header @html Cache-Control "no-cache"
     header /assets/* Cache-Control "public, max-age=31536000, immutable"
+    header /probes/*/*.bin.gz Cache-Control "public, max-age=31536000, immutable"
     file_server
 }
 ```
@@ -104,7 +107,7 @@ Locally, after a build, `bun run check:hosts` verifies that both Vite modes acce
 
 Build each release from a known commit after fetching its LFS objects. Publish the new `dist/` as a complete release through the host's deployment mechanism; keep the previous release available for rollback. Use the hosting provider's atomic deployment or a versioned directory switch on your own server to avoid serving a partially copied bundle.
 
-Only filenames under `assets/` are content-hashed for long-term immutable caching. Keep HTML revalidated; unversioned images and audio should also be revalidated when replaced. Record the deployed commit so a failed release can be rolled back to its previous build.
+Only filenames under `assets/` and the reflection atlases under `probes/<set>/` (named with their probe revision) are content-hashed for long-term immutable caching; `probes/manifest.json` keeps the same name and must revalidate. Keep HTML revalidated; unversioned images and audio should also be revalidated when replaced. Record the deployed commit so a failed release can be rolled back to its previous build.
 
 ## Troubleshooting
 

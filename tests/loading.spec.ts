@@ -42,3 +42,17 @@ test('missing saved reflections fall back to a playable town', async ({ page }) 
   const state = await page.evaluate(() => (window as any).__livistone.snapshot());
   expect(state.ready).toBe(true); expect(state.probes.saved).toEqual([]); await expect.poll(async () => page.evaluate(() => { const state = (window as any).__livistone.snapshot(); return state.probes[state.night ? 'night' : 'day']; }), { timeout: 90000 }).toBeGreaterThan(0);
 });
+
+test('the loading screen turns the music off and the game keeps that choice', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.goto('/?graphics=mobile' + backend);
+  const music = page.locator('#loading-sound');
+  await expect(music).toBeVisible(); await expect(music).toHaveAttribute('aria-pressed', 'true'); await expect(music).toContainText('Music on');
+  // From 5% on the bootstrap module has wired the button.
+  await expect.poll(() => page.locator('#loading-progress').evaluate((bar: HTMLProgressElement) => bar.value)).toBeGreaterThanOrEqual(5);
+  await music.click();
+  await expect(music).toHaveAttribute('aria-pressed', 'false'); await expect(music).toHaveAttribute('aria-label', 'Play music'); await expect(music).toContainText('Music off');
+  await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 90000 });
+  await expect(page.locator('#hud-sound')).toHaveAttribute('aria-label', 'Enable sound');
+  await expect(page.locator('#hud-sound')).toHaveAttribute('aria-pressed', 'false');
+});

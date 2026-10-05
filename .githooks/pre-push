@@ -1,3 +1,11 @@
 #!/usr/bin/env sh
 command -v git-lfs >/dev/null 2>&1 || { printf >&2 'Git LFS is required to push the kalimba recordings.\n'; exit 2; }
-git lfs pre-push "$@"
+refs=$(cat)
+# A second gate for the saved reflection probes (scripts/check-probes.ts), when the push includes the checked-out commit: the
+# check reads the working tree. SKIP_PROBE_CHECK=1 git push … skips it once.
+if [ "${SKIP_PROBE_CHECK-}" != 1 ] && printf '%s\n' "$refs" | awk -v head="$(git rev-parse HEAD)" '$2 == head { found = 1 } END { exit !found }'; then
+  cd "$(git rev-parse --show-toplevel)" || exit 1
+  if command -v bun >/dev/null 2>&1; then bun scripts/check-probes.ts || exit 1
+  else node --experimental-strip-types --no-warnings scripts/check-probes.ts || exit 1; fi
+fi
+if [ -n "$refs" ]; then printf '%s\n' "$refs" | git lfs pre-push "$@"; else git lfs pre-push "$@" </dev/null; fi

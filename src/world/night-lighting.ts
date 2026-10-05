@@ -58,6 +58,12 @@ export class NightLighting {
   private readonly lights: THREE.PointLight[];
   private night = false;
   constructor(root: THREE.Object3D, scene: THREE.Scene, reduced: boolean, private tier: GraphicsTier = reduced ? 'mobile' : 'gpu', private hardwareHalos = false) {
+    this.scan(root);
+    this.lights = Array.from({ length: graphicsProfile(tier).lights }, () => { const light = new THREE.PointLight('#ffffff', 0, 15, 2); scene.add(light); return light; });
+  }
+  /** A part of the town built after loading (world.ts): its halos, light sources and night emissions join, in the current phase. */
+  add(root: THREE.Object3D): void { this.scan(root); this.setNight(this.night); }
+  private scan(root: THREE.Object3D): void {
     root.updateWorldMatrix(true, true);
     root.traverse(object => {
       if (object instanceof THREE.Sprite && object.userData.nightGlow) {
@@ -69,7 +75,6 @@ export class NightLighting {
         if ((material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshLambertMaterial || material instanceof THREE.MeshStandardNodeMaterial) && material.userData.nightEmission) this.materials.add(material);
       }
     });
-    this.lights = Array.from({ length: graphicsProfile(tier).lights }, () => { const light = new THREE.PointLight('#ffffff', 0, 15, 2); scene.add(light); return light; });
   }
   setNight(night: boolean): void {
     this.night = night; this.halos.forEach(halo => { halo.visible = night && (this.tier !== 'cpu' || this.hardwareHalos); });

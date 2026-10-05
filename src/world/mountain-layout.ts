@@ -201,7 +201,7 @@ export const TRAIL_GATE = { x: -5.3, z: -160.1 };
 
 /** The plateau's outline in plan, west to east along its lip over the gorge and back along the crags' foot. */
 // Its lip runs along the gorge's north wall (gorgeShape cuts that wall down to the floor), so the meadow ends in a clean cliff.
-const PLATEAU_OUTLINE: readonly (readonly [number, number])[] = [
+export const PLATEAU_OUTLINE: readonly (readonly [number, number])[] = [
   [-46, -252.5], [-35, -251.6], [-25, -252.1], [-15, -251.2], [-9, -250], [-3, -253], [1, -259.5], [2, -267], [-3, -275.5], [-14, -280],
   [-27, -282], [-39, -281], [-47, -280.5], [-54, -277], [-55.5, -271], [-51.5, -262], [-49.5, -255.5],
 ];

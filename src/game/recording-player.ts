@@ -5,11 +5,17 @@ export class RecordingPlayer {
   private timer?: ReturnType<typeof setTimeout>;
   private generation = 0;
   private hidden = false;
+  private started = false;
   enabled = true;
-  onStateChange?: (enabled: boolean) => void;
+  /** Every control that shows the state: the loading screen's button, then the game's toolbar and menu. */
+  private readonly listeners = new Set<(enabled: boolean) => void>();
   constructor(private readonly tracks: readonly string[]) {}
-  private readonly unlock = (): void => { this.resume(); };
+  onStateChange(listener: (enabled: boolean) => void): void { this.listeners.add(listener); }
+  private changed(): void { for (const listener of this.listeners) listener(this.enabled); }
+  // A first press on a sound button is that button's toggle: starting playback for it too would make the toggle silence it.
+  private readonly unlock = (event: Event): void => { if (!(event.target instanceof Element && event.target.closest('[data-sound-toggle]'))) this.resume(); };
   start(): void {
+    if (this.started) return; this.started = true;
     window.addEventListener('pointerdown', this.unlock, true);
     window.addEventListener('keydown', this.unlock, true);
     this.resume();
@@ -42,7 +48,7 @@ export class RecordingPlayer {
   private failure(error: unknown, token: number): void {
     // A blocked autoplay remains armed for the visitor's first gesture.
     if (token !== this.generation || (error instanceof DOMException && error.name === 'NotAllowedError')) return;
-    this.enabled = false; this.audio?.pause(); this.onStateChange?.(false);
+    this.enabled = false; this.audio?.pause(); this.changed();
   }
   async toggle(): Promise<boolean> {
     const token = ++this.generation;
@@ -50,7 +56,7 @@ export class RecordingPlayer {
     this.enabled = !this.enabled;
     if (!this.enabled) this.audio?.pause();
     else try { await this.play(); } catch (error) { this.failure(error, token); }
-    this.onStateChange?.(this.enabled);
+    this.changed();
     return this.enabled;
   }
   suspend(): void { this.hidden = true; clearTimeout(this.timer); this.timer = undefined; this.audio?.pause(); }

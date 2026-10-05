@@ -5,3 +5,5 @@ export class Ambience extends RecordingPlayer {
   constructor() { super(KALIMBA_TRACKS); }
   setGarden(_garden: boolean): void { /* The same quiet playlist throughout town. */ }
 }
+/** One player for the page: it starts on the loading screen, whose music button the game's controls then follow. */
+export const ambience = new Ambience();

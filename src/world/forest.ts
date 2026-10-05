@@ -124,6 +124,8 @@ export class Forest extends THREE.Group {
   sites: THREE.Vector3[] = [];
   /** Called with each cell's trunk visibility, in forestCells order, whenever any of them changes. */
   onCells: ((shown: readonly boolean[]) => void) | null = null;
+  /** Which cells show their trunks now, as onCells last reported them. */
+  trunks(): boolean[] { return this.cells.map((cell) => cell.state >= TRUNKS); }
   private cells: Cell[] = [];
   private parts: Part[] = [];
   private matrices: Float32Array[] = [];

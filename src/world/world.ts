@@ -47,9 +47,9 @@ import { shoreTime } from './shore-nodes';
 import type { ShorePebbles } from './pebbles';
 import { createCityHallFacade, loadCityHallTextures } from './city-hall';
 import { mitoringAmberMaterial, loadMitoringAmberTextures, loadMitoringSilverTexture } from './mitoring-materials';
-import { CIVIC_LANDMARKS } from '../game/content';
+import { CIVIC_LANDMARKS, SPAWN } from '../game/content';
 import { createStation } from './station';
-import { LivingWaters } from './living-waters';
+import { LivingWaters, createGardenPaths } from './living-waters';
 import { terrainHeight, terrainVertexHeight, townTerrainGeometry } from './terrain';
 import { LAMP_POSTS, transformColliders } from './town-layout';
 import { createRailwayStructure, loadRailwayTextures } from './railway';
@@ -65,8 +65,25 @@ import { createAlpinePlants } from './alpine-plants';
 import { CRAGS, CragGround, cragObstacles, cragSites, createCrags, useCragMaps } from './crags';
 import type { Crags } from './crags';
 import { brookGround, createGorgeWater } from './mountain-water';
+import { around, footprintCentre, footprintDistance, footprintOf, neededAtArrival } from './town-parts';
+import type { Footprint, TownPart } from './town-parts';
+import type { GroundDisc } from './grass-field';
+import { GARDENS } from './living-waters-layout';
+import { FUTURE_HOUSE } from './elevated-layout';
+import { ROTUNDA } from './concept-rotunda-layout';
+import { EYELENSE } from './eyelense-gate-layout';
+import { ENHANCEMENT } from './enhancement-layout';
+import { WINTER } from './winter-gate-layout';
+import { GORGE_STREAM, PLATEAU_OUTLINE, PLATEAU_STREAM, TRAIL_SAMPLES, WATERFALL } from './mountain-layout';
 import type { ContactSite } from './contact-shadows';
 
+// Sub-plan 27's parts along the Jepii Mici trail, each round what it builds: the crags line the gorge and the ridge's crest band
+// well beside the trail; the signs, boulders, fence and lights keep to it; the alpine plants to the plateau; the water to its
+// streams, waterfall and cave.
+const PLATEAU = PLATEAU_OUTLINE.map(([x, z]) => ({ x, z }));
+const TRAIL_FOOTPRINT = footprintOf(TRAIL_SAMPLES, 12), CRAGS_FOOTPRINT = footprintOf(TRAIL_SAMPLES, 60);
+const SIGNS_FOOTPRINT = [...TRAIL_FOOTPRINT, ...footprintOf(PLATEAU, 12)], PLATEAU_FOOTPRINT = footprintOf(PLATEAU, 25);
+const WATER_FOOTPRINT = footprintOf([...GORGE_STREAM, WATERFALL.foot, WATERFALL.lip, ...PLATEAU_STREAM], 15);
 /** Culling flags saved while Town.warmUp() draws everything. */
 const warmCulled = new WeakMap<THREE.Object3D, boolean>();
 /** Within this many metres of its centre an enclosed collection draws; farther, glazing and haze leave its posters faint specks. */
@@ -115,13 +132,13 @@ export class Town {
   /** Full poster photographs and captions only for the collections most recently approached (sub-plan 12). */
   readonly posters = new PosterResidency(this.exhibitions);
   train!: THREE.Object3D;
-  gardens!: LivingWaters;
+  /** Living Waters, once built (a distant part on most tiers: see place()). */
+  gardens?: LivingWaters;
   readonly researchPanels: THREE.Mesh[] = [];
   private mountains!: Mountains;
   private railway!: THREE.Group;
   private researchReady!: Promise<void>;
   private readonly jewelryReady: Promise<void>[] = [];
-  private ringReady: Promise<void> = Promise.resolve();
   private fireflies?: TrailFireflies;
   private streaming = false;
   private readonly white = new THREE.MeshStandardMaterial({ color: '#f4f0df', roughness: 0.57, metalness: 0.07 });
@@ -135,12 +152,23 @@ export class Town {
   private rocks: RockSite[] = [];
   /** Sub-plan 27: the Jepii Mici trail's boulders (in the river rocks' collider) and its sign posts' contact patches. */
   private boulders: RockSite[] = [];
-  private trailContacts: ContactSite[] = [];
+  /** Contact patches and grass discs that parts give the town's shared batches: the contact shadows and the near grass bake. */
+  private readonly contactSites: ContactSite[] = [];
+  private readonly groundDiscs: GroundDisc[] = [];
+  private grass: ReturnType<typeof createGrassField> = null;
+  /** Progressive loading (town-parts.ts): parts beyond the walking view from the arrival point, built after the first view. */
+  private readonly waiting: { name: string; footprint: Footprint; build: () => void | Promise<void> }[] = [];
+  /** Distant parts built so far, shown or still preparing. */
+  readonly parts: TownPart[] = [];
+  /** Dev-only: main-thread milliseconds each labelled producer took to build (snapshot().load.parts). */
+  readonly buildTimes: Record<string, number> = {};
+  private mark = 0;
+  private markTime = 0;
   /** Sub-plan 27 round 2: the mountain's limestone crags (one mesh, one collider), shaded once the mountains' rock maps load. */
   private crags: Crags | null = null;
   private cragsReady: Promise<void> = Promise.resolve();
   /** Hall interiors and enclosed collections, whose meshes (never their lights, which WebGPU builds into shaders) hide beyond ROOM_RANGE. */
-  private readonly rooms: { center: THREE.Vector3; parts: THREE.Object3D[]; shown: boolean | null }[] = [];
+  private readonly rooms: { center: THREE.Vector3; parts: THREE.Object3D[]; shown: boolean | null; held?: boolean }[] = [];
   private contactShadows!: ContactShadows;
   private pebbles: ShorePebbles | null = null;
   /** Sub-plan 24's mapped ashlar, terrazzo and brass; null with ?surfaces=off, which keeps the flat white and gold below. */
@@ -156,20 +184,96 @@ export class Town {
   /** Sub-plan 07: per probe site, the parts that reflect it and the envelope hidden while it bakes. */
   private readonly probeParts = new Map<string, { objects: THREE.Object3D[]; hide: THREE.Object3D[] }>();
   private winter?: WinterGate;
-  private constructor(private mobile: boolean, private tier: GraphicsTier) {
+  private constructor(private mobile: boolean, private tier: GraphicsTier, private readonly progressive: boolean) {
     this.water = waterMaterial(tier); this.paving = pavingMaterial(mobile);
     this.surfaces = activateSurfaces(tier); this.masonry = this.surfaces?.masonry ?? this.white; this.brass = this.surfaces?.gold ?? this.gold;
   }
-  static async create(mobile: boolean, stage: (value: number, label: string) => Promise<void>, tier: GraphicsTier = mobile ? 'mobile' : 'gpu'): Promise<Town> {
-    const town = new Town(mobile, tier); await town.build(stage); return town;
+  /** `progressive` builds the distant parts after the first view (buildNext); without it, as for captures and probe bakes, all now. */
+  static async create(mobile: boolean, stage: (value: number, label: string) => Promise<void>, tier: GraphicsTier = mobile ? 'mobile' : 'gpu', progressive = false): Promise<Town> {
+    const town = new Town(mobile, tier, progressive); await town.build(stage); return town;
+  }
+  /** Names this producer's unnamed top-level objects for the dev budget breakdown (snapshot().budget) and times it. */
+  private label(name: string): void {
+    for (const child of this.root.children.slice(this.mark)) if (!child.name) child.name = name;
+    this.mark = this.root.children.length;
+    if (import.meta.env.DEV) { const now = performance.now(); this.buildTimes[name] = (this.buildTimes[name] ?? 0) + Math.round(now - this.markTime); this.markTime = now; }
+  }
+  /**
+   * A part of the town standing within `footprint` (its own layout's centre and reach). When the town is progressive and the
+   * walking view cannot reach the footprint from the arrival point, the part waits for buildNext() after the first view;
+   * otherwise it builds now. A part writes into the town as every producer does (root children, colliders, interactives,
+   * panels, exhibitions, rooms, probe parts, `jewelryReady`, ground discs and contact sites); buildNext() takes what it added
+   * by difference, so a new building needs nothing but its footprint here.
+   */
+  private async place(name: string, footprint: Footprint, build: () => void | Promise<void>): Promise<void> {
+    if (!this.progressive || neededAtArrival(footprint, graphicsProfile(this.tier).fog)) { await build(); this.label(name); return; }
+    this.waiting.push({ name, footprint, build });
+  }
+  /**
+   * Whether distant parts are still waiting or preparing within `radius` of a point. A teleport waits for those within half the
+   * walking view, so what stands round the arrival is there; farther parts finish in the haze soon after, nearest first.
+   */
+  pending(x: number, z: number, radius = graphicsProfile(this.tier).fog / 2): boolean {
+    return [...this.waiting, ...this.parts.filter(part => !part.shown && !part.failed)].some(part => footprintDistance(part.footprint, { x, z }) <= radius);
+  }
+  /** Distant parts not yet built. */
+  get waitingParts(): number { return this.waiting.length; }
+  /**
+   * Build the waiting part nearest `position`, hidden: main.ts gives it its colliders, reflections and lights, builds its
+   * shaders and then calls show(). Null once every part is built. A part whose build threw comes back with `failed`, hidden.
+   */
+  async buildNext(position: { x: number; z: number }): Promise<TownPart | null> {
+    if (!this.waiting.length) return null;
+    this.waiting.sort((a, b) => footprintCentre(a.footprint, position) - footprintCentre(b.footprint, position));
+    const next = this.waiting.shift()!, probes = new Set(this.probeParts.keys());
+    const before = { root: this.root.children.length, details: this.details.children.length, colliders: this.colliders.length, exhibitions: this.exhibitions.length, ready: this.jewelryReady.length, discs: this.groundDiscs.length, contacts: this.contactSites.length };
+    this.markTime = performance.now(); this.mark = before.root;
+    let failed: unknown; try { await next.build(); } catch (error) { failed = error ?? new Error(next.name); }
+    this.label(next.name);
+    const root = new THREE.Group(); root.name = next.name; root.visible = false;
+    // A part may add nothing on a tier (the cpu tier has no alpine plants); add() with no argument would complain.
+    const added = this.root.children.slice(before.root); if (added.length) root.add(...added); this.root.add(root); this.mark = this.root.children.length;
+    // Its near-ground details wait inside the hidden part too, and join the details group (which map mode hides) when shown.
+    const details = this.details.children.slice(before.details); if (details.length) root.add(...details);
+    const exhibitions = this.exhibitions.slice(before.exhibitions);
+    const part: TownPart = {
+      name: next.name, footprint: next.footprint, root, details, colliders: this.colliders.slice(before.colliders),
+      probeScopes: PROBE_SITES.flatMap(site => { const parts = probes.has(site.id) ? undefined : this.probeParts.get(site.id); return parts ? [{ site, ...parts }] : []; }),
+      ready: Promise.all([...this.jewelryReady.slice(before.ready), ...exhibitions.map(exhibition => exhibition.ready)]), shown: false, failed,
+      discs: this.groundDiscs.slice(before.discs), contacts: this.contactSites.length - before.contacts,
+    };
+    if (import.meta.env.DEV && !failed) this.checkFootprint(part);
+    this.parts.push(part); return part;
+  }
+  /** A prepared part joins the town: shown, its ground discs keep the near grass off, its contact patches drawn. */
+  show(part: TownPart): void {
+    if (part.details.length) this.details.add(...part.details); part.root.visible = true; part.shown = true;
+    if (part.discs.length) this.grass?.stamp(part.discs);
+    // The batch rebuilds (tens to hundreds of milliseconds) only for a part that brought patches of its own.
+    if (part.contacts) this.refreshContacts();
+  }
+  /** Dev-only: a part drawn nearer the arrival point than its footprint allowed would pop into the first view. */
+  private checkFootprint(part: TownPart): void {
+    const fog = graphicsProfile(this.tier).fog, sphere = new THREE.Sphere(); let nearest = Infinity, near = '';
+    part.root.updateMatrixWorld(true);
+    // Visible meshes only: a featured model's placeholder waits hidden at the origin until its collection places it.
+    for (const child of part.root.children) child.traverseVisible(object => {
+      const geometry = (object as THREE.Mesh).geometry; if (!geometry?.attributes.position || (object as THREE.InstancedMesh).isInstancedMesh) return;
+      if (!geometry.boundingSphere) geometry.computeBoundingSphere(); sphere.copy(geometry.boundingSphere!).applyMatrix4(object.matrixWorld);
+      let reach = Math.hypot(sphere.center.x - SPAWN.x, sphere.center.z - SPAWN.z) - sphere.radius; if (reach >= nearest || reach > fog) return;
+      // A merged mesh's sphere reaches far past its shape: measure its vertices.
+      const position = geometry.attributes.position, point = new THREE.Vector3(); reach = Infinity;
+      for (let i = 0; i < position.count; i++) { point.fromBufferAttribute(position, i).applyMatrix4(object.matrixWorld); reach = Math.min(reach, Math.hypot(point.x - SPAWN.x, point.z - SPAWN.z)); }
+      if (reach < nearest) { nearest = reach; near = object.name || object.parent?.name || object.type; }
+    });
+    if (nearest <= fog) console.warn(`Livistone: part "${part.name}" reaches ${Math.round(nearest)} m from the arrival point (${near}), inside the ${fog} m walking view; enlarge its footprint so it builds at loading.`);
   }
   private async build(stage: (value: number, label: string) => Promise<void>): Promise<void> {
     const mobile = this.mobile;
     await stage(20, 'Shaping the river, bridge and town entrance…');
     this.root.name = 'Livistone'; this.interiors.name = 'Hall interiors'; this.details.name = 'Meadow grass details'; this.root.add(this.interiors, this.details);
     // Dev budget breakdown (snapshot().budget): each producer names its unnamed top-level objects.
-    let mark = this.root.children.length;
-    const label = (name: string): void => { for (const child of this.root.children.slice(mark)) if (!child.name) child.name = name; mark = this.root.children.length; };
+    this.mark = this.root.children.length; this.markTime = performance.now(); const label = (name: string): void => this.label(name);
     this.createTerrain(); this.createPaths(); label('Paths and civic paving'); createBridge(this.root, this.colliders, this.masonry, this.paving, this.brass); label('Livistone bridge');
     const gateway = createGateway(this.root, this.colliders, mobile, this.paving); label('Gateway'); this.probeParts.set('gateway', { objects: [gateway], hide: [gateway] });
     const gatewayPoster = createGatewayPoster(this.root, this.colliders); this.researchPanels.push(...gatewayPoster.panels); this.interactives.push({ id: 'kings-chapel', object: gatewayPoster.panels[0], position: gatewayPoster.position });
@@ -203,48 +307,58 @@ export class Town {
     this.probeParts.set('station-concourse', { objects: [gallery, ...structure.children.filter(part => !envelope.includes(part))], hide: [] });
     label('Embryo Station and train'); this.railway = createRailwayStructure(this.root, this.colliders, mobile); label('Mountain railway');
     await stage(46, 'Growing the lake gardens and elevated galleries…');
-    this.gardens = new LivingWaters(mobile, this.paving, this.wind); this.root.add(this.gardens.root);
-    this.gardens.presentLakeJewelry(); this.ringReady = this.gardens.presentMyceliumRing();
-    await this.gardens.presentDewdropSilver();
-    this.gardens.addInterpretation('living-mycelium', 'Mycelium Rain Garden', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
-    this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
-    label('Living Waters · town gardens');
+    // The garden's paths reach toward the civic gardens, into the first view; the garden itself may come after it.
+    createGardenPaths(this.root, this.colliders, this.paving, mobile); label('Lake walking network');
+    await this.place('Living Waters · town gardens', around(GARDENS.x, GARDENS.z, GARDENS.radius), async () => {
+      const gardens = this.gardens = new LivingWaters(mobile, this.paving, this.wind, false); this.root.add(gardens.root);
+      gardens.presentLakeJewelry(); this.jewelryReady.push(gardens.presentMyceliumRing());
+      await gardens.presentDewdropSilver();
+      gardens.addInterpretation('living-mycelium', 'Mycelium Rain Garden', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
+      this.colliders.push(...gardens.colliders); this.interactives.push(...gardens.interactives); this.researchPanels.push(...gardens.panels); this.groundDiscs.push(...gardens.stems);
+    });
     await stage(50, 'Building the two-stone Eye of Winter…');
-    this.winter = await loadWinterGate(mobile, this.paving);
-    this.root.add(this.winter.root); this.colliders.push(...this.winter.colliders);
-    this.probeParts.set('winter-gate', { objects: [this.winter.root], hide: [this.winter.root] });
-    const winterPoster = gateFittingsEnabled() ? createGatePoster(this.root, this.colliders, WINTER_POSTER, 'eye-of-winter', 'winter-gate-story', 'Eye of Winter') : null;
-    if (winterPoster) { this.researchPanels.push(...winterPoster.panels); this.interactives.push({ id: 'winter-gate-story', object: winterPoster.panels[0], position: winterPoster.position }); }
-    label('Eye of Winter');
+    await this.place('Eye of Winter', around(WINTER.x, WINTER.z, 40), async () => {
+      const winter = this.winter = await loadWinterGate(mobile, this.paving);
+      this.root.add(winter.root); this.colliders.push(...winter.colliders);
+      this.probeParts.set('winter-gate', { objects: [winter.root], hide: [winter.root] });
+      const poster = gateFittingsEnabled() ? createGatePoster(this.root, this.colliders, WINTER_POSTER, 'eye-of-winter', 'winter-gate-story', 'Eye of Winter') : null;
+      if (poster) { this.researchPanels.push(...poster.panels); this.interactives.push({ id: 'winter-gate-story', object: poster.panels[0], position: poster.position }); this.jewelryReady.push(poster.ready); }
+    });
     await stage(52, 'Opening the Eyelense red bead passage…');
-    const eyelense = await loadEyelenseGate(mobile, this.paving);
-    this.root.add(eyelense.root); this.colliders.push(...eyelense.colliders);
-    this.probeParts.set('eyelense-gate', { objects: [eyelense.root], hide: eyelense.root.children.filter(part => part instanceof THREE.Mesh && !Array.isArray(part.material) && part.material.userData.heroEnv) });
-    const eyelensePoster = gateFittingsEnabled() ? createGatePoster(this.root, this.colliders, EYELENSE_POSTER, 'eyelense', 'eyelense-gate-story', 'Eyelense') : null;
-    if (eyelensePoster) { this.researchPanels.push(...eyelensePoster.panels); this.interactives.push({ id: 'eyelense-gate-story', object: eyelensePoster.panels[0], position: eyelensePoster.position }); }
-    label('Eyelense Gate');
-    const concepts = createConceptRotunda(this.root, this.colliders, mobile); this.researchPanels.push(...concepts.panels); this.jewelryReady.push(concepts.ready);
-    this.fireflies = new TrailFireflies(this.root, mobile);
+    await this.place('Eyelense Gate', around(EYELENSE.x, EYELENSE.z, 20), async () => {
+      const eyelense = await loadEyelenseGate(mobile, this.paving);
+      this.root.add(eyelense.root); this.colliders.push(...eyelense.colliders);
+      this.probeParts.set('eyelense-gate', { objects: [eyelense.root], hide: eyelense.root.children.filter(part => part instanceof THREE.Mesh && !Array.isArray(part.material) && part.material.userData.heroEnv) });
+      const poster = gateFittingsEnabled() ? createGatePoster(this.root, this.colliders, EYELENSE_POSTER, 'eyelense', 'eyelense-gate-story', 'Eyelense') : null;
+      if (poster) { this.researchPanels.push(...poster.panels); this.interactives.push({ id: 'eyelense-gate-story', object: poster.panels[0], position: poster.position }); this.jewelryReady.push(poster.ready); }
+    });
+    await this.place('Concept rotunda', around(ROTUNDA.x, ROTUNDA.z, ROTUNDA.radius + 6), () => {
+      const concepts = createConceptRotunda(this.root, this.colliders, mobile); this.researchPanels.push(...concepts.panels); this.jewelryReady.push(concepts.ready);
+    });
+    await this.place('Jepii Mici · drifting lights', TRAIL_FOOTPRINT, () => { this.fireflies = new TrailFireflies(this.root, mobile); });
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.masonry, this.paving, this.brass, bridge);
-    label('Garden bridges'); let first = this.root.children.length; createTimeTower(this.root, this.colliders, this.mobile); label('Time tower');
-    const tower = this.root.children.slice(first); first = this.root.children.length;
-    createFutureHouse(this.root, this.colliders, this.mobile); label('Future House'); const house = this.root.children.slice(first);
+    label('Garden bridges'); const first = this.root.children.length; createTimeTower(this.root, this.colliders, this.mobile); label('Time tower');
+    const tower = this.root.children.slice(first);
+    // Timeface hangs its posters on the open gallery, seen across town; the tower's posters vanish with its envelope.
+    this.exhibitions.push(new PlanarExhibition('timeface', this.root, 0, 0, this.colliders, this.interactives, this.tier)); label('Posters · timeface');
+    const timeface = this.exhibitions[this.exhibitions.length - 1].objects; this.probeParts.set('timeface', { objects: [...tower, ...timeface], hide: [...tower, ...timeface] });
+    await this.place('Future House', around(FUTURE_HOUSE.x, FUTURE_HOUSE.z, 32), () => {
+      const first = this.root.children.length; createFutureHouse(this.root, this.colliders, this.mobile); const house = this.root.children.slice(first);
+      // The house keeps its three posters inside the cabin, an enclosed room that hides with distance and with the envelope.
+      const exhibition = new PlanarExhibition('future-house', this.root, 0, 0, this.colliders, this.interactives, this.tier); this.exhibitions.push(exhibition);
+      this.probeParts.set('future-house', { objects: [...house, ...exhibition.objects], hide: [...house, ...exhibition.objects] }); this.addRoom(exhibition);
+    });
     await stage(54, 'Making room for science and bioart…');
-    createEnhancementHill(this.root, this.colliders);
-    label('Enhancement hill');
-    const enhancementSign = createEnhancementPanel(this.root, this.colliders); this.researchPanels.push(...enhancementSign.panels); this.interactives.push({ id: 'materialized-enhancements', object: enhancementSign.panels[0], position: enhancementSign.position });
-    const enhancementGallery = createEnhancementGallery(this.root, this.colliders); this.researchPanels.push(...enhancementGallery.panels); this.interactives.push(...enhancementGallery.interactives);
-    label('Enhancement gallery');
-    for (const id of ['timeface', 'future-house']) { this.exhibitions.push(new PlanarExhibition(id, this.root, 0, 0, this.colliders, this.interactives, this.tier)); label('Posters · ' + id); }
-    // The tower's posters hang on its spiral and the house's stand in its cabin: both vanish with the envelope they belong to.
-    for (const [id, parts] of [['timeface', tower], ['future-house', house]] as const) { const posters = this.exhibitions.find(e => e.id === id)!.objects; this.probeParts.set(id, { objects: [...parts, ...posters], hide: [...parts, ...posters] }); }
-    // Timeface hangs its posters on the open gallery, seen across town; the Future House keeps its three inside the cabin.
-    this.addRoom(this.exhibitions[this.exhibitions.length - 1]);
+    await this.place('Enhancement hill', around(ENHANCEMENT.x, ENHANCEMENT.z, 45), () => {
+      createEnhancementHill(this.root, this.colliders);
+      const sign = createEnhancementPanel(this.root, this.colliders); this.researchPanels.push(...sign.panels); this.interactives.push({ id: 'materialized-enhancements', object: sign.panels[0], position: sign.position });
+      const gallery = createEnhancementGallery(this.root, this.colliders); this.researchPanels.push(...gallery.panels); this.interactives.push(...gallery.interactives); this.jewelryReady.push(gallery.ready);
+    });
     label('Glucose Commons');
     const research = createGlucosePavilion(this.root, this.colliders, mobile, this.paving); this.researchPanels.push(...research.panels); this.interactives.push(...research.interactives);
-    this.researchReady = Promise.all([research.ready, enhancementGallery.ready, gatewayPoster.ready, winterPoster?.ready, eyelensePoster?.ready]).then(() => undefined);
+    this.researchReady = Promise.all([research.ready, gatewayPoster.ready]).then(() => undefined);
     await stage(62, 'Planting the woodland and mountain slopes…');
-    label('Glucose Commons'); this.createTrees(); this.createGardens(); this.createContactShadows(); label('River rocks and lamps');
+    label('Glucose Commons'); this.createTrees(); await this.createGardens(); this.createContactShadows(); label('River rocks and lamps');
     for (const landmark of CIVIC_LANDMARKS) {
       const color = landmark.id === 'energy' ? '#ffbf66' : landmark.id === 'science' ? '#99ded7' : '#ffe0a3';
       addGlow(this.root, new THREE.Vector3(landmark.x, 6, landmark.z), color, 25, 90, 24, .3);
@@ -253,7 +367,7 @@ export class Town {
     // The concourse glows stay a quarter below their first strength, so the platform lamps' own pools read at night (sub-plan 28).
     for (const x of [-20, 0, 20]) addGlow(arrival, new THREE.Vector3(x, 4.3, -68), '#ffd28a', 12, 50, 17, .22);
     this.mountains = new Mountains(mobile, this.tier, this.groundOcclusion, this.grassShade); this.root.add(this.mountains);
-    const crags = this.crags; if (crags) this.cragsReady = this.mountains.rock.then(({ rock, rockNormal }) => useCragMaps(crags.material, this.tier, rock, rockNormal)).catch(() => { /* Plain grey crags if the rock maps fail. */ });
+    if (this.crags) this.cragsReady = this.cragMaps(this.crags);
   }
   private createTerrain(): void {
     const geo = townTerrainGeometry(); this.terrainVertices = new Float32Array(geo.getAttribute('position').array);
@@ -430,45 +544,40 @@ export class Town {
     return PROBE_SITES.flatMap(site => { const parts = this.probeParts.get(site.id); return parts ? [{ site, ...parts }] : []; });
   }
   readonly forest = new Forest();
-  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows, this.wind), this.mountains.ready, this.cragsReady, this.researchReady, ...this.jewelryReady, this.ringReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
+  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows, this.wind), this.mountains.ready, this.cragsReady, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
     const sites = forestSites(this.mobile);
     for (const { x, y, z } of sites) this.colliders.push({ type: 'box', position: [x, y + 2, z], size: [0.3, 2, 0.3] });
     this.forest.sites = sites; this.forest.name = 'Forest'; this.root.add(this.forest);
   }
-  private createGardens(): void {
+  private async createGardens(): Promise<void> {
     // The near grass field (gpu and mobile) replaces the meadow tufts close to the camera; map mode hides it with the details.
     // The ground's baked crown and wall occlusion (sub-plan 16), shared by the terrain and the grass standing on it.
     this.groundOcclusion = CONTACT_OFF ? undefined : groundShadeField(treeShadeDiscs(this.forest.sites), TOWN_SHADE_FOOTPRINTS);
     const trail = MOUNTAIN ? trailBoulders(this.mobile) : [];
     this.boulders = trail.map(boulder => boulder.site); const rocks = [...this.rocks, ...this.boulders];
-    if (CRAGS) {
-      // Sub-plan 27 round 2: limestone crags wherever the mountain is steep, clear of trunks and the trail's boulders; one draw,
-      // and one collider on every tier.
-      const obstacles = cragObstacles(this.forest.sites, this.boulders);
-      // The ground under them comes from the collider grid's heights, already computed.
-      const ground = new CragGround((x, z) => terrainVertexHeight(this.terrainVertices, x, z));
-      this.crags = createCrags(this.tier, cragSites({ obstacles, ground }), ground); this.root.add(this.crags.mesh); this.colliders.push(this.crags.collider);
+    // Sub-plan 27: the Jepii Mici trail's crags, signs and boulders, alpine plants and water. Four parts, so each one built after
+    // the first view holds the main thread only briefly.
+    if (MOUNTAIN) {
+      if (CRAGS) await this.place('Limestone crags', CRAGS_FOOTPRINT, () => this.buildCrags());
+      await this.place('Jepii Mici trail signs', SIGNS_FOOTPRINT, () => this.buildTrailSigns(trail));
+      await this.place('Alpine plants', PLATEAU_FOOTPRINT, () => {
+        // The plateau's rhododendron mats, their cards with the turf's flowers and moss campion: three draws, none on cpu.
+        const plants = createAlpinePlants(this.tier, rocks, FOREST_DETAIL.coverage); if (plants.meshes.length) this.root.add(...plants.meshes); this.contactSites.push(...plants.contacts);
+      });
+      await this.place('Gorge water and snow cave', WATER_FOOTPRINT, () => {
+        // Round 2's water: the gorge's stream out of its snow cave, the plateau's brook and its waterfall; the mist joins the details.
+        const water = createGorgeWater(this.tier); this.root.add(water.group); if (water.spray) this.details.add(water.spray);
+      });
     }
-    // The plateau's brook (sub-plan 27, round 2) keeps the blades off its water; the gorge's floor grows none.
-    const grass = createGrassField(this.tier, { rocks, stems: [...this.gardens.stems, ...MOUNTAIN ? brookGround() : [], ...this.crags?.discs ?? []], height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
+    // The plateau's brook (sub-plan 27, round 2) keeps the blades off its water; the gorge's floor grows none. Parts built after
+    // the first view stamp their own discs into the bake (show()).
+    const grass = this.grass = createGrassField(this.tier, { rocks, stems: [...this.groundDiscs, ...MOUNTAIN ? brookGround() : []], height: (x, z) => terrainVertexHeight(this.terrainVertices, x, z), shade: this.groundOcclusion });
     if (grass) { this.details.add(grass.mesh); this.grassShade = grass.ground; }
     this.planting = createPlanting(this.root, this.details, this.mobile, terrainHeight, riverCenter, this.tier, grass?.ground.radius ?? 0, this.wind);
     // One instanced draw of blended boulder variants; one collider mesh sampled from the same shapes and transforms.
     // The trail's boulders keep their own draw, so the river rocks' bounds stay on the river; both share one collider.
     const stone = rockMaterial(this.mobile); this.root.add(createRiverRocks(this.rocks, stone, this.tier)); this.colliders.push(rockColliders(rocks));
-    if (MOUNTAIN) {
-      // Matte grey limestone, darker than the pale river stone, which read as a bright lens on the sunlit slope.
-      const limestone = rockMaterial(this.mobile); limestone.color.set('#cdc9bf');
-      const boulders = createRiverRocks(this.boulders, limestone, this.tier); boulders.name = 'Trail boulders'; this.root.add(boulders);
-      // The Jepii Mici trailhead (sub-plan 27): every sign, post, rope and blaze is one mesh on one painted atlas; the cushions one draw.
-      const signs = createTrailSigns(this.colliders, trail, this.forest.sites, this.mobile); this.root.add(signs.mesh); paintTrailSigns(signs, this.tier);
-      this.researchPanels.push(signs.mesh); this.interactives.push({ id: 'jepii-mici', object: signs.mesh, position: signs.position });
-      // The plateau's rhododendron mats, their cards with the turf's flowers and moss campion: three draws, none on cpu.
-      const plants = createAlpinePlants(this.tier, rocks, FOREST_DETAIL.coverage); if (plants.meshes.length) this.root.add(...plants.meshes); this.trailContacts = [...signs.contacts, ...plants.contacts, ...this.crags?.contacts ?? []];
-      // Round 2's water: the gorge's stream out of its snow cave, the plateau's brook and its waterfall; the mist joins the details.
-      const water = createGorgeWater(this.tier); this.root.add(water.group); if (water.spray) this.details.add(water.spray);
-    }
     // Shore pebbles live with the other near-ground details, so map mode hides them; cpu has none. Only nearby cells draw.
     this.pebbles = createPebbles(this.tier, this.rocks); if (this.pebbles) this.details.add(this.pebbles.mesh);
     for (const [x, z] of LAMP_POSTS) {
@@ -478,12 +587,42 @@ export class Town {
       addGlow(this.root, new THREE.Vector3(x, 2.8, z), '#ffcf79', 4.5, 36, 10, .7);
     }
   }
+  /** Sub-plan 27 round 2: limestone crags wherever the mountain is steep, clear of trunks and the trail's boulders; one draw, and one collider on every tier. */
+  private buildCrags(): void {
+    const obstacles = cragObstacles(this.forest.sites, this.boulders);
+    // The ground under them comes from the collider grid's heights, already computed.
+    const ground = new CragGround((x, z) => terrainVertexHeight(this.terrainVertices, x, z));
+    const crags = this.crags = createCrags(this.tier, cragSites({ obstacles, ground }), ground); this.root.add(crags.mesh); this.colliders.push(crags.collider);
+    this.groundDiscs.push(...crags.discs); this.contactSites.push(...crags.contacts);
+    // Built after the first view, the mountains' rock maps are already loading; at loading, the mountains come later (build()).
+    if (this.mountains) this.jewelryReady.push(this.cragMaps(crags));
+  }
+  /** The Jepii Mici trailhead and its boulders: every sign, post, rope and blaze is one mesh on one painted atlas. */
+  private buildTrailSigns(trail: ReturnType<typeof trailBoulders>): void {
+    // Matte grey limestone, darker than the pale river stone, which read as a bright lens on the sunlit slope.
+    const limestone = rockMaterial(this.mobile); limestone.color.set('#cdc9bf');
+    const boulders = createRiverRocks(this.boulders, limestone, this.tier); boulders.name = 'Trail boulders'; this.root.add(boulders);
+    const signs = createTrailSigns(this.colliders, trail, this.forest.sites, this.mobile); this.root.add(signs.mesh); paintTrailSigns(signs, this.tier);
+    this.researchPanels.push(signs.mesh); this.interactives.push({ id: 'jepii-mici', object: signs.mesh, position: signs.position }); this.contactSites.push(...signs.contacts);
+  }
+  private cragMaps(crags: Crags): Promise<void> {
+    return this.mountains.rock.then(({ rock, rockNormal }) => useCragMaps(crags.material, this.tier, rock, rockNormal)).catch(() => { /* Plain grey crags if the rock maps fail. */ });
+  }
   /** One multiply-blended draw grounds trunks, rocks, feet, posts and benches; tree patches follow the forest's own cells. */
   private createContactShadows(): void {
-    const trees = forestCells(this.forest.sites).map(cell => cell.sites.flatMap(({ p, index }) => treeContactSites(p, index)));
-    this.contactShadows = createContactShadows([...objectContactSites(), ...rockContactSites([...this.rocks, ...this.boulders.filter(b => snowCover(b.x, b.z) < .5)]), ...this.trailContacts], trees);
+    this.contactShadows = this.contactBatch();
     if (!CONTACT_OFF) this.root.add(this.contactShadows.mesh);
     this.forest.onCells = this.contactShadows.showGroups;
+  }
+  private contactBatch(): ContactShadows {
+    const trees = forestCells(this.forest.sites).map(cell => cell.sites.flatMap(({ p, index }) => treeContactSites(p, index)));
+    return createContactShadows([...objectContactSites(), ...rockContactSites([...this.rocks, ...this.boulders.filter(b => snowCover(b.x, b.z) < .5)]), ...this.contactSites], trees);
+  }
+  /** The batch again with the patches of parts shown since: new geometry on the same mesh and material, so nothing rebuilds. */
+  private refreshContacts(): void {
+    const next = this.contactBatch(), mesh = this.contactShadows.mesh;
+    mesh.geometry.dispose(); mesh.geometry = next.mesh.geometry; next.mesh.material.dispose();
+    this.contactShadows = { ...next, mesh }; this.forest.onCells = next.showGroups; next.showGroups(this.forest.trunks());
   }
   /**
    * Returns whether a shadow caster changed detail or visibility this frame. `fullFog` is where the view's fog is complete
@@ -500,7 +639,7 @@ export class Town {
     const crowns = mapView || !cpu ? fullFog : Math.min(fullFog, profile.forest), reach = mapView || (!cpu && HAZE_CLASSIC) ? fullFog : cpu ? Math.min(fullFog, profile.forest) : fullFog * TREE_REACH;
     const trees = this.forest.update(camera, reach, mapView, shadow);
     // Their light silhouette matches, so a cached shadow map waits for its next re-bake.
-    this.gardens.updateDetail(camera, crowns, mapView); this.gardens.turnRing();
+    this.gardens?.updateDetail(camera, crowns, mapView); this.gardens?.turnRing();
     this.fireflies?.update();
     // Shrub batches toggle every couple of metres while walking; re-baking for them cost a shadow pass per ~2 m, so their shadows catch up at the next quarter-box re-bake.
     this.planting?.update(camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
@@ -508,6 +647,7 @@ export class Town {
     // The map's camera is far above the town; residency follows the walking eye only.
     if (!mapView) { this.posters.update(camera.position); if (this.streaming) for (const exhibition of this.exhibitions) exhibition.updateFeatured(camera.position, ROOM_RANGE); }
     for (const room of this.rooms) {
+      if (room.held) continue;
       const shown = mapView || BUDGET_OFF || camera.position.distanceTo(room.center) < ROOM_RANGE;
       if (shown !== room.shown) { room.shown = shown; for (const part of room.parts) part.visible = shown; }
     }
@@ -527,9 +667,25 @@ export class Town {
    * signs keep their culling: the view from the station already builds their shaders, and uploading every canvas and photo
    * now would only move their upload from first sight to loading. Poster maps that arrive later swap onto built materials.
    */
+  /**
+   * As warmUp(), for one distant part while its shaders build (main.ts): every instance drawn, culling off and its rooms held
+   * open, so the part builds every shader it can show. The part's root stays hidden meanwhile; its children are compiled.
+   */
+  warmPart(part: TownPart, on: boolean): void {
+    const inside = (object: THREE.Object3D): boolean => { for (let at: THREE.Object3D | null = object; at; at = at.parent) if (at === part.root) return true; return false; };
+    for (const exhibition of this.exhibitions) if (exhibition.objects.some(inside)) exhibition.warmUp(on);
+    if (this.gardens && inside(this.gardens.root)) this.gardens.warmUp(on);
+    for (const room of this.rooms) if (room.parts.some(inside)) { room.held = on; room.shown = null; if (on) for (const object of room.parts) object.visible = true; }
+    part.root.traverse((object) => {
+      const material = (object as THREE.Mesh).material;
+      if (!Array.isArray(material) && material?.userData.display) return;
+      if (on) { warmCulled.set(object, object.frustumCulled); object.frustumCulled = false; }
+      else { const culled = warmCulled.get(object); if (culled !== undefined) object.frustumCulled = culled; }
+    });
+  }
   warmUp(on: boolean): void {
     for (const exhibition of this.exhibitions) exhibition.warmUp(on);
-    this.forest.warmUp(on); this.planting?.warmUp(on); this.pebbles?.warmUp(on); this.gardens.warmUp(on);
+    this.forest.warmUp(on); this.planting?.warmUp(on); this.pebbles?.warmUp(on); this.gardens?.warmUp(on);
     // Rooms draw during the warm-up, so their shaders build now; the next update() hides the distant ones again.
     if (on) for (const room of this.rooms) { room.shown = null; for (const part of room.parts) part.visible = true; }
     this.root.traverse((object) => {

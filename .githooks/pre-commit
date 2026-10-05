@@ -2,4 +2,11 @@
 # Livistone pre-commit hook. Installed by `bun run hooks:install`, which points
 # core.hooksPath at this directory so the hook is version-controlled with the repo.
 set -euo pipefail
-exec "$(git rev-parse --show-toplevel)/scripts/sync-agent-docs.sh" --staged
+top="$(git rev-parse --show-toplevel)"
+"$top/scripts/sync-agent-docs.sh" --staged
+# Saved reflection probes must match the sources they were baked from, or every visitor bakes them live. The check runs only
+# when a staged path feeds their signature, so other commits stay instant. SKIP_PROBE_CHECK=1 git commit … skips it once.
+if [ "${SKIP_PROBE_CHECK-}" = 1 ]; then exit 0; fi
+cd "$top"
+if command -v bun >/dev/null 2>&1; then exec bun scripts/check-probes.ts --staged; fi
+exec node --experimental-strip-types --no-warnings scripts/check-probes.ts --staged

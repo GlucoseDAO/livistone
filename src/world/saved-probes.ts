@@ -5,16 +5,21 @@ export interface SavedProbe { id: string; width: number; height: number; file: s
 export interface ProbeManifest { revision: string; sets: Record<string, SavedProbe[]> }
 export const probeSet = (size: number, phase: SkyPhase, renderer: THREE.WebGPURenderer): string => `${(renderer.backend as unknown as { isWebGPUBackend?: boolean }).isWebGPUBackend ? 'webgpu' : 'webgl'}-${size}-${phase}`;
 let manifest: Promise<ProbeManifest | null> | undefined;
+/** Rejected saved probes leave the page baking them live; say why once per page (scripts/check-probes.ts catches it before commit). */
+let warned = false;
+const reject = (...reason: unknown[]): null => { if (!warned) { warned = true; console.warn('Livistone: saved reflections not used, baking them live.', ...reason); } return null; };
 
 /** Restore the already filtered half-float atlas into a target, preserving PMREM's render-target sampling convention. */
 export async function loadSavedProbes(renderer: THREE.WebGPURenderer, size: number, phase: SkyPhase, ids: string[]): Promise<Map<string, THREE.RenderTarget> | null> {
   const params = import.meta.env.DEV ? new URLSearchParams(location.search) : null;
-  if (params?.get('probes') === 'bake' || params && [...params.keys()].some(key => !['graphics', 'capture', 'backend', 'probes', 'featured'].includes(key))) return null;
+  if (params?.get('probes') === 'bake' || params && [...params.keys()].some(key => !['graphics', 'capture', 'backend', 'probes', 'featured', 'parts'].includes(key))) return null;
   const base = `${import.meta.env.BASE_URL}probes/`, targets = new Map<string, THREE.RenderTarget>();
   try {
     manifest ??= fetch(base + 'manifest.json?v=' + import.meta.env.VITE_PROBE_REVISION).then(async response => response.ok ? await response.json() as ProbeManifest : null).catch(() => null);
     const saved = await manifest, set = saved?.sets[probeSet(size, phase, renderer)];
-    if (!saved || saved.revision !== import.meta.env.VITE_PROBE_REVISION || !set || ids.some(id => !set.some(entry => entry.id === id))) return null;
+    if (!saved) return reject('public/probes/manifest.json could not be loaded.');
+    if (saved.revision !== import.meta.env.VITE_PROBE_REVISION) return reject(`The page expects revision ${import.meta.env.VITE_PROBE_REVISION}; the manifest has ${saved.revision}.`);
+    if (!set || ids.some(id => !set.some(entry => entry.id === id))) return reject(`The manifest has no complete ${probeSet(size, phase, renderer)} set.`);
     const loaded = await Promise.allSettled(ids.map(async id => {
       const entry = set.find(entry => entry.id === id)!;
       if (entry.width < 1 || entry.height < 1 || entry.width > 1024 || entry.height > 1024 || !/^[a-z0-9/-]+\.bin\.gz$/.test(entry.file)) throw new Error('Invalid reflection atlas');
@@ -32,5 +37,5 @@ export async function loadSavedProbes(renderer: THREE.WebGPURenderer, size: numb
     }));
     const failed = loaded.find(result => result.status === 'rejected'); if (failed?.status === 'rejected') throw failed.reason;
     return targets;
-  } catch (error) { if (import.meta.env.DEV) console.warn('Saved reflections unavailable', error); for (const target of targets.values()) target.dispose(); return null; }
+  } catch (error) { for (const target of targets.values()) target.dispose(); return reject(error); }
 }

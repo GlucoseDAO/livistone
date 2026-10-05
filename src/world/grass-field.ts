@@ -66,6 +66,8 @@ export interface GrassBake {
   field: Float32Array;
   /** Per vertex: the ground's vertex-colour factor over its grass baseline (÷ 1.5), and how fully grass grows there (alpha). */
   tint: Uint8Array;
+  /** The field and tint as the material reads them, refreshed when stampGrassDiscs changes the bake. */
+  textures?: THREE.DataTexture[];
 }
 
 /** Clearance from water and from the merged walking network (paving, fillets and planting margins), capped at ±LIMIT. */
@@ -123,13 +125,7 @@ export function bakeGrassField(options: { rocks?: readonly RockSite[]; stems?: r
   }
   // Rocks keep their footprint and a ring of bank around it. Below about 40 cm the 2 m grid cannot resolve a rock, so a few
   // short bank blades may still meet the smallest pebbles. Stems keep their own trunk disc.
-  for (const disc of [...(options.rocks ?? []).map(rock => ({ x: rock.x, z: rock.z, radius: rockReach(rock.s) + .5 })), ...options.stems ?? []]) {
-    const radius = disc.radius, i0 = Math.floor((disc.x - radius - LIMIT - minX) / STEP), j0 = Math.floor((disc.z - radius - LIMIT - minZ) / STEP);
-    for (let j = Math.max(0, j0); j <= Math.min(depth - 1, j0 + Math.ceil((radius + LIMIT) * 2 / STEP) + 1); j++)
-      for (let i = Math.max(0, i0); i <= Math.min(width - 1, i0 + Math.ceil((radius + LIMIT) * 2 / STEP) + 1); i++) {
-        const n = (j * width + i) * 4 + 1; field[n] = Math.min(field[n], Math.hypot(minX + i * STEP - disc.x, minZ + j * STEP - disc.z) - radius);
-      }
-  }
+  stampDiscs({ minX, minZ, width, depth, field }, [...(options.rocks ?? []).map(rock => ({ x: rock.x, z: rock.z, radius: rockReach(rock.s) + .5 })), ...options.stems ?? []]);
   const colour = new THREE.Color();
   for (let j = 0; j < depth; j++) for (let i = 0; i < width; i++) {
     const n = j * width + i, x = minX + i * STEP, z = minZ + j * STEP, h = heights[n];
@@ -151,6 +147,28 @@ export function bakeGrassField(options: { rocks?: readonly RockSite[]; stems?: r
 }
 
 /** How fully grass grows (0–1): outside reserved ground, at the density its soil and slope allow. */
+/** Each grid vertex near a disc takes its distance to the disc's edge if nearer; returns the vertices changed. */
+function stampDiscs({ minX, minZ, width, depth, field }: Pick<GrassBake, 'minX' | 'minZ' | 'width' | 'depth' | 'field'>, discs: readonly GroundDisc[]): number[] {
+  const changed: number[] = [];
+  for (const disc of discs) {
+    const radius = disc.radius, i0 = Math.floor((disc.x - radius - LIMIT - minX) / STEP), j0 = Math.floor((disc.z - radius - LIMIT - minZ) / STEP);
+    for (let j = Math.max(0, j0); j <= Math.min(depth - 1, j0 + Math.ceil((radius + LIMIT) * 2 / STEP) + 1); j++)
+      for (let i = Math.max(0, i0); i <= Math.min(width - 1, i0 + Math.ceil((radius + LIMIT) * 2 / STEP) + 1); i++) {
+        const n = j * width + i, clearance = Math.hypot(minX + i * STEP - disc.x, minZ + j * STEP - disc.z) - radius;
+        if (clearance < field[n * 4 + 1]) { field[n * 4 + 1] = clearance; changed.push(n); }
+      }
+  }
+  return changed;
+}
+/**
+ * Discs of a part built after the field (world.ts places distant parts after the first view): the bake keeps their blades off
+ * as if they had been there from the start. The terrain's `grassCover`, baked into its vertices at load, keeps its first value.
+ */
+export function stampGrassDiscs(bake: GrassBake, discs: readonly GroundDisc[]): boolean {
+  const changed = stampDiscs(bake, discs);
+  for (const n of changed) bake.tint[n * 4 + 3] = bake.field[n * 4 + 1] <= -LIMIT ? 0 : Math.round(meadowAmount(bake.field[n * 4 + 1], bake.field[n * 4 + 2]) * 255);
+  return changed.length > 0;
+}
 const meadowAmount = (clearance: number, density: number): number => THREE.MathUtils.smoothstep(clearance, BLADE_CLEARANCE, FULL_CLEARANCE) * density;
 
 /** How fully grass grows at a point: the tint's alpha, bilinear and clamped at the edges as the linear-filtered lookup read it. */
@@ -202,7 +220,7 @@ function grassMaterial(spec: Spec, bake: GrassBake, look: GroundLook): THREE.Mes
   const data = new THREE.DataTexture(bake.field, bake.width, bake.depth, THREE.RGBAFormat, THREE.FloatType);
   data.magFilter = data.minFilter = THREE.NearestFilter; data.needsUpdate = true;
   const tints = new THREE.DataTexture(bake.tint, bake.width, bake.depth, THREE.RGBAFormat, THREE.UnsignedByteType);
-  tints.magFilter = tints.minFilter = THREE.LinearFilter; tints.needsUpdate = true;
+  tints.magFilter = tints.minFilter = THREE.LinearFilter; tints.needsUpdate = true; bake.textures = [data, tints];
   const colour = varyingProperty('vec3', 'vGrassColour'), normal = varyingProperty('vec3', 'vGrassNormal'), occlusion = varyingProperty('float', 'vGrassOcclusion');
   const perLevel = spec.cells ** 2, radius = fieldRadius(spec);
   const position = Fn(() => {
@@ -271,10 +289,10 @@ function grassMaterial(spec: Spec, bake: GrassBake, look: GroundLook): THREE.Mes
 }
 
 /** The field for a tier (null on cpu or with `?grass=off`). Map mode hides it with the rest of the town's details. */
-export function createGrassField(tier: GraphicsTier, options: Parameters<typeof bakeGrassField>[0] = {}, look: GroundLook = groundLook()): { mesh: THREE.Mesh; ground: GrassShade } | null {
+export function createGrassField(tier: GraphicsTier, options: Parameters<typeof bakeGrassField>[0] = {}, look: GroundLook = groundLook()): { mesh: THREE.Mesh; ground: GrassShade; stamp(discs: readonly GroundDisc[]): void } | null {
   if (tier === 'cpu' || !grassFieldEnabled()) return null;
   const spec = GRASS_TIERS[tier], bake = bakeGrassField(options), material = grassMaterial(spec, bake, look), mesh = new THREE.Mesh(patchGeometry(spec), material);
   // The field follows the camera in the vertex shader, so it is always in view; it receives shadows but casts none.
   mesh.name = 'Near grass field'; mesh.frustumCulled = false; mesh.receiveShadow = true; mesh.castShadow = false;
-  return { mesh, ground: { amount: (x, z) => grassAmount(bake, x, z), radius: fieldRadius(spec) } };
+  return { mesh, ground: { amount: (x, z) => grassAmount(bake, x, z), radius: fieldRadius(spec) }, stamp: (discs) => { if (stampGrassDiscs(bake, discs)) for (const data of bake.textures ?? []) data.needsUpdate = true; } };
 }

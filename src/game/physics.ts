@@ -20,6 +20,17 @@ export class Physics {
   private constructor(specs: ColliderSpec[]) {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = 1 / 60;
+    this.add(specs);
+    this.body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(SPAWN.x, SPAWN.y, SPAWN.z));
+    this.collider = this.world.createCollider(RAPIER.ColliderDesc.capsule(0.53, 0.29), this.body);
+    this.controller = this.world.createCharacterController(0.025);
+    this.controller.enableAutostep(0.32, 0.25, false);
+    this.controller.enableSnapToGround(0.4);
+    this.controller.setMaxSlopeClimbAngle(Math.PI / 4);
+    this.controller.setMinSlopeSlideAngle(Math.PI / 3);
+  }
+  /** Colliders of a part of the town built after loading (world.ts), in the same world as the rest. */
+  add(specs: readonly ColliderSpec[]): void {
     for (const spec of specs) {
       if (spec.type === 'box') {
         const desc = RAPIER.ColliderDesc.cuboid(...spec.size).setTranslation(...spec.position);
@@ -28,13 +39,6 @@ export class Physics {
         if (spec.dynamic) this.dynamic.set(spec.dynamic, collider);
       } else { const collider = this.world.createCollider(RAPIER.ColliderDesc.trimesh(spec.vertices, spec.indices)); if (spec.climbable) this.climbable.add(collider.handle); }
     }
-    this.body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(SPAWN.x, SPAWN.y, SPAWN.z));
-    this.collider = this.world.createCollider(RAPIER.ColliderDesc.capsule(0.53, 0.29), this.body);
-    this.controller = this.world.createCharacterController(0.025);
-    this.controller.enableAutostep(0.32, 0.25, false);
-    this.controller.enableSnapToGround(0.4);
-    this.controller.setMaxSlopeClimbAngle(Math.PI / 4);
-    this.controller.setMinSlopeSlideAngle(Math.PI / 3);
   }
   step(x: number, z: number, dt = 1 / 60, jump = false): void {
     const current = this.body.translation(), onEnhancement = enhancementClearing(current.x, current.z, 0);

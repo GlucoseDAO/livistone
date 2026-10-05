@@ -24,7 +24,7 @@ import { Town } from './world/world';
 import { UI } from './ui/ui';
 import type { Mode } from './ui/ui';
 import { Input } from './game/input';
-import { Ambience } from './game/audio';
+import { ambience } from './game/audio';
 import { LANDMARKS, DISCOVERIES, SPAWN, readProgress, writeProgress } from './game/content';
 import { graphicsProfile } from './game/graphics';
 import { chosenTier, GRAPHICS_CHOICE_KEY, parseGraphicsChoice, readGraphicsChoice } from './game/graphics-choice';
@@ -46,12 +46,11 @@ import type { DrawCost } from './game/render-budget';
 import { aerialFogNode, aerialParams, setAerial } from './render/aerial';
 import { cubeTexture } from 'three/tsl';
 import { ProbeEnvironment, ReflectionProbes, litMaterials, probesEnabled, refreshEnvironment } from './world/probes';
+import type { TownPart } from './world/town-parts';
 import type { ProbeBake } from './world/probes';
+import { CPU_FOG_NEAR, LIGHT_COLOUR, LOADING_VIEW, MAP_FOG, MIST, SHADOW, SHADOW_TARGET, SUN_DISTANCE, phaseLight } from './render/scene-light';
+import type { Light } from './render/scene-light';
 
-// The map's range fog; walking, the cpu tier fogs linearly from CPU_FOG_NEAR to its full-fog distance (GraphicsProfile.fog).
-const MAP_FOG = { near: 240, far: 630 }, CPU_FOG_NEAR = 42;
-// Walking with the distant ranges (sub-plan 26): the valley mist's altitude band on them in metres, and their haze per metre.
-const MIST = { low: 25, high: 150, aerial: 1.2e-4 };
 // On the cpu tier the eye sits this far ahead of the capsule axis. Standing exactly over a terrain grid vertex (map arrivals
 // and teleports use whole-metre positions) put that vertex on the camera plane, and SwiftShader then smeared its attributes
 // over the adjoining near triangles as one flat colour, in classic as in WebGPU. Two millimetres keep it clipped; hardware
@@ -60,29 +59,11 @@ const EYE_LEAD = .002;
 // Dev-only ?light=a keeps 02's old hemisphere-heavy fill (sun and haze coherence only). b, the default, lets the baked sky
 // carry the ambient light and gives heroEnv materials their own reflection strength.
 const LOOK = import.meta.env.DEV && new URLSearchParams(location.search).get('light') === 'a' ? 'a' : 'b';
+// Progressive loading (world/town-parts.ts): parts beyond the walking view from the arrival point build after the first view.
+// Captures and probe bakes build everything first; dev-only ?parts=eager does so too, for comparison.
+const PROGRESSIVE = !(import.meta.env.DEV && new URLSearchParams(location.search).get('parts') === 'eager');
 // Dev-only ?post=off|ao|gi overrides the tier's screen-space stages (sub-plan 18): none, occlusion with bloom, or the SSGI experiment.
 const POST = ((value: string | null) => import.meta.env.DEV && (value === 'off' || value === 'ao' || value === 'gi') ? value : null)(new URLSearchParams(location.search).get('post'));
-// The physical day sky (sub-plan 26) lights about a quarter less than the painted one, its zenith being a deeper blue: this
-// keeps the town's shade as bright as before (arrival-meadow and meadow-ground matched within one grey level).
-const PHYSICAL_DAY_FILL = 1.35;
-// Sub-plan 21 (the owner chose its moderate contrast): a stronger sun against a weaker sky fill, so cast shadows read as
-// shadows. Horizontal sunlit ground keeps its old brightness while shade loses about a third: sunlit to shaded about 2.8:1,
-// from 1.8:1. Moonlight is rebalanced the same way at the same overall level; emissions are untouched.
-type Light = { sun: number; environment: number; hemi: number };
-const LIGHT: Record<SkyPhase, Light> = { day: { sun: 3.35, environment: .6, hemi: .36 }, night: { sun: .42, environment: .24, hemi: .17 } };
-// The cpu tier has no environment light and no shadows: its hemisphere carries the fill, and the contrast shows in form shading.
-const CPU_LIGHT: Record<SkyPhase, Light> = { day: { sun: 2.75, environment: 0, hemi: .92 }, night: { sun: .38, environment: 0, hemi: .22 } };
-// 02's look a, before the sky carried the fill.
-const LEGACY_LIGHT: Record<SkyPhase, Light> = { day: { sun: 2.4, environment: .5, hemi: 1.2 }, night: { sun: .32, environment: .2, hemi: .28 } };
-// The map shadow box stays on the town centre; walking boxes follow the player.
-const SHADOW_TARGET = new THREE.Vector3(0, 0, -60);
-// Far enough along the light that the ±160 m map box keeps every caster and receiver between near and far for suns above ~20°.
-const SUN_DISTANCE = 400;
-// Walking boxes trade reach for ~5 cm (2048) and ~8 cm (1024) texels, led ahead of the view so the edge falls into the fog; the map keeps the whole town.
-// The depth bias is a fixed few centimetres in world units; the normal offset follows texel size.
-// Shadows fade out between 72% and 90% of the walking half-size: with the lead and the quarter-box re-bake drift, that band stays inside the box across the whole view.
-const SHADOW = { walk: 50, walkReduced: 40, map: 160, lead: .3, fade: [.72, .9], bias: .05, normalBias: .6 };
-
 class Game {
   private readonly renderer: THREE.WebGPURenderer;
   private readonly output: OutputPipeline;
@@ -134,7 +115,7 @@ class Game {
   private readonly orbit: OrbitControls;
   private town!: Town;
   private readonly input: Input;
-  private readonly ambience = new Ambience();
+  private readonly ambience = ambience;
   private readonly sun: THREE.DirectionalLight;
   /** Unit vector from the shadow target toward the sun or moon; the light always sits SUN_DISTANCE along it. */
   private readonly sunDirection = new THREE.Vector3();
@@ -167,6 +148,9 @@ class Game {
   private readonly hemi: THREE.HemisphereLight;
   private physics?: Physics;
   private readonly zone = 'town';
+  /** Where the distant parts stream toward first: a waiting teleport's destination, else the player. */
+  private streamFocus: { x: number; z: number } | null = null;
+  private readonly partWaiters: { x: number; z: number; resolve: () => void }[] = [];
 
   private mode: Mode = 'welcome';
   private returnMode: 'walking' | 'map' = 'walking';
@@ -188,7 +172,7 @@ class Game {
   private hoverPointer: { x: number; y: number; buttons: number } | null = null;
   private cursorDirty = false;
   constructor(private ui: UI, private readonly view: RenderView) {
-    this.ambience.onStateChange = enabled => this.ui.setSound(enabled);
+    this.ambience.onStateChange(enabled => this.ui.setSound(enabled));
     this.ui.setSound(this.ambience.enabled);
     this.ambience.start();
     this.renderer = view.renderer; this.graphics = view.graphics;
@@ -214,10 +198,10 @@ class Game {
     this.renderer.shadowMap.enabled = this.graphics.shadows; this.renderer.shadowMap.type = THREE.PCFShadowMap;
     // The output pass (render/output.ts) applies Khronos PBR Neutral (render/tone.ts) at this exposure, except to display materials.
     this.renderer.toneMapping = THREE.NoToneMapping; this.renderer.toneMappingExposure = SKY_EXPOSURE[this.phase];
-    this.hemi = new THREE.HemisphereLight(this.night ? '#8ea4c6' : '#e9f4f0', this.night ? '#121820' : '#73805c', this.light.hemi);
+    this.hemi = new THREE.HemisphereLight(LIGHT_COLOUR[this.phase].sky, LIGHT_COLOUR[this.phase].ground, this.light.hemi);
     this.scene.add(this.hemi);
-    this.sun = new THREE.DirectionalLight(this.night ? '#c9d6ee' : '#fff0ce', this.light.sun); this.sun.castShadow = true;
-    this.sun.shadow.mapSize.setScalar(this.reduced ? 1024 : 2048); this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = SUN_DISTANCE * 2;
+    this.sun = new THREE.DirectionalLight(LIGHT_COLOUR[this.phase].sun, this.light.sun); this.sun.castShadow = true;
+    this.sun.shadow.mapSize.setScalar(this.reduced ? SHADOW.reducedSize : SHADOW.size); this.sun.shadow.camera.near = 1; this.sun.shadow.camera.far = SUN_DISTANCE * 2;
     // The shadow camera also draws the forest's shadow-only meshes, which the view cameras skip.
     this.sun.shadow.camera.layers.enable(SHADOW_LAYER);
     this.scene.add(this.sun, this.sun.target); installShadowFade(this.sun); this.aimSun();
@@ -236,7 +220,7 @@ class Game {
     // The town and sun are static; refresh shadows only when scene visibility changes. WebGPU schedules shadows per light.
     this.sun.shadow.autoUpdate = false; this.sun.shadow.needsUpdate = true;
     this.post = POST ?? this.graphics.post; this.output = new OutputPipeline(this.renderer, this.scene, this.post, this.walkCamera);
-    this.mapCamera.position.set(62, 44, 69); this.mapCamera.lookAt(0, 2, -13);
+    this.mapCamera.position.set(...LOADING_VIEW.position); this.mapCamera.lookAt(...LOADING_VIEW.target);
     this.orbit = new OrbitControls(this.mapCamera, ui.canvas); this.orbit.target.set(0, 1, -12); this.orbit.enabled = false;
     this.orbit.enableDamping = true; this.orbit.dampingFactor = 0.08; this.orbit.minDistance = 30; this.orbit.maxDistance = 410;
     this.orbit.minPolarAngle = 0.16; this.orbit.maxPolarAngle = Math.PI * 0.44;
@@ -263,8 +247,12 @@ class Game {
     this.resize();
     if (import.meta.env.DEV) {
       Object.assign(window, { __livistone: {
-        snapshot: () => ({ ready: this.started, night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, post: this.post, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined, probes: this.probes ? { ...this.probeTimes, ...Object.fromEntries(Object.entries(this.probes.timings).flatMap(([phase, time]) => [[phase, time.ms], [phase + 'Steps', time.steps]])), materials: this.probes.materials.size, saved: [...this.probes.saved], baking: this.bake?.phase ?? (this.skyBaking ? this.skyBaking.night ? 'night' : 'day' : null) } : null, load: { ...this.loadTimes }, shaders: view.shaders() }),
-        teleport: (x: number, z: number, yaw = 0, y = 1.05, pitch = 0) => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = pitch; this.accumulator = 0; },
+        snapshot: () => ({ ready: this.started, night: this.night, timeOfDay: this.timeOfDay, mode: this.mode, position: this.position(), zone: this.zone, journey: null, yaw: this.input.yaw, pitch: this.input.pitch, fps: this.fps, ...this.view.stats(), interaction: this.interaction, progress: structuredClone(this.progress), selectedLandmark: this.selection, reducedGraphics: this.reduced, graphicsTier: this.graphics.tier, renderScale: this.renderer.getPixelRatio(), cpuGeometry: this.cpuGeometry, capture: this.capture, frames: this.frames, backend: view.backend, post: this.post, budget: this.drawBudget ? structuredClone(this.drawBudget()) : undefined, probes: this.probes ? { ...this.probeTimes, ...Object.fromEntries(Object.entries(this.probes.timings).flatMap(([phase, time]) => [[phase, time.ms], [phase + 'Steps', time.steps]])), materials: this.probes.materials.size, saved: [...this.probes.saved], baking: this.bake?.phase ?? (this.skyBaking ? this.skyBaking.night ? 'night' : 'day' : null) } : null, load: { ...this.loadTimes, build: this.town ? { ...this.town.buildTimes } : undefined }, parts: this.town ? { waiting: this.town.waitingParts, built: this.town.parts.length, shown: this.town.parts.filter(part => part.shown).length, order: this.town.parts.map(part => part.name + (part.shown ? '' : part.failed ? ' (failed)' : ' …')) } : null, shaders: view.shaders() }),
+        // Into a distant part still on its way, the teleport waits for it and returns a promise (page.evaluate awaits it).
+        teleport: (x: number, z: number, yaw = 0, y = 1.05, pitch = 0) => {
+          const go = (): void => { this.physics?.teleport({ x, y, z }); this.input.yaw = yaw; this.input.pitch = pitch; this.accumulator = 0; };
+          if (!this.town?.pending(x, z)) { go(); return; } return this.partsReady(x, z).then(go);
+        },
         // The capture harness stands on whatever lies under a view, ground, deck or floor, looking from 2.2 m above the terrain.
         standingHeight: (x: number, z: number) => this.physics?.standingHeight(x, z, terrainHeight(x, z) + 2.2) ?? null,
       } });
@@ -298,7 +286,7 @@ class Game {
     // Leaf cards smooth their cut-out edges by alpha-to-coverage wherever the frame is multisampled (fine pointers).
     FOREST_DETAIL.coverage = this.renderer.samples > 1;
     this.mark('start', true);
-    this.town = await Town.create(this.reduced, loadingStage, this.graphics.tier); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
+    this.town = await Town.create(this.reduced, loadingStage, this.graphics.tier, PROGRESSIVE && !this.capture); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
     this.mark('town');
     await loadingStage(70, 'Loading gallery images and woodland…');
     const assets = this.town.loadAssets();
@@ -343,7 +331,50 @@ class Game {
     await this.gpuFinished(); await new Promise(resolve => requestAnimationFrame(resolve));
     await loadingStage(100, 'Welcome to Livistone');
     this.started = true; this.input.active = true; this.ui.ready(); this.town.startStreaming(); this.lastTime = performance.now(); this.frameId = requestAnimationFrame(this.frame);
-    this.mark('ready', true);
+    this.mark('ready', true); void this.streamParts();
+  }
+  /**
+   * After the first view, the distant parts one at a time, nearest the player (or a waiting teleport's destination) first. Each
+   * is built hidden, then given what the town got at loading before it shows. A part that fails to build stays hidden; the
+   * rest still come.
+   */
+  private async streamParts(): Promise<void> {
+    for (;;) {
+      // A frame between parts: building one holds the main thread for a moment.
+      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve)));
+      let part: TownPart | null = null;
+      try { part = await this.town.buildNext(this.streamFocus ?? this.position() ?? SPAWN); if (!part) break; if (part.failed) throw part.failed; await this.preparePart(part); }
+      catch (error) { if (part) part.failed ??= error; console.error('Livistone: a distant part of the town could not be built:', part?.name, error); }
+      this.settleWaiters();
+    }
+    for (const waiter of this.partWaiters.splice(0)) waiter.resolve();
+    this.streamFocus = null; this.mark('parts', true); this.startBake();
+  }
+  /** Colliders, reflections, night state, lights, quality and every shader, as loading gave the town; then the part shows. */
+  private async preparePart(part: TownPart): Promise<void> {
+    await part.ready.catch(() => undefined);
+    this.physics?.add(part.colliders);
+    if (this.graphics.tier === 'cpu') { const { prepareCpuDetail } = await import('./world/cpu-detail'); await prepareCpuDetail(part.root, this.skyBackground); }
+    if (this.probes && part.probeScopes.length) this.probes.add(part.probeScopes, part.root);
+    part.root.traverse(object => { if (object instanceof THREE.Mesh) for (const material of Array.isArray(object.material) ? object.material : [object.material]) setEyelenseNight(material, this.night); });
+    this.pointReflections(this.skies.get(this.night)!, part.root);
+    if (this.environment) { const known = new Set(this.litMaterials), added = litMaterials(part.root).filter(material => !known.has(material)); refreshEnvironment(added, this.phase); this.litMaterials.push(...added); }
+    if (this.lowQuality) this.applyQuality(part.root, true);
+    this.nightLighting.add(part.root);
+    this.town.warmPart(part, true);
+    try { await this.output.compileLater(this.walkCamera, [...part.root.children]); } finally { this.town.warmPart(part, false); }
+    this.town.show(part); this.showProbes();
+    if (this.graphics.shadows) this.sun.shadow.needsUpdate = true;
+  }
+  /** Resolves once no distant part is still to come near (x, z); the stream turns to them meanwhile. */
+  private partsReady(x: number, z: number): Promise<void> {
+    if (!this.town.pending(x, z)) return Promise.resolve();
+    this.streamFocus = { x, z };
+    return new Promise(resolve => this.partWaiters.push({ x, z, resolve }));
+  }
+  private settleWaiters(): void {
+    for (const waiter of [...this.partWaiters]) if (!this.town.pending(waiter.x, waiter.z)) { this.partWaiters.splice(this.partWaiters.indexOf(waiter), 1); waiter.resolve(); }
+    this.streamFocus = this.partWaiters[0] ?? null;
   }
   private get phase(): SkyPhase { return this.night ? 'night' : 'day'; }
   /** The walking eye stands .78 m above the capsule's centre, which is .82 m above its feet. */
@@ -379,8 +410,7 @@ class Game {
   }
   /** Sun (or moon), sky environment and hemisphere strengths for this phase. CPU has no PMREM environment: its hemisphere fills. */
   private get light(): Light {
-    const light = (this.graphics.tier === 'cpu' ? CPU_LIGHT : LOOK === 'a' ? LEGACY_LIGHT : LIGHT)[this.phase];
-    return this.night || skyLook() === 'classic' ? light : { ...light, environment: light.environment * PHYSICAL_DAY_FILL };
+    return phaseLight(this.phase, this.graphics.tier === 'cpu', LOOK === 'a', skyLook() === 'classic');
   }
   private get mapView(): boolean {
     return this.mode === 'map' || this.mode === 'welcome' || (['lore', 'journal', 'paused', 'gallery', 'teleport', 'graphics'].includes(this.mode) && this.returnMode === 'map');
@@ -393,7 +423,7 @@ class Game {
     this.renderer.setPixelRatio(this.pixelRatio());
     const width = window.innerWidth, height = window.innerHeight;
     this.renderer.setSize(width, height); this.walkCamera.aspect = width / height; this.walkCamera.updateProjectionMatrix();
-    this.mapCamera.aspect = width / height; this.mapCamera.fov = width < 650 ? 72 : 44;
+    this.mapCamera.aspect = width / height; this.mapCamera.fov = width < 650 ? LOADING_VIEW.narrowFov : LOADING_VIEW.fov;
     this.mapCamera.clearViewOffset();
     if (this.mode === 'map') {
       if (width < 650) this.mapCamera.setViewOffset(width, height, 0, height * 0.2, width, height);
@@ -493,8 +523,12 @@ class Game {
       location.reload();
     } else if (action.startsWith('quality:')) this.quality(action.split(':')[1] === 'low');
   }
-  private visitLandmark(id: string): void {
+  private async visitLandmark(id: string): Promise<void> {
     const landmark = LANDMARKS.find(place => place.id === id); if (!landmark || !['map', 'teleport'].includes(this.mode)) return;
+    if (this.town.pending(landmark.entrance.x, landmark.entrance.z)) {
+      this.ui.toast('Preparing ' + landmark.name + '…'); await this.partsReady(landmark.entrance.x, landmark.entrance.z);
+      if (!['map', 'teleport'].includes(this.mode)) return;
+    }
     this.physics!.teleport(landmark.entrance);
     this.input.yaw = landmark.entrance.yaw; this.input.pitch = 0; this.selection = landmark.id;
     this.returnMode = 'walking'; this.loreFromJournal = false; this.setMode('walking'); this.updateWalking(0); this.ambience.resume();
@@ -609,8 +643,8 @@ class Game {
     this.skyBackground = sky.background; if (!this.environment) this.pointReflections(sky);
     this.scene.environmentIntensity = this.light.environment; if (this.environment) refreshEnvironment(this.litMaterials, this.phase);
     this.renderer.toneMappingExposure = SKY_EXPOSURE[this.phase];
-    this.hemi.color.set(night ? '#8ea4c6' : '#e9f4f0'); this.hemi.groundColor.set(night ? '#121820' : '#73805c'); this.hemi.intensity = this.light.hemi;
-    this.sun.color.set(night ? '#c9d6ee' : '#fff0ce'); this.sun.intensity = this.light.sun;
+    this.hemi.color.set(LIGHT_COLOUR[this.phase].sky); this.hemi.groundColor.set(LIGHT_COLOUR[this.phase].ground); this.hemi.intensity = this.light.hemi;
+    this.sun.color.set(LIGHT_COLOUR[this.phase].sun); this.sun.intensity = this.light.sun;
     // The light turns to the sun or moon about its shadow box's target; aimSun() then fits the box (its shadow map is the sun's
     // or the moon's only once rendered again).
     this.sunDirection.copy(night ? MOON_DIR : SUN_DIR); this.sun.position.copy(this.sun.target.position).addScaledVector(this.sunDirection, SUN_DISTANCE); this.sun.updateMatrixWorld();
@@ -631,6 +665,8 @@ class Game {
   private startBake(phase = this.phase): void {
     if (phase !== this.phase && import.meta.env.DEV && new URLSearchParams(location.search).get('probes') === 'bake') return;
     if (!this.probes || this.probes.settled(phase) || (phase !== this.phase && this.probes.has(phase)) || this.bake || this.skyBaking) return;
+    // Bakes see the whole town: they wait for the distant parts still streaming in (streamParts starts them once done).
+    if (this.town.waitingParts || this.town.parts.some(part => !part.shown && !part.failed)) return;
     const night = phase === 'night', sky = this.skies.get(night); this.bakeWait = 2;
     if (sky) this.bake = this.probes.bake(phase, sky, HORIZON_RADIANCE[phase]);
     else this.skyBaking = { night, steps: skyBake(this.renderer, this.reduced, night, this.graphics.tier, LOOK === 'b') };
@@ -691,10 +727,10 @@ class Game {
   /** r186 gives any material without its own envMap scene.environmentIntensity instead of its envMapIntensity, so heroEnv
    *  materials keep an envMap for their own strength (look b) and sample the environment node, which follows the phase without
    *  a rebuild. CPU Lambert metals sample the plain cube instead; no PMREM exists there. */
-  private pointReflections(sky: Sky): void {
+  private pointReflections(sky: Sky, root: THREE.Object3D = this.scene): void {
     const cpu = this.graphics.tier === 'cpu'; if (!cpu && (LOOK === 'a' || !this.environment)) return;
     const environment = this.environment as unknown as THREE.Node;
-    this.scene.traverse(object => {
+    root.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
       for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
         if (cpu) { if (material instanceof THREE.MeshLambertMaterial && material.envMap) material.envMap = sky.background; }
@@ -709,13 +745,13 @@ class Game {
   private aimSun(): void { this.sunDirection.copy(this.night ? MOON_DIR : SUN_DIR); this.frameShadow(true); }
   /** Fit the sun's shadow box to the view and re-bake only when forced or after the box centre drifts a quarter box, so standing still costs no shadow pass. */
   private frameShadow(force = false, map = this.mapView): void {
-    const camera = this.sun.shadow.camera, size = this.sun.shadow.mapSize.x, walkHalf = size >= 2048 ? SHADOW.walk : SHADOW.walkReduced;
+    const camera = this.sun.shadow.camera, size = this.sun.shadow.mapSize.x, walkHalf = size >= SHADOW.size ? SHADOW.walk : SHADOW.walkReduced;
     // While probes bake (sub-plan 07) the map's whole-town box stays: the bake's faces need every building's shadow, which the
     // walking box would leave out. Walking frames take it with their own fade; it renders again only for a new light direction
     // or map size, so each probe sees the shadows the first one did.
     const held = !!this.bake && this.bake.phase === this.phase, walking = !map && !!this.physics, half = walking && !held ? walkHalf : SHADOW.map;
     if (walking && !held) { const p = this.physics!.position(), lead = half * SHADOW.lead; this.shadowAim.set(p.x - Math.sin(this.input.yaw) * lead, p.y, p.z - Math.cos(this.input.yaw) * lead); }
-    else this.shadowAim.copy(SHADOW_TARGET);
+    else this.shadowAim.set(...SHADOW_TARGET);
     if (held) shadowFade.value.set(walking ? walkHalf * SHADOW.fade[0] : 0, walking ? walkHalf * SHADOW.fade[1] : 0);
     const kept = half === this.shadowHalf && this.shadowAim.distanceTo(this.shadowCenter) < half / 4;
     if (kept && (!force || (held && this.shadowLight.equals(this.sunDirection) && this.shadowSize === size))) return;
@@ -732,8 +768,13 @@ class Game {
   private quality(low: boolean): void {
     this.lowQuality = low || this.graphics.tier === 'cpu'; this.renderScale = Math.min(low ? 1 : 1.5, this.graphics.pixelRatio); this.scaler = new RenderScale(this.hardwareLight ? LIGHTWEIGHT_GPU_SCALE : SCALE_RULES[this.graphics.tier], this.renderScale); this.renderer.setPixelRatio(this.pixelRatio());
     // WebGPU resizes the light's shadow target to mapSize on its next render; frameShadow requests that render.
-    this.sun.shadow.mapSize.setScalar(low ? 1024 : 2048); this.frameShadow(true);
-    this.scene.traverse((object) => {
+    this.sun.shadow.mapSize.setScalar(low ? SHADOW.reducedSize : SHADOW.size); this.frameShadow(true);
+    this.applyQuality(this.scene, low);
+    this.nightLighting.setNight(this.night); this.resize(); this.ui.toast(low ? 'Gentle visual detail enabled.' : 'Rich visual detail enabled.');
+  }
+  /** The visual-detail switch's optics for every glazing, gem and amber under `root` (a distant part takes the current one). */
+  private applyQuality(root: THREE.Object3D, low: boolean): void {
+    root.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       for (const material of materials) if (material instanceof THREE.MeshPhysicalNodeMaterial && material.userData.stationAmber) setStationAmberQuality(material, low);
@@ -753,7 +794,6 @@ class Game {
         material.opacity = material.userData.clearGallery ? (low ? .18 : .26) : (low ? .32 : .65); material.needsUpdate = true;
       }
     });
-    this.nightLighting.setNight(this.night); this.resize(); this.ui.toast(low ? 'Gentle visual detail enabled.' : 'Rich visual detail enabled.');
   }
   private updateWalking(dt: number): void {
     if (!this.physics) return;
@@ -822,7 +862,7 @@ class Game {
     // A queued animation frame can predate the startup or visibility timestamp.
     const rawDt = Math.max(0, (now - this.lastTime) / 1000); const dt = Math.min(rawDt, 0.1); this.lastTime = now; this.elapsed = this.capture ? 12 : this.elapsed + dt;
     if (this.mode === 'walking') this.updateWalking(dt);
-    if (this.graphics.tier !== 'cpu') this.town.gardens.update(this.elapsed, this.mode === 'walking' && !this.capture ? dt : 0, matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (this.graphics.tier !== 'cpu') this.town.gardens?.update(this.elapsed, this.mode === 'walking' && !this.capture ? dt : 0, matchMedia('(prefers-reduced-motion: reduce)').matches);
     if (this.mode === 'map') { this.orbit.update(); this.updateMarkers(); }
     const camera = this.mapView ? this.mapCamera : this.walkCamera;
     this.probeCheck += rawDt;

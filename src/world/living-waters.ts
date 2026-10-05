@@ -48,6 +48,25 @@ function sizedPoints(points: THREE.Points): void {
 /** The opal orb's top over the grove floor, and the clear air between it and the floating ring's net. */
 const RING_ORB_TOP = 1.75, RING_GAP = 1, RING_SCALE = 1.6;
 const GROVE_PIN = import.meta.env?.DEV && typeof location !== 'undefined' ? new URLSearchParams(location.search).get('grove') : null;
+/**
+ * The garden's share of the merged walking network (walking-surface.ts): paving and kerbs, each with its mesh collider, under
+ * `parent` placed at `origin`. Its paths reach toward the civic gardens, into the first view from the arrival point, so the
+ * town builds them at loading even when the rest of the garden comes after (world.ts, town-parts.ts).
+ */
+export function createGardenPaths(parent: THREE.Object3D, colliders: ColliderSpec[], material: THREE.Material, mobile: boolean, origin = { x: 0, z: 0 }): void {
+  const { paving, kerbs } = walkingSurface(mobile), local = (g: THREE.BufferGeometry): THREE.BufferGeometry => g.translate(-origin.x, 0, -origin.z);
+  const kerbMaterial = new THREE.MeshStandardMaterial({ color: '#e4decf', vertexColors: true, roughness: .97 });
+  if (material instanceof THREE.MeshStandardMaterial) {
+    kerbMaterial.map = material.map;
+    material.userData.ready?.then(() => { kerbMaterial.map = material.map; kerbMaterial.needsUpdate = true; });
+  }
+  for (const [geometry, mat, name] of [[local(paving[GARDEN_PAVING]), material, 'Lake walking network'], [local(kerbs[GARDEN_PAVING]), kerbMaterial, 'Lake path stone kerbs']] as const) {
+    const mesh = new THREE.Mesh(geometry, mat); mesh.name = name; mesh.receiveShadow = true; mesh.castShadow = name !== 'Lake walking network'; parent.add(mesh);
+    mesh.updateWorldMatrix(true, false); const world = geometry.clone().applyMatrix4(mesh.matrixWorld);
+    colliders.push({ type: 'mesh', vertices: new Float32Array(world.getAttribute('position').array), indices: world.index ? new Uint32Array(world.index.array) : Uint32Array.from({ length: world.getAttribute('position').count }, (_, i) => i) }); world.dispose();
+  }
+  paving.filter((_, i) => i !== GARDEN_PAVING).concat(kerbs.filter((_, i) => i !== GARDEN_PAVING)).forEach(g => g.dispose());
+}
 export class LivingWaters {
   readonly root = new THREE.Group();
   readonly colliders: ColliderSpec[] = [];
@@ -68,7 +87,8 @@ export class LivingWaters {
   private readonly drips: THREE.Points;
   private readonly drainage: THREE.Curve<THREE.Vector3>[] = [];
   /** `wind`: the reeds sway (gpu and mobile tiers); the cpu tier keeps them still and their geometry unchanged. */
-  constructor(private mobile: boolean, private readonly pathMaterial: THREE.Material = new THREE.MeshStandardMaterial({ color: '#d4cfbc', roughness: .91 }), private readonly wind = false) {
+  /** `paths: false` leaves the garden's paving and kerbs to createGardenPaths (the town builds them at loading, world.ts). */
+  constructor(private mobile: boolean, private readonly pathMaterial: THREE.Material = new THREE.MeshStandardMaterial({ color: '#d4cfbc', roughness: .91 }), private readonly wind = false, paths = true) {
     this.root.name = 'Living Waters · town gardens'; this.root.position.set(GARDENS.x, 0, GARDENS.z);
     // The eyes keep clear of the garden paths' paving and kerbs (lake-eyes.ts), so their stone lips never cross a path.
     const network = shape(LAKE_OUTLINE); waterEyes().forEach((eye) => network.holes.push(new THREE.Path(eye.outline.map(([x, z]) => new THREE.Vector2(x, -z)))));
@@ -81,15 +101,7 @@ export class LivingWaters {
     // Each cell keeps its own surface height and local x/z, so the ripples are unchanged when the eyes draw together.
     mergeStatic(eyes, 'Lake water eyes'); mergeStatic(eyeKerbs, 'Lake water-eye stone kerbs');
     // The garden's share of the merged walking network (walking-surface.ts), level at 13 cm; paving and kerbs are both walkable.
-    const { paving, kerbs } = walkingSurface(mobile), local = (g: THREE.BufferGeometry): THREE.BufferGeometry => g.translate(-GARDENS.x, 0, -GARDENS.z);
-    const surface = this.mesh(local(paving[GARDEN_PAVING]), this.pathMaterial, true); surface.name = 'Lake walking network'; surface.castShadow = false;
-    const kerbMaterial = new THREE.MeshStandardMaterial({ color: '#e4decf', vertexColors: true, roughness: .97 });
-    if (this.pathMaterial instanceof THREE.MeshStandardMaterial) {
-      const paving = this.pathMaterial; kerbMaterial.map = paving.map;
-      paving.userData.ready?.then(() => { kerbMaterial.map = paving.map; kerbMaterial.needsUpdate = true; });
-    }
-    this.mesh(local(kerbs[GARDEN_PAVING]), kerbMaterial, true).name = 'Lake path stone kerbs';
-    paving.filter((_, i) => i !== GARDEN_PAVING).concat(kerbs.filter((_, i) => i !== GARDEN_PAVING)).forEach(g => g.dispose());
+    if (paths) createGardenPaths(this.root, this.colliders, this.pathMaterial, mobile, GARDENS);
     this.pavilion();
     this.mushrooms(); this.wetlandPlanting(); createLakePlants(this.root, mobile);
     for (const [name, [x, z]] of Object.entries(GARDEN_PANELS)) {

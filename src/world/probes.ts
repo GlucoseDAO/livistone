@@ -161,7 +161,11 @@ export class ReflectionProbes {
   private readonly cameras = new THREE.CubeCamera(.1, FAR, new THREE.CubeRenderTarget(1));
   private far: THREE.CubeCamera | null = null;
   private readonly haze = uniform(new THREE.Color());
-  constructor(readonly scopes: ProbeScope[], root: THREE.Object3D, readonly environment: ProbeEnvironment, private readonly size: number) {
+  readonly scopes: ProbeScope[] = [];
+  constructor(scopes: ProbeScope[], root: THREE.Object3D, readonly environment: ProbeEnvironment, private readonly size: number) { this.add(scopes, root); }
+  /** Sites of a part of the town built after loading (world.ts) join the ones the town started with; nearby saved ones load next. */
+  add(scopes: ProbeScope[], root: THREE.Object3D): void {
+    const environment = this.environment; this.scopes.push(...scopes);
     // Floors, plazas and rims stay: hidden, they left the bare terrain below in view, and every lower face reflected soil.
     root.updateMatrixWorld(true); const box = new THREE.Box3();
     for (const scope of scopes) {

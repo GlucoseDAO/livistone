@@ -67,6 +67,18 @@ export const DISTANT_DISPLAY = mrt({ display: vec4(0, Fn(() => {
   return float(1).sub(float(1).sub(DEPTH.mul(mist)).mul(exp(displayFog.aerial.mul(max(length(positionView).sub(displayFog.near), 0)).negate())));
 })(), 0, 1) });
 
+/** Double-sided transmissive materials render a back pass and then a front pass; each side needs its own shader and pipeline. */
+function twoPassMeshes(parts: THREE.Object3D[]): Map<THREE.Material, THREE.Mesh[]> {
+  const twoPass = new Map<THREE.Material, THREE.Mesh[]>();
+  for (const part of parts) part.traverse((object) => {
+    const mesh = object as THREE.Mesh; if (!mesh.isMesh) return;
+    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      const physical = material as THREE.MeshPhysicalNodeMaterial;
+      if (material.side === THREE.DoubleSide && !material.forceSinglePass && (physical.transmission > 0 || physical.transmissionNode)) twoPass.set(material, [...twoPass.get(material) ?? [], mesh]);
+    }
+  });
+  return twoPass;
+}
 export class OutputPipeline {
   private readonly target: THREE.RenderTarget;
   private readonly targets: ReturnType<typeof mrt>;
@@ -121,6 +133,8 @@ export class OutputPipeline {
     const ao = occlusion && camera === this.post.camera && !!this.post.occlusion;
     if (ao) this.post.prepare(this.renderer);
     this.pipeline(ao).render();
+    // A later compile in flight builds its shaders between frames against whatever is bound then (compileLater).
+    if (this.compiling) this.bind();
   }
   private pipeline(occlusion: boolean): THREE.RenderPipeline {
     let pipeline = this.pipelines.get(occlusion); if (pipeline) return pipeline;
@@ -148,14 +162,7 @@ export class OutputPipeline {
     // A double-sided transmissive material renders a back pass and then a front pass. compileAsync sets each side while it
     // collects the two passes but builds them after restoring DoubleSide, so both would keep a double-sided shader and
     // pipeline (the hall glass drawn four layers deep). Compile them one side at a time instead: the cache keys hold the side.
-    const twoPass = new Map<THREE.Material, THREE.Mesh[]>();
-    for (const part of parts) part.traverse((object) => {
-      const mesh = object as THREE.Mesh; if (!mesh.isMesh) return;
-      for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-        const physical = material as THREE.MeshPhysicalNodeMaterial;
-        if (material.side === THREE.DoubleSide && !material.forceSinglePass && (physical.transmission > 0 || physical.transmissionNode)) twoPass.set(material, [...twoPass.get(material) ?? [], mesh]);
-      }
-    });
+    const twoPass = twoPassMeshes(parts);
     // Large groups otherwise monopolise one worker while the other five run out of work.
     const queue = compileParts(parts), total = queue.length; let completed = 0; this.bind();
     try {
@@ -168,6 +175,23 @@ export class OutputPipeline {
     for (const occlusion of [true, false]) { if (occlusion && this.post.occlusion) this.post.prepare(this.renderer); this.pipeline(occlusion && !!this.post.occlusion).render(); }
     if (this.behind) { this.renderer.setMRT(null); this.renderer.setRenderTarget(AERIAL_BEHIND); this.behind.render(this.renderer); this.unbind(); }
   }
+  /**
+   * Shaders of objects added after loading (world/town-parts.ts), a part at a time while frames go on. compileAsync builds the
+   * node shaders and pipelines after it is called, against the target and MRT bound at that moment; frames drawn meanwhile bind
+   * their own, so render() binds the scene target again after each frame until no compile is left. Double-sided transmissive
+   * materials keep one side until their builds are done, as in compile(); they belong to a part that stays hidden until shown.
+   */
+  async compileLater(camera: THREE.Camera, parts: THREE.Object3D[], scene = this.scene): Promise<void> {
+    const twoPass = twoPassMeshes(parts), sides = (side: THREE.Side): void => { for (const material of twoPass.keys()) material.side = side; };
+    const call = (part: THREE.Object3D): Promise<void> => { this.bind(); return this.renderer.compileAsync(part, camera, scene); };
+    this.compiling++;
+    try {
+      sides(THREE.FrontSide); for (const part of compileParts(parts)) await call(part);
+      sides(THREE.BackSide); for (const mesh of new Set([...twoPass.values()].flat())) await call(mesh);
+    } finally { sides(THREE.DoubleSide); if (--this.compiling === 0) this.unbind(); }
+  }
+  /** Compiles in flight (compileLater). */
+  private compiling = 0;
   private bind(): void {
     this.renderer.getDrawingBufferSize(this.size);
     if (this.target.width !== this.size.x || this.target.height !== this.size.y) this.target.setSize(this.size.x, this.size.y);
