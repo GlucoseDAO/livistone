@@ -8,7 +8,9 @@ import type { Progress, Discovery } from '../game/content';
 import { drawResearchFigure } from '../game/research-art';
 import { timeOfDayLabel } from '../game/daylight';
 import type { TimeOfDay } from '../game/daylight';
-export type Mode = 'welcome' | 'walking' | 'map' | 'lore' | 'journal' | 'paused' | 'gallery' | 'teleport';
+import type { GraphicsChoice } from '../game/graphics-choice';
+import type { GraphicsTier } from '../game/graphics';
+export type Mode = 'welcome' | 'walking' | 'map' | 'lore' | 'journal' | 'paused' | 'gallery' | 'teleport' | 'graphics';
 const icons: Record<string, string> = {
   map: '<path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5Z"/><path d="M9 3v16M15 5v16"/>',
   book: '<path d="M12 5v16M12 5C9 3 5 3 2 4v15c4-1 7 0 10 2 3-2 6-3 10-2V4c-3-1-7-1-10 1Z"/>',
@@ -23,6 +25,7 @@ const icons: Record<string, string> = {
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2.5m0 13V21M3 12h2.5m13 0H21M5.6 5.6l1.8 1.8m9.2 9.2 1.8 1.8m0-12.8-1.8 1.8m-9.2 9.2-1.8 1.8"/>',
   moon: '<path d="M19.9 13.8A8 8 0 1 1 10.2 4.1a7.2 7.2 0 0 0 9.7 9.7Z"/>',
+  graphics: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 13V9m5 4V7m5 6v-3"/>',
   minimize: '<path d="M5 18h14"/>',
   restore: '<rect x="5" y="5" width="14" height="14" rx="1"/>',
 };
@@ -38,7 +41,8 @@ export class UI {
   private readonly prompt: HTMLButtonElement;
   private readonly live: HTMLElement;
   private toastTimer = 0;
-  private navigationTimer = 0;
+  private controlsTimer = 0;
+  private controlsIntroComplete = false;
   private hasExplored = false;
   private nearbyId: string | null = null;
   private slide = 0;
@@ -48,7 +52,7 @@ export class UI {
     this.app.innerHTML = [
       '<canvas id="world" aria-label="Livistone interactive 3D town" tabindex="0"></canvas>',
       '<div class="vignette" aria-hidden="true"></div>',
-      '<header class="topbar"><div class="brand" aria-label="Livistone">' + icon('leaf') + '<span>LIVISTONE<span class="brand-sub">A LIVING WORLD</span></span></div><div class="top-center"><span class="status-dot"></span><span id="mode-label">ART, SCIENCE & NATURE</span></div><nav id="tools" aria-label="Explore Livistone"><button id="view-toggle" class="tool view-toggle" data-action="map" aria-label="First person" aria-keyshortcuts="M" disabled>' + icon('walk') + '<span>First person</span><kbd>M</kbd></button><button class="tool" data-action="journal" aria-label="Open discovery journal" aria-expanded="false" aria-controls="journal" disabled>' + icon('book') + '<span>Journal</span></button><button id="hud-time" class="tool time-control" data-action="time-of-day:next" aria-label="Time of day" aria-keyshortcuts="T" disabled>' + icon('clock') + '</button><button id="hud-sound" class="tool sound-control" data-action="sound" aria-label="Enable sound" aria-pressed="false" disabled>' + icon('sound-off') + '</button><button id="hud-teleport" class="tool teleport-control" data-action="teleport" aria-label="Teleport to a place" title="Teleport to a place" aria-haspopup="dialog" aria-expanded="false" aria-controls="teleport-menu" disabled>' + icon('compass') + '</button><button class="tool square" data-action="pause" aria-label="Open menu" aria-expanded="false" aria-controls="pause" disabled>' + icon('menu') + '</button></nav><section id="teleport-menu" class="dialog teleport-dropdown" role="dialog" aria-labelledby="teleport-title" aria-describedby="teleport-help" hidden><button class="close-button" data-action="close" aria-label="Close teleport options">' + icon('close') + '</button><h2 id="teleport-title">Teleport</h2><p id="teleport-help">Choose a place to arrive at its entrance.</p><div class="teleport-list">' + LANDMARKS.map((l, i) => '<button class="teleport-item" data-action="landmark:' + l.id + '" aria-label="Teleport to ' + l.name + '"><span class="landmark-number">' + String(i + 1).padStart(2, '0') + '</span><span><strong>' + l.name + '</strong><small>' + l.artifact + '</small></span>' + icon('arrow') + '</button>').join('') + '</div></section></header>',
+      '<header class="topbar"><div class="brand" aria-label="Livistone">' + icon('leaf') + '<span>LIVISTONE<span class="brand-sub">A LIVING WORLD</span></span></div><div class="top-center"><span class="status-dot"></span><span id="mode-label">ART, SCIENCE & NATURE</span></div><nav id="tools" aria-label="Explore Livistone"><button id="view-toggle" class="tool view-toggle" data-action="map" aria-label="First person" aria-keyshortcuts="M" disabled>' + icon('walk') + '<span>First person</span><kbd>M</kbd></button><button class="tool" data-action="journal" aria-label="Open discovery journal" aria-expanded="false" aria-controls="journal" disabled>' + icon('book') + '<span>Journal</span></button><button id="hud-time" class="tool time-control" data-action="time-of-day:next" aria-label="Time of day" aria-keyshortcuts="T" disabled>' + icon('clock') + '</button><button id="hud-sound" class="tool sound-control" data-action="sound" aria-label="Enable sound" aria-pressed="false" disabled>' + icon('sound-off') + '</button><button id="hud-teleport" class="tool teleport-control" data-action="teleport" aria-label="Teleport to a place" title="Teleport to a place" aria-haspopup="dialog" aria-expanded="false" aria-controls="teleport-menu" disabled>' + icon('compass') + '</button><button id="hud-graphics" class="tool graphics-control" data-action="graphics" aria-label="Graphics" aria-haspopup="dialog" aria-expanded="false" aria-controls="graphics-menu" disabled>' + icon('graphics') + '</button><button class="tool square" data-action="pause" aria-label="Open menu" aria-expanded="false" aria-controls="pause" disabled>' + icon('menu') + '</button></nav><section id="teleport-menu" class="dialog teleport-dropdown" role="dialog" aria-labelledby="teleport-title" aria-describedby="teleport-help" hidden><button class="close-button" data-action="close" aria-label="Close teleport options">' + icon('close') + '</button><h2 id="teleport-title">Teleport</h2><p id="teleport-help">Choose a place to arrive at its entrance.</p><div class="teleport-list">' + LANDMARKS.map((l, i) => '<button class="teleport-item" data-action="landmark:' + l.id + '" aria-label="Teleport to ' + l.name + '"><span class="landmark-number">' + String(i + 1).padStart(2, '0') + '</span><span><strong>' + l.name + '</strong><small>' + l.artifact + '</small></span>' + icon('arrow') + '</button>').join('') + '</div></section><section id="graphics-menu" class="dialog teleport-dropdown graphics-dropdown" role="dialog" aria-labelledby="graphics-title" aria-describedby="graphics-help" hidden><button class="close-button" data-action="close" aria-label="Close graphics options">' + icon('close') + '</button><h2 id="graphics-title">Graphics</h2><p id="graphics-help">Choose a level. Changing it saves your choice and reloads the scene.</p><div class="graphics-options">' + (['auto', 'light', 'balanced', 'rich'] as const).map(value => '<button class="graphics-option" data-action="performance:' + value + '" aria-pressed="false"><strong>' + ({ auto: 'Auto', light: 'Lightweight', balanced: 'Balanced', rich: 'Rich' }[value]) + '</strong><small>' + ({ auto: 'Suit this device', light: 'Smoother walking', balanced: 'More reflections', rich: 'Maximum detail' }[value]) + '</small></button>').join('') + '</div></section></header>',
       '<div id="welcome" class="loading-notice" role="status">Preparing Livistone…</div>',
       '<div id="crosshair" class="crosshair" aria-hidden="true" hidden></div>',
       '<footer id="walk-footer" class="walk-footer" hidden><div class="place-card"><div class="place-head"><span id="location" class="eyebrow">Riverside Gardens</span><button id="place-toggle" class="place-toggle" data-action="toggle-nearby" aria-controls="nearby-story" aria-expanded="true" aria-label="Minimize nearby panel" title="Minimize nearby panel" hidden>' + icon('minimize') + '</button></div><strong id="nearby-preview" class="nearby-preview" hidden></strong><div id="nearby-story" hidden><span class="nearby-label">NEARBY</span><strong id="nearby-title"></strong><p id="nearby-sentence"></p><button id="nearby-read" class="nearby-read" data-action="nearby-story">Read story ' + icon('arrow') + '</button></div><span id="discoveries" class="sr-only">0 discoveries</span></div><div class="controls-hint"><div id="controls-details" class="controls-details"><span><kbd>W A S D</kbd> Walk</span><span><kbd>← →</kbd> Turn</span><button data-action="jump"><kbd>Space</kbd> Jump</button><span id="look-hint">Hold left mouse to look</span><button id="discover-control" data-action="interact" disabled><kbd>E</kbd> Read story</button><span class="time-hint"><kbd>T</kbd> Time of day</span></div><button id="controls-toggle" data-action="toggle-controls" aria-controls="controls-details" aria-expanded="true" aria-label="Minimize controls panel" title="Minimize controls panel">' + icon('minimize') + '</button></div></footer>',
@@ -72,7 +76,6 @@ export class UI {
     if (matchMedia('(pointer:coarse), (max-width:650px)').matches) this.setNearbyExpanded(false);
     this.app.addEventListener('click', (e) => {
       const button = (e.target as Element).closest<HTMLElement>('[data-action]');
-      if (button?.dataset.action === 'toggle-navigation') { this.setNavigation(this.app.dataset.navigation === 'folded'); this.scheduleNavigation(); return; }
       if (button?.dataset.action === 'toggle-nearby') { this.toggleNearby(); return; }
       if (button?.dataset.action === 'toggle-controls') { this.toggleControls(); return; }
       if (button) action(button.dataset.action!);
@@ -81,9 +84,9 @@ export class UI {
     this.app.querySelector('#performance')!.addEventListener('change', (e) => action('performance:' + (e.target as HTMLSelectElement).value));
     this.app.querySelector('#quality')!.addEventListener('change', (e) => action('quality:' + (e.target as HTMLSelectElement).value));
     document.addEventListener('keydown', (e) => {
-      const teleport = this.app.querySelector<HTMLElement>('#teleport-menu')!;
-      if (!teleport.hidden && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
-        const buttons = [...teleport.querySelectorAll<HTMLButtonElement>('.teleport-item')], index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const options = this.app.querySelector<HTMLElement>('#teleport-menu:not([hidden]), #graphics-menu:not([hidden])');
+      if (options && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
+        const buttons = [...options.querySelectorAll<HTMLButtonElement>('.teleport-item, .graphics-option')], index = buttons.indexOf(document.activeElement as HTMLButtonElement);
         if (index >= 0) { e.preventDefault(); e.stopPropagation(); buttons[e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1 : (index + (e.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus(); return; }
       }
       const loreOpen = !this.app.querySelector<HTMLElement>('#lore')!.hidden;
@@ -97,28 +100,21 @@ export class UI {
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
     });
   }
+  focusGraphics(): void { this.app.querySelector<HTMLButtonElement>('#hud-graphics')!.focus({ preventScroll: true }); }
   focusTeleport(): void { this.app.querySelector<HTMLButtonElement>('#hud-teleport')!.focus({ preventScroll: true }); }
   ready(): void {
     this.app.querySelector<HTMLElement>('#welcome')!.hidden = true;
     this.app.querySelectorAll<HTMLButtonElement>('#tools button').forEach((button) => { button.disabled = false; });
-    const tab = document.createElement('button'); tab.id = 'navigation-tab'; tab.className = 'navigation-tab'; tab.dataset.action = 'toggle-navigation';
-    tab.setAttribute('aria-controls', 'tools'); tab.innerHTML = icon('menu') + '<span>Navigation</span>'; this.app.querySelector('.topbar')!.append(tab);
-    this.setNavigation(true); this.scheduleNavigation();
+    this.scheduleControls();
   }
-  private setNavigation(open: boolean): void {
-    this.app.dataset.navigation = open ? 'open' : 'folded'; this.app.querySelector<HTMLElement>('#tools')!.inert = !open;
-    const tab = this.app.querySelector<HTMLButtonElement>('#navigation-tab');
-    tab?.setAttribute('aria-expanded', String(open)); tab?.setAttribute('aria-label', open ? 'Hide navigation' : 'Show navigation');
-    if (!open && this.app.querySelector('#tools')!.contains(document.activeElement)) tab?.focus({ preventScroll: true });
-  }
-  private scheduleNavigation(): void {
-    window.clearTimeout(this.navigationTimer);
-    this.navigationTimer = window.setTimeout(() => {
-      if (this.app.dataset.mode !== 'walking') return;
-      const tools = this.app.querySelector<HTMLElement>('#tools')!;
-      if (tools.matches(':hover') || tools.contains(document.activeElement)) { this.scheduleNavigation(); return; }
-      this.setNavigation(false);
-    }, 8000);
+  private scheduleControls(): void {
+    window.clearTimeout(this.controlsTimer);
+    if (this.controlsIntroComplete || this.app.dataset.mode !== 'walking' || this.app.querySelector<HTMLButtonElement>('#view-toggle')!.disabled) return;
+    this.controlsTimer = window.setTimeout(() => {
+      const panel = this.app.querySelector<HTMLElement>('.controls-hint')!;
+      if (panel.contains(document.activeElement)) { this.scheduleControls(); return; }
+      this.controlsIntroComplete = true; this.setControlsExpanded(false);
+    }, 6000);
   }
   setMode(mode: Mode, mapView = mode === 'map' || mode === 'welcome'): void {
     const previousDialog = this.app.querySelector<HTMLElement>('.dialog:not([hidden])');
@@ -127,11 +123,11 @@ export class UI {
       welcome: mode === 'welcome' || !!this.app.querySelector<HTMLButtonElement>('#tools button')?.disabled, tools: true,
       'walk-footer': mode === 'walking', crosshair: mode === 'walking', 'touch-controls': mode === 'walking',
       'map-panel': mode === 'map', 'map-controls': mode === 'map', 'map-markers': mode === 'map',
-      'teleport-menu': mode === 'teleport', scrim: ['lore', 'journal', 'paused', 'gallery', 'teleport'].includes(mode), lore: mode === 'lore', journal: mode === 'journal', pause: mode === 'paused', gallery: mode === 'gallery',
+      'teleport-menu': mode === 'teleport', 'graphics-menu': mode === 'graphics', scrim: ['lore', 'journal', 'paused', 'gallery', 'teleport', 'graphics'].includes(mode), lore: mode === 'lore', journal: mode === 'journal', pause: mode === 'paused', gallery: mode === 'gallery',
     };
     Object.entries(visible).forEach(([id, value]) => { this.app.querySelector<HTMLElement>('#' + id)!.hidden = !value; });
     this.app.dataset.mode = mode; this.gallery.floating.hidden = true;
-    if (mode !== 'walking') this.setNavigation(true); else this.scheduleNavigation();
+    this.scheduleControls();
     if (mode === 'walking') this.hasExplored = true;
     const start = this.app.querySelector<HTMLButtonElement>('#start-exploring')!, startLabel = this.hasExplored ? 'Resume exploring' : 'Start exploring';
     start.querySelector('strong')!.textContent = startLabel; start.setAttribute('aria-label', startLabel);
@@ -140,14 +136,14 @@ export class UI {
     this.modeLabel.textContent = mode === 'welcome' ? 'ART, SCIENCE & NATURE' : mode === 'map' ? 'A DIFFERENT PERSPECTIVE' : '';
     if (mode !== 'walking') this.prompt.hidden = true;
     const dialog = this.app.querySelector<HTMLElement>('.dialog:not([hidden])');
-    const navigationTab = this.app.querySelector<HTMLButtonElement>('#navigation-tab'); if (navigationTab) navigationTab.hidden = !!dialog;
     this.canvas.inert = !!dialog;
     const toggle = this.app.querySelector<HTMLButtonElement>('#view-toggle')!, label = mapView ? 'First person' : 'Map';
     toggle.innerHTML = icon(mapView ? 'walk' : 'map') + '<span>' + label + '</span><kbd>M</kbd>'; toggle.setAttribute('aria-label', label);
     this.app.querySelector('[data-action="journal"]')!.setAttribute('aria-expanded', String(mode === 'journal'));
     this.app.querySelector('[data-action="pause"]')!.setAttribute('aria-expanded', String(mode === 'paused'));
     this.app.querySelector('#hud-teleport')!.setAttribute('aria-expanded', String(mode === 'teleport'));
-    if (dialog) dialog.querySelector<HTMLElement>(mode === 'teleport' ? '.teleport-item' : 'button')?.focus({ preventScroll: true });
+    this.app.querySelector('#hud-graphics')!.setAttribute('aria-expanded', String(mode === 'graphics'));
+    if (dialog) dialog.querySelector<HTMLElement>(mode === 'teleport' ? '.teleport-item' : mode === 'graphics' ? '.graphics-option[aria-pressed=true]' : 'button')?.focus({ preventScroll: true });
     else if (previousDialog) {
       const target = this.lastFocus?.isConnected && this.lastFocus.getClientRects().length ? this.lastFocus : toggle;
       target.focus({ preventScroll: true }); this.lastFocus = null;
@@ -257,7 +253,11 @@ export class UI {
     this.setNearbyExpanded(this.app.querySelector('.place-card')!.classList.contains('is-collapsed'));
   }
   private toggleControls(): void {
-    const panel = this.app.querySelector<HTMLElement>('.controls-hint')!, expanded = panel.classList.toggle('is-collapsed') === false;
+    this.controlsIntroComplete = true; window.clearTimeout(this.controlsTimer);
+    this.setControlsExpanded(this.app.querySelector('.controls-hint')!.classList.contains('is-collapsed'));
+  }
+  private setControlsExpanded(expanded: boolean): void {
+    this.app.querySelector('.controls-hint')!.classList.toggle('is-collapsed', !expanded);
     const toggle = this.app.querySelector<HTMLButtonElement>('#controls-toggle')!;
     const label = expanded ? 'Minimize controls panel' : 'Expand controls panel';
     toggle.setAttribute('aria-expanded', String(expanded)); toggle.setAttribute('aria-label', label); toggle.title = label;
@@ -296,6 +296,19 @@ export class UI {
     button.setAttribute('aria-label', label); button.title = label;
     if (pending) button.setAttribute('aria-busy', 'true'); else button.removeAttribute('aria-busy');
     this.app.querySelector<HTMLSelectElement>('#time-of-day')!.value = mode;
+  }
+  setGraphics(choice: GraphicsChoice, tier: GraphicsTier, automaticTier = tier): void {
+    const resolved = { gpu: 'Rich', mobile: 'Balanced', cpu: 'Lightweight' }[tier];
+    const automatic = { gpu: 'Rich', mobile: 'Balanced', cpu: 'Lightweight' }[automaticTier];
+    const value = choice === 'auto' ? `Auto (${resolved})` : resolved;
+    const button = this.app.querySelector<HTMLButtonElement>('#hud-graphics')!;
+    button.title = `Graphics: ${value}`; button.setAttribute('aria-label', `Graphics: ${value}`);
+    this.app.querySelector<HTMLSelectElement>('#performance')!.value = choice;
+    this.app.querySelector('#performance option[value="auto"]')!.textContent = `Automatic (${automatic}) — suit this device`;
+    for (const option of this.app.querySelectorAll<HTMLButtonElement>('.graphics-option')) {
+      option.setAttribute('aria-pressed', String(option.dataset.action === `performance:${choice}`));
+      if (option.dataset.action === 'performance:auto') option.querySelector('strong')!.textContent = `Auto (${automatic})`;
+    }
   }
   setSound(enabled: boolean): void {
     const hud = this.app.querySelector<HTMLButtonElement>('#hud-sound')!, label = enabled ? 'Mute sound' : 'Enable sound';

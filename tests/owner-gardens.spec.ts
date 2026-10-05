@@ -1,17 +1,15 @@
 import { test, expect } from '@playwright/test';
 
-test('folding navigation, stable map anchors and the connected concept rotunda', async ({ page }) => {
+test('persistent navigation, stable map anchors and the connected concept rotunda', async ({ page }) => {
   // WebGL's first shader compilation can take over two minutes on Windows.
   test.setTimeout(process.env.LIVISTONE_BACKEND === 'webgl' ? 360000 : 240000);
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(() => localStorage.setItem('livistone-time-of-day', 'day'));
   await page.goto('/');
-  await expect(page.locator('#navigation-tab')).toBeVisible({ timeout: process.env.LIVISTONE_BACKEND === 'webgl' ? 240000 : 120000 });
+  await expect(page.locator('#hud-graphics')).toBeEnabled({ timeout: process.env.LIVISTONE_BACKEND === 'webgl' ? 240000 : 120000 });
   await page.locator('#world').focus(); await page.mouse.move(500, 500);
-  await expect(page.locator('#app')).toHaveAttribute('data-navigation', 'folded', { timeout: 25000 });
-  await expect(page.locator('#tools')).toHaveJSProperty('inert', true);
-  await page.getByRole('button', { name: 'Show navigation' }).click();
   await expect(page.locator('#tools')).toHaveJSProperty('inert', false);
+  await expect(page.locator('#navigation-tab')).toHaveCount(0);
   await page.locator('#view-toggle').click();
   const marker = page.locator('#marker-city-hall'); await expect(marker).toBeVisible();
   // The first map projection is written on the next rendered frame, after the buttons become visible.
@@ -34,7 +32,7 @@ test('folding navigation, stable map anchors and the connected concept rotunda',
   await page.keyboard.press('Escape');
   await expect(page.locator('#performance')).toHaveValue('auto');
   await page.locator('#performance').selectOption('light');
-  await expect(page.locator('#navigation-tab')).toBeVisible({ timeout: 120000 });
+  await expect(page.locator('#hud-graphics')).toBeEnabled({ timeout: 120000 });
   await page.keyboard.press('Escape');
   await expect(page.locator('#performance')).toHaveValue('light');
   await expect(page.locator('#graphics-profile')).toContainText('Lightweight');

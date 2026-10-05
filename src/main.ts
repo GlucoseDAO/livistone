@@ -192,7 +192,7 @@ class Game {
     this.ui.setSound(this.ambience.enabled);
     this.ambience.start();
     this.renderer = view.renderer; this.graphics = view.graphics;
-    const choice = readGraphicsChoice();
+    const choice = readGraphicsChoice(), automaticTier = this.graphics.tier;
     Object.assign(this.graphics, graphicsProfile(chosenTier(choice, this.graphics.tier)));
     if (import.meta.env.DEV) {
       const override = new URLSearchParams(location.search).get('graphics');
@@ -249,7 +249,7 @@ class Game {
     ui.progress(this.progress); ui.setMode('welcome');
     ui.setTimeOfDay(this.timeOfDay, this.night);
     document.querySelector<HTMLSelectElement>('#quality')!.value = this.reduced ? 'low' : 'high';
-    document.querySelector<HTMLSelectElement>('#performance')!.value = choice;
+    ui.setGraphics(choice, this.graphics.tier, choice === 'auto' ? this.graphics.tier : automaticTier);
     window.addEventListener('resize', () => this.resize());
     document.addEventListener('visibilitychange', () => {
       this.lastTime = performance.now(); this.accumulator = 0;
@@ -383,7 +383,7 @@ class Game {
     return this.night || skyLook() === 'classic' ? light : { ...light, environment: light.environment * PHYSICAL_DAY_FILL };
   }
   private get mapView(): boolean {
-    return this.mode === 'map' || this.mode === 'welcome' || (['lore', 'journal', 'paused', 'gallery', 'teleport'].includes(this.mode) && this.returnMode === 'map');
+    return this.mode === 'map' || this.mode === 'welcome' || (['lore', 'journal', 'paused', 'gallery', 'teleport', 'graphics'].includes(this.mode) && this.returnMode === 'map');
   }
   private pixelRatio(): number {
     const cap = this.graphics.tier === 'cpu' ? Math.sqrt((this.hardwareLight ? 500000 : 180000) / (window.innerWidth * window.innerHeight)) : Infinity;
@@ -418,9 +418,9 @@ class Game {
       if (next === 'map') this.resetMap();
       this.setMode(next); if (next === 'walking') this.ambience.resume(); return;
     }
-    if (action === 'journal' || action === 'pause' || action === 'teleport') {
-      const next = action === 'journal' ? 'journal' : action === 'teleport' ? 'teleport' : 'paused';
-      if (this.mode === next) { this.setMode(this.returnMode); if (next === 'teleport') this.ui.focusTeleport(); return; }
+    if (action === 'journal' || action === 'pause' || action === 'teleport' || action === 'graphics') {
+      const next = action === 'journal' ? 'journal' : action === 'teleport' ? 'teleport' : action === 'graphics' ? 'graphics' : 'paused';
+      if (this.mode === next) { this.setMode(this.returnMode); if (next === 'teleport') this.ui.focusTeleport(); if (next === 'graphics') this.ui.focusGraphics(); return; }
       if (this.mode === 'walking' || this.mode === 'map') this.returnMode = this.mode;
       this.loreFromJournal = false; this.setMode(next); return;
     }
@@ -460,13 +460,13 @@ class Game {
     if (action.startsWith('tap:') && this.mode === 'walking') { this.clickPhoto(Number(action.split(':')[1]), Number(action.split(':')[2])); return; }
     if (this.mode === 'gallery' && !['escape', 'close'].includes(action)) return;
     if (action === 'escape') {
-      if (['paused', 'lore', 'journal', 'gallery', 'teleport'].includes(this.mode)) { await this.action('close'); return; }
+      if (['paused', 'lore', 'journal', 'gallery', 'teleport', 'graphics'].includes(this.mode)) { await this.action('close'); return; }
       this.returnMode = this.mode === 'map' ? 'map' : 'walking'; this.setMode('paused');
     } else if (action === 'close') {
-      const teleport = this.mode === 'teleport';
+      const teleport = this.mode === 'teleport', graphics = this.mode === 'graphics';
       if (this.mode === 'gallery') { const id = this.ui.gallery.currentDiscovery; if (this.galleryReturn === 'lore' && id) { this.discover(id, this.loreFromJournal); this.ui.selectSlideImage(this.ui.gallery.currentImageSrc); } else this.setMode(this.galleryReturn); return; }
       if (this.mode === 'lore' && this.loreFromJournal) { this.loreFromJournal = false; this.setMode('journal'); }
-      else { this.setMode(this.returnMode); if (teleport) this.ui.focusTeleport(); }
+      else { this.setMode(this.returnMode); if (teleport) this.ui.focusTeleport(); if (graphics) this.ui.focusGraphics(); }
     } else if ((action === 'interact' || action === 'nearby-story') && this.mode === 'walking') {
       const id = action === 'interact' ? this.interaction ?? this.nearby?.id : this.nearby?.id;
       if (id) this.discover(id);
@@ -488,7 +488,8 @@ class Game {
     } else if (action === 'sound') {
       try { this.ui.setSound(await this.ambience.toggle()); } catch { this.ui.toast('Sound is unavailable in this browser.'); }
     } else if (action.startsWith('performance:')) {
-      try { localStorage.setItem(GRAPHICS_CHOICE_KEY, parseGraphicsChoice(action.split(':')[1])); } catch { this.ui.toast('Could not save the performance setting.'); return; }
+      const choice = parseGraphicsChoice(action.split(':')[1]); if (choice === readGraphicsChoice()) return;
+      try { localStorage.setItem(GRAPHICS_CHOICE_KEY, choice); } catch { this.ui.toast('Could not save the performance setting.'); return; }
       location.reload();
     } else if (action.startsWith('quality:')) this.quality(action.split(':')[1] === 'low');
   }

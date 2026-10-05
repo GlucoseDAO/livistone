@@ -26,7 +26,8 @@ for (const mobile of [false, true]) test(`nearby ring and Nut stories have worki
       await page.locator('#place-toggle').click(); await expect(page.locator('#nearby-story')).toBeHidden();
       expect((await page.locator('.place-card').boundingBox())!.height).toBeLessThan(110);
       expect((await page.locator('.place-card').boundingBox())!.width).toBeLessThan(250);
-      await page.locator('#controls-toggle').click(); await expect(page.locator('#controls-details')).toBeHidden();
+      if (await page.locator('#controls-details').isVisible()) await page.locator('#controls-toggle').click();
+      await expect(page.locator('#controls-details')).toBeHidden();
       expect((await page.locator('.controls-hint').boundingBox())!.width).toBeLessThan(60);
       await expect(page.locator('#controls-toggle')).toHaveAttribute('aria-label', 'Expand controls panel');
       await expect(page.locator('#controls-toggle svg')).toBeVisible();

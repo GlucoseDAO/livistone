@@ -254,7 +254,7 @@ docs/jewelry-stl-inclusion-analysis.md Mesh health, decimation limits and a tier
 - **The loop is fixed-timestep.** `main.ts` accumulates real time and steps physics at
   1/60 s. Rendering is per animation frame. Anything time-dependent takes `dt` explicitly.
 - **Modes drive the UI.** `Mode` is `'welcome' | 'walking' | 'map' | 'lore' | 'journal' |
-  'paused' | 'gallery' | 'teleport'`. `welcome` is the loading state; ready opens first person at SPAWN facing the city gate, without an entry gate. The static loading introduction precedes module loading; Town.create yields between construction stages and progress follows completed stages. Mode changes are the single place where input capture, the active camera, and
+  'paused' | 'gallery' | 'teleport' | 'graphics'`. `welcome` is the loading state; ready opens first person at SPAWN facing the city gate, without an entry gate. The static loading introduction precedes module loading; Town.create yields between construction stages and progress follows completed stages. Mode changes are the single place where input capture, the active camera, and
   DOM visibility all change together. Do not bypass them with ad-hoc DOM toggling.
   Keep the labeled First person / Map switch (M), journal, and menu usable across
   panels. Dialogs leave navigation accessible and make the scene inert; native control
@@ -263,15 +263,15 @@ docs/jewelry-stl-inclusion-analysis.md Mesh health, decimation limits and a tier
   requiring a landmark visit. Preserve existing save IDs.
   On touch and narrow screens, the nearby-story card starts folded and has an accessible
   toggle; desktop can fold it too. Keep the nearby title visible when folded and the story
-  link reachable when expanded. The desktop controls strip also folds, while touch movement
+  link reachable when expanded. The desktop controls strip automatically folds after six seconds of walking (deferred while one of its controls is focused); reopening it keeps it open. It also folds manually, while touch movement
   and Jump remain available. The top sound control is a compact labeled speaker button. Beside it, the time button
   (`#hud-time`) cycles your time (`'auto'`, the local clock) → day → night per click or T (not with Ctrl, Alt or Meta; like M
   it also works with a toolbar button focused; the menu note names T, the controls strip only above 1100 px, where it does not
   squeeze the place card), shows a clock, sun or moon, and names the mode in its `aria-label` and
   `title`, for your time with what the clock gives now ("Time of day: your time (night now)"). It and the menu's select
   ("Your time — local clock", Day, Night) follow each other through `UI.setTimeOfDay`. Up to 440 px wide the icon buttons narrow
-  to 40 px (38 px below 380 px) and “First person” takes two lines, so icon buttons remain tappable from 360 px; the six tools now use a separate row below the brand up to 440 px;
-  from 651 to 760 px the journal shows only its icon, and the centred mode label waits for 1241 px.
+  to 40 px (38 px below 380 px) and “First person” takes two lines, so icon buttons remain tappable from 360 px; the seven tools now use a separate row below the brand up to 440 px;
+  from 651 to 760 px the journal shows only its icon, and the centred mode label waits for 1401 px.
   The loading progress bar spans the viewport; larger introduction text and portrait must
   remain fully reachable by scrolling on short screens.
 - **Mouse rotation requires a held left mouse button; Left/Right arrows also turn.** Never request pointer lock or turn on
@@ -556,7 +556,7 @@ Open grass areas have broad rolling contours, reaching roughly 1–2.5 metres wh
 - `concept-rotunda-layout.ts` owns the level terrace east of Eyelense; keep its approach continuous and reserve full planting footprints. `concept-rotunda.ts` shows fifteen generated concepts suspended within rounded garden arches. `garden-arch.ts` batches curved leaves and layered, cupped flower petals per arch, with foliage outside image apertures and matching post/planter colliders. Original concepts stay untouched; `build-concept-panels.py` creates local derivatives and source hashes.
 - The floating Mycelium ring has its own emissive silver. Register its material before the night-light scan, but keep its empty mesh hidden until loaded. Trail fireflies are bodiless halos on the shared wind clock; their pooled light sources follow the sprites. Never introduce one real light per orb.
 - The Swiss Blue architectural coil is an interpretation of the supplied STL band section; the exact optimized source sits on the Dewdrop stand. Preserve clear walking entries below it. Lake and inner Winter topaz must have outward facet normals and dielectric optics; night glow stays faint and quality switches preserve those settings.
-- Navigation starts open, folds after eight seconds of walking and is restored by the small Navigation edge tab. Do not fold a focused toolbar or an open dialog. Compact map numbers have stable world anchors and thin leader lines; hover labels must never trigger rearrangement.
+- Top navigation stays visible by default on desktop and touch, with quick music, teleport and graphics buttons. Graphics uses a mode-driven dropdown for Auto/Lightweight/Balanced/Rich; its tooltip and Auto option name the resolved preset from the active GraphicsTier. Performance changes persist and reload the scene. Compact map numbers have stable world anchors and thin leader lines; hover labels must never trigger rearrangement.
 
 - Eye of Winter has no exterior lamp fixtures: its silver, quartz and inner topaz emit a restrained night glow with one low-power internal halo. Do not restore floodlit snow pools.
 - Older Intel HD/UHD 4xx–6xx and gen-9 adapters select lightweight rendering automatically. Hardware lightweight keeps reflective gems and halo sprites, with a 500k-pixel cap and adaptive scale. Real software rendering retains its smaller budget. The Performance menu persists Auto/Lightweight/Balanced/Rich and reloads the scene; visual detail alone does not rebuild meshes.
