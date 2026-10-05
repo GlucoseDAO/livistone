@@ -31,7 +31,7 @@
 .map-start{flex-shrink:0;min-height:66px;margin:4px 0 18px;gap:14px;font-size:16px;justify-content:flex-start}.map-start>span{flex:1;text-align:left}.map-start strong{display:block;font-weight:600}.map-start small{display:block;margin-top:5px;font-size:11px;font-weight:400;opacity:.85}.map-start>svg{width:22px;height:22px}.map-panel{max-height:calc(100dvh - 165px)}.map-description{min-height:0;margin-top:12px}
 @media(max-width:650px){.map-panel{max-height:48dvh}.map-panel .map-start{min-height:62px;padding:12px 15px;font-size:16px;margin:0 0 12px}.map-panel h2{font-size:29px}}
 @media(max-height:550px) and (orientation:landscape){.map-panel{max-height:calc(100dvh - 91px)}.map-panel h2{font-size:26px;margin:7px 0}.map-start{min-height:54px;margin-bottom:10px;padding:10px 14px}.map-start small{margin-top:2px}}
-.source-image{display:block;text-align:center;background:white;border-radius:4px}.source-image img{display:block;width:100%;height:auto;max-height:440px;object-fit:contain}.source-image:after{content:"Open original image ↗";display:block;padding:8px;font-size:12px}.source-image[hidden],.lore-figure canvas[hidden]{display:none}
+.source-image{cursor:zoom-in;display:block;text-align:center;background:white;border-radius:4px}.source-image img{display:block;width:100%;height:auto;max-height:440px;object-fit:contain}.source-image:after{content:"Enlarge image · browse this building";display:block;padding:8px;font-size:12px}.source-image[hidden],.lore-figure canvas[hidden]{display:none}
 
 /* Make the view destination a primary navigation control on desktop and touch. */
 #view-toggle{min-height:54px;min-width:154px;font-size:16px;padding:14px 20px;font-weight:600}#view-toggle svg{width:24px;height:24px}
@@ -69,3 +69,20 @@
 @media(max-height:550px) and (orientation:landscape){.teleport-dropdown{top:calc(100% - 8px);max-height:calc(100dvh - 90px)}}
 
 .artist-link{display:block;color:#365444;text-underline-offset:3px;font-size:13px;line-height:1.5;padding:15px 0;min-height:44px}.artist-link small{display:block;color:#687360;font-size:11px;margin-top:4px}
+/* A small edge tab leaves the walking view clear after the opening introduction. */
+.navigation-tab{position:absolute;right:14px;top:0;min-height:32px;padding:5px 13px;display:flex;align-items:center;gap:7px;background:#f4f0e5ed;color:var(--ink);border-radius:0 0 7px 7px;font-size:10px;box-shadow:0 2px 12px #0002;pointer-events:auto}
+.navigation-tab svg{width:16px;height:16px}
+#app[data-navigation=folded] .topbar>.brand,#app[data-navigation=folded] .topbar>.top-center,#app[data-navigation=folded] #tools{visibility:hidden;pointer-events:none}
+#app .map-marker{width:44px;height:44px;min-width:44px;min-height:44px;padding:5px;border:0;background:transparent;box-shadow:none;transform:translate(-50%,calc(-100% - 24px));animation:none;transition:none;border-radius:50%;overflow:visible}
+#app .map-marker>span{display:flex;width:34px;height:34px;align-items:center;justify-content:center;border:1px solid #e7f5c4;background:#243c35e8;color:#fffce8;border-radius:50%;font-size:11px;box-shadow:0 0 8px #d4eea375,inset 0 0 5px #d4eea330;animation:none}
+#app .map-marker::after{content:'';position:absolute;left:21.5px;top:39px;width:1px;height:29px;background:linear-gradient(#edf7cbcc,#dcf4b455);pointer-events:none}
+#app .map-marker::before{content:'';position:absolute;left:17px;top:64px;width:10px;height:10px;border-radius:50%;background:#d3edb24d;box-shadow:0 0 15px 8px #dbefa52b;pointer-events:none}
+#app .map-marker>b{display:none;position:absolute;left:50%;top:-30px;transform:translateX(-50%);white-space:nowrap;background:#f4f0e5;padding:5px 9px;border-radius:3px;font-size:11px;color:#294338;pointer-events:none}
+#app .map-marker:hover>b,#app .map-marker:focus-visible>b{display:block}
+@media(prefers-reduced-motion:reduce){.navigation-tab{transition:none}}
+
+/* Building content navigation stays available above long panel stories. */
+.panel-controls { position: sticky; top: 0; z-index: 2; background: var(--paper, #f4f0e5); padding: .7rem 0; gap: .5rem; }
+.panel-controls button { min-height: 44px; }
+.panel-controls span { white-space: nowrap; }
+@media (max-width: 540px) { .panel-controls { font-size: .8rem; } .panel-controls button { padding: .55rem; } }

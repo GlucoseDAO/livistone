@@ -772,5 +772,34 @@
         "deviationOfFeature": 0.019
       }
     ]
+  },
+  "dewdrop-silver": {
+    "use": "gate",
+    "sources": [
+      {
+        "file": "03_PARAM 2019/swiss blue/swiss blue2.stl",
+        "sha256": "9821e647e8623998547e1f67f1fe4bda3348f66f71515abc15fec1a2c3066752",
+        "modified": "2019-07-17T21:33:02.211Z",
+        "triangles": 213394
+      }
+    ],
+    "cleanup": {
+      "duplicates": 0,
+      "shells": 1,
+      "debris": 0,
+      "inverted": 0,
+      "trianglesAfter": 212810
+    },
+    "featureMm": 0.911,
+    "metresPerMm": 0.55061,
+    "levels": [
+      {
+        "file": "public/models/jewelry/dewdrop-silver.glb",
+        "triangles": 16000,
+        "bytes": 297940,
+        "deviationMm": 0.012,
+        "deviationOfFeature": 0.013
+      }
+    ]
   }
 }

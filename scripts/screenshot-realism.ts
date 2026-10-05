@@ -18,6 +18,7 @@ interface Hook { snapshot(): Record<string, unknown> & { ready: boolean; mode: s
 
 // Coordinates follow scripts/screenshot-landmarks.mjs; pitch is radians, positive looks up.
 const VIEWS: Record<string, View> = Object.fromEntries(([
+  ['concept-rotunda', 120, -36, -Math.PI / 2, .08], ['concept-panel', 137, -36, 0, .08], ['dewdrop-topaz', -10, -94, 0, .32],
   ['station-arrival', 0, 58, 0], ['arrival-meadow', 10, 52, -.9], ['garden-overview', 0, 52, 0], ['gateway-front', 0, 52, 0, .18],
   ['gateway-side', 9, 47, .92, .26], ['bridge-crossing', 0, 36, 0], ['garden-path', -14, 8, 1.2],
   ['city-hall-front', 0, 4, 0], ['energy-front', -29, 12, 0], ['energy-side', -4, -9, Math.PI / 2], ['science-front', 29, 14, 0], ['science-side', 6, -11, -Math.PI / 2],

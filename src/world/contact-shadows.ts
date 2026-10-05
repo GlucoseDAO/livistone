@@ -1,4 +1,4 @@
-import { WINTER_POSTER, WINTER_LAMPS } from './winter-gate-layout';
+import { WINTER_POSTER } from './winter-gate-layout';
 import { EYELENSE_POSTER, EYELENSE_LAMPS } from './eyelense-gate-layout';
 import { gateFittingsEnabled } from './gate-lamps';
 import { WINTER } from './winter-gate-layout';
@@ -167,7 +167,7 @@ export function objectContactSites(): ContactSite[] {
   const sites: ContactSite[] = [-1, 1].map(side => ({ x: WINTER.quartzX - .3, z: WINTER.z + side * 2.1, rx: 1.3, rz: .5, floor: WINTER.floor, strength: .55 }));
   if (gateFittingsEnabled()) {
     for (const p of [WINTER_POSTER, EYELENSE_POSTER]) sites.push(feet(p.x, p.z, p.yaw, 1.6, .6, p.y));
-    for (const p of [...WINTER_LAMPS, ...EYELENSE_LAMPS]) sites.push(post(p.x, p.z, .4, p.y));
+    for (const p of EYELENSE_LAMPS) sites.push(post(p.x, p.z, .4, p.y));
   }
   sites.push(...LAMP_POSTS.map(([x, z]) => post(x, z, .6)));
   for (const hall of CIVIC_LANDMARKS) for (const p of posterLayout(hall.id, pieces(hall.id))) sites.push(feet(hall.x + p.x, hall.z + p.z, p.yaw, (hall.id === 'science' ? 1.72 : 2) * .7, .48, HALL_FLOOR));

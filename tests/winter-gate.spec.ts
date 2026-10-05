@@ -3,11 +3,14 @@ import { WINTER, WINTER_ARRIVAL } from '../src/world/winter-gate-layout';
 import { EXPECTED_BACKEND } from './gpu-errors';
 
 test('arrives at Eye of Winter from the map and walks through its iris', async ({ page }) => {
+  // With probes disabled, cold WebGL material preparation on Windows can exceed 90 seconds.
+  const coldStart = process.env.LIVISTONE_BACKEND === 'webgl' ? 240000 : 90000;
+  test.setTimeout(coldStart + 60000);
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => localStorage.setItem('livistone-time-of-day', 'day'));
   await page.goto('/?graphics=mobile&probes=off' + (process.env.LIVISTONE_BACKEND === 'webgl' ? '&backend=webgl' : ''));
-  await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 90000 });
+  await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: coldStart });
   await page.getByRole('button', { name: 'Map', exact: true }).click();
   await expect(page.locator('#marker-winter-gate')).toBeInViewport();
   await page.locator('#marker-winter-gate').click();

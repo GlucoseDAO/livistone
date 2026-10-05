@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-05",
+  "method": "built-in image_gen",
+  "purpose": "Fill only the ten missing concept rotunda slots. The original five displayed concepts remain unchanged.",
+  "sources": [
+    "concepts/01-garden-town/prompts",
+    "concepts/09-river-gardens/notes.md",
+    "concepts/11-glucose-pavilion/notes.md",
+    "src/game/content.ts",
+    "owner conversation descriptions"
+  ],
+  "images": [
+    {
+      "id": "city-hall",
+      "prompt": "concepts/01-garden-town/prompts/02-city-hall.txt",
+      "original": "C:\\Users\\liv\\.codex\\generated_images\\01a0cb06-97dd-77d1-a47f-1ad7c71c653e\\exec-003805fa-a031-4c41-a020-04a6abf8374a.png",
+      "file": "concepts/16-concept-garden/images/city-hall.png"
+    },
+    {
+      "id": "energy",
+      "prompt": "concepts/01-garden-town/prompts/03-ministry-of-energy.txt",
+      "original": "C:\\Users\\liv\\.codex\\generated_images\\01a0cb06-97dd-77d1-a47f-1ad7c71c653e\\exec-fec92764-e7d7-48b2-9371-0e680398b66e.png",
+      "file": "concepts/16-concept-garden/images/energy.png"
+    },
+    {
+      "id": "science",
+      "prompt": "concepts/01-garden-town/prompts/04-ministry-of-science.txt",
+      "original": "C:\\Users\\liv\\.codex\\generated_images\\01a0cb06-97dd-77d1-a47f-1ad7c71c653e\\exec-3475c23b-f8a7-4ca2-83a7-181d88dcef23.png",
+      "file": "concepts/16-concept-garden/images/science.png"
+    },
+    {
+      "id": "timeface",
+      "prompt": "concepts/16-concept-garden/prompts/timeface.txt",
+      "original": "C:\\Users\\liv\\.codex\\generated_images\\01a0cb06-97dd-77d1-a47f-1ad7c71c653e\\exec-0b7eaabf-6445-42c8-b050-1a252b6bc939.png",
+      "file": "concepts/16-concept-garden/images/timeface.png"
+    },
+    {
+      "id": "glucose",
+      "prompt": "concepts/16-concept-garden/prompts/glucose.txt",
+      "original": "C:\\Users\\liv\\.codex\\generated_images\\01a0cb06-97dd-77d1-a47f-1ad7c71c653e\\exec-130814ef-97fd-474f-9d29-06bdcd4d378f.png",
+      "file": "concepts/16-concept-garden/images/glucose.png"
+    },
+    {
+      "id": "lake",
+      "prompt": "concepts/16-concept-garden/prompts/lake.txt",
+      "original": "C:\\Users\\liv\\.codex\\generated_images\\01a0cb06-97dd-77d1-a47f-1ad7c71c653e\\exec-8a80bce5-6aef-45c0-b814-3ab62363c349.png",
+      "file": "concepts/16-concept-garden/images/lake.png"
+    },
+    {
+      "id": "future-house",
+      "prompt": "concepts/16-concept-garden/prompts/future-house.txt",
+      "original": "C:\\Users\\liv\\.codex\\generated_images\\01a0cb06-97dd-77d1-a47f-1ad7c71c653e\\exec-086b241b-bccc-47aa-b302-978a8b00eed8.png",
+      "file": "concepts/16-concept-garden/images/future-house.png"
+    },
+    {
+      "id": "mycelium",
+      "prompt": "concepts/16-concept-garden/prompts/mycelium.txt",
+      "original": "C:\\Users\\liv\\.codex\\generated_images\\01a0cb06-97dd-77d1-a47f-1ad7c71c653e\\exec-91ff789c-7ba5-45fd-9f24-37af5429adf3.png",
+      "file": "concepts/16-concept-garden/images/mycelium.png"
+    },
+    {
+      "id": "enhancement",
+      "prompt": "concepts/16-concept-garden/prompts/enhancement.txt",
+      "original": "C:\\Users\\liv\\.codex\\generated_images\\01a0cb06-97dd-77d1-a47f-1ad7c71c653e\\exec-e835d725-90e5-4c94-a76e-a84f3e7b3881.png",
+      "file": "concepts/16-concept-garden/images/enhancement.png"
+    },
+    {
+      "id": "jepii",
+      "prompt": "concepts/16-concept-garden/prompts/jepii.txt",
+      "original": "C:\\Users\\liv\\.codex\\generated_images\\01a0cb06-97dd-77d1-a47f-1ad7c71c653e\\exec-9a6afeff-0fb7-428a-bea7-fbcd0fb1fdff.png",
+      "file": "concepts/16-concept-garden/images/jepii.png"
+    }
+  ]
+}

@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { createGateLamps, gateFittingsEnabled } from './gate-lamps';
+import { gateFittingsEnabled } from './gate-lamps';
 import { nightEmission, addGlow } from './night-lighting';
-import { WINTER_LAMPS } from './winter-gate-layout';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { modelURL } from '../game/featured';
 import type { ColliderSpec } from '../game/physics';
@@ -62,7 +61,7 @@ export function winterBlueGeometry(): THREE.BufferGeometry {
   const centre = new THREE.Vector3(rings[3].x, WINTER.centreY, WINTER.z);
   for (let i = 0; i < 6; i++) tris.push([centre, pts[3][i], pts[3][(i + 1) % 6]]);
   // Flat normals preserve the faceted stone; the little rear face seals its pavilion.
-  tris.push(...fan([...pts[0]].reverse())); return geometry(tris);
+  tris.push(...fan([...pts[0]].reverse())); return geometry(tris.map(t => [t[0], t[2], t[1]]));
 }
 
 function doorPoint(p: THREE.Vector2, outward = .025): Point {
@@ -85,11 +84,11 @@ export function createWinterGate(source: THREE.BufferGeometry, mobile = false, p
   const silverMaterial = new THREE.MeshStandardMaterial({ color: '#e3e9ed', metalness: 1, roughness: .27, userData: { heroEnv: true } });
   const gold = new THREE.MeshStandardMaterial({ color: '#c3a15c', metalness: .85, roughness: .24, userData: { heroEnv: true } });
   const quartzMaterial = new THREE.MeshPhysicalMaterial({ color: '#eaf7ff', roughness: .045, metalness: 0, transmission: mobile ? 0 : .88, thickness: .2, ior: 1.46, transparent: true, opacity: mobile ? .22 : .5, depthWrite: false, side: THREE.DoubleSide, clearcoat: 1, userData: { winterQuartz: true, winterReduced: mobile, heroEnv: true } });
-  const blueMaterial = new THREE.MeshPhysicalMaterial({ color: '#237bb4', roughness: .035, metalness: .12, transmission: mobile ? 0 : .35, thickness: .8, ior: 1.62, clearcoat: 1, flatShading: true, emissive: '#0b2942', emissiveIntensity: .22, userData: { heroEnv: true } });
+  const blueMaterial = new THREE.MeshPhysicalMaterial({ color: '#dbf1fc', roughness: .018, metalness: 0, transmission: mobile ? 0 : .96, transparent: true, opacity: mobile ? .62 : 1, thickness: 1.25, attenuationColor: '#4ca6d3', attenuationDistance: 3.5, ior: 1.62, envMapIntensity: 1.65, clearcoat: 1, clearcoatRoughness: .015, dispersion: mobile ? 0 : .035, flatShading: true, userData: { heroEnv: true, winterTopaz: true, winterReduced: mobile } });
   if (gateFittingsEnabled()) {
-    nightEmission(silverMaterial, '#9ac6d9', .065); nightEmission(quartzMaterial, '#a0d1ef', .06); nightEmission(blueMaterial, '#2f9dd4', .7);
-    createGateLamps(root, colliders, WINTER_LAMPS, '#d4eaff');
-    addGlow(root, new THREE.Vector3(WINTER.x - 1.5, WINTER.centreY, WINTER.z), '#63bced', 2, 90, 18, .2);
+    nightEmission(silverMaterial, '#9ac6d9', .16); nightEmission(quartzMaterial, '#a0d1ef', .085); nightEmission(blueMaterial, '#78c7e9', .045);
+    // The structure glows from within; no exterior fittings or floodlit snow.
+    addGlow(root, new THREE.Vector3(WINTER.x - 1.5, WINTER.centreY, WINTER.z), '#9ed3eb', 7, 8, 6, .09);
   }
   const add = (name: string, g: THREE.BufferGeometry, m: THREE.Material, solid = true): THREE.Mesh => {
     const mesh = new THREE.Mesh(g, m); mesh.name = name; mesh.castShadow = mesh.receiveShadow = true; root.add(mesh);

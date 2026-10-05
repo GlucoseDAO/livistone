@@ -1,5 +1,13 @@
 # Livistone: browser game implementation plan
 
+## Garden concepts and owner review — 5 October 2026
+
+The east exit of Eyelense connects to a level circular concept terrace with fifteen inward-facing posters suspended in rounded garden arches, climbing leaves and layered three-dimensional flowers. The five existing generated concepts are preserved; ten missing concepts now use newly generated images based on the original building briefs. The source PNGs remain untouched and compressed WebP derivatives record their provenance. The terrace and connection share planting reservations, terrain grading and collision.
+
+The floating Mycelium ring has dedicated night emission and a pooled light. Jepii Mici has sparse, drifting, bodiless light sprites, with their nearby pooled lights following the same positions and reduced-motion clock. The Dewdrop briolette has outward facet normals and clear topaz optics, a faint glow and a concave coiled silver band inspired by the supplied Swiss Blue STL; a 16k-triangle derivative of the original setting appears on its source stand. Eye of Winter’s inner topaz also has corrected outward normals and polished dielectric reflection/refraction instead of opaque metallic blue.
+
+The toolbar folds into a small edge tab after eight seconds of idle walking, staying open while it holds focus or a dialog is active. Map numbers keep fixed anchors with fine lines and subtle ground glows; labels appear on hover/focus without moving neighbouring markers. Eye of Winter has soft structural night emission without exterior lamps. Older Intel HD graphics now select a lighter rendering path automatically; the Performance menu offers persistent manual choices. Same-machine headless Chrome walking samples improved from 5–7 fps to about 29–30 fps, with reduced materials and resolution. This is not a measurement of the embedded browser or other devices. Verification results are recorded in `docs/realism/29-owner-gardens.md` and `docs/realism/30-garden-arches.md`.
+
 ## Teleport dropdown and creator links — 4 October 2026
 
 A compact compass button beside sound opens a scrollable dropdown of all 13 destinations in visitor-route order, using the same clear entrances and facing directions as map arrivals. Opening it pauses walking and map controls; choosing a stop resumes first-person exploration there. Escape, closing it, pressing its toolbar button again or clicking outside preserves the previous walking or map view and position. Keyboard navigation includes Tab, arrow keys, Home and End, with focus restored to the teleport button when cancelled. On phones up to 440 px wide, the six navigation tools have their own row below the Livistone name. Menu, Journal and the creator story link directly to liviazaharia.com; existing individual-work source links remain available.
@@ -575,3 +583,7 @@ The loading introduction now uses larger type and a larger uncropped portrait; s
 ### Eye-building visits and snow (4 October 2026)
 
 Arrival views for the civic buildings, Materialized Enhancements and both eyes now stand farther back on connected paving or the snow ramp. Source-photo boards beside the two eyes open the full photographs and architectural stories. Shielded lamps share the town’s fixed night light pool. Snow uses cool white shading, wider wandering hiking tracks and rounded terrain grades. Review and verification: [realism sub-plan 29](realism/29-gate-arrivals-snow.md).
+
+## Building and concept albums — 5 October 2026
+
+The rotunda opens a 15-image concept slideshow from any poster. Building panels open source content with previous/next navigation scoped to that building; enlarged photographs and research slides browse the same building’s images and return to their matching content. Gate reference photographs remain scoped to the gate even when the original jewellery is exhibited elsewhere. Albums reuse the existing image viewer and load only the displayed full image.

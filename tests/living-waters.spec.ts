@@ -6,7 +6,8 @@ interface Snapshot { mode: string; zone: string; journey: string | null; positio
 const snapshot = (page: Page): Promise<Snapshot> => page.evaluate(() => (window as unknown as { __livistone: { snapshot(): Snapshot } }).__livistone.snapshot());
 const teleport = (page: Page, x: number, z: number, yaw = 0) => page.evaluate(({ x, z, yaw }) => (window as unknown as { __livistone: { teleport(x: number, z: number, yaw: number): void } }).__livistone.teleport(x, z, yaw), { x, z, yaw });
 for (const mobile of [false, true]) test(`integrated garden stories, walking and map preservation (${mobile ? 'touch' : 'desktop'})`, async ({ browser }) => {
-  test.setTimeout(120000);
+  // This scenario loads the whole town twice; a cold Windows WebGPU load can take about 55 seconds on its own.
+  test.setTimeout(240000);
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 800 }, isMobile: mobile, hasTouch: mobile });
   try {
     const page = await context.newPage(), errors: string[] = []; page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (message.type() === 'error' && GPU_ERROR.test(message.text())) errors.push(message.text()); });
@@ -43,6 +44,7 @@ test('walk from the civic gardens into the lake without travel or a scene switch
   await teleport(page, -23, -54, -.18); await page.keyboard.down('KeyW');
   await expect.poll(async () => (await snapshot(page)).position.z, { timeout: 30000 }).toBeLessThan(-78); await page.keyboard.up('KeyW');
   const arrived = await snapshot(page); expect(arrived.zone).toBe('town'); expect(arrived.journey).toBeNull(); expect(arrived.position.y).toBeGreaterThan(.55);
+  if (await page.locator('#app').getAttribute('data-navigation') === 'folded') await page.getByRole('button', { name: 'Show navigation' }).click();
   await page.locator('#view-toggle').click(); for (const id of ['city-hall', 'station', 'living-waters', 'mycelium-garden']) expect(await page.locator('#marker-' + id).evaluate(e => e.hasAttribute('hidden'))).toBe(false);
   await page.locator('#view-toggle').click(); expect((await snapshot(page)).position.x).toBeCloseTo(arrived.position.x); expect((await snapshot(page)).position.z).toBeCloseTo(arrived.position.z);
 });

@@ -1,6 +1,7 @@
 {
   "about": "Decimated jewelry models built by scripts/build-jewelry-models.ts from Livia Zaharia's Drive export (millimetres, life size). Files are relative to that export; the STLs never enter this repository. rotate is applied in degrees (x, y, z) after STL Z-up becomes Y-up; size is the longest side in metres after scaling.",
   "models": [
+    { "id": "dewdrop-silver", "use": "gate", "files": ["03_PARAM 2019/swiss blue/swiss blue2.stl"], "rotate": [0, 0, 0], "size": 13, "anchor": "base", "triangles": [16000] },
     { "id": "nucalong", "use": "featured", "files": ["03_PARAM 2019/pt ceramica/+nucalong.stl"], "rotate": [90, 0, -90], "size": 1.3, "triangles": [10000] },
     { "id": "nocciola", "use": "featured", "files": ["07.PARAM 2023/nuca/+nocciola.stl"], "rotate": [0, 0, 90], "size": 1.3, "triangles": [10000] },
     { "id": "splash", "use": "featured", "files": ["02_PARAM 2018/splash/splash.stl"], "rotate": [0, 0, 0], "size": 1.3, "triangles": [10000] },

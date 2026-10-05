@@ -1,4 +1,6 @@
 import { createGatePoster } from './gate-posters';
+import { createConceptRotunda } from './concept-rotunda';
+import { TrailFireflies } from './trail-fireflies';
 import { gateFittingsEnabled } from './gate-lamps';
 import { EYELENSE_POSTER } from './eyelense-gate-layout';
 import { WINTER_POSTER } from './winter-gate-layout';
@@ -120,6 +122,7 @@ export class Town {
   private researchReady!: Promise<void>;
   private readonly jewelryReady: Promise<void>[] = [];
   private ringReady: Promise<void> = Promise.resolve();
+  private fireflies?: TrailFireflies;
   private streaming = false;
   private readonly white = new THREE.MeshStandardMaterial({ color: '#f4f0df', roughness: 0.57, metalness: 0.07 });
   private readonly silver = new THREE.MeshStandardMaterial({ color: '#e2e7dd', roughness: 0.26, metalness: 0.65 });
@@ -202,6 +205,7 @@ export class Town {
     await stage(46, 'Growing the lake gardens and elevated galleries…');
     this.gardens = new LivingWaters(mobile, this.paving, this.wind); this.root.add(this.gardens.root);
     this.gardens.presentLakeJewelry(); this.ringReady = this.gardens.presentMyceliumRing();
+    await this.gardens.presentDewdropSilver();
     this.gardens.addInterpretation('living-mycelium', 'Mycelium Rain Garden', 'The Mycelium grove', 'Curled, open silver gills surround opal hearts, following the Mycelium ring. Tall crowns and lower ring-scale shrubs share the same folds. Its setting was designed to drain water away from porous opal. Follow the dry loop and silver rill to the lake.');
     this.colliders.push(...this.gardens.colliders); this.interactives.push(...this.gardens.interactives); this.researchPanels.push(...this.gardens.panels);
     label('Living Waters · town gardens');
@@ -219,6 +223,8 @@ export class Town {
     const eyelensePoster = gateFittingsEnabled() ? createGatePoster(this.root, this.colliders, EYELENSE_POSTER, 'eyelense', 'eyelense-gate-story', 'Eyelense') : null;
     if (eyelensePoster) { this.researchPanels.push(...eyelensePoster.panels); this.interactives.push({ id: 'eyelense-gate-story', object: eyelensePoster.panels[0], position: eyelensePoster.position }); }
     label('Eyelense Gate');
+    const concepts = createConceptRotunda(this.root, this.colliders, mobile); this.researchPanels.push(...concepts.panels); this.jewelryReady.push(concepts.ready);
+    this.fireflies = new TrailFireflies(this.root, mobile);
     for (const bridge of GARDEN_BRIDGES) createGardenBridge(this.root, this.colliders, this.masonry, this.paving, this.brass, bridge);
     label('Garden bridges'); let first = this.root.children.length; createTimeTower(this.root, this.colliders, this.mobile); label('Time tower');
     const tower = this.root.children.slice(first); first = this.root.children.length;
@@ -495,6 +501,7 @@ export class Town {
     const trees = this.forest.update(camera, reach, mapView, shadow);
     // Their light silhouette matches, so a cached shadow map waits for its next re-bake.
     this.gardens.updateDetail(camera, crowns, mapView); this.gardens.turnRing();
+    this.fireflies?.update();
     // Shrub batches toggle every couple of metres while walking; re-baking for them cost a shadow pass per ~2 m, so their shadows catch up at the next quarter-box re-bake.
     this.planting?.update(camera, mapView ? (this.tier === 'cpu' ? 0 : 200) : profile.plants);
     this.pebbles?.update(camera);

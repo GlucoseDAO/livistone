@@ -196,28 +196,44 @@ export class LivingWaters {
   private pavilion(): void {
     const x = GARDENS.pavilionX, z = GARDENS.pavilionZ;
     this.mesh(new THREE.CylinderGeometry(6, 6.15, .18, 10), this.stone, true, x, .09, z);
-    const blue = new THREE.MeshPhysicalMaterial({ color: '#79cde9', roughness: .13, metalness: .12, transmission: this.mobile ? 0 : .42, thickness: .6, ior: 1.61, clearcoat: 1, transparent: true, opacity: this.mobile ? .45 : .7, side: THREE.DoubleSide, depthWrite: false, flatShading: true });
-    blue.userData.pavilionGem = blue.userData.heroEnv = true; nightEmission(blue, '#74cbe5', .24);
+    const blue = new THREE.MeshPhysicalMaterial({ color: '#e4f5fc', roughness: .025, metalness: 0, transmission: this.mobile ? 0 : .94, thickness: 1.8, attenuationColor: '#69bddc', attenuationDistance: 7, ior: 1.62, clearcoat: 1, clearcoatRoughness: .025, envMapIntensity: 1.35, transparent: true, opacity: this.mobile ? .48 : 1, side: THREE.DoubleSide, depthWrite: false, flatShading: true });
+    blue.userData.pavilionGem = blue.userData.heroEnv = true; nightEmission(blue, '#79cde5', .055);
     // Staggered triangular facets follow the pear profile; the two existing entry sectors stay open.
-    const profile = [[4.5, .18], [5.8, 1.5], [6, 3.2], [5.4, 4.9], [4, 6.7], [2.4, 8.7], [1.05, 10.5], [.03, 12.4]], segments = 20, vertices: number[] = [];
+    const profile = [[4.5, .18], [5.5, 1.5], [5.85, 3.2], [5.45, 4.9], [4.3, 6.7], [2.85, 8.7], [1.35, 10.5], [.28, 11.9], [.03, 12.1]], segments = 24, vertices: number[] = [];
     const point = (ring: number, sector: number): THREE.Vector3 => { const a = (sector + (ring % 2 ? .5 : 0)) / segments * Math.PI * 2; return new THREE.Vector3(Math.sin(a) * profile[ring][0], profile[ring][1], Math.cos(a) * profile[ring][0]); };
     for (let ring = 0; ring < profile.length - 1; ring++) for (let i = 0; i < segments; i++) {
       const angle = (i + .5) / segments * 360;
       if (ring < 2 && ((angle >= 36 && angle <= 108) || (angle >= 144 && angle <= 216))) continue;
       const a = point(ring, i), b = point(ring, i + 1), c = point(ring + 1, i), d = point(ring + 1, i + 1);
-      for (const p of [a, c, b, b, c, d]) vertices.push(p.x, p.y, p.z);
+      for (const p of [a, b, c, b, d, c]) vertices.push(p.x, p.y, p.z);
     }
     const gem = new THREE.BufferGeometry(); gem.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); gem.computeVertexNormals();
     this.mesh(gem, blue, true, x, 0, z).name = 'Dewdrop pavilion · faceted briolette';
-    const metal = this.silver.clone(); metal.metalness = .9; metal.roughness = .2;
-    nightEmission(metal, '#87bac4', .15);
-    // The adjustable ring's two free silver ends sweep around the lower stone and curl upward.
-    mergeStatic([-1, 1].map((side) => {
-      const embrace = [[.8, 3.35, 6.2], [4.8, 3.6, 4.5], [6.1, 4, 0], [5, 6, -1.8], [3.1, 8.8, -.8], [.55, 11.7, .15]].map(([px, py, pz]) => new THREE.Vector3(x + side * px, py, z + pz));
-      return this.mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(embrace), this.mobile ? 64 : 110, .2, 8, false), metal, true);
-    }), 'Dewdrop · open silver embrace');
-    addGlow(this.root, new THREE.Vector3(x, 4, z), '#8cdeef', 14, 75, 16, .32);
-    addGlow(this.root, new THREE.Vector3(x, 7.2, z), '#b2eeff', 8, 0, 8, .28);
+    const metal = this.silver.clone(); metal.metalness = 1; metal.roughness = .18; metal.userData.heroEnv = true;
+    nightEmission(metal, '#87bac4', .045);
+    // The supplied Swiss Blue shank has a concave broad band, rolled shoulders and open curled tips.
+    // Lift that cross-section into a continuous serpentine wrap, entirely above the two walking entrances.
+    const coils: number[] = [], steps = this.mobile ? 100 : 180, sides = 12;
+    const at = (u: number, v: number): THREE.Vector3 => {
+      const y = 3.7 + u * 7.65, row = profile.findIndex(p => p[1] >= y), lo = profile[row - 1], hi = profile[row];
+      const r = THREE.MathUtils.lerp(lo[0], hi[0], (y - lo[1]) / (hi[1] - lo[1])) + .4, a = -.7 + u * Math.PI * 2.65;
+      const taper = .15 + .85 * Math.sin(Math.PI * (.06 + .9 * u)) ** .6, width = .55 * taper, section = v * Math.PI * 2;
+      const radial = r + .11 * Math.cos(section) + .1 * Math.sin(section) ** 2;
+      return new THREE.Vector3(x + Math.sin(a) * radial, y + Math.sin(section) * width, z + Math.cos(a) * radial);
+    };
+    for (let i = 0; i < steps; i++) for (let j = 0; j < sides; j++) for (const [u, v] of [[i,j],[i+1,j],[i,j+1],[i,j+1],[i+1,j],[i+1,j+1]]) coils.push(...at(u / steps, v / sides).toArray());
+    const coil = new THREE.BufferGeometry(); coil.setAttribute('position', new THREE.Float32BufferAttribute(coils, 3)); coil.computeVertexNormals();
+    this.mesh(coil, metal, true).name = 'Dewdrop · coiled Swiss Blue silver band';
+    addGlow(this.root, new THREE.Vector3(x, 4, z), '#8cdeef', 10, 32, 12, .15);
+    addGlow(this.root, new THREE.Vector3(x, 7.2, z), '#b2eeff', 6, 0, 8, .12);
+  }
+  /** The exact optimized print source accompanies its architectural interpretation on the Dewdrop stand. */
+  async presentDewdropSilver(): Promise<void> {
+    const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+    const gltf = await new GLTFLoader().loadAsync(modelURL('dewdrop-silver'));
+    const source = gltf.scene.getObjectByProperty('type', 'Mesh') as THREE.Mesh;
+    (source.material as THREE.Material).dispose(); source.material = this.silver;
+    source.scale.setScalar(.12); source.position.set(GARDEN_PANELS.dewdrop[0], 3.45, GARDEN_PANELS.dewdrop[1]); source.name = 'Swiss Blue · original silver setting'; this.root.add(source);
   }
   private mushrooms(): void {
     const sites: { x: number; z: number; scale: number; height: number }[] = [], rand = random(8142);
@@ -268,7 +284,10 @@ export class LivingWaters {
       this.colliders.push({ type: 'box', position: [GARDENS.x + site.x, site.height + .08 * site.scale, GARDENS.z + site.z], size: [site.scale * MYCELIUM_RADIUS, .42 * site.scale, site.scale * MYCELIUM_RADIUS] });
     });
     this.grove = new MyceliumGrove(this.root, instances, silver, opal, this.mobile);
-    this.ring.material = silver;
+    const ringSilver = silver.clone(); nightEmission(ringSilver, '#b9ead6', .55); this.ring.material = ringSilver;
+    // Register the material and light before the async model arrives and NightLighting scans the world.
+    this.ring.visible = false; this.root.add(this.ring);
+    addGlow(this.root, new THREE.Vector3(OPAL_BASIN.x, 4.2, OPAL_BASIN.z), '#bef6df', 6.5, 28, 9, .32);
   }
   /**
    * Loads the ring (public/models/jewelry/mycelium.glb, one draw, named for the grove's frame-budget group). Its net hangs
@@ -281,7 +300,7 @@ export class LivingWaters {
       const source = gltf.scene.getObjectByProperty('type', 'Mesh') as THREE.Mesh | undefined; (source?.material as THREE.Material | undefined)?.dispose(); if (!source) return;
       const geometry = source.geometry; geometry.computeBoundingBox(); geometry.computeBoundingSphere();
       this.ringBase = RING_ORB_TOP + RING_GAP - geometry.boundingBox!.min.y * RING_SCALE; this.ring.scale.setScalar(RING_SCALE);
-      Object.assign(this.ring, { geometry, name: 'Mycelium ring', castShadow: true }); this.ring.userData.keepGeometry = true;
+      Object.assign(this.ring, { geometry, name: 'Mycelium ring', castShadow: true, visible: true }); this.ring.userData.keepGeometry = true;
       this.ring.position.set(OPAL_BASIN.x, this.ringBase, OPAL_BASIN.z); this.root.add(this.ring);
     } catch { /* The grove stands without it. */ }
   }

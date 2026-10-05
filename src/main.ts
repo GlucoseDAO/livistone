@@ -1,3 +1,4 @@
+import { panelImages } from './ui/album';
 import { setEyelenseNight, setEyelenseQuality } from './world/eyelense-gate';
 import { WINTER } from './world/winter-gate-layout';
 import { setCityHallCrystalQuality } from './world/city-hall';
@@ -26,6 +27,7 @@ import { Input } from './game/input';
 import { Ambience } from './game/audio';
 import { LANDMARKS, DISCOVERIES, SPAWN, readProgress, writeProgress } from './game/content';
 import { graphicsProfile } from './game/graphics';
+import { chosenTier, GRAPHICS_CHOICE_KEY, parseGraphicsChoice, readGraphicsChoice } from './game/graphics-choice';
 import type { PostMode } from './game/graphics';
 import { nextTimeOfDay, parseTimeOfDay, readTimeOfDay, resolveNight, saveTimeOfDay } from './game/daylight';
 import type { TimeOfDay } from './game/daylight';
@@ -38,7 +40,7 @@ import { createRenderer } from './render/renderer';
 import type { RenderView } from './render/renderer';
 import { OutputPipeline, displayFog } from './render/output';
 import { TownLighting } from './render/lighting';
-import { RenderScale, SCALE_RULES } from './game/render-scale';
+import { RenderScale, SCALE_RULES, LIGHTWEIGHT_GPU_SCALE } from './game/render-scale';
 import { BUDGET_OFF, trackDraws } from './game/render-budget';
 import type { DrawCost } from './game/render-budget';
 import { aerialFogNode, aerialParams, setAerial } from './render/aerial';
@@ -181,6 +183,7 @@ class Game {
   private fps = 0;
   private frameId = 0;
   private lowQuality = false;
+  private hardwareLight = false;
   private selection: string | null = null;
   private hoverPointer: { x: number; y: number; buttons: number } | null = null;
   private cursorDirty = false;
@@ -189,15 +192,19 @@ class Game {
     this.ui.setSound(this.ambience.enabled);
     this.ambience.start();
     this.renderer = view.renderer; this.graphics = view.graphics;
+    const choice = readGraphicsChoice();
+    Object.assign(this.graphics, graphicsProfile(chosenTier(choice, this.graphics.tier)));
     if (import.meta.env.DEV) {
       const override = new URLSearchParams(location.search).get('graphics');
       if (override === 'cpu' || override === 'mobile' || override === 'gpu') Object.assign(this.graphics, graphicsProfile(override));
     }
+    this.hardwareLight = this.graphics.tier === 'cpu' && !this.graphics.software;
+    if (this.hardwareLight) Object.assign(this.graphics, { pixelRatio: .75, skyDay: 512, skyNight: 512 });
     this.walkCamera.far = BUDGET_OFF ? 150 : this.graphics.fog; this.farCamera.near = this.walkCamera.far * .9;
     this.walkCamera.updateProjectionMatrix(); this.farCamera.updateProjectionMatrix();
     // The night pool, hall and station lamps: room for the pool plus the fixed lamps (render/lighting.ts).
     this.renderer.lighting = new TownLighting({ maxPointLights: this.graphics.lights + 8 });
-    this.renderScale = this.graphics.pixelRatio; this.scaler = new RenderScale(SCALE_RULES[this.graphics.tier], this.renderScale);
+    this.renderScale = this.graphics.pixelRatio; this.scaler = new RenderScale(this.hardwareLight ? LIGHTWEIGHT_GPU_SCALE : SCALE_RULES[this.graphics.tier], this.renderScale);
     if (import.meta.env.DEV) this.drawBudget = trackDraws(this.renderer.info, (object) => this.drawGroup(object));
     this.reduced = this.graphics.reduced; this.lowQuality = this.reduced;
     this.ranges = this.graphics.tier !== 'cpu' && ridgesLook() === 'ranges'; if (this.ranges) this.mapCamera.layers.enable(FAR_LAYER);
@@ -242,6 +249,7 @@ class Game {
     ui.progress(this.progress); ui.setMode('welcome');
     ui.setTimeOfDay(this.timeOfDay, this.night);
     document.querySelector<HTMLSelectElement>('#quality')!.value = this.reduced ? 'low' : 'high';
+    document.querySelector<HTMLSelectElement>('#performance')!.value = choice;
     window.addEventListener('resize', () => this.resize());
     document.addEventListener('visibilitychange', () => {
       this.lastTime = performance.now(); this.accumulator = 0;
@@ -307,10 +315,10 @@ class Game {
     await this.probes?.load(this.renderer, this.phase, this.capture ? undefined : new THREE.Vector3(SPAWN.x, 0, SPAWN.z)); this.showProbes();
     this.scene.traverse(object => { if (object instanceof THREE.Mesh) for (const material of Array.isArray(object.material) ? object.material : [object.material]) setEyelenseNight(material, this.night); });
     this.pointReflections(this.skies.get(this.night)!); if (this.environment) this.litMaterials = litMaterials(this.scene, this.distant);
-    this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced, this.graphics.tier); this.nightLighting.setNight(this.night);
+    this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced, this.graphics.tier, this.hardwareLight); this.nightLighting.setNight(this.night);
     // The distant pass draws its own copies of the ranges, which the map sees in the town (FAR_LAYER).
     if (this.ranges) for (const mesh of this.town.root.getObjectsByProperty('name', 'Distant ranges') as THREE.Mesh[]) { const copy = new THREE.Mesh(mesh.geometry, mesh.material); copy.name = mesh.name; this.distant.add(copy); this.distantRanges.push(copy); }
-    document.querySelector<HTMLElement>('#graphics-profile')!.textContent = 'Device profile: ' + ({ gpu: 'GPU', mobile: 'Mobile / integrated GPU', cpu: 'CPU software renderer' }[this.graphics.tier]) + ({ webgpu: ' · WebGPU', 'webgl2-fallback': ' · WebGL 2' }[this.view.backend]);
+    document.querySelector<HTMLElement>('#graphics-profile')!.textContent = ({ gpu: 'Rich scene with detailed reflections.', mobile: 'Balanced scene with reflections and fewer plants.', cpu: 'Lightweight scene for smoother walking; simpler materials and no cast shadows.' }[this.graphics.tier]);
     await loadingStage(92, 'Preparing materials for your first view…');
     this.bakeCamera.copy(this.mapCamera); this.startBake(); this.frameShadow(true);
     this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true, this.sun.shadow);
@@ -378,7 +386,7 @@ class Game {
     return this.mode === 'map' || this.mode === 'welcome' || (['lore', 'journal', 'paused', 'gallery', 'teleport'].includes(this.mode) && this.returnMode === 'map');
   }
   private pixelRatio(): number {
-    const cap = this.graphics.tier === 'cpu' ? Math.sqrt(180000 / (window.innerWidth * window.innerHeight)) : Infinity;
+    const cap = this.graphics.tier === 'cpu' ? Math.sqrt((this.hardwareLight ? 500000 : 180000) / (window.innerWidth * window.innerHeight)) : Infinity;
     return Math.min(devicePixelRatio, this.renderScale, cap);
   }
   private resize(): void {
@@ -429,9 +437,25 @@ class Game {
     }
     if (action.startsWith('exhibit:')) { await this.exhibitionAction(action); return; }
     if (action === 'catalogue') { this.galleryReturn = this.mode === 'journal' ? 'journal' : this.mode === 'lore' ? 'lore' : 'walking'; this.ui.gallery.showCatalogue(); this.setMode('gallery'); return; }
+    if (action === 'panel-prev' || action === 'panel-next') {
+      if (this.mode === 'lore') { const id = this.ui.adjacentPanel(action === 'panel-next' ? 1 : -1); if (id) this.discover(id, this.loreFromJournal); }
+      return;
+    }
+    if (action === 'panel-image' && this.mode === 'lore' && this.ui.currentDiscovery) {
+      const images = panelImages(this.ui.currentDiscovery), index = images.findIndex(image => image.discovery === this.ui.currentDiscovery && image.src === this.ui.currentSlideImage);
+      if (images.length) { this.galleryReturn = 'lore'; this.ui.gallery.showAlbum(images, Math.max(0, index), 'LIVISTONE · BUILDING IMAGES'); this.setMode('gallery'); }
+      return;
+    }
+    if (action === 'album-back' && this.mode === 'gallery') { await this.action('close'); return; }
+    if (action.startsWith('panel-photo:') && this.mode === 'lore') {
+      const [, id, photo] = action.split(':'), images = panelImages(id);
+      const index = images.findIndex(image => image.discovery === id);
+      if (index >= 0) { this.galleryReturn = 'lore'; this.ui.gallery.showAlbum(images, index + Number(photo), 'LIVISTONE · BUILDING IMAGES'); this.setMode('gallery'); }
+      return;
+    }
     if (action.startsWith('exhibit-photo:')) {
       const [, id, index] = action.split(':'); const exhibit = COLLECTION.find((e) => e.discovery === id);
-      if (exhibit) { if (this.mode !== 'gallery') this.galleryReturn = this.mode === 'lore' ? 'lore' : 'walking'; this.ui.gallery.showPhoto(exhibit, Number(index)); this.setMode('gallery'); } return;
+      if (exhibit) { const fromJournal = this.mode === 'journal' || (this.mode === 'gallery' && this.galleryReturn === 'journal') || this.loreFromJournal; this.discover(id, fromJournal); this.galleryReturn = 'lore'; this.ui.gallery.showPhoto(exhibit, Number(index)); this.setMode('gallery'); } return;
     }
     if (action.startsWith('tap:') && this.mode === 'walking') { this.clickPhoto(Number(action.split(':')[1]), Number(action.split(':')[2])); return; }
     if (this.mode === 'gallery' && !['escape', 'close'].includes(action)) return;
@@ -440,7 +464,7 @@ class Game {
       this.returnMode = this.mode === 'map' ? 'map' : 'walking'; this.setMode('paused');
     } else if (action === 'close') {
       const teleport = this.mode === 'teleport';
-      if (this.mode === 'gallery') { this.setMode(this.galleryReturn); return; }
+      if (this.mode === 'gallery') { const id = this.ui.gallery.currentDiscovery; if (this.galleryReturn === 'lore' && id) { this.discover(id, this.loreFromJournal); this.ui.selectSlideImage(this.ui.gallery.currentImageSrc); } else this.setMode(this.galleryReturn); return; }
       if (this.mode === 'lore' && this.loreFromJournal) { this.loreFromJournal = false; this.setMode('journal'); }
       else { this.setMode(this.returnMode); if (teleport) this.ui.focusTeleport(); }
     } else if ((action === 'interact' || action === 'nearby-story') && this.mode === 'walking') {
@@ -463,6 +487,9 @@ class Game {
       this.input.requestJump();
     } else if (action === 'sound') {
       try { this.ui.setSound(await this.ambience.toggle()); } catch { this.ui.toast('Sound is unavailable in this browser.'); }
+    } else if (action.startsWith('performance:')) {
+      try { localStorage.setItem(GRAPHICS_CHOICE_KEY, parseGraphicsChoice(action.split(':')[1])); } catch { this.ui.toast('Could not save the performance setting.'); return; }
+      location.reload();
     } else if (action.startsWith('quality:')) this.quality(action.split(':')[1] === 'low');
   }
   private visitLandmark(id: string): void {
@@ -476,18 +503,18 @@ class Game {
     const discovery = DISCOVERIES.find((d) => d.id === id); if (!discovery) return;
     if (!this.progress.discovered.includes(id)) { this.progress.discovered.push(id); writeProgress(this.progress); this.ui.progress(this.progress); }
     if (!fromJournal) this.returnMode = 'walking';
-    this.loreFromJournal = fromJournal; this.ui.showLore(discovery, COLLECTION.find((piece) => piece.discovery === id)); this.setMode('lore');
+    this.loreFromJournal = fromJournal; this.ui.showLore(discovery, COLLECTION.find((piece) => piece.discovery === id)); this.setMode('lore'); document.querySelector<HTMLElement>('#lore')!.scrollTop = 0;
   }
   private async exhibitionAction(action: string): Promise<void> {
     const [, command, hall, piece] = action.split(':'); const exhibition = this.town.exhibitions.find((e) => e.id === hall); if (!exhibition) return;
     if (command === 'info') { this.discover(exhibition.selected.discovery); }
     else if (command === 'lore') { this.discover(hall === 'city-hall' ? 'artifactor' : hall === 'energy' ? 'shelter' : hall === 'station' ? 'embryo-station' : hall === 'future-house' ? 'future-house-story' : hall === 'timeface' ? 'timeface' : 'connections'); }
     else if (command === 'browse') { this.galleryReturn = 'walking'; this.ui.gallery.showBrowse(hall, exhibition.selected); this.setMode('gallery'); }
-    else if (command === 'photo') { this.galleryReturn = 'walking'; this.ui.gallery.showPhoto(exhibition.selected); this.setMode('gallery'); }
+    else if (command === 'photo') { this.discover(exhibition.selected.discovery); this.galleryReturn = 'lore'; this.ui.gallery.showPhoto(exhibition.selected); this.setMode('gallery'); }
     else if (command === 'left' || command === 'right') exhibition.turn(command === 'left' ? -1 : 1);
     else if (command === 'select') {
       const selected = COLLECTION.find((e) => e.discovery === piece); if (!selected || !exhibition.select(selected)) return;
-      this.galleryReturn = 'walking'; this.ui.gallery.showPhoto(selected); this.setMode('gallery');
+      this.discover(selected.discovery); this.galleryReturn = 'lore'; this.ui.gallery.showPhoto(selected); this.setMode('gallery');
     }
   }
 
@@ -504,16 +531,20 @@ class Game {
   }
   private clickPhoto(x: number, y: number): void {
     const hit = this.clickTarget(x, y); if (!hit) return;
-    if (hit.object.userData.href) { window.open(hit.object.userData.href as string, '_blank', 'noopener,noreferrer'); return; }
-    const piece = COLLECTION.find((p) => p.discovery === hit.object.userData.piece);
-    if (piece && !hit.object.userData.posterInfo && hit.object.userData.kind !== 'caption') {
-      this.galleryReturn = 'walking'; this.ui.gallery.showPhoto(piece, hit.object.userData.photoIndex as number ?? 0); this.setMode('gallery'); return;
+    const data = hit.object.userData;
+    if (typeof data.href === 'string' && data.href.includes('/images/concepts/')) {
+      const panels = this.town.researchPanels.filter(panel => typeof panel.userData.href === 'string' && panel.userData.href.includes('/images/concepts/'));
+      const images = panels.map(panel => ({ src: panel.userData.href as string, title: panel.name.replace('Concept · ', ''), alt: panel.name,
+        facts: 'AI-generated architectural concept · Livistone' }));
+      this.galleryReturn = 'walking'; this.ui.gallery.showAlbum(images, panels.indexOf(hit.object as THREE.Mesh)); this.setMode('gallery'); return;
     }
-    if (hit.object.userData.discovery) { this.discover(hit.object.userData.discovery as string); return; }
-    if (!piece) return;
-    if (hit.object.userData.posterInfo) { this.discover(piece.discovery); return; }
-    this.galleryReturn = 'walking'; this.ui.gallery.showPhoto(piece, hit.object.userData.photoIndex as number); this.setMode('gallery');
+    if (data.gatePoster) { this.discover(data.piece === 'eye-of-winter' ? 'winter-gate-story' : 'eyelense-gate-story'); return; }
+    const piece = COLLECTION.find(p => p.discovery === data.piece);
+    if (piece) { this.discover(piece.discovery); return; }
+    if (data.discovery) { this.discover(data.discovery as string); return; }
+    if (data.href) window.open(data.href as string, '_blank', 'noopener,noreferrer');
   }
+
   private updateExhibitionControls(): void {
     const p = this.physics?.position(); this.ui.gallery.floating.hidden = true; if (!p || this.mode !== 'walking') return;
     const landmark = LANDMARKS.find((l) => Math.hypot((p.x - l.x) / l.stretch.x, (p.z - l.z) / l.stretch.z) < 6.7); if (!landmark) return;
@@ -698,7 +729,7 @@ class Game {
     this.sun.shadow.needsUpdate = true;
   }
   private quality(low: boolean): void {
-    this.lowQuality = low || this.graphics.tier === 'cpu'; this.renderScale = Math.min(low ? 1 : 1.5, this.graphics.pixelRatio); this.scaler = new RenderScale(SCALE_RULES[this.graphics.tier], this.renderScale); this.renderer.setPixelRatio(this.pixelRatio());
+    this.lowQuality = low || this.graphics.tier === 'cpu'; this.renderScale = Math.min(low ? 1 : 1.5, this.graphics.pixelRatio); this.scaler = new RenderScale(this.hardwareLight ? LIGHTWEIGHT_GPU_SCALE : SCALE_RULES[this.graphics.tier], this.renderScale); this.renderer.setPixelRatio(this.pixelRatio());
     // WebGPU resizes the light's shadow target to mapSize on its next render; frameShadow requests that render.
     this.sun.shadow.mapSize.setScalar(low ? 1024 : 2048); this.frameShadow(true);
     this.scene.traverse((object) => {
@@ -713,7 +744,8 @@ class Game {
         if (material.userData.winterQuartz) { const reduced = low || material.userData.winterReduced; material.transmission = reduced ? 0 : .88; material.opacity = reduced ? .22 : .5; material.needsUpdate = true; continue; }
         if (material.userData.myceliumOpal) { material.iridescence = low ? .35 : 1; material.needsUpdate = true; continue; }
         if (material.userData.gatewayGem) { setGatewayQuality(material, low); continue; }
-        if (material.userData.pavilionGem) { material.transmission = low ? 0 : .42; material.opacity = low ? .45 : .7; material.needsUpdate = true; continue; }
+        if (material.userData.winterTopaz) { const reduced = low || material.userData.winterReduced; material.transmission = reduced ? 0 : .96; material.opacity = reduced ? .62 : 1; material.dispersion = reduced ? 0 : .035; material.needsUpdate = true; continue; }
+        if (material.userData.pavilionGem) { const reduced = low || this.graphics.tier !== 'gpu'; material.transmission = reduced ? 0 : .94; material.opacity = reduced ? .48 : 1; material.needsUpdate = true; continue; }
         // Only hall glazing follows the generic switch; the station amber, river and Future House glass keep their own optics.
         if (!material.userData.hallGlass) continue;
         material.transmission = low ? 0 : .45;
@@ -771,23 +803,11 @@ class Game {
 
   private updateMarkers(): void {
     const width = window.innerWidth, height = window.innerHeight;
-    const placed: { x: number; y: number; w: number; h: number }[] = [];
-    const markers = LANDMARKS.map(landmark => {
-      this.point.set(landmark.x, landmark.id === 'winter-gate' ? WINTER.centreY : 15, landmark.z).project(this.mapCamera);
+    for (const landmark of LANDMARKS) {
+      this.point.set(landmark.x, landmark.id === 'winter-gate' ? WINTER.centreY : 4, landmark.z).project(this.mapCamera);
       const marker = document.querySelector<HTMLElement>('#marker-' + landmark.id)!;
-      return { marker, x: (this.point.x * .5 + .5) * width, y: (-this.point.y * .5 + .5) * height, hidden: Math.abs(this.point.z) > 1, w: marker.offsetWidth || 44, h: marker.offsetHeight || 44 };
-    });
-    // The larger shared map packs civic labels closely; keep every destination independently clickable.
-    for (const item of markers) {
-      let y = item.y;
-      if (!item.hidden) {
-        for (const offset of [0, -1, 1, -2, 2, -3, 3]) {
-          const candidate = item.y + offset * (item.h + 8);
-          if (!placed.some(p => Math.abs(p.x - item.x) < (p.w + item.w) / 2 + 6 && candidate > p.y - p.h - 6 && candidate - item.h < p.y + 6)) { y = candidate; break; }
-        }
-        placed.push({ x: item.x, y, w: item.w, h: item.h });
-      }
-      item.marker.style.left = item.x + 'px'; item.marker.style.top = y + 'px'; item.marker.hidden = item.hidden;
+      // Anchors never rearrange in response to hover text or the size of a neighbouring label.
+      marker.style.left = (this.point.x * .5 + .5) * width + 'px'; marker.style.top = (-this.point.y * .5 + .5) * height + 'px'; marker.hidden = Math.abs(this.point.z) > 1;
     }
     if (this.physics) {
       const pos = this.position()!; this.point.set(pos.x, pos.y + .3, pos.z).project(this.mapCamera);

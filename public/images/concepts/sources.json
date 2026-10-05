@@ -1,0 +1,137 @@
+{
+  "overview": {
+    "source": "concepts/01-garden-town/images/01-town-overview.png",
+    "sha256": "6ffedcb0e5922d205cf4b392e3fd079d7c42bb9691d5ed8f51675091fce5266b",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "embryo": {
+    "source": "concepts/06-town-extension/images/01-embryo-station.png",
+    "sha256": "cede62a5dfaea5f98e8070f0065526362a67b361b799bded44ee0f0801c081b4",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "gateway": {
+    "source": "concepts/07-bridge-monument/images/08-kings-chapel-name-on-top.png",
+    "sha256": "9bb579294756d97b6d9474686f2cde448f9aa32b19ceffc90c0c0cd1079c6aeb",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "eyelense": {
+    "source": "concepts/15-moon-gates/images/12-eyelense-e-red-bead-passage.png",
+    "sha256": "1195b8b6ea0718eaa70afe6b0206e366a8cf094cb65e1da4e91773cc11b48a81",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "winter": {
+    "source": "concepts/15-moon-gates/images/17-winter-g-model-two-stones-open.png",
+    "sha256": "2b5fbfa942097076d8212c7dc8bb9ce42bfbf6b7f9d5d887f0f40667af39fef7",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "city-hall": {
+    "source": "concepts/16-concept-garden/images/city-hall.png",
+    "sha256": "a102e5c1f79d52f9ecda6ffa52a7b96dd2f239955e0e478c1a58e35e75ba5882",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "energy": {
+    "source": "concepts/16-concept-garden/images/energy.png",
+    "sha256": "d08f2e65c6c4a3bf86ce5c5b8765689da5ef8a0b606958141c7c72189fbbcd0a",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "science": {
+    "source": "concepts/16-concept-garden/images/science.png",
+    "sha256": "b2c59f67821200c656959cae9f5022defe5d7a7d4ebc279996277bd05859c3f1",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "timeface": {
+    "source": "concepts/16-concept-garden/images/timeface.png",
+    "sha256": "db8d0919d18337fd711eb6225262e6b6f161a5769ecb0a6cf48827501d3b3bbf",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "glucose": {
+    "source": "concepts/16-concept-garden/images/glucose.png",
+    "sha256": "3a224c6cb99212833f6e5dfa32b355e4edf3fcaf46ac5c4b02a9d340b23df709",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "lake": {
+    "source": "concepts/16-concept-garden/images/lake.png",
+    "sha256": "2e4693abd0e9d9f410f28d827e0e8cdaec67f9ad5d8dadc7abec0802d2c88ab4",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "future-house": {
+    "source": "concepts/16-concept-garden/images/future-house.png",
+    "sha256": "d598fd816315eb16a219294014c881992eed0ada7f1b4b5c666d6a717d7d8bdf",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "mycelium": {
+    "source": "concepts/16-concept-garden/images/mycelium.png",
+    "sha256": "237880bfbeca866b627ed8566a29ffd4fcf8abd3ed5a6f15661e92b9a4dbd1a8",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "enhancement": {
+    "source": "concepts/16-concept-garden/images/enhancement.png",
+    "sha256": "85d77976c24816b77777ded1eddf2cbfd6e26b78c58e9aee06c2ebc40b881313",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  },
+  "jepii": {
+    "source": "concepts/16-concept-garden/images/jepii.png",
+    "sha256": "fdb0db3b6ab0d83b4c2207a02f40caf45d43cc13abfcf27bc43296889154619f",
+    "kind": "AI-generated architectural concept",
+    "size": [
+      1440,
+      960
+    ]
+  }
+}

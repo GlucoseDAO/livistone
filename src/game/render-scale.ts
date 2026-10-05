@@ -16,6 +16,8 @@ export const SCALE_RULES: Record<GraphicsTier, ScaleRule> = {
   cpu: { target: 18, floor: .3, ceiling: .55, lowerAfter: 1, raiseEvery: Infinity, headroom: 0, step: .05, proportional: false },
 };
 const round = (value: number): number => Math.round(value * 100) / 100;
+/** Lightweight geometry on a real older GPU can render much more sharply than SwiftShader. */
+export const LIGHTWEIGHT_GPU_SCALE: ScaleRule = { target: 28, floor: .4, ceiling: .8, lowerAfter: 2, raiseEvery: 6, headroom: .15, step: .05, proportional: true };
 
 /**
  * Hysteresis on one-second frame-rate samples: lower soon after a sustained shortfall, recover slowly while there is clear

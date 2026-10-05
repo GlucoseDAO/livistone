@@ -52,18 +52,18 @@ const POOL_FADE = 4;
 export class NightLighting {
   private readonly halos: THREE.Sprite[] = [];
   private readonly materials = new Set<THREE.MeshStandardMaterial | THREE.MeshLambertMaterial | THREE.MeshStandardNodeMaterial>();
-  private readonly sources: { position: THREE.Vector3; color: string; intensity: number; distance: number }[] = [];
+  private readonly sources: { position: THREE.Vector3; color: string; intensity: number; distance: number; moving?: THREE.Object3D }[] = [];
   private readonly surfaceHalos: { sprite: THREE.Sprite; center: THREE.Vector3; offset: number }[] = [];
   private readonly direction = new THREE.Vector3();
   private readonly lights: THREE.PointLight[];
   private night = false;
-  constructor(root: THREE.Object3D, scene: THREE.Scene, reduced: boolean, private tier: GraphicsTier = reduced ? 'mobile' : 'gpu') {
+  constructor(root: THREE.Object3D, scene: THREE.Scene, reduced: boolean, private tier: GraphicsTier = reduced ? 'mobile' : 'gpu', private hardwareHalos = false) {
     root.updateWorldMatrix(true, true);
     root.traverse(object => {
       if (object instanceof THREE.Sprite && object.userData.nightGlow) {
         this.halos.push(object);
         if (object.userData.surfaceOffset) this.surfaceHalos.push({ sprite: object, center: object.getWorldPosition(new THREE.Vector3()), offset: object.userData.surfaceOffset });
-        if (object.userData.lightSource.intensity) this.sources.push({ ...object.userData.lightSource, position: object.getWorldPosition(new THREE.Vector3()) });
+        if (object.userData.lightSource.intensity) this.sources.push({ ...object.userData.lightSource, position: object.getWorldPosition(new THREE.Vector3()), moving: object.userData.moving ? object : undefined });
       }
       if (object instanceof THREE.Mesh) for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
         if ((material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshLambertMaterial || material instanceof THREE.MeshStandardNodeMaterial) && material.userData.nightEmission) this.materials.add(material);
@@ -72,12 +72,13 @@ export class NightLighting {
     this.lights = Array.from({ length: graphicsProfile(tier).lights }, () => { const light = new THREE.PointLight('#ffffff', 0, 15, 2); scene.add(light); return light; });
   }
   setNight(night: boolean): void {
-    this.night = night; this.halos.forEach(halo => { halo.visible = night && this.tier !== 'cpu'; });
+    this.night = night; this.halos.forEach(halo => { halo.visible = night && (this.tier !== 'cpu' || this.hardwareHalos); });
     this.materials.forEach(material => { const value = material.userData[night ? 'nightEmission' : 'dayEmission']; material.emissive.set(value.color); material.emissiveIntensity = value.intensity; material.userData.onNight?.(night); });
     if (!night) this.lights.forEach(light => { light.intensity = 0; });
   }
   update(camera: THREE.Camera): void {
     if (!this.night) return;
+    for (const source of this.sources) source.moving?.getWorldPosition(source.position);
     // Place the halo just in front of its own opaque opal, retaining depth tests against intervening scenery.
     for (const halo of this.surfaceHalos) { this.direction.copy(camera.position).sub(halo.center).normalize().multiplyScalar(halo.offset).add(halo.center); halo.sprite.position.copy(halo.sprite.parent!.worldToLocal(this.direction)); }
     const sorted = [...this.sources].sort((a, b) => a.position.distanceToSquared(camera.position) - b.position.distanceToSquared(camera.position));

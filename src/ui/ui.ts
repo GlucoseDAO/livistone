@@ -1,3 +1,4 @@
+import { panelCollection, panelExhibit } from './album';
 import type { NearbyStory } from '../game/nearby';
 import { GalleryUI } from './gallery';
 import type { Exhibit } from '../game/exhibits';
@@ -37,6 +38,7 @@ export class UI {
   private readonly prompt: HTMLButtonElement;
   private readonly live: HTMLElement;
   private toastTimer = 0;
+  private navigationTimer = 0;
   private hasExplored = false;
   private nearbyId: string | null = null;
   private slide = 0;
@@ -56,13 +58,13 @@ export class UI {
       '<div id="map-controls" class="map-controls" hidden><button class="tool square" data-action="zoom-in" aria-label="Zoom map in">+</button><button class="tool square" data-action="zoom-out" aria-label="Zoom map out">−</button><button class="tool square" data-action="reset-map" aria-label="Reset map view">' + icon('compass') + '</button><span>Drag to orbit · Pinch or scroll to zoom</span></div>',
       '<div id="map-markers" hidden>' + LANDMARKS.map((l, i) => '<button class="map-marker" id="marker-' + l.id + '" data-action="landmark:' + l.id + '" aria-label="Go to ' + l.name + '"><span>' + String(i + 1).padStart(2, '0') + '</span><b>' + l.name + '</b></button>').join('') + '<div id="player-marker" class="player-marker"><span></span>You are here</div></div>',
       '<div id="scrim" class="scrim" data-action="close" aria-hidden="true" hidden></div>',
-      '<section id="lore" class="dialog lore" role="dialog" aria-labelledby="lore-title" hidden><button class="close-button" data-action="close" aria-label="Close discovery">' + icon('close') + '</button><div class="eyebrow" id="lore-category"></div><div id="lore-emblem" class="lore-emblem">✧</div><h2 id="lore-title"></h2><figure id="lore-figure" class="lore-figure" hidden><canvas id="lore-figure-canvas" width="720" height="280"></canvas></figure><div id="lore-slides" hidden><p id="lore-slide-title"></p><p id="lore-slide-body"></p><div class="slide-controls" aria-label="Chapter slides"><button data-action="slide-prev" aria-label="Previous slide">←</button><span id="lore-slide-count" aria-live="polite"></span><button data-action="slide-next" aria-label="Next slide">→</button></div><p class="viewer-help">← / → slides · Esc close</p></div><div id="exhibit-catalogue" hidden></div><p id="lore-body"></p><div class="lore-source">From Livia’s artifacts to a living town.</div><button class="text-button full" data-action="close">Continue exploring ' + icon('arrow') + '</button></section>',
+      '<section id="lore" class="dialog lore" role="dialog" aria-labelledby="lore-title" hidden><button class="close-button" data-action="close" aria-label="Close discovery">' + icon('close') + '</button><div class="eyebrow" id="lore-category"></div><div id="lore-emblem" class="lore-emblem">✧</div><h2 id="lore-title"></h2><nav class="slide-controls panel-controls" id="panel-controls" aria-label="Building panels" hidden><button data-action="panel-prev" aria-label="Previous panel">← Previous panel</button><span id="panel-count" aria-live="polite"></span><button data-action="panel-next" aria-label="Next panel">Next panel →</button></nav><figure id="lore-figure" class="lore-figure" hidden><canvas id="lore-figure-canvas" width="720" height="280"></canvas></figure><div id="lore-slides" hidden><p id="lore-slide-title"></p><p id="lore-slide-body"></p><div class="slide-controls" aria-label="Chapter slides"><button data-action="slide-prev" aria-label="Previous slide">←</button><span id="lore-slide-count" aria-live="polite"></span><button data-action="slide-next" aria-label="Next slide">→</button></div><p class="viewer-help">Use the slide buttons within this chapter · ← / → building panels · Esc close</p></div><div id="exhibit-catalogue" hidden></div><p id="lore-body"></p><div class="lore-source">From Livia’s artifacts to a living town.</div><button class="text-button full" data-action="close">Continue exploring ' + icon('arrow') + '</button></section>',
       '<section id="journal" class="dialog journal" role="dialog" aria-labelledby="journal-title" hidden><button class="close-button" data-action="close" aria-label="Close journal">' + icon('close') + '</button><div class="eyebrow">YOUR FIELD NOTES</div><h2 id="journal-title">A little more wonder.</h2><p>Browse every story and photograph. Read in any order, or find them as you walk.</p><button class="primary full" data-action="catalogue">Browse the jewelry catalogue</button><a class="artist-link" href="https://liviazaharia.com/" target="_blank" rel="noopener noreferrer">Meet Livia Zaharia ↗<small>Jewelry, art and citizen science · liviazaharia.com</small></a><div id="journal-list"></div></section>',
-      '<section id="pause" class="dialog pause" role="dialog" aria-labelledby="pause-title" hidden><button class="close-button" data-action="close" aria-label="Close menu">' + icon('close') + '</button><div class="eyebrow">MAKE YOURSELF AT HOME</div><h2 id="pause-title">A moment of quiet.</h2><button class="primary full" data-action="close">Continue exploring ' + icon('arrow') + '</button><button class="menu-item" data-action="open-map">' + icon('map') + 'Open city map</button><button class="menu-item" data-action="reset-position">' + icon('compass') + 'Return to the train exit</button><button class="menu-item" id="sound-toggle" data-action="sound" aria-pressed="false">' + icon('sound') + 'Livistone Radio: off</button><label class="quality-label">Time of day<select id="time-of-day"><option value="auto">Your time — local clock</option><option value="day">Day</option><option value="night">Night</option></select></label><label class="quality-label">Visual detail<select id="quality"><option value="low">Gentle — lower detail</option><option value="high">Rich — higher detail</option></select></label><a class="artist-link" href="https://liviazaharia.com/" target="_blank" rel="noopener noreferrer">Meet Livia Zaharia ↗<small>The artist behind Livistone · liviazaharia.com</small></a><p class="graphics-profile" id="graphics-profile"></p><p class="menu-note">Move forward/back with W/S or ↑/↓. Strafe with A/D. Jump with Space or the Jump button; jump over gallery rails to leave towers. Turn with ←/→, or hold the left mouse button and drag to look. On touch screens, use the left stick and drag to look. Switch between your time, day and night with T or the clock, sun and moon button at the top. Music: Livia Zaharia playing kalimba, recorded on her phone — informal personal recordings, not professional studio recordings. Your discoveries are saved on this device.</p></section>',
+      '<section id="pause" class="dialog pause" role="dialog" aria-labelledby="pause-title" hidden><button class="close-button" data-action="close" aria-label="Close menu">' + icon('close') + '</button><div class="eyebrow">MAKE YOURSELF AT HOME</div><h2 id="pause-title">A moment of quiet.</h2><button class="primary full" data-action="close">Continue exploring ' + icon('arrow') + '</button><button class="menu-item" data-action="open-map">' + icon('map') + 'Open city map</button><button class="menu-item" data-action="reset-position">' + icon('compass') + 'Return to the train exit</button><button class="menu-item" id="sound-toggle" data-action="sound" aria-pressed="false">' + icon('sound') + 'Livistone Radio: off</button><label class="quality-label">Time of day<select id="time-of-day"><option value="auto">Your time — local clock</option><option value="day">Day</option><option value="night">Night</option></select></label><label class="quality-label">Performance (reloads the scene)<select id="performance"><option value="auto">Automatic — suit this device</option><option value="light">Lightweight — smoother walking</option><option value="balanced">Balanced — more reflections</option><option value="rich">Rich — maximum detail</option></select></label><label class="quality-label">Visual detail<select id="quality"><option value="low">Gentle — lower detail</option><option value="high">Rich — higher detail</option></select></label><a class="artist-link" href="https://liviazaharia.com/" target="_blank" rel="noopener noreferrer">Meet Livia Zaharia ↗<small>The artist behind Livistone · liviazaharia.com</small></a><p class="graphics-profile" id="graphics-profile"></p><p class="menu-note">Move forward/back with W/S or ↑/↓. Strafe with A/D. Jump with Space or the Jump button; jump over gallery rails to leave towers. Turn with ←/→, or hold the left mouse button and drag to look. On touch screens, use the left stick and drag to look. Switch between your time, day and night with T or the clock, sun and moon button at the top. Music: Livia Zaharia playing kalimba, recorded on her phone — informal personal recordings, not professional studio recordings. Your discoveries are saved on this device.</p></section>',
       '<div id="toast" class="toast" role="status" hidden></div><div id="live" class="sr-only" aria-live="polite"></div>',
       '<section id="error" class="error-screen" hidden><div class="eyebrow">LIVISTONE</div><h2>Let’s try that again.</h2><p id="error-message"></p><button class="primary" data-action="reload">Reload the town</button></section>',
     ].join('');
-    this.gallery = new GalleryUI(this.app);
+    this.gallery = new GalleryUI(this.app, this.action);
     this.canvas = this.app.querySelector('#world')!; this.joystick = this.app.querySelector('#joystick')!;
     this.modeLabel = this.app.querySelector('#mode-label')!; this.location = this.app.querySelector('#location')!; this.prompt = this.app.querySelector('#interact')!; this.live = this.app.querySelector('#live')!;
     const loading = document.querySelector<HTMLElement>('#boot-loading')!;
@@ -70,11 +72,13 @@ export class UI {
     if (matchMedia('(pointer:coarse), (max-width:650px)').matches) this.setNearbyExpanded(false);
     this.app.addEventListener('click', (e) => {
       const button = (e.target as Element).closest<HTMLElement>('[data-action]');
+      if (button?.dataset.action === 'toggle-navigation') { this.setNavigation(this.app.dataset.navigation === 'folded'); this.scheduleNavigation(); return; }
       if (button?.dataset.action === 'toggle-nearby') { this.toggleNearby(); return; }
       if (button?.dataset.action === 'toggle-controls') { this.toggleControls(); return; }
       if (button) action(button.dataset.action!);
     });
     this.app.querySelector('#time-of-day')!.addEventListener('change', (e) => action('time-of-day:' + (e.target as HTMLSelectElement).value));
+    this.app.querySelector('#performance')!.addEventListener('change', (e) => action('performance:' + (e.target as HTMLSelectElement).value));
     this.app.querySelector('#quality')!.addEventListener('change', (e) => action('quality:' + (e.target as HTMLSelectElement).value));
     document.addEventListener('keydown', (e) => {
       const teleport = this.app.querySelector<HTMLElement>('#teleport-menu')!;
@@ -82,8 +86,8 @@ export class UI {
         const buttons = [...teleport.querySelectorAll<HTMLButtonElement>('.teleport-item')], index = buttons.indexOf(document.activeElement as HTMLButtonElement);
         if (index >= 0) { e.preventDefault(); e.stopPropagation(); buttons[e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1 : (index + (e.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus(); return; }
       }
-      const loreOpen = !this.app.querySelector<HTMLElement>('#lore')!.hidden && (this.openDiscovery?.slides?.length ?? 0) > 1;
-      if (loreOpen && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); e.stopPropagation(); this.action(e.key === 'ArrowRight' ? 'slide-next' : 'slide-prev'); return; }
+      const loreOpen = !this.app.querySelector<HTMLElement>('#lore')!.hidden;
+      if (loreOpen && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); e.stopPropagation(); this.action(e.key === 'ArrowRight' ? 'panel-next' : 'panel-prev'); return; }
       if (e.key !== 'Tab') return;
       const dialog = this.app.querySelector<HTMLElement>('.dialog:not([hidden])');
       if (!dialog) return;
@@ -97,6 +101,24 @@ export class UI {
   ready(): void {
     this.app.querySelector<HTMLElement>('#welcome')!.hidden = true;
     this.app.querySelectorAll<HTMLButtonElement>('#tools button').forEach((button) => { button.disabled = false; });
+    const tab = document.createElement('button'); tab.id = 'navigation-tab'; tab.className = 'navigation-tab'; tab.dataset.action = 'toggle-navigation';
+    tab.setAttribute('aria-controls', 'tools'); tab.innerHTML = icon('menu') + '<span>Navigation</span>'; this.app.querySelector('.topbar')!.append(tab);
+    this.setNavigation(true); this.scheduleNavigation();
+  }
+  private setNavigation(open: boolean): void {
+    this.app.dataset.navigation = open ? 'open' : 'folded'; this.app.querySelector<HTMLElement>('#tools')!.inert = !open;
+    const tab = this.app.querySelector<HTMLButtonElement>('#navigation-tab');
+    tab?.setAttribute('aria-expanded', String(open)); tab?.setAttribute('aria-label', open ? 'Hide navigation' : 'Show navigation');
+    if (!open && this.app.querySelector('#tools')!.contains(document.activeElement)) tab?.focus({ preventScroll: true });
+  }
+  private scheduleNavigation(): void {
+    window.clearTimeout(this.navigationTimer);
+    this.navigationTimer = window.setTimeout(() => {
+      if (this.app.dataset.mode !== 'walking') return;
+      const tools = this.app.querySelector<HTMLElement>('#tools')!;
+      if (tools.matches(':hover') || tools.contains(document.activeElement)) { this.scheduleNavigation(); return; }
+      this.setNavigation(false);
+    }, 8000);
   }
   setMode(mode: Mode, mapView = mode === 'map' || mode === 'welcome'): void {
     const previousDialog = this.app.querySelector<HTMLElement>('.dialog:not([hidden])');
@@ -109,6 +131,7 @@ export class UI {
     };
     Object.entries(visible).forEach(([id, value]) => { this.app.querySelector<HTMLElement>('#' + id)!.hidden = !value; });
     this.app.dataset.mode = mode; this.gallery.floating.hidden = true;
+    if (mode !== 'walking') this.setNavigation(true); else this.scheduleNavigation();
     if (mode === 'walking') this.hasExplored = true;
     const start = this.app.querySelector<HTMLButtonElement>('#start-exploring')!, startLabel = this.hasExplored ? 'Resume exploring' : 'Start exploring';
     start.querySelector('strong')!.textContent = startLabel; start.setAttribute('aria-label', startLabel);
@@ -117,6 +140,7 @@ export class UI {
     this.modeLabel.textContent = mode === 'welcome' ? 'ART, SCIENCE & NATURE' : mode === 'map' ? 'A DIFFERENT PERSPECTIVE' : '';
     if (mode !== 'walking') this.prompt.hidden = true;
     const dialog = this.app.querySelector<HTMLElement>('.dialog:not([hidden])');
+    const navigationTab = this.app.querySelector<HTMLButtonElement>('#navigation-tab'); if (navigationTab) navigationTab.hidden = !!dialog;
     this.canvas.inert = !!dialog;
     const toggle = this.app.querySelector<HTMLButtonElement>('#view-toggle')!, label = mapView ? 'First person' : 'Map';
     toggle.innerHTML = icon(mapView ? 'walk' : 'map') + '<span>' + label + '</span><kbd>M</kbd>'; toggle.setAttribute('aria-label', label);
@@ -144,8 +168,11 @@ export class UI {
   }
   showLore(discovery: Discovery, selected?: Exhibit): void {
     this.openDiscovery = discovery; this.slide = 0;
-    const exhibit = selected ?? COLLECTION.find((e) => e.discovery === discovery.id);
-    const jewelry = !!exhibit && !discovery.slides;
+    const panels = panelCollection(discovery.id);
+    this.app.querySelector<HTMLElement>('#panel-controls')!.hidden = panels.length < 2;
+    this.app.querySelector('#panel-count')!.textContent = `${panels.indexOf(discovery.id) + 1} / ${panels.length}`;
+    const exhibit = selected ?? panelExhibit(discovery.id);
+    const jewelry = !!exhibit && exhibit.discovery === discovery.id && !discovery.slides;
     const civic = !!exhibit && ['nut', 'mitoring', 'nanot'].includes(discovery.id);
     this.app.querySelector('#lore-title')!.textContent = jewelry ? exhibit.title : discovery.title;
     this.app.querySelector('#lore-category')!.textContent = jewelry ? (exhibit.collection ?? 'IN THE JEWELRY GALLERY') : discovery.category;
@@ -163,7 +190,7 @@ export class UI {
         const figure = document.createElement('figure'), image = document.createElement('img'), caption = document.createElement('figcaption');
         image.src = photoURL(photo.file); image.alt = photo.alt; image.loading = 'eager';
         caption.textContent = 'Livia Zaharia · Studio archive'; image.onerror = () => { image.hidden = true; caption.textContent = 'Photograph unavailable. The catalogue information remains below.'; };
-        const open = document.createElement('button'); open.className = 'photo-open'; open.dataset.action = `exhibit-photo:${exhibit.discovery}:${index}`; open.setAttribute('aria-label', 'Enlarge photograph ' + (index + 1)); open.append(image);
+        const open = document.createElement('button'); open.className = 'photo-open'; open.dataset.action = `panel-photo:${discovery.id}:${index}`; open.setAttribute('aria-label', 'Enlarge photograph ' + (index + 1)); open.append(image);
         figure.append(open, caption); gallery.append(figure);
       }
       const heading = document.createElement('h3'); heading.textContent = 'The story of this piece';
@@ -183,6 +210,17 @@ export class UI {
     this.renderSlide();
     this.live.textContent = 'Discovered: ' + discovery.title;
   }
+  get currentDiscovery(): string | undefined { return this.openDiscovery?.id; }
+  adjacentPanel(step: number): string | undefined {
+    if (!this.openDiscovery) return;
+    const ids = panelCollection(this.openDiscovery.id);
+    return ids[(ids.indexOf(this.openDiscovery.id) + step + ids.length) % ids.length];
+  }
+  selectSlideImage(src: string | undefined): void {
+    const index = this.openDiscovery?.slides?.findIndex(slide => slide.image === src) ?? -1;
+    if (index >= 0) { this.slide = index; this.renderSlide(); }
+  }
+  get currentSlideImage(): string | undefined { return this.openDiscovery?.slides?.[this.slide]?.image; }
   turnSlide(step: number): void {
     const slides = this.openDiscovery?.slides; if (!slides?.length) return;
     this.slide = (this.slide + step + slides.length) % slides.length; this.renderSlide();
@@ -201,7 +239,7 @@ export class UI {
     let source = figure.querySelector<HTMLAnchorElement>('.source-image');
     if (!source) { source = document.createElement('a'); source.className = 'source-image'; source.target = '_blank'; source.rel = 'noopener noreferrer'; source.append(document.createElement('img')); figure.prepend(source); }
     source.hidden = !slide.image; canvas.hidden = !!slide.image;
-    if (slide.image) { source.href = slide.image; source.title = 'Open original image at full size'; const image = source.querySelector('img')!; image.src = slide.image; image.alt = slide.imageAlt ?? slide.title; figure.hidden = false; return; }
+    if (slide.image) { source.removeAttribute('href'); source.removeAttribute('target'); source.setAttribute('role', 'button'); source.tabIndex = 0; source.dataset.action = 'panel-image'; source.title = 'Enlarge image and browse this building'; source.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.action('panel-image'); } }; const image = source.querySelector('img')!; image.src = slide.image; image.alt = slide.imageAlt ?? slide.title; figure.hidden = false; return; }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (slide.figure) drawResearchFigure(ctx, slide.figure, 0, 0, canvas.width, canvas.height);
     else { figure.hidden = true; }

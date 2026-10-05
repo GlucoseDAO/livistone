@@ -10,6 +10,11 @@ export function softwareRenderer(name: string): boolean {
   return SOFTWARE.test(name);
 }
 
+/** Older Intel HD/UHD hardware needs the lightweight scene, despite being a real GPU. */
+export function legacyIntegratedRenderer(name: string): boolean {
+  return /intel.*(?:\b(?:hd|uhd)\s*(?:graphics)?\s*[456]\d\d\b|\bgen-9(?:\b|\.))/i.test(name);
+}
+
 export function modestRenderer(name: string): boolean {
   return softwareRenderer(name) || INTEGRATED.test(name);
 }
@@ -50,7 +55,7 @@ export interface AdapterInfo { vendor?: string; architecture?: string; device?: 
 export function adapterProbe(info: AdapterInfo, webglRenderer: () => string): { renderer: string; caveatFailed: boolean; integrated: boolean } {
   const renderer = [info.vendor, info.architecture, info.device, info.description].filter(Boolean).join(' ');
   const intel = /intel/i.test(info.vendor ?? ''), gl = (intel || /\b(amd|ati)\b/i.test(info.vendor ?? '')) && !info.description ? webglRenderer() : '';
-  return { renderer, caveatFailed: !!info.isFallbackAdapter, integrated: INTEGRATED.test(renderer) || (gl ? INTEGRATED.test(gl) : intel && !/hp/i.test(info.architecture ?? '')) };
+  return { renderer: [renderer, gl].filter(Boolean).join(' '), caveatFailed: !!info.isFallbackAdapter, integrated: INTEGRATED.test(renderer) || (gl ? INTEGRATED.test(gl) : intel && !/hp/i.test(info.architecture ?? '')) };
 }
 
 /** The WebGPU build's probeGraphics. A throwaway WebGL context is read only for Intel and AMD adapters. */
@@ -77,6 +82,7 @@ export interface GraphicsProfile {
 }
 export function graphicsTier(input: { coarse: boolean; caveatFailed?: boolean; renderer?: string; integrated?: boolean }): GraphicsTier {
   if (input.caveatFailed || (input.renderer && softwareRenderer(input.renderer))) return 'cpu';
+  if (input.renderer && legacyIntegratedRenderer(input.renderer)) return 'cpu';
   return input.coarse || input.integrated || (input.renderer && modestRenderer(input.renderer)) ? 'mobile' : 'gpu';
 }
 /**

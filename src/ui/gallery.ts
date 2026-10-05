@@ -1,4 +1,6 @@
 import { COLLECTION, CATALOGUE_URL, photoSize, photoURL } from '../game/exhibits';
+import { pieceImages, panelImages } from './album';
+import type { AlbumImage } from './album';
 import type { Exhibit } from '../game/exhibits';
 
 export class GalleryUI {
@@ -6,14 +8,15 @@ export class GalleryUI {
   readonly dialog: HTMLElement;
   private readonly stage: HTMLElement;
   private readonly image: HTMLImageElement;
-  private exhibit: Exhibit = COLLECTION[0];
   private index = 0;
+  private album: AlbumImage[] = [];
+  get currentImageSrc(): string | undefined { return this.album[this.index]?.src; }
+  get currentDiscovery(): string | undefined { return this.album[this.index]?.discovery; }
   private zoom = 1;
   private pan = { x: 0, y: 0 };
   private pointers = new Map<number, { x: number; y: number }>();
   private pane: 'photo' | 'browse' = 'browse';
-  private browseHall = 'all';
-  constructor(app: HTMLElement) {
+  constructor(app: HTMLElement, private readonly action: (action: string) => void) {
     app.insertAdjacentHTML('beforeend', `
       <section id="exhibition-controls" class="exhibition-controls" aria-label="Jewelry gallery controls" hidden>
         <span class="eyebrow">LIVIA ZAHARIA · JEWELRY GALLERY</span><strong id="poster-title"></strong>
@@ -22,11 +25,11 @@ export class GalleryUI {
       </section>
       <section id="gallery" class="dialog gallery-dialog" role="dialog" aria-labelledby="gallery-title" hidden>
         <button class="close-button" data-action="close" aria-label="Close gallery">×</button>
-        <div class="eyebrow">LIVIA ZAHARIA · STUDIO PHOTOGRAPHS</div><h2 id="gallery-title"></h2>
+        <div class="eyebrow" id="gallery-category">LIVIA ZAHARIA · STUDIO PHOTOGRAPHS</div><h2 id="gallery-title"></h2>
         <div id="piece-browser"><p>Each piece has a permanent home in Livistone. Select a photograph to inspect it.</p><div id="catalogue-filters" class="catalogue-filters"></div><p id="catalogue-count" aria-live="polite"></p><div id="piece-grid" class="piece-grid"></div><a href="${CATALOGUE_URL}" target="_blank" rel="noopener noreferrer">See the full collection on Livia’s website ↗</a></div>
         <div id="photo-viewer" hidden><div id="photo-stage" class="photo-stage" tabindex="0" aria-label="Photograph viewer. Drag to pan when enlarged; use plus and minus to zoom."><img id="viewer-image" draggable="false" alt=""><span id="photo-error" hidden>Photograph unavailable. Try another view.</span></div>
         <div class="viewer-controls" aria-label="Photograph controls"><button data-viewer="previous" aria-label="Previous photograph">←</button><span id="photo-count" aria-live="polite"></span><button data-viewer="next" aria-label="Next photograph">→</button><button data-viewer="out" aria-label="Zoom photograph out">−</button><output id="photo-zoom">100%</output><button data-viewer="in" aria-label="Zoom photograph in">+</button><button data-viewer="fit">Fit image</button></div>
-        <button class="text-button" data-viewer="browse">Back to the collection</button><p id="viewer-facts"></p><a id="viewer-source" target="_blank" rel="noopener noreferrer">Catalogue source ↗</a><p class="viewer-help">Drag to pan · Scroll or pinch to zoom · ← / → photos · + / − zoom · 0 fit · Esc close</p></div>
+        <button class="text-button" data-viewer="back">Back to panel content</button><p id="viewer-facts"></p><a id="viewer-source" target="_blank" rel="noopener noreferrer">Catalogue source ↗</a><p class="viewer-help">Drag to pan · Scroll or pinch to zoom · ← / → photos · + / − zoom · 0 fit · Esc close</p></div>
       </section>`);
     this.floating = app.querySelector('#exhibition-controls')!; this.dialog = app.querySelector('#gallery')!;
     this.stage = app.querySelector('#photo-stage')!; this.image = app.querySelector('#viewer-image')!;
@@ -65,8 +68,9 @@ export class GalleryUI {
       this.floating.querySelector<HTMLElement>('#poster-' + name)!.dataset.action = `exhibit:${action}:${id}`;
   }
   showCatalogue(): void { this.showBrowse('all', COLLECTION[0]); }
-  showBrowse(hall: string, selected: Exhibit): void {
-    this.pane = 'browse'; this.browseHall = hall; this.exhibit = selected;
+  showBrowse(hall: string, _selected: Exhibit): void {
+    this.pane = 'browse'; this.album = [];
+    this.dialog.querySelector('#gallery-category')!.textContent = 'LIVIA ZAHARIA · STUDIO PHOTOGRAPHS';
     this.dialog.querySelector('#gallery-title')!.textContent = hall === 'all' ? 'The jewelry catalogue' : 'This place’s collection';
     this.dialog.querySelector<HTMLElement>('#piece-browser')!.hidden = false; this.dialog.querySelector<HTMLElement>('#photo-viewer')!.hidden = true;
     const filters = this.dialog.querySelector('#catalogue-filters')!; filters.replaceChildren();
@@ -93,23 +97,33 @@ export class GalleryUI {
     }; render();
   }
   showPhoto(exhibit: Exhibit, index = 0): void {
-    this.pane = 'photo'; if (this.dialog.hidden) this.browseHall = exhibit.location ?? 'all'; this.exhibit = exhibit; this.index = index;
+    const images = exhibit.location ? panelImages(exhibit.discovery) : pieceImages(COLLECTION);
+    const first = images.findIndex(image => image.discovery === exhibit.discovery);
+    this.showAlbum(images.length ? images : pieceImages([exhibit]), Math.max(0, first) + index, 'LIVIA ZAHARIA · STUDIO PHOTOGRAPHS');
+  }
+  showAlbum(images: AlbumImage[], index = 0, category = 'LIVISTONE · CONCEPT GARDEN'): void {
+    if (!images.length) return;
+    this.pane = 'photo'; this.album = images; this.index = Math.max(0, Math.min(index, images.length - 1));
+    this.dialog.querySelector('#gallery-category')!.textContent = category;
+    this.dialog.querySelector<HTMLElement>('[data-viewer="back"]')!.textContent = category.includes('CONCEPT') ? 'Back to the garden' : 'Back to panel content';
     this.dialog.querySelector<HTMLElement>('#piece-browser')!.hidden = true; this.dialog.querySelector<HTMLElement>('#photo-viewer')!.hidden = false;
     this.renderPhoto();
   }
   private renderPhoto(): void {
-    const photo = this.exhibit.photos[this.index]; this.zoom = 1; this.pan = { x: 0, y: 0 }; this.pointers.clear();
-    this.dialog.querySelector('#gallery-title')!.textContent = this.exhibit.title;
-    this.dialog.querySelector('#viewer-facts')!.textContent = `${this.exhibit.type} · ${this.exhibit.year} · ${this.exhibit.materials} · ${this.exhibit.dimensions}. ${this.exhibit.story ?? this.exhibit.description}`;
-    this.dialog.querySelector<HTMLAnchorElement>('#viewer-source')!.href = this.exhibit.source ?? CATALOGUE_URL;
-    this.image.alt = photo.alt; this.image.src = photoURL(photo.file); this.image.hidden = false; this.dialog.querySelector<HTMLElement>('#photo-error')!.hidden = true;
-    this.dialog.querySelector('#photo-count')!.textContent = `${this.index + 1} / ${this.exhibit.photos.length}`;
+    const photo = this.album[this.index]; this.zoom = 1; this.pan = { x: 0, y: 0 }; this.pointers.clear();
+    this.dialog.querySelector('#gallery-title')!.textContent = photo.title;
+    this.dialog.querySelector('#viewer-facts')!.textContent = photo.facts;
+    const source = this.dialog.querySelector<HTMLAnchorElement>('#viewer-source')!;
+    source.hidden = !photo.source; if (photo.source) source.href = photo.source;
+    this.image.alt = photo.alt; this.image.hidden = true; this.dialog.querySelector<HTMLElement>('#photo-error')!.hidden = true; this.image.src = photo.src;
+    this.dialog.querySelector('#photo-count')!.textContent = `${this.index + 1} / ${this.album.length}`;
+    for (const command of ['previous', 'next']) this.dialog.querySelector<HTMLButtonElement>(`[data-viewer="${command}"]`)!.disabled = this.album.length < 2;
     this.transform(); this.stage.classList.remove('photo-unfold'); void this.stage.offsetWidth; this.stage.classList.add('photo-unfold');
     requestAnimationFrame(() => this.transform());
   }
   private control(command: string): void {
-    if (command === 'browse') { this.showBrowse(this.browseHall, this.exhibit); return; }
-    if (command === 'previous' || command === 'next') { this.index = (this.index + (command === 'next' ? 1 : -1) + this.exhibit.photos.length) % this.exhibit.photos.length; this.renderPhoto(); }
+    if (command === 'back') { this.action('album-back'); return; }
+    if (command === 'previous' || command === 'next') { this.index = (this.index + (command === 'next' ? 1 : -1) + this.album.length) % this.album.length; this.renderPhoto(); }
     else if (command === 'fit') { this.pan = { x: 0, y: 0 }; this.setZoom(1); }
     else this.setZoom(this.zoom * (command === 'in' ? 1.3 : 1 / 1.3));
   }

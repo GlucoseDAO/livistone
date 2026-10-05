@@ -1,6 +1,10 @@
 # Livistone
 
-Eye of Winter has a first walkable two-stone building study above the Jepii Mici snow chimney, with its original silver geometry, a broad snow plateau, a connected approach and a hexagonal iris that opens as you approach. Both eye buildings have source-photo boards and night lamps. Teleport views stand farther back, and the snow has broad wandering tracks and smoother drifts; see [the model plan](docs/jewelry-models-plan.md).
+The navigation is visible on arrival and folds after eight seconds of walking; use the small **Navigation** tab at the top to bring it back. Map stops are compact glowing numbers with fixed connecting lines; hover or focus one to read its name.
+
+Walk through Eyelense into the circular concept garden: fifteen posters hang inside climbing garden arches with dimensional ivory and blush flowers. All spaces have AI-generated architectural studies; the original five images are preserved and ten missing concepts have been added. Click a picture to view it. At night the floating Mycelium ring and soft flying lights along Jepii Mici glow. The lake pavilion has a polished Swiss blue topaz interpretation and coiled silver inspired by Livia’s supplied setting; the exact optimized silver model sits above the Dewdrop information stand.
+
+Eye of Winter has a first walkable two-stone building study above the Jepii Mici snow chimney, with its original silver geometry, a broad snow plateau, a connected approach and a hexagonal iris that opens as you approach. Both eye buildings have source-photo boards. Winter glows softly from its silver and crystal structure at night, without exterior lamp posts or floodlit snow. Teleport views stand farther back, and the snow has broad wandering tracks and smoother drifts; see [the model plan](docs/jewelry-models-plan.md).
 
 **Walk into a town where rings and pendants have become buildings.**
 
@@ -86,7 +90,7 @@ Jump to clear gallery rails, wade across the river, and climb the copper ramp in
 - **Day or night:** the clock, sun and moon button in the top bar (or **T**) switches between your time, day and night; the menu offers the same choice. Your time follows your device's clock, day and night ignore it, and the choice is remembered on this device. A switch can take a moment, longest the first time, while the town prepares the new light; the button pulses until it is done.
 - **Music:** on by default. If your browser blocks autoplay, it starts after your first click, tap or keypress. Use the speaker button or **Livistone Radio** in the menu whenever you prefer silence.
 - **About the music:** these are informal phone recordings of Livia Zaharia playing kalimba, not professional studio recordings. The six included clips were reviewed and approved by Livia.
-- **Performance:** select **Gentle** visual detail if movement is slow. Initial loading can take longer on a phone or a slower connection. The game picks one of three graphics profiles automatically (GPU, mobile/integrated graphics, or CPU software rendering) and shows it in the menu. Resolution then adapts to the frame rate: the GPU profile aims for 50 FPS and the mobile profile for 28. Software rendering on the CPU still runs at only 2–4 FPS, so it is not yet playable.
+- **Performance:** open the menu and choose **Automatic**, **Lightweight**, **Balanced** or **Rich**. This choice is saved and reloads the scene. Automatic uses Lightweight on older Intel HD/UHD graphics: simpler materials, fewer details and no cast shadows, while keeping the same buildings, paths, stories and night glows on hardware GPUs. Balanced and Rich retain more detailed reflections. Resolution adapts to the frame rate; the text interface stays sharp. On the tested Intel HD 630 at 1600×900, Lightweight measured about 29–30 FPS versus 5–7 FPS in the previous automatic profile. Those are local Chrome measurements, not a guarantee for every device. Initial loading and software-only rendering can still be slow.
 - **Progress:** visits and stories read are saved in this browser. They do not sync between devices; clearing site data resets them.
 - **Lost?** Open the Teleport dropdown beside sound or choose a destination on the map. Both arrive at a clear entrance facing the place. Escape, the close button or a click outside cancels the dropdown without moving you. On narrow phones, the navigation tools occupy a row below the Livistone name.
 
@@ -150,3 +154,9 @@ Browser tests require Chrome and use the dev server on port 5173. On Linux they 
 - [Kalimba credits and source records](public/audio/kalimba/README.md)
 
 Livistone is a playable prototype. Performance varies by device, and physical-phone and Safari verification (including Safari's WebGPU) remain ongoing work. The [technical guide](docs/technical-guide.md#look-and-materials) describes how the ground, stone, water, grass and lighting are made. Artwork and recording credits, third-party asset licences and concept references are preserved in the [technical guide](docs/technical-guide.md#credits-and-licensing).
+
+### Browsing panels as albums
+
+Click any concept-garden poster to open all 15 concepts in an enlarged slideshow. Use the on-screen arrows or Left/Right keys; Back to the garden closes it.
+
+In a building, clicking a piece panel opens its information. Previous/Next panel browses the content in that same building. Click an image to enlarge it and browse the building’s images; Back to panel content returns to the panel for the currently displayed image. Glucose chapters keep their own slide buttons, and their source images also open in the building album. Zoom, pan and Escape remain available.

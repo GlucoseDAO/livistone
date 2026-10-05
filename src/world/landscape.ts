@@ -1,4 +1,5 @@
 import { EYELENSE, eyelenseClearing, eyelenseGround } from './eyelense-gate-layout';
+import { rotundaGround, rotundaClearing } from './concept-rotunda-layout';
 import { introductionClearing } from './introduction-layout';
 import { enhancementClearing, enhancementGround } from './enhancement-layout';
 import * as THREE from 'three';
@@ -76,10 +77,12 @@ export function footprintReserved(x: number, z: number, radius: number): boolean
 }
 /** Clearings kept free of trees, shrubs and flowers but not of grass: the mycelium grove and lake margin, the meadow round the Enhancement hill and the ground under the Future House camel. */
 function canopyReserved(x: number, z: number, radius: number): boolean {
+  if (rotundaClearing(x, z, radius)) return true;
   return gardenFootprint(x, z, radius) || enhancementClearing(x, z, radius) || futureClearing(x, z, radius) || winterClearing(x, z, radius) || eyelenseClearing(x, z, radius);
 }
 /** Ground something stands on or covers, which neither plants nor grass may grow through (grass-field.ts bisects its radius). */
 export function groundReserved(x: number, z: number, radius: number): boolean {
+  if (rotundaGround(x, z, radius)) return true;
   if (eyelenseGround(x, z, radius)) return true;
   if (introductionClearing(x, z, radius) || winterGround(x, z, radius)) return true;
   if (futureGround(x, z, radius) || enhancementGround(x, z, radius)) return true;

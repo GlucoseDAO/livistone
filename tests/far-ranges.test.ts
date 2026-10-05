@@ -13,8 +13,9 @@ import { RAILWAY, STATION } from '../src/world/station-layout';
 // trail, its plateau, the peaks and the couloir out after the draws, so every other site is unchanged, and appended a few round
 // the trailhead (the last site is one of them). Winter moved from the meadow onto the already treeless mountain shelf; the meadow regains its 20 desktop / 14 mobile trees. Eyelense then clears 20 desktop / 12 mobile trees at its east-meadow site.
 const FOREST: [boolean, number, [number, number], [number, number]][] = [
-  [false, 890, [-27.918645669706166, -199.93845618027262], [-22.32522038852804, -199.00970863348874]],
-  [true, 505, [-27.918645669706166, -199.93845618027262], [-18.4485683455656, -205.57238135935123]],
+  // The concept rotunda reserves the east meadow beyond Eyelense, including full tree crowns.
+  [false, 867, [-27.918645669706166, -199.93845618027262], [-22.32522038852804, -199.00970863348874]],
+  [true, 497, [-27.918645669706166, -199.93845618027262], [-18.4485683455656, -205.57238135935123]],
 ];
 
 describe('distant ranges (sub-plan 26)', () => {

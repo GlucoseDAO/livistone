@@ -10,14 +10,14 @@ const backend = process.argv[2] ?? 'webgl';
 if (!['webgl', 'webgpu'].includes(backend)) throw new Error('Choose webgl or webgpu');
 const dir = 'public/probes', url = process.env.LIVISTONE_BASE_URL ?? 'http://127.0.0.1:5173';
 const flags = backend === 'webgl' ? ['--disable-features=WebGPU'] : process.platform === 'linux' ? ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-webgpu-power-preference=force-low-power'] : [];
-const browser = await chromium.launch({ channel: 'chrome', headless: !process.env.PW_HEADED, args: ['--disable-dev-shm-usage', ...(process.env.PW_HEADED && process.platform === 'linux' ? ['--ozone-platform=x11'] : []), '--use-gl=angle', '--use-angle=gl', '--ignore-gpu-blocklist', ...flags] });
+const browser = await chromium.launch({ channel: 'chrome', headless: !process.env.PW_HEADED, args: ['--disable-dev-shm-usage', ...(process.env.PW_HEADED && process.platform === 'linux' ? ['--ozone-platform=x11'] : []), '--use-gl=angle', process.platform === 'win32' ? '--use-angle=d3d11' : '--use-angle=gl', '--ignore-gpu-blocklist', ...flags] });
 try {
   for (const tier of ['gpu', 'mobile']) for (const phase of ['day', 'night']) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } }), page = await context.newPage();
     try {
       await page.addInitScript(phase => { localStorage.setItem('livistone-time-of-day', phase); }, phase);
       await page.goto(`${url}/?graphics=${tier}&capture=1&probes=bake${backend === 'webgl' ? '&backend=webgl' : ''}`);
-      await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('#tools button')?.disabled === false, null, { timeout: 120000 });
+      await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('#tools button')?.disabled === false, null, { timeout: 240000 });
       const exported = await page.evaluate(async () => {
         type Atlas = { id: string; width: number; height: number; data: Uint16Array };
         const result = await (window as unknown as { __exportProbes(): Promise<{ revision: string; backend: string; size: number; phase: string; probes: Atlas[] }> }).__exportProbes();

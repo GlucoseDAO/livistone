@@ -1,3 +1,4 @@
+import { panelImages } from '../src/ui/album';
 import { COLLECTION } from '../src/game/exhibits';
 import { LANDMARKS } from '../src/game/content';
 import { posterLayout } from '../src/world/poster-layout';
@@ -218,8 +219,8 @@ test('curated collections keep permanent locations, full-photo controls, source 
     const before = await snapshot(page); await page.getByRole('button', { name: 'Zoom photograph in' }).click(); await expect(page.locator('#photo-zoom')).toHaveText('130%');
     await page.keyboard.press('+'); await expect(page.locator('#photo-zoom')).toHaveText('169%');
     await page.getByRole('button', { name: 'Fit image' }).click(); await expect(page.locator('#photo-zoom')).toHaveText('100%');
-    await page.keyboard.press('ArrowRight'); await expect(page.locator('#photo-count')).toHaveText('2 / 2');
-    await page.keyboard.press('Escape'); expect((await snapshot(page)).position.z).toBeCloseTo(before.position.z, 2); expect((await snapshot(page)).yaw).toBe(before.yaw);
+    await page.keyboard.press('ArrowRight'); const album = panelImages(selected.discovery), firstImage = album.findIndex(image => image.discovery === selected.discovery); await expect(page.locator('#photo-count')).toHaveText(`${firstImage + 2} / ${album.length}`);
+    await page.keyboard.press('Escape'); await expect(page.locator('#lore')).toBeVisible(); await page.keyboard.press('Escape'); expect((await snapshot(page)).position.z).toBeCloseTo(before.position.z, 2); expect((await snapshot(page)).yaw).toBe(before.yaw);
   }
   await page.getByRole('button', { name: 'Open discovery journal' }).click(); await page.getByRole('button', { name: 'Browse the jewelry catalogue' }).click();
   await expect(page.locator('.piece-card')).toHaveCount(41); await page.getByRole('searchbox', { name: 'Search jewelry' }).fill('Mycelium'); await expect(page.locator('.piece-card')).toHaveCount(1); await page.getByRole('searchbox', { name: 'Search jewelry' }).fill(''); await page.getByLabel('Location', { exact: true }).selectOption('station'); await expect(page.locator('.piece-card')).toHaveCount(7);
@@ -233,7 +234,7 @@ test('touch poster inspection preserves look gestures and fits the screen', asyn
     const page = await context.newPage(); await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.locator('#view-toggle').tap();
     await facePiece(page, 'nanot'); await page.locator('#interact').tap(); await page.locator('.photo-open').first().tap();
     await expect(page.locator('#viewer-image')).toBeVisible(); await page.getByRole('button', { name: 'Zoom photograph in' }).tap(); await expect(page.locator('#photo-zoom')).toHaveText('130%');
-    await page.getByRole('button', { name: 'Next photograph' }).tap(); await expect(page.locator('#photo-count')).toHaveText('2 / 2');
+    await page.getByRole('button', { name: 'Next photograph' }).tap(); const album = panelImages('nanot'), firstImage = album.findIndex(image => image.discovery === 'nanot'); await expect(page.locator('#photo-count')).toHaveText(`${firstImage + 2} / ${album.length}`);
     expect(await page.locator('#gallery').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     await page.screenshot({ path: 'output/testing/poster-viewer-mobile.png' }); await page.getByRole('button', { name: 'Close gallery' }).tap(); await page.getByRole('button', { name: 'Continue exploring' }).tap();
     const before = await snapshot(page); await page.touchscreen.tap(190, 350); const after = await snapshot(page); expect(after.yaw).toBe(before.yaw);
