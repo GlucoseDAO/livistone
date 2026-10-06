@@ -15,7 +15,8 @@ test('arrives at Eye of Winter from the map and walks through its iris', async (
   await expect(page.locator('#marker-winter-gate')).toBeInViewport();
   await page.locator('#marker-winter-gate').click();
   const state = () => page.evaluate(() => (window as any).__livistone.snapshot());
-  await expect.poll(async () => (await state()).mode).toBe('walking');
+  // The arrival waits for the trail's distant parts to build ("Preparing …"), which a cold page may still be doing.
+  await expect.poll(async () => (await state()).mode, { timeout: 60000 }).toBe('walking');
   await expect.poll(async () => (await state()).position.x).toBeCloseTo(WINTER_ARRIVAL.x, 1);
   await page.keyboard.down('w');
   try { await expect.poll(async () => (await state()).position.x, { timeout: 15000 }).toBeLessThan(WINTER.quartzX + 1); }

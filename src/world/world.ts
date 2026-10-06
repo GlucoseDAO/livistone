@@ -19,7 +19,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ColliderSpec } from '../game/physics';
 import { mitoringCage, nanotCage, ENERGY_HALL } from './jewelry';
 import { FOREST_DETAIL, Forest, forestCells } from './forest';
-import { forestSites } from './forest-layout';
+import { DWARF_PINE, forestSites } from './forest-layout';
 import { createContactShadows, objectContactSites, rockContactSites, TOWN_SHADE_FOOTPRINTS, treeContactSites, treeShadeDiscs } from './contact-shadows';
 import type { ContactShadows } from './contact-shadows';
 import { groundShadeField } from './ground-cover';
@@ -544,10 +544,11 @@ export class Town {
     return PROBE_SITES.flatMap(site => { const parts = this.probeParts.get(site.id); return parts ? [{ site, ...parts }] : []; });
   }
   readonly forest = new Forest();
-  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows, this.wind), this.mountains.ready, this.cragsReady, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
+  async loadAssets(): Promise<void> { await Promise.all([this.paving.userData.ready, this.surfaces?.ready, this.forest.load(this.mobile, graphicsProfile(this.tier).shadows, this.wind, this.tier === 'gpu' && MOUNTAIN), this.mountains.ready, this.cragsReady, this.researchReady, ...this.jewelryReady, loadRailwayTextures(this.railway, this.mobile), ...this.exhibitions.map((exhibition) => exhibition.ready)]); }
   private createTrees(): void {
     const sites = forestSites(this.mobile);
-    for (const { x, y, z } of sites) this.colliders.push({ type: 'box', position: [x, y + 2, z], size: [0.3, 2, 0.3] });
+    // A dwarf pine is a cushion of stems, not a trunk: its collider keeps walkers out of the bush.
+    for (const { x, y, z, species } of sites) this.colliders.push(species === DWARF_PINE ? { type: 'box', position: [x, y + .6, z], size: [.9, .6, .9] } : { type: 'box', position: [x, y + 2, z], size: [0.3, 2, 0.3] });
     this.forest.sites = sites; this.forest.name = 'Forest'; this.root.add(this.forest);
   }
   private async createGardens(): Promise<void> {

@@ -81,10 +81,11 @@ const extinction = Fn(() => {
 const fade = Fn(() => pow(vec3(pow(smoothstep(params.fade, params.full, length(positionWorld.sub(cameraPosition))), FADE_GAMMA)), params.fadeTint))() as unknown as Node<'vec3'>;
 /** Per-channel fog factor of the current fragment (aerialFog): how much of its own colour is gone; zero when aerial perspective is off. */
 export const aerialFactor = Fn(() => vec3(1).sub(extinction.mul(vec3(1).sub(fade))).mul(params.on))() as unknown as Node<'vec3'>;
-// The haze bake is 64 px a face; mip 3 (8 px, about 11° a texel) keeps the sky's gradient and cloud banks but no detail.
+// The haze bake is 64 px a face and holds no clouds (sky.ts); mip 3 (8 px, about 11° a texel) keeps the sky's gradient, no detail.
 const sky = cubeTexture(new THREE.CubeTexture(), normalize(positionWorld.sub(cameraPosition)), float(3));
 /** The sky's radiance behind the current fragment, blurred: the colour of the air's inscattered light. */
 export const aerialSky = sky.rgb as unknown as Node<'vec3'>;
+
 /**
  * The distant pass's frame as the radiance the output pass shows for it (sky, ranges, their mist; render/output.ts fills it
  * between that pass and the town's): what a fully hazed town surface becomes, so the town meets the ranges in one colour.
@@ -92,7 +93,13 @@ export const aerialSky = sky.rgb as unknown as Node<'vec3'>;
 export const AERIAL_BEHIND = new THREE.RenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
 AERIAL_BEHIND.texture.name = 'aerial.behind';
 // Level 0 explicitly: the fog runs after alpha tests, where an implicit-derivative sample would leave uniform control flow.
-const behind = texture(AERIAL_BEHIND.texture, screenUV, float(0)).rgb as unknown as Node<'vec3'>;
+const drawnBehind = texture(AERIAL_BEHIND.texture, screenUV, float(0));
+/**
+ * What a fully hazed surface fades into: in front of the ranges (AERIAL_BEHIND's alpha, from the distant pass's depth) exactly
+ * what that pass drew; in front of sky the blurred haze bake, the clear sky's gradient without clouds. Fading into the pass's sharp
+ * cumulus, tall rock 100–130 m away (the north ridge's crags) read as translucent, clouds through the cliff (sub-plan 27, round 3).
+ */
+const behind = mix(aerialSky, drawnBehind.rgb, drawnBehind.a) as unknown as Node<'vec3'>;
 /** What a fully hazed surface becomes: what the distant pass drew behind it, or without that pass the blurred sky. */
 export const aerialTarget = select(params.behind.greaterThan(.5), behind, aerialSky) as unknown as Node<'vec3'>;
 /** Haze a colour: the inscatter toward `air`, then the horizon fade toward `target`, both given in the colour's own space. */

@@ -1,13 +1,16 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { diffuseColor, float, fwidth, mix, positionLocal, positionView, smoothstep } from 'three/tsl';
+import { attribute, cameraPosition, cameraViewMatrix, diffuseColor, float, fwidth, mix, normalize, positionGeometry, positionLocal, vec2, vec3, vec4 } from 'three/tsl';
 import { BUDGET_OFF } from '../game/render-budget';
 import { WIND_ROOT, addWindRoots, treeSway, windRoots } from './wind';
+import { TREE_SPECIES, treeSpecies } from './forest-layout';
+import type { TreeSite } from './forest-layout';
 
 const NEAR = 36;
 /**
- * Beyond this distance to its nearest tree a cell draws only its thinned crowns, no branches: only the summit view's longer fog
- * (main.ts) reaches it, where a trunk is a few pixels wide and the branch tubes would more than double the forest's triangles.
+ * Beyond this distance to its nearest tree a cell draws each tree as one camera-facing card of its baked side view (impostors,
+ * gpu): only the summit view's longer fog (main.ts) reaches it, where whole trees more than doubled the forest's triangles and
+ * their sub-pixel leaf cards thinned to speckles in the haze.
  */
 const CROWN = 160;
 /** Layer of the shadow-only tree meshes; the sun's shadow camera renders it (main.ts), the view cameras do not. */
@@ -33,19 +36,19 @@ function thinFoliage(geo: THREE.BufferGeometry): THREE.BufferGeometry {
   copy.setIndex(reduced); return copy;
 }
 
-/** Foliage half-extent of the oak and ash models at scale 1, from their GLB bounds; even site indices are oaks. */
-export const TREE_CANOPY = [5.4, 5.2];
+/** Foliage half-extent of each species' model at scale 1, from its GLB bounds (forest-layout.ts TREE_SPECIES, treeSpecies). */
+export const TREE_CANOPY: readonly number[] = TREE_SPECIES.map(species => species.canopy);
 /** Per-tree size shared by the instances, their contact shadows and the baked ground shade. */
 export function treeScale(index: number): number { return .66 + ((index * 317) % 100) / 100 * .48; }
 export interface ForestCell { species: number; sites: { p: THREE.Vector3; index: number }[] }
 /** Each species' trees on a 48 m grid, species by species, then in grid order. Contact shadows plan the same cells, so a decal
  *  hides with its tree when onCells reports the cell. */
-export function forestCells(sites: readonly THREE.Vector3[]): ForestCell[] {
+export function forestCells(sites: readonly TreeSite[]): ForestCell[] {
   const cells: ForestCell[] = [];
-  for (let species = 0; species < TREE_CANOPY.length; species++) {
+  for (let species = 0; species < TREE_SPECIES.length; species++) {
     const grouped = new Map<string, { p: THREE.Vector3; index: number }[]>();
     sites.forEach((p, index) => {
-      if (index % 2 !== species) return;
+      if (treeSpecies(p, index) !== species) return;
       const key = Math.floor(p.x / 48) + ':' + Math.floor(p.z / 48);
       const cell = grouped.get(key) ?? []; cell.push({ p, index }); grouped.set(key, cell);
     });
@@ -78,8 +81,6 @@ export function dropTwigs(geo: THREE.BufferGeometry, size = 2): THREE.BufferGeom
  * `coverage`: leaf cards use alpha-to-coverage; main.ts turns it on where the renderer multisamples (fine pointers).
  */
 export const FOREST_DETAIL = { twigless: !BUDGET_OFF, coverage: false };
-/** Height of both tree models at scale 1, from their GLB bounds. */
-const TREE_HEIGHT = 12;
 
 /**
  * A tree part's material, swaying in the wind (wind.ts): a node copy of the GLB's material, as three's own conversion makes
@@ -88,18 +89,51 @@ const TREE_HEIGHT = 12;
  * blows almost square to the sun's azimuth, so the moving cards hardly change depth against that rest-pose map. `far`: the
  * crown's lean only, for the reduced detail (wind.ts treeSway).
  */
-export function swayingTreeMaterial(source: THREE.MeshStandardMaterial, foliage: boolean, coverage = FOREST_DETAIL.coverage, far = false): THREE.MeshStandardNodeMaterial {
+export function swayingTreeMaterial(source: THREE.MeshStandardMaterial, foliage: boolean, coverage = FOREST_DETAIL.coverage, far = false, height = 12): THREE.MeshStandardNodeMaterial {
   const material = new THREE.MeshStandardNodeMaterial();
   for (const key in source) (material as unknown as Record<string, unknown>)[key] = (source as unknown as Record<string, unknown>)[key];
-  material.positionNode = treeSway(TREE_HEIGHT, foliage, far); material.castShadowPositionNode = positionLocal;
+  material.positionNode = treeSway(height, foliage, far); material.castShadowPositionNode = positionLocal;
   // With MSAA the cards' cut-out edges cover a share of the samples instead of stepping at the .45 cutoff; the shadow pass
   // keeps the plain alpha test (three copies alphaTest, not alphaToCoverage, to its shadow material). three ramps coverage
   // over the pixel above the cutoff, which thinned every crown; centring the ramp on the cutoff keeps the alpha test's density.
   if (foliage && coverage && source.alphaTest > 0) { material.alphaToCoverage = true; material.alphaTestNode = float(source.alphaTest).sub(fwidth(diffuseColor.a).mul(.5)); }
-  // Past the usual tree reach (only the summit view draws there) the cards are under a pixel and their alpha mips fall below the
-  // cutoff, which left bare branches: the far detail lowers its cutoff with distance so the crowns stay whole.
-  else if (foliage && far && source.alphaTest > 0) material.alphaTestNode = float(source.alphaTest).mul(mix(1, .3, smoothstep(120, 220, positionView.length())));
   return material;
+}
+/** The impostor atlas (scripts/build-tree-impostors.ts): one square cell per species of `size` metres, base at its lower middle. */
+interface ImpostorAtlas { texture: THREE.Texture; cell: number; cells: { name: string; size: number }[] }
+/**
+ * A far tree's card: the baked side view on a quad that turns about the trunk to face the camera (positionNode, from the tree's
+ * windRoot: base and scale), shaded as a rounded crown (a normal bent across the card and toward its top) so the sun lights one
+ * flank, darker toward the foot. Haze, sun and sky come as for any lit surface.
+ */
+function impostorMaterial(atlas: ImpostorAtlas, size: number, coverage: boolean): THREE.MeshStandardNodeMaterial {
+  const material = new THREE.MeshStandardNodeMaterial({ map: atlas.texture, alphaTest: .4, roughness: .95, metalness: 0 });
+  const root = attribute<'vec4'>(WIND_ROOT, 'vec4'), look = cameraPosition.sub(root.xyz), flat = normalize(vec2(look.x, look.z)), right = vec3(flat.y, 0, flat.x.negate());
+  material.positionNode = root.xyz.add(right.mul(positionGeometry.x.mul(root.w))).add(vec3(0, positionGeometry.y.mul(root.w), 0));
+  const u = positionGeometry.x.div(size).mul(2), v = positionGeometry.y.div(size);
+  const normal = normalize(vec3(flat.x, 0, flat.y).mul(.75).add(right.mul(u.mul(.65))).add(vec3(0, v.mul(.7).sub(.1), 0)));
+  material.normalNode = normalize(cameraViewMatrix.mul(vec4(normal, 0)).xyz); material.aoNode = mix(float(.55), float(1), v);
+  if (coverage) { material.alphaToCoverage = true; material.alphaTestNode = float(.4).sub(fwidth(diffuseColor.a).mul(.5)); }
+  return material;
+}
+/** The atlas and its cell sizes, in TREE_SPECIES order. */
+async function loadImpostors(base: string): Promise<ImpostorAtlas> {
+  const [texture, layout] = await Promise.all([new THREE.TextureLoader().loadAsync(base + 'impostors.webp'), fetch(base + 'impostors.json').then(response => response.json() as Promise<{ cell: number; cells: { name: string; size: number }[] }>)]);
+  texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 4;
+  return { texture, cell: layout.cell, cells: TREE_SPECIES.map(species => layout.cells.find(cell => cell.name === species.name)!) };
+}
+/** Foliage parts are named foliage in the GLBs (a suffix where one file holds several species). */
+const foliage = (mesh: THREE.Object3D): boolean => mesh.name.startsWith('foliage');
+/** Grove tint per species: hue and its spread across groves, foliage saturation and lightness (multiplying the leaf texture). */
+const TINTS: readonly { hue: number; spread: number; saturation: number; light: number }[] = [
+  { hue: .19, spread: .055, saturation: .18, light: .67 }, { hue: .19, spread: .055, saturation: .18, light: .67 },
+  { hue: .28, spread: .03, saturation: .1, light: .7 }, { hue: .22, spread: .04, saturation: .16, light: .74 }, { hue: .27, spread: .03, saturation: .1, light: .7 },
+];
+/** One species' card: `size` square, its base on the ground at the trunk, uv on the species' atlas cell. */
+function impostorGeometry(atlas: ImpostorAtlas, species: number): THREE.BufferGeometry {
+  const size = atlas.cells[species].size, count = atlas.cells.length, geometry = new THREE.PlaneGeometry(size, size).translate(0, size / 2, 0), uv = geometry.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) uv.setX(i, (species + uv.getX(i)) / count);
+  return geometry;
 }
 /** The same vertices and index under a geometry of its own, so a second view mesh can carry its own per-instance windRoot. */
 function twin(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
@@ -119,7 +153,7 @@ interface Cell { species: number; center: THREE.Vector3; first: number; count: n
  */
 interface Part { species: number; view: THREE.InstancedMesh; shadow: THREE.InstancedMesh | null; colors: Float32Array; shows: (state: number) => boolean; casts?: (state: number) => boolean }
 // A view mesh's windRoot attribute sits on its geometry; shadow meshes share that geometry but draw the rest pose and never read it.
-// Cell states: hidden, trunks only (map), trunks with reduced foliage, trunks with full foliage, reduced foliage alone (CROWN).
+// Cell states: hidden, trunks only (map), trunks with reduced foliage, trunks with full foliage, impostor cards alone (CROWN).
 const HIDDEN = 0, TRUNKS = 1, REDUCED = 2, FULL = 3, CROWNS = 4;
 const frustum = new THREE.Frustum(), viewProjection = new THREE.Matrix4();
 
@@ -143,15 +177,23 @@ export class Forest extends THREE.Group {
   private reach = Infinity;
   private roots: Float32Array[] = [];
   private warm = false;
-  /** `wind`: the trees sway (gpu and mobile; the cpu tier keeps the GLB materials and geometry untouched). */
-  async load(mobile: boolean, shadows = true, wind = false): Promise<void> {
-    const loader = new GLTFLoader();
-    const models = await Promise.all(['oak', 'ash'].map((name) => loader.loadAsync(import.meta.env.BASE_URL + 'models/trees/' + name + '.glb')));
+  /**
+   * `wind`: the trees sway (gpu and mobile; the cpu tier keeps the GLB materials and geometry untouched). `impostors`: cells past
+   * CROWN draw baked cards (gpu, where the summit view reaches them).
+   */
+  async load(mobile: boolean, shadows = true, wind = false, impostors = false): Promise<void> {
+    const loader = new GLTFLoader(), base = import.meta.env.BASE_URL + 'models/trees/', files = [...new Set(TREE_SPECIES.map(species => species.file))];
+    const [models, atlas] = await Promise.all([
+      Promise.all(files.map(file => loader.loadAsync(base + file + '.glb'))).then(loaded => new Map(files.map((file, i) => [file, loaded[i].scene]))),
+      impostors ? loadImpostors(base) : null,
+    ]);
     const planned = forestCells(this.sites);
-    for (let species = 0; species < models.length; species++) {
-      const parts: THREE.Mesh[] = []; models[species].scene.updateMatrixWorld(true);
-      models[species].scene.traverse((o) => { if (o instanceof THREE.Mesh) parts.push(o); });
+    for (let species = 0; species < TREE_SPECIES.length; species++) {
+      const { name, file } = TREE_SPECIES[species], scene = models.get(file)!, model = file === name ? scene : scene.getObjectByName(name)!;
+      const parts: THREE.Mesh[] = []; scene.updateMatrixWorld(true);
+      model.traverse((o) => { if (o instanceof THREE.Mesh) parts.push(o); });
       const sites = planned.filter((cell) => cell.species === species).map((cell) => cell.sites), total = sites.reduce((sum, cell) => sum + cell.length, 0);
+      if (!total) continue;
       const geometries = parts.map((source) => source.geometry.clone().applyMatrix4(source.matrixWorld));
       const bounds = geometries.reduce((sphere, geo) => { geo.computeBoundingSphere(); return sphere.radius < 0 ? sphere.copy(geo.boundingSphere!) : sphere.union(geo.boundingSphere!); }, new THREE.Sphere(new THREE.Vector3(), -1));
       const matrices = new Float32Array(total * 16), spheres = new Float32Array(total * 4), tints = parts.map(() => new Float32Array(total * 3));
@@ -167,27 +209,28 @@ export class Forest extends THREE.Group {
           matrix.compose(p, quaternion, new THREE.Vector3(scale, scale * (1 + (index % 3) * .035), scale)); matrix.toArray(matrices, next * 16);
           scaled.copy(bounds).applyMatrix4(matrix); if (cell.sphere.radius < 0) cell.sphere.copy(scaled); else cell.sphere.union(scaled);
           scaled.center.toArray(spheres, next * 4); spheres[next * 4 + 3] = scaled.radius;
-          // Spatial colour families read as woodland groves rather than alternating identical trees.
-          const grove = .5 + .5 * Math.sin(p.x * .038 + Math.sin(p.z * .047) * 2);
-          parts.forEach((source, i) => { color.setHSL(.19 + grove * .055, source.name === 'foliage' ? .18 + grove * .12 : .04, .67 + grove * .13 + (index % 3) * .025); color.toArray(tints[i], next * 3); });
+          // Spatial colour families read as woodland groves rather than alternating identical trees; conifers stay cooler.
+          const grove = .5 + .5 * Math.sin(p.x * .038 + Math.sin(p.z * .047) * 2), tint = TINTS[species];
+          parts.forEach((source, i) => { color.setHSL(tint.hue + grove * tint.spread, foliage(source) ? tint.saturation + grove * .12 : .04, tint.light + grove * .13 + (index % 3) * .025); color.toArray(tints[i], next * 3); });
           next++;
         }
         this.cells.push(cell);
       }
-      this.matrices[species] = matrices; this.spheres[species] = spheres; if (wind) this.roots[species] = windRoots(matrices);
+      this.matrices[species] = matrices; this.spheres[species] = spheres; if (wind || atlas) this.roots[species] = windRoots(matrices);
+      const height = geometries.reduce((top, geo) => { geo.computeBoundingBox(); return Math.max(top, geo.boundingBox!.max.y); }, 0);
       parts.forEach((source, i) => {
         const original = source.material as THREE.MeshStandardMaterial;
         original.envMapIntensity = .35;
         if (original.map) original.map.anisotropy = 4;
-        const foliage = source.name === 'foliage', reduced = foliage ? thinFoliage(geometries[i]) : null;
+        const leafy = foliage(source), reduced = leafy ? thinFoliage(geometries[i]) : null;
         // Each detail is its own instanced mesh and shader build anyway; the distant one sways more cheaply.
-        const material = wind ? swayingTreeMaterial(original, foliage) : original, far = wind ? swayingTreeMaterial(original, foliage, FOREST_DETAIL.coverage, true) : original;
+        const material = wind ? swayingTreeMaterial(original, leafy, FOREST_DETAIL.coverage, false, height) : original, far = wind ? swayingTreeMaterial(original, leafy, FOREST_DETAIL.coverage, true, height) : original;
         // Mobile always draws the thinned foliage; desktop thins it beyond NEAR metres. Distant views drop the twigs (sub-plan 25)
         // through one extra view-only mesh; the map's bare trunks and every shadow keep them.
-        const twigless = !foliage && FOREST_DETAIL.twigless;
-        const details: [THREE.BufferGeometry, THREE.Material, (state: number) => boolean, boolean, ((state: number) => boolean)?][] = !foliage
+        const twigless = !leafy && FOREST_DETAIL.twigless;
+        const details: [THREE.BufferGeometry, THREE.Material, (state: number) => boolean, boolean, ((state: number) => boolean)?][] = !leafy
           ? twigless ? [[geometries[i], material, (state) => state === FULL || state === TRUNKS, true, (state) => state >= TRUNKS], [dropTwigs(geometries[i]), far, (state) => state === REDUCED, false]] : [[geometries[i], material, (state) => state >= TRUNKS, true]]
-          : [[mobile ? reduced! : geometries[i], material, (state) => state === FULL, true], [mobile && wind ? twin(reduced!) : reduced!, far, (state) => state === REDUCED || state === CROWNS, true]];
+          : [[mobile ? reduced! : geometries[i], material, (state) => state === FULL, true], [mobile && wind ? twin(reduced!) : reduced!, far, (state) => state === REDUCED || (!atlas && state === CROWNS), true]];
         for (const [geometry, look, shows, casts, castShows] of details) {
           if (wind) addWindRoots(geometry, total);
           const instanced = (castShadow: boolean): THREE.InstancedMesh => {
@@ -200,6 +243,13 @@ export class Forest extends THREE.Group {
           this.parts.push({ species, view: instanced(false), shadow: shadows && casts ? instanced(true) : null, colors: tints[i], shows, casts: castShows });
         }
       });
+      if (atlas) {
+        // Far cells' cards take the foliage's grove tint, so a crown keeps its colour as it turns into a card.
+        const geometry = impostorGeometry(atlas, species); addWindRoots(geometry, total);
+        const view = new THREE.InstancedMesh(geometry, impostorMaterial(atlas, atlas.cells[species].size, FOREST_DETAIL.coverage), total);
+        view.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(total * 3), 3); view.count = 0; view.visible = false; view.name = name + ' impostors'; this.add(view);
+        this.parts.push({ species, view, shadow: null, colors: tints[Math.max(0, parts.findIndex(foliage))], shows: (state) => state === CROWNS });
+      }
     }
   }
   /**

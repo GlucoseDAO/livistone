@@ -1,5 +1,11 @@
 # Livistone: browser game implementation plan
 
+## Summit view, mountain trees and device detection — 6 October 2026
+
+From the Jepii Mici plateau the desktop (gpu) view now clears to 330 m and shows the whole town, the lake garden and the halls; trees beyond 160 m there are baked cards, which keep that view's triangles near the rest of the trail's (about 5M in `plateau-view`, against 6.75M without them) though it draws about 500 times a frame. Spruce and larch take over the slopes from about 15 m and dwarf pines grow on the high ground round the gorge; the gorge's crags are rougher and less regular; tall rock in front of cloud no longer shows the clouds through it, after a fix to the sky's mip levels. See `docs/realism/27-mountain-trail.md` (round 3). Measured headless on one laptop and on its RTX 4090 through Chrome's Vulkan flags (about 40 fps on the plateau); weaker desktop GPUs and every phone are untested for that view, which phones never take.
+
+Graphics detection: Auto picks Rich on flagship phone GPUs (tested on one Android phone, a HONOR Magic8 Pro), Balanced no longer caps the frame rate at 30 fps, and the graphics dropdown names the GPU drawing the town and, on Linux Chrome without WebGPU or with hardware acceleration off, the setting that holds it back (README). The music button now reads off while the browser blocks autoplay.
+
 ## Progressive loading — 6 October 2026
 
 Visitors reported long loading, some leaving before the town appeared. The town now builds only what the walking view can reach from the station before it shows; the lake garden, Future House, the Enhancement hill, both eye gates, the concept rotunda and the Jepii Mici trail (crags, signs, alpine plants, water) build after the first view, one at a time, nearest the player first, each with its collisions, reflections, night lights and shaders prepared before it appears (`src/world/town-parts.ts`; AGENTS.md describes the rule). Parts declare circles from their own layouts, so a new building needs only a footprint, and one without stays in the first load. A teleport or map jump to a part still on its way waits for what stands within half the view of its arrival ("Preparing …"), about 7–12 s right after the first view on this laptop, nothing once the parts are in. The garden's paths reach into the first view, so the town builds them with the arrival area.

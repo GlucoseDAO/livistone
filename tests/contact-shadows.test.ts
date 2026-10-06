@@ -4,7 +4,7 @@ import { CONTACT_GRID, CONTACT_WATER_FADE, createContactShadows, objectContactSi
 import { KEEP_DISPLAY } from '../src/render/output';
 import type { ContactSite } from '../src/world/contact-shadows';
 import { forestCells } from '../src/world/forest';
-import { forestSites } from '../src/world/forest-layout';
+import { DWARF_PINE, forestSites } from '../src/world/forest-layout';
 import { gatewayApproachWidth } from '../src/world/gateway-layout';
 import { contactFalloff, GROUND_SHADE_MIN, groundShadeField } from '../src/world/ground-cover';
 import { PATH_CURVES, PATH_WIDTH, WATER_CLEARANCE } from '../src/world/landscape';
@@ -106,9 +106,12 @@ describe('contact shadows', () => {
 
   it('batches every tier into one draw, with a crown and a trunk patch per tree', () => {
     for (const tier of [gpu, mobile]) {
-      expect(tier.groups.flat()).toHaveLength(tier.trees.length * 2);
+      // Only dwarf pines stand past the near grid, where no patch can lie on the ground (sub-plan 27, round 3).
+      const patched = tier.trees.filter((p, i) => treeContactSites(p, i).length), beyond = tier.trees.filter((p, i) => !treeContactSites(p, i).length);
+      expect(beyond.every(p => p.species === DWARF_PINE)).toBe(true);
+      expect(tier.groups.flat()).toHaveLength(patched.length * 2);
       expect(tier.cells.reduce((sum, cell) => sum + cell.sites.length, 0)).toBe(tier.trees.length);
-      expect(tier.shadows.patches).toBe(tier.trees.length * 2 + tier.bankRocks.length + tier.objects.length);
+      expect(tier.shadows.patches).toBe(patched.length * 2 + tier.bankRocks.length + tier.objects.length);
       // Rocks standing in the stream get no ground patch; every bank rock still does.
       expect(tier.bankRocks.length).toBeGreaterThan(tier.rocks.length * .9); expect(tier.bankRocks.length).toBeLessThan(tier.rocks.length);
       expect(tier.shadows.mesh).toBeInstanceOf(THREE.Mesh);

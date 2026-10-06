@@ -9,7 +9,7 @@
 // that haze; cream paper stays #f4f0e5 up close by day and night. Ambient occlusion and bloom (sub-plan 18, render/post.ts) act
 // on the linear radiance before tone mapping and leave display pixels alone.
 import * as THREE from 'three';
-import { Fn, abs, exp, float, length, materialReference, max, mix, mrt, normalize, output, positionLocal, positionView, positionWorld, renderGroup, sRGBTransferEOTF, sRGBTransferOETF, smoothstep, texture, toneMappingExposure, uniform, vec3, vec4 } from 'three/tsl';
+import { Fn, abs, exp, float, length, materialReference, max, mix, mrt, normalize, output, positionLocal, positionView, positionWorld, renderGroup, sRGBTransferEOTF, sRGBTransferOETF, smoothstep, step, texture, textureLoad, textureSize, toneMappingExposure, uniform, uv, ivec2, vec2, vec3, vec4 } from 'three/tsl';
 import type { Node, NodeBuilder } from 'three/webgpu';
 import type { PostMode } from '../game/graphics';
 import { AO, ScreenSpace } from './post';
@@ -102,7 +102,10 @@ export class OutputPipeline {
       // occlusion), turned back into linear radiance: a town surface hazed into this colour displays as the ranges behind it.
       const drawn = texture(this.target.textures[0]), shown = texture(this.target.textures[1]), material = new THREE.NodeMaterial();
       const display = fromSRGB(mix(toSRGB(toneMapNode(drawn.rgb as unknown as Node<'vec3'>, exposure)), toSRGB(displayFog.color as unknown as Node<'vec3'>), shown.g) as unknown as Node<'vec3'>);
-      material.fragmentNode = vec4(untoneMapNode(display, exposure), 1); material.name = 'aerial.behind';
+      // Alpha keeps whether the ranges stand there (they wrote depth) or only sky (cleared depth): aerial.ts fades to the blurred
+      // sky there. The scene depth is multisampled, read by load as post.ts reads it.
+      const depth = texture(this.target.depthTexture!), ranges = float(1).sub(step(.99999, textureLoad(depth, ivec2(uv().mul(vec2(textureSize(textureLoad(depth)) as unknown as Node<'ivec2'>)))).x));
+      material.fragmentNode = vec4(untoneMapNode(display, exposure), ranges); material.name = 'aerial.behind';
       // Sized once, before anything compiles, and never resized: a resize gives the target a new texture, and r186 refreshes the
       // object-group bindings of materials without node properties only when the material changes, so they would go on sampling
       // the destroyed one. Read by screenUV, it need not follow the render scale: the largest buffer the game draws (the screen at

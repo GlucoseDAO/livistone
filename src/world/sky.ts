@@ -150,7 +150,9 @@ function physicalDay(darkGround: boolean, tier: GraphicsTier, noise: THREE.Data3
     // The sun's disc, a little larger than the true 0.27° so it reads at screen resolution, with limb darkening.
     const sunAngle = acos(clamp(dot(d, vec3(SUN_DIR)), -1, 1)).toVar();
     if (!haze) sky.addAssign(vec3(...sunDisc).mul(float(1).sub(smoothstep(.0085, .0105, sunAngle))).mul(float(.55).add(cos(sunAngle.div(.0105).mul(1.4)).mul(.45))));
-    If(d.y.greaterThan(0), () => {
+    // The haze bake is the air's own light, which the clouds do not scatter into: a hazed cliff in front of cumulus fades to the clear
+    // sky's colour rather than taking the clouds' shapes (sub-plan 27, round 3).
+    if (!haze) If(d.y.greaterThan(0), () => {
       const clouds = cloudLayer(d, noise, q).toVar();
       sky.assign(sky.mul(clouds.w).add(clouds.xyz));
     });
@@ -284,6 +286,9 @@ export function* skyBake(renderer: THREE.WebGPURenderer, mobile: boolean, night 
   const bake = function* (faces: number): Generator<void, THREE.CubeRenderTarget> {
     const target = new THREE.CubeRenderTarget(faces, { type: tier === 'cpu' ? THREE.UnsignedByteType : THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
     const cameras = new THREE.CubeCamera(.1, 20, target); cameras.updateMatrixWorld(); cameras.coordinateSystem = renderer.coordinateSystem; cameras.updateCoordinateSystem();
+    // Allocate the cube with its mip chain now: three sizes a target's texture when it is first drawn, and generateMipmaps is off
+    // for the first five faces, so every bake had one level and the haze's blurred taps (aerial.ts) read the sharp sky, clouds and all.
+    renderer.initRenderTarget(target);
     for (let face = 0; face < 6; face++) {
       const previous = renderer.getRenderTarget(), cube = renderer.getActiveCubeFace(), level = renderer.getActiveMipmapLevel();
       target.texture.generateMipmaps = face === 5; renderer.setRenderTarget(target, face); renderer.render(scene, cameras.children[face] as THREE.Camera);

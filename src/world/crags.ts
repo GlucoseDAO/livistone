@@ -81,7 +81,7 @@ export function cragRegion(ground: CragGround): CragRegion {
     if (cragOnSnow(x, z)) return false;
     // The meadow inside the plateau's outline is walkable ground; where the crags rise steeply out of it, blocks may stand.
     if (cragOnMeadow(x, z) > 0 && ground.normal(x, z).slope < 40) return false;
-    return cragFloorClear(x, z, boulder) && !nearLine(GORGE_STREAM, x, z, .9) && brookDistance(x, z) > 1.2;
+    return cragFloorClear(x, z, boulder) && !nearLine(GORGE_STREAM, x, z, .9) && brookDistance(x, z) > 1.5;
   };
   return {
     ...CRAG_BOUNDS,
@@ -160,19 +160,21 @@ export class CragGround {
 // Shapes
 
 /** One slab between two bedding planes: its outline corners (local x, z, ordered by angle), heights and rounded edge. */
-interface Slab { corners: [number, number][]; cx: number; cz: number; y0: number; y1: number; bevel: number }
+interface Slab { corners: [number, number][]; cx: number; cz: number; y0: number; y1: number; bevel: number; tx: number; tz: number }
 interface Shape { slabs: Slab[]; crisp: boolean; lump: number }
 /** The block's outline, slabs and lumps follow from the site alone, so every tier and the collider share them. */
 const shapes = new WeakMap<CragSite, Shape>();
 function cragShape(site: CragSite): Shape {
   let shape = shapes.get(site); if (shape) return shape;
   const rand = random(site.seed), { width: w, depth: d, height: h, kind } = site;
-  const sides = kind === 'massive' ? 8 : kind === 'talus' ? 5 : 6, phase = rand();
+  // Round 3: outlines ragged enough (more sides, wider radius spread, a chipped corner, each bed turned a little) that the blocks
+  // no longer read as cut masonry; the crest's masses split into beds instead of standing as single pillows.
+  const sides = kind === 'massive' ? 9 : kind === 'talus' ? 5 : 7, phase = rand();
   const base = Array.from({ length: sides }, (_, k) => {
-    const a = (k + phase + (rand() - .5) * .5) / sides * TAU, r = .78 + rand() * .26;
+    const a = (k + phase + (rand() - .5) * .5) / sides * TAU, r = .66 + rand() * .44;
     return [Math.cos(a) * w / 2 * r, Math.sin(a) * d / 2 * r] as [number, number];
   });
-  const count = kind === 'massive' ? 1 : kind === 'talus' ? (rand() < .35 ? 2 : 1) : Math.max(2, Math.min(5, Math.round(h / (.8 + rand() * 1.1))));
+  const count = kind === 'massive' ? (h > 3.4 ? 3 : 2) : kind === 'talus' ? (rand() < .35 ? 2 : 1) : Math.max(2, Math.min(5, Math.round(h / (.8 + rand() * 1.1))));
   const parts = Array.from({ length: count }, () => .5 + rand() * 1.1), total = parts.reduce((a, b) => a + b, 0);
   // Higher beds of a step recede a little into the slope or, now and then, jut out over the one below.
   const run = 1 / Math.tan(Math.max(site.slope, 20) * DEG), recede = kind === 'bedded' ? rand() * .35 : 0, slabs: Slab[] = [];
@@ -180,12 +182,15 @@ function cragShape(site: CragSite): Shape {
   parts.forEach((part, i) => {
     const t = h * part / total, scale = (kind === 'bedded' ? 1 - .04 * i : 1) + (rand() - .5) * .14, overhang = kind === 'bedded' && i > 0 && rand() < .25 ? (.08 + rand() * .12) * d : 0;
     const dx = (rand() - .5) * .14 * w, dz = -recede * run * y + (rand() - .5) * .16 * d + overhang;
-    const corners = base.map(([cx, cz]) => { const r = .88 + rand() * .2; return [cx * scale * r + dx, cz * scale * r + dz] as [number, number]; });
-    const bevel = kind === 'massive' ? .32 * Math.min(w, d, h) : Math.min(.06 + rand() * .14, .22 * t, kind === 'talus' ? .2 * Math.min(w, d) : 1);
-    slabs.push({ corners, cx: corners.reduce((s, c) => s + c[0], 0) / sides, cz: corners.reduce((s, c) => s + c[1], 0) / sides, y0: y, y1: y + t, bevel });
+    const turn = (rand() - .5) * .22, cos = Math.cos(turn), sin = Math.sin(turn), chip = rand() < .45 ? Math.floor(rand() * sides) : -1, bite = .45 + rand() * .2;
+    const corners = base.map(([cx, cz], k) => { const r = (.82 + rand() * .3) * (k === chip ? bite : 1); return [(cx * cos - cz * sin) * scale * r + dx, (cx * sin + cz * cos) * scale * r + dz] as [number, number]; });
+    const bevel = kind === 'massive' ? Math.min(.14 * Math.min(w, d, h), .3 * t) : Math.min(.06 + rand() * .14, .22 * t, kind === 'talus' ? .2 * Math.min(w, d) : 1);
+    // Bed tops dip a little each their own way (metres per metre across the slab), so no two steps share a level.
+    const tx = (rand() - .5) * .16, tz = (rand() - .5) * .16;
+    slabs.push({ corners, cx: corners.reduce((s, c) => s + c[0], 0) / sides, cz: corners.reduce((s, c) => s + c[1], 0) / sides, y0: y, y1: y + t, bevel, tx, tz });
     y += t;
   });
-  shape = { slabs, crisp: kind !== 'massive', lump: kind === 'massive' ? .2 : kind === 'talus' ? .05 : .07 };
+  shape = { slabs, crisp: kind !== 'massive', lump: kind === 'massive' ? .14 : kind === 'talus' ? .07 : .1 };
   shapes.set(site, shape); return shape;
 }
 /** The block's frame: yaw, then tilt, at (x, y, z). */
@@ -237,10 +242,11 @@ export function cragObstacles(trees: readonly { x: number; z: number }[], boulde
   return [...trees.filter(near).map(t => ({ x: t.x, z: t.z, radius: .8 })), ...boulders.filter(near).map(b => ({ x: b.x, z: b.z, radius: rockReach(b.s) + .2 }))];
 }
 /** Most blocks a region holds: face blocks (steps, ledges and masses) and talus, besides the gorge's lining and floor boulders. */
-const CAPS = { face: 300, talus: 70 };
+// Round 3 raised both, so fewer of the steep faces between blocks show the two-metre grid's smooth planes.
+const CAPS = { face: 440, talus: 100 };
 const GRID = 8;
 /** How far a block's rendered lumps and bulging beds may stand beyond the corners of its outline, metres. */
-export const LUMPS = .15;
+export const LUMPS = .2;
 /** Seats and keeps blocks that stand clear of the trail, the obstacles, the region's ground and the blocks already kept. */
 class Placer {
   readonly sites: CragSite[] = [];
@@ -269,7 +275,16 @@ class Placer {
     const open = this.region.open, clear = this.region.clear;
     // The outline is the slabs' corners; rendered lumps and bulges stand up to `LUMPS` beyond it.
     if (outline.some(p => trailDistance(p.x, p.z) < site.trail + LUMPS || (open && !open(p.x, p.z)))) return false;
-    if (clear && outline.some(p => { const above = p.y + site.y - this.ground.near(p.x, p.z); return above > -1.5 && above < 2.5 && !clear(p.x, p.z, site); })) return false;
+    if (clear) {
+      // Every outline column, at the corners and halfway along each edge (gpu draws those), wherever any of its height comes near
+      // the ground: a tall block's buried foot and high top once let the wall between them stand over the brook.
+      const matrix = frame(site, 0), columns = shape.slabs.flatMap(slab => slab.corners.flatMap((c, k) => {
+        const n = slab.corners[(k + 1) % slab.corners.length];
+        return [c, [(c[0] + n[0]) / 2, (c[1] + n[1]) / 2]].map(([x, z]) => [new THREE.Vector3(x, slab.y0, z).applyMatrix4(matrix), new THREE.Vector3(x, slab.y1, z).applyMatrix4(matrix)]);
+      }));
+      const near = (p: THREE.Vector3): number => p.y + site.y - this.ground.near(p.x, p.z);
+      if (columns.some(([low, high]) => Math.min(near(low), near(high)) < 2.5 && Math.max(near(low), near(high)) > -1.5 && (!clear(low.x, low.z, site) || !clear(high.x, high.z, site)))) return false;
+    }
     const end = { x: TERRAIN_GRID.minX + (TERRAIN_GRID.columns - 1) * TERRAIN_GRID.step, z: TERRAIN_GRID.minZ + (TERRAIN_GRID.rows - 1) * TERRAIN_GRID.step };
     site.collider = outline.some(p => p.x > TERRAIN_GRID.minX && p.x < end.x && p.z > TERRAIN_GRID.minZ && p.z < end.z);
     this.sites.push(site);
@@ -313,6 +328,14 @@ function gorgeSites(placer: Placer, rand: () => number): void {
       const back = out(face + .5 + depth / 2);
       if (!placer.place(block, 0) && !placer.place({ ...block, width: width * .7, depth: depth + .4, x: back.x, z: back.z }, 0)) placer.place({ ...block, width: 1.6, depth: depth + .4, x: back.x, z: back.z, kind: 'bedded' }, 0);
     }
+  }
+  // Low blocks at the waterfall wall's foot either side of its pool, where the two-metre ground left fins between the sheet's slot
+  // and the lining (round 3): set against the wall, clear of the pool and the falling water.
+  for (const along of [-5.2, -3.6, 3.4, 5]) {
+    const draws = Array.from({ length: 6 }, rand), s = STAGE.waterfall + along + (draws[0] - .5), half = gorgeHalf(s), p = besideTrail(s, half - .2), foot = WATERFALL.foot;
+    if (Math.hypot(p.x - foot.x, p.z - foot.z) < 3.2) continue;
+    const axis = besideTrail(s, 0), yaw = Math.atan2(axis.x - p.x, axis.z - p.z), width = 1.8 + draws[1] * 1.2, tilt = bedDip(draws[2]);
+    placer.place(site({ x: p.x, z: p.z, yaw, tilt: [tilt.x, tilt.y, tilt.z, tilt.w], width, depth: 2.2 + draws[3], height: 1.6 + draws[4] * 1.4, kind: 'bedded', seed: Math.floor(draws[5] * 2 ** 31), slope: 60, hung: false, trail: TRAIL_HALF + .9, rank: draws[0] }), 0);
   }
   // Boulders on the floor along the walls, more of them and bigger under the waterfall: a fallen-rock cone, off its pool.
   for (let k = 0, placed = 0; k < 400 && placed < 34; k++) {
@@ -426,8 +449,10 @@ function emitBlock(out: Builder, site: CragSite, detail: Detail, ground: CragGro
     // rounding and pushed out or in by the block's lumps. Walls, their duplicated sharp corners and the caps all reuse them.
     const grid = rows.map(row => Array.from({ length: columns }, (_, c) => {
       const a = slab.corners[Math.floor(c / detail.split)], e = slab.corners[(Math.floor(c / detail.split) + 1) % sides], u = (c % detail.split) / detail.split;
-      const x = a[0] + (e[0] - a[0]) * u, z = a[1] + (e[1] - a[1]) * u, y = slab.y0 + row.h, q = inset(slab, x, z, row.in, y), rx = x - slab.cx, rz = z - slab.cz, r = Math.hypot(rx, rz) || 1;
-      const bump = row.lump ? (noise(x * .9 + site.seed % 97, y * .9, z * .9, site.seed) - .5) * 2 * shape.lump : 0;
+      const x = a[0] + (e[0] - a[0]) * u, z = a[1] + (e[1] - a[1]) * u, rx = x - slab.cx, rz = z - slab.cz, r = Math.hypot(rx, rz) || 1;
+      const y = slab.y0 + row.h + (slab.tx * rx + slab.tz * rz) * row.h / t, q = inset(slab, x, z, row.in, y);
+      // Broad lumps and a finer fracture relief on top of them.
+      const bump = row.lump ? ((noise(x * .9 + site.seed % 97, y * .9, z * .9, site.seed) - .5) * 2 + (noise(x * 2.4, y * 2.4 + site.seed % 89, z * 2.4, site.seed ^ 0x2c1b) - .5) * .9) * shape.lump : 0;
       return q.set(q.x + rx / r * bump, y, q.z + rz / r * bump).applyMatrix4(matrix);
     }));
     // Darker where the rock meets the ground: only the lowest slab (or a tumbled boulder) reaches it.
@@ -449,7 +474,8 @@ function emitBlock(out: Builder, site: CragSite, detail: Detail, ground: CragGro
       const centre = out.add(new THREE.Vector3(slab.cx, y, slab.cz).applyMatrix4(matrix), ao, moss, tint), ids = Array.from({ length: columns }, (_, c) => vertex(r, c, ao, moss));
       for (let c = 0; c < columns; c++) { const a = ids[c], e = ids[(c + 1) % columns]; if (up) out.index.push(centre, e, a); else out.index.push(centre, a, e); }
     };
-    cap(rows.length - 1, slab.y1 + dome, true, 1, .5 + .5 * rand());
+    // Ledge tops hold turf (the owner's waterfall photograph): most caps carry nearly full moss.
+    cap(rows.length - 1, slab.y1 + dome, true, 1, .7 + .3 * rand());
     if (s > 0 || closed || site.hung) cap(0, slab.y0 - dome * .5, false, .5, 0);
   });
 }

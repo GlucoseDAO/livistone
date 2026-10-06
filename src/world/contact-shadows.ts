@@ -9,6 +9,9 @@ import { COLLECTION } from '../game/exhibits';
 import { FUTURE_HOUSE, TOWER_WALK } from './elevated-layout';
 import { ENHANCEMENT_SIGN, GALLERY, POSTER_SITES, STAND_SITES } from './enhancement-layout';
 import { TREE_CANOPY, treeScale } from './forest';
+import { treeSpecies } from './forest-layout';
+/** A forest site as treeSpecies reads it: its height picks a mountain conifer, `species` pins one. */
+type Site = { x: number; y?: number; z: number; species?: number };
 import { GATEWAY, GATEWAY_POSTER } from './gateway-layout';
 import { GLUCOSE_PAVILION, GLUCOSE_POSTERS } from './glucose-layout';
 import { contactFalloff } from './ground-cover';
@@ -126,8 +129,10 @@ export function createContactShadows(fixed: readonly ContactSite[], groups: read
 
 /** A crown-wide patch and a tight contact at the trunk, both scaled with the tree. The crown patch stays light: the baked ground
  *  shade already dims the sky light under it, and the trees' own shade sits in the dark toe of the output pass's tone curve. */
-export function treeContactSites(p: { x: number; z: number }, index: number): ContactSite[] {
-  const scale = treeScale(index), crown = TREE_CANOPY[index % 2] * scale * .85, trunk = 1.3 * scale;
+export function treeContactSites(p: Site, index: number): ContactSite[] {
+  const scale = treeScale(index), crown = TREE_CANOPY[treeSpecies(p, index)] * scale * .85, trunk = 1.3 * scale;
+  // Past the near grid (the highest dwarf pines) no patch could lie on the coarser rendered ground.
+  if (p.z - crown < CONTACT_GRID.minZ) return [];
   return [{ x: p.x, z: p.z, rx: crown, rz: crown, strength: .3 }, { x: p.x, z: p.z, rx: trunk, rz: trunk, strength: .7 }];
 }
 /** How far a bank boulder's patch reaches past its silhouette (ROCK_STRETCH × s), growing with the rock as its shade would. */
@@ -197,8 +202,8 @@ export function objectContactSites(): ContactSite[] {
 }
 
 /** Ground-shade discs for the baked occlusion: a soft crown disc and a darker ring around each trunk. */
-export function treeShadeDiscs(sites: readonly { x: number; z: number }[]): ShadeDisc[] {
-  return sites.flatMap((p, index): ShadeDisc[] => { const scale = treeScale(index); return [{ x: p.x, z: p.z, radius: TREE_CANOPY[index % 2] * scale * .9, strength: .28 }, { x: p.x, z: p.z, radius: 1.4 * scale, strength: .32 }]; });
+export function treeShadeDiscs(sites: readonly Site[]): ShadeDisc[] {
+  return sites.flatMap((p, index): ShadeDisc[] => { const scale = treeScale(index); return [{ x: p.x, z: p.z, radius: TREE_CANOPY[treeSpecies(p, index)] * scale * .9, strength: .28 }, { x: p.x, z: p.z, radius: 1.4 * scale, strength: .32 }]; });
 }
 /** Buildings whose walls or overhangs shade the ground at their foot. Paved rings and floors cover the inside; the reach outside matters. */
 export const TOWN_SHADE_FOOTPRINTS: readonly ShadeFootprint[] = [

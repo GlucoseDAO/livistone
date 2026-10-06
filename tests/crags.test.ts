@@ -72,10 +72,11 @@ describe('limestone crags (sub-plan 27, round 2)', () => {
     for (const tier of ['gpu', 'mobile', 'cpu'] as const) expect(cragsDrawn(sites, tier).filter(s => s.collider).length).toBe(sites.filter(s => s.collider).length);
   });
 
-  it('stay within budget: one mesh, at most 150k triangles on gpu, 50k on mobile, fewer on cpu, and the same blocks every time', () => {
+  // Round 3 placed more blocks over the steep faces' smooth planes: the budgets rose from 150k and 50k.
+  it('stay within budget: one mesh, at most 180k triangles on gpu, 60k on mobile, fewer on cpu, and the same blocks every time', () => {
     const triangles = (tier: 'gpu' | 'mobile' | 'cpu'): number => cragGeometry(sites, tier, ground).index!.count / 3;
     const gpu = triangles('gpu'), mobile = triangles('mobile'), cpu = triangles('cpu');
-    expect(gpu).toBeLessThan(150_000); expect(mobile).toBeLessThan(50_000); expect(cpu).toBeLessThanOrEqual(mobile);
+    expect(gpu).toBeLessThan(180_000); expect(mobile).toBeLessThan(60_000); expect(cpu).toBeLessThanOrEqual(mobile);
     expect(cragSites({ ground }).map(s => [s.x, s.y, s.z, s.seed])).toEqual(sites.map(s => [s.x, s.y, s.z, s.seed]));
     expect(TRAIL_SAMPLES.length).toBeGreaterThan(STAGE.head);
   });

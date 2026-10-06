@@ -6,37 +6,29 @@ Work from a worktree, not the owner's checkout `~/sources/livistone` (it holds a
 
 ## Next, in order
 
-### 1. Summit view (owner's decision: "clear view, desktop only") — first look awaiting the owner
+### 1. Summit view follow-ups (27, round 3)
 
-Built on branch `realism/summit-view` (pushed, not merged): on the gpu tier, high on the plateau, the walking fog eases from 130 m to 330 m and the far plane, distant pass, haze and town culling follow; far forest cells draw crowns only. Review `review/summit-view/`; numbers and open points in [27](27-mountain-trail.md#summit-view-4-october-2026-branch-realismsummit-view-awaiting-the-owner). `plateau-view`: 131 → 368 calls, 2.41M → 6.75M triangles, headless 11 → about 5 fps. Open: far trees (160–300 m) read as sparse speckles; the dark dotted line along the ridge was the sky taking ambient occlusion, fixed on `main` (rebase the branch). The owner picks: impostor cards for far trees, a shorter summit fog (about 250 m), or merge as is.
+- The faint dotted line across the valley mist along a ridge, seen from the plateau: multisampled edges between hazed town terrain and the distant pass. A fix would copy the distant pass's raw radiance and mist factor into `AERIAL_BEHIND` and have hazed town fragments write that mist factor too.
+- The summit view draws the whole town (509 calls in `plateau-view`, the concept rotunda alone 108): a coarser far detail for town parts past about 200 m would be the next lever. About 40 fps on an RTX 4090 through Chrome's Vulkan flags; weaker gpu-tier machines untested.
 
-### 2. Jepii Mici follow-ups (27)
-
-- The crags read as rock now, but up close blocks look built (bevelled slabs) and the crest's rounded masses like pillows; the 60° terrain faces between and above blocks are smooth; a few fins remain at the wall foot in the waterfall slot. The 2 m terrain grid cannot draw sheer walls (they alias into fins): keep sheer rock in meshes.
-- Conifers: the gorge and upper woods have only oak and ash. EZ-Tree (already a dev dependency) has `Pine Small/Medium/Large` presets; a spruce GLB via `scripts/generate-trees.mjs` (hard-coded to port 5173: make the URL configurable) and a mountain species mix above about 15 m would match the owner's photographs (spruce and larch above the gorge, dwarf pine on ledges). Budget the extra forest draws.
-- The waterfall photo has grassy ledges with dwarf pines and larches on the cirque walls; the gully photo has the stream running out under a thick snow lip (the water branch's snow cave).
-- Round 2's `mountain` set on touch and software (day) and desktop night is captured in `review/27-mountain-tiers/main/` (no before; for reference).
-
-- Haze (21) against cloud: tall rock 100–130 m away (the north ridge's crags in `ridge-north`) fades into what the distant pass drew behind it, which there is cumulus, so the cliff reads as translucent with clouds through it. Before the haze follow-up it faded to the horizon haze instead (a pale cut-out). Owner to judge; one option is to fade toward the haze cube's blurred sky (no clouds) above the horizon and toward the distant pass only near and below it.
-
-### 3. Tests and verification (task 6)
+### 2. Tests and verification (task 6)
 
 - Run the full suite on both backends on a quiet machine (the WebGL 2 fallback's post and night specs now allow 240 s, with the reason in each spec).
 - One Android phone is tested (HONOR Magic8 Pro, Adreno 840, Chrome 154, 6 October 2026: Auto picks Rich, 41–47 fps at CSS resolution). Other physical devices, Safari 26 (macOS, iOS) and Firefox remain untested.
 - WebGPU guard: Chrome on a Linux laptop with Intel and NVIDIA graphics and Vulkan on without the ANGLE flags renders WebGPU on the NVIDIA card and presents nothing (Dawn `ImportMemory` validation errors). Falling back to WebGL when the first frames raise such errors needs `render/renderer.ts`, which feeds the probe signature: batch it with the next probe rebake.
 
-### 4. Parked work (task 7)
+### 3. Parked work (task 7)
 
 - **08 building materials:** WIP `5d893ca` on `realism/08-materials` (worktree `07-08-materials`), built on the old 07; rebase onto `main`, finish, review.
 - **15 water reflections:** uncommitted work in worktree `15-reflections` (6 files, based on `36eca2b`); commit as WIP first, then rebase (conflicts with 21 in `output.ts` and `main.ts`).
 - **05 golden hour:** not started; builds on 26's atmosphere and 21's haze.
 
-### 5. Housekeeping (task 8)
+### 4. Housekeeping (task 8)
 
 - Stale remote branches `origin/realism/16-contact`, `origin/realism/21-on-round-2`: delete only with the owner's approval.
 - Worktrees left: `integration` (tracks `origin/main`), `main-baseline` (detached, port 5194), `07-08-materials` and `15-reflections` (parked work above).
 
-### 6. Loading time (after progressive loading, 6 October 2026)
+### 5. Loading time (after progressive loading, 6 October 2026)
 
 What still holds the first view, measured on the production build (headless, one laptop; not device timings):
 
@@ -50,7 +42,7 @@ What still holds the first view, measured on the production build (headless, one
 
 1. **Ground look** a (default) or b (`review/combined-04-03`), **river look** a or b: unconfirmed.
 2. **Grass colour** (13): the near blades read slightly lighter and yellower than the ground texture.
-3. Round-3 decisions already made (4 October 2026): station amber deeper honey, keep the pierced plate, leave the ring view; summit view clear on desktop only.
+3. Round-3 decisions already made (4 October 2026): station amber deeper honey, keep the pierced plate, leave the ring view; summit view clear on desktop only (6 October: far trees as impostor cards).
 
 ## Rules for agents (binding)
 

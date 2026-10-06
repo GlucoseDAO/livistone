@@ -1,8 +1,10 @@
+import { DWARF_PINE, LARCH, SPRUCE, TREE_SPECIES, forestSites, treeSpecies } from '../src/world/forest-layout';
+import { mountainClearing, trailCorridor } from '../src/world/mountain-layout';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { positionLocal } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { Forest, SHADOW_LAYER, forestLod, swayingTreeMaterial } from '../src/world/forest';
+import { Forest, SHADOW_LAYER, TREE_CANOPY, forestCells, forestLod, swayingTreeMaterial } from '../src/world/forest';
 import { WIND_ROOT } from '../src/world/wind';
 import { aerialFog, aerialParams } from '../src/render/aerial';
 import { TREE_REACH, graphicsProfile } from '../src/game/graphics';
@@ -30,10 +32,15 @@ describe('forest distance detail', () => {
 });
 
 // Stand-ins for the two GLB models: a branch mesh and an alpha-tested foliage mesh, with the GLB parts' names and materials.
-GLTFLoader.prototype.loadAsync = async function () {
-  const scene = new THREE.Group(), branches = new THREE.CylinderGeometry(.2, .3, 12, 6).translate(0, 6, 0), foliage = new THREE.PlaneGeometry(4, 4, 6, 6).translate(0, 9, 0);
-  scene.add(Object.assign(new THREE.Mesh(branches, new THREE.MeshStandardMaterial({ color: '#7a6a50', roughness: .9 })), { name: 'branches' }));
-  scene.add(Object.assign(new THREE.Mesh(foliage, new THREE.MeshStandardMaterial({ color: '#8eaa5e', roughness: .9, alphaTest: .45, side: THREE.DoubleSide })), { name: 'foliage' }));
+// conifers.glb holds one group per species, its parts' names suffixed as GLTFLoader makes them unique.
+GLTFLoader.prototype.loadAsync = async function (url: string) {
+  const tree = (suffix = ''): THREE.Group => {
+    const group = new THREE.Group(), branches = new THREE.CylinderGeometry(.2, .3, 12, 6).translate(0, 6, 0), foliage = new THREE.PlaneGeometry(4, 4, 6, 6).translate(0, 9, 0);
+    group.add(Object.assign(new THREE.Mesh(branches, new THREE.MeshStandardMaterial({ color: '#7a6a50', roughness: .9 })), { name: 'branches' + suffix }));
+    group.add(Object.assign(new THREE.Mesh(foliage, new THREE.MeshStandardMaterial({ color: '#8eaa5e', roughness: .9, alphaTest: .45, side: THREE.DoubleSide })), { name: 'foliage' + suffix }));
+    return group;
+  };
+  const scene = url.includes('conifers') ? new THREE.Group().add(...['spruce', 'larch', 'dwarf-pine'].map((name, i) => Object.assign(tree(i ? '_' + i : ''), { name }))) : tree();
   return { scene } as unknown as Awaited<ReturnType<InstanceType<typeof GLTFLoader>['loadAsync']>>;
 };
 const sites = Array.from({ length: 40 }, (_, i) => new THREE.Vector3((i % 8) * 14 - 50, (i % 3) * .4, Math.floor(i / 8) * 15 - 40));
@@ -88,5 +95,20 @@ describe('forest reach', () => {
     expect(selections).toBe(first);
     trees.update(camera, low + 4, false);
     expect(drawn(trees)).toBe(await fresh(low + 4));
+  });
+});
+
+describe('forest species (sub-plan 27, round 3)', () => {
+  it('keeps the valley alternating oak and ash, puts conifers on the slopes and dwarf pines on the high ground off the trail', () => {
+    const sites = forestSites(false), species = sites.map((p, index) => treeSpecies(p, index));
+    sites.forEach((p, index) => { if (p.y < 11 && p.species === undefined) expect(species[index], `site ${index}`).toBe(index % 2); });
+    const conifers = sites.filter((_, index) => species[index] === SPRUCE || species[index] === LARCH);
+    expect(conifers.length).toBeGreaterThan(80); expect(conifers.every(p => p.y > 11)).toBe(true);
+    const pines = sites.filter((_, index) => species[index] === DWARF_PINE);
+    expect(pines.length).toBeGreaterThan(30);
+    for (const p of pines) { expect(p.y).toBeGreaterThan(28); expect(trailCorridor(p.x, p.z) || mountainClearing(p.x, p.z)).toBe(false); }
+    // Every species the cells name is one Forest loads, with a canopy for its clearance and shade.
+    expect(new Set(forestCells(sites).map(cell => cell.species))).toEqual(new Set(TREE_SPECIES.map((_, i) => i)));
+    expect(TREE_CANOPY).toHaveLength(TREE_SPECIES.length);
   });
 });
