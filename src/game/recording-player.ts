@@ -6,12 +6,16 @@ export class RecordingPlayer {
   private generation = 0;
   private hidden = false;
   private started = false;
+  /** The browser refused to start without a gesture. The radio stays on, armed for the next one, but nothing is heard yet. */
+  private blocked = false;
   enabled = true;
   /** Every control that shows the state: the loading screen's button, then the game's toolbar and menu. */
   private readonly listeners = new Set<(enabled: boolean) => void>();
   constructor(private readonly tracks: readonly string[]) {}
   onStateChange(listener: (enabled: boolean) => void): void { this.listeners.add(listener); }
-  private changed(): void { for (const listener of this.listeners) listener(this.enabled); }
+  /** What the sound buttons show: on only while the radio is on and the browser lets it play. */
+  get audible(): boolean { return this.enabled && !this.blocked; }
+  private changed(): void { for (const listener of this.listeners) listener(this.audible); }
   // A first press on a sound button is that button's toggle: starting playback for it too would make the toggle silence it.
   private readonly unlock = (event: Event): void => { if (!(event.target instanceof Element && event.target.closest('[data-sound-toggle]'))) this.resume(); };
   start(): void {
@@ -39,6 +43,7 @@ export class RecordingPlayer {
     if (audio.getAttribute('src') !== url) audio.src = url;
     if (!audio.paused) return;
     await audio.play();
+    if (this.blocked) { this.blocked = false; this.changed(); }
     if (!this.enabled || this.hidden) audio.pause();
     else {
       window.removeEventListener('pointerdown', this.unlock, true);
@@ -46,18 +51,20 @@ export class RecordingPlayer {
     }
   }
   private failure(error: unknown, token: number): void {
-    // A blocked autoplay remains armed for the visitor's first gesture.
-    if (token !== this.generation || (error instanceof DOMException && error.name === 'NotAllowedError')) return;
+    if (token !== this.generation) return;
+    // A blocked autoplay remains armed for the visitor's first gesture; until then the buttons show the silence.
+    if (error instanceof DOMException && error.name === 'NotAllowedError') { if (!this.blocked) { this.blocked = true; this.changed(); } return; }
     this.enabled = false; this.audio?.pause(); this.changed();
   }
   async toggle(): Promise<boolean> {
     const token = ++this.generation;
     clearTimeout(this.timer); this.timer = undefined;
-    this.enabled = !this.enabled;
+    // While blocked the buttons read off, so a press there means play: turning the radio off would leave the town silent.
+    this.enabled = this.blocked || !this.enabled;
     if (!this.enabled) this.audio?.pause();
     else try { await this.play(); } catch (error) { this.failure(error, token); }
     this.changed();
-    return this.enabled;
+    return this.audible;
   }
   suspend(): void { this.hidden = true; clearTimeout(this.timer); this.timer = undefined; this.audio?.pause(); }
   resume(): void {

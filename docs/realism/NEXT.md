@@ -22,7 +22,8 @@ Built on branch `realism/summit-view` (pushed, not merged): on the gpu tier, hig
 ### 3. Tests and verification (task 6)
 
 - Run the full suite on both backends on a quiet machine (the WebGL 2 fallback's post and night specs now allow 240 s, with the reason in each spec).
-- Physical devices, Safari 26 (macOS, iOS), Firefox and an Android phone remain untested.
+- One Android phone is tested (HONOR Magic8 Pro, Adreno 840, Chrome 154, 6 October 2026: Auto picks Rich, 41–47 fps at CSS resolution). Other physical devices, Safari 26 (macOS, iOS) and Firefox remain untested.
+- WebGPU guard: Chrome on a Linux laptop with Intel and NVIDIA graphics and Vulkan on without the ANGLE flags renders WebGPU on the NVIDIA card and presents nothing (Dawn `ImportMemory` validation errors). Falling back to WebGL when the first frames raise such errors needs `render/renderer.ts`, which feeds the probe signature: batch it with the next probe rebake.
 
 ### 4. Parked work (task 7)
 

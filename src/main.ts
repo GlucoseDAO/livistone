@@ -28,7 +28,8 @@ import { ambience } from './game/audio';
 import { LANDMARKS, DISCOVERIES, SPAWN, readProgress, writeProgress } from './game/content';
 import { graphicsProfile } from './game/graphics';
 import { chosenTier, GRAPHICS_CHOICE_KEY, parseGraphicsChoice, readGraphicsChoice } from './game/graphics-choice';
-import type { PostMode } from './game/graphics';
+import type { AdapterInfo, GraphicsTier, PostMode } from './game/graphics';
+import { declineOffer, declinedOffers, deviceNote, deviceTier, firstTip, gpuLabel, graphicsTip, platform, TierAdvisor, webglRenderer } from './game/device-tier';
 import { nextTimeOfDay, parseTimeOfDay, readTimeOfDay, resolveNight, saveTimeOfDay } from './game/daylight';
 import type { TimeOfDay } from './game/daylight';
 import { NightLighting } from './world/night-lighting';
@@ -130,6 +131,11 @@ class Game {
   private readonly direction = new THREE.Vector3();
   private readonly point = new THREE.Vector3();
   private readonly graphics: RenderView['graphics'];
+  /** What Auto picks here, and the GPU's WebGL name, read once and only when needed (game/device-tier.ts). */
+  private readonly automaticTier: GraphicsTier;
+  private readonly gpuName: () => string;
+  /** Auto's guess checked against the walking frame rate; absent once the visitor chose a level. */
+  private advisor?: TierAdvisor;
   private renderScale: number;
   private scaler: RenderScale;
   /** Dev-only: draws of the last frame by top-level town group, all passes (snapshot().budget). */
@@ -173,10 +179,12 @@ class Game {
   private cursorDirty = false;
   constructor(private ui: UI, private readonly view: RenderView) {
     this.ambience.onStateChange(enabled => this.ui.setSound(enabled));
-    this.ui.setSound(this.ambience.enabled);
+    this.ui.setSound(this.ambience.audible);
     this.ambience.start();
     this.renderer = view.renderer; this.graphics = view.graphics;
-    const choice = readGraphicsChoice(), automaticTier = this.graphics.tier;
+    let gpuName: string | undefined; this.gpuName = () => gpuName ??= webglRenderer((view.renderer.backend as { gl?: WebGL2RenderingContext }).gl);
+    const detected = deviceTier(this.graphics, this.gpuName); if (detected !== this.graphics.tier) Object.assign(this.graphics, graphicsProfile(detected));
+    const choice = readGraphicsChoice(), automaticTier = this.automaticTier = this.graphics.tier;
     Object.assign(this.graphics, graphicsProfile(chosenTier(choice, this.graphics.tier)));
     if (import.meta.env.DEV) {
       const override = new URLSearchParams(location.search).get('graphics');
@@ -189,6 +197,7 @@ class Game {
     // The night pool, hall and station lamps: room for the pool plus the fixed lamps (render/lighting.ts).
     this.renderer.lighting = new TownLighting({ maxPointLights: this.graphics.lights + 8 });
     this.renderScale = this.graphics.pixelRatio; this.scaler = new RenderScale(this.hardwareLight ? LIGHTWEIGHT_GPU_SCALE : SCALE_RULES[this.graphics.tier], this.renderScale);
+    if (choice === 'auto' && !this.capture && !(import.meta.env.DEV && new URLSearchParams(location.search).has('graphics'))) this.advisor = new TierAdvisor(this.graphics.tier, this.graphics.software, this.scaler.rule.target, declinedOffers());
     if (import.meta.env.DEV) this.drawBudget = trackDraws(this.renderer.info, (object) => this.drawGroup(object));
     this.reduced = this.graphics.reduced; this.lowQuality = this.reduced;
     this.ranges = this.graphics.tier !== 'cpu' && ridgesLook() === 'ranges'; if (this.ranges) this.mapCamera.layers.enable(FAR_LAYER);
@@ -330,7 +339,7 @@ class Game {
     // Resizing clears the canvas; reveal only after a complete walking frame, including its nearby lights, reaches the GPU.
     await this.gpuFinished(); await new Promise(resolve => requestAnimationFrame(resolve));
     await loadingStage(100, 'Welcome to Livistone');
-    this.started = true; this.input.active = true; this.ui.ready(); this.town.startStreaming(); this.lastTime = performance.now(); this.frameId = requestAnimationFrame(this.frame);
+    this.started = true; this.input.active = true; this.ui.ready(); if (graphicsTip({ ...this.graphics, tier: this.automaticTier }, this.view.backend, platform()) && firstTip()) this.ui.toast('Tip: the Graphics menu (top right) explains how to get a sharper town on this computer.', 9000); this.town.startStreaming(); this.lastTime = performance.now(); this.frameId = requestAnimationFrame(this.frame);
     this.mark('ready', true); void this.streamParts();
   }
   /**
@@ -452,6 +461,7 @@ class Game {
       const next = action === 'journal' ? 'journal' : action === 'teleport' ? 'teleport' : action === 'graphics' ? 'graphics' : 'paused';
       if (this.mode === next) { this.setMode(this.returnMode); if (next === 'teleport') this.ui.focusTeleport(); if (next === 'graphics') this.ui.focusGraphics(); return; }
       if (this.mode === 'walking' || this.mode === 'map') this.returnMode = this.mode;
+      if (next === 'graphics') this.ui.setGraphicsDevice(deviceNote({ ...this.graphics, tier: this.automaticTier }, this.view.backend, gpuLabel(this.gpuName(), (this.renderer.backend as { device?: { adapterInfo?: AdapterInfo } }).device?.adapterInfo), platform()));
       this.loreFromJournal = false; this.setMode(next); return;
     }
     if (action.startsWith('time-of-day:')) {
@@ -517,6 +527,8 @@ class Game {
       this.input.requestJump();
     } else if (action === 'sound') {
       try { this.ui.setSound(await this.ambience.toggle()); } catch { this.ui.toast('Sound is unavailable in this browser.'); }
+    } else if (action.startsWith('graphics-offer:dismiss:')) {
+      declineOffer(this.automaticTier + ':' + action.split(':')[2]); this.ui.hideGraphicsOffer();
     } else if (action.startsWith('performance:')) {
       const choice = parseGraphicsChoice(action.split(':')[1]); if (choice === readGraphicsChoice()) return;
       try { localStorage.setItem(GRAPHICS_CHOICE_KEY, choice); } catch { this.ui.toast('Could not save the performance setting.'); return; }
@@ -573,6 +585,9 @@ class Game {
         facts: 'AI-generated architectural concept · Livistone' }));
       this.galleryReturn = 'walking'; this.ui.gallery.showAlbum(images, panels.indexOf(hit.object as THREE.Mesh)); this.setMode('gallery'); return;
     }
+    // An outside link (enhancement.bio's posters, the cabin's advertisements) opens its site, as README promises, before the
+    // story the same face also carries for the E key.
+    if (typeof data.href === 'string' && /^https?:/.test(data.href)) { window.open(data.href, '_blank', 'noopener,noreferrer'); return; }
     if (data.gatePoster) { this.discover(data.piece === 'eye-of-winter' ? 'winter-gate-story' : 'eyelense-gate-story'); return; }
     const piece = COLLECTION.find(p => p.discovery === data.piece);
     if (piece) { this.discover(piece.discovery); return; }
@@ -624,8 +639,12 @@ class Game {
   private async applyTimeOfDay(): Promise<void> {
     const night = resolveNight(this.timeOfDay); if (night === this.night) return; this.night = night;
     // A sky still baking in the background finishes now (or is dropped if it is the other phase's).
+    // The sky renders its own targets. A part still compiling keeps the scene target and its MRT bound between frames
+    // (OutputPipeline.compileLater), and a sky built under them got an empty WGSL output struct, so its pipelines failed.
+    const target = this.renderer.getRenderTarget(), mrt = this.renderer.getMRT(); this.renderer.setRenderTarget(null); this.renderer.setMRT(null);
     if (this.skyBaking) { const { night: baking, steps } = this.skyBaking; this.skyBaking = null; if (baking === night) { let step = steps.next(); while (!step.done) step = steps.next(); this.skies.set(night, step.value); } }
     if (!this.skies.has(night)) this.skies.set(night, createSky(this.renderer, this.reduced, night, this.graphics.tier, LOOK === 'b'));
+    this.renderer.setRenderTarget(target); this.renderer.setMRT(mrt);
     // A bake of the other phase stops; this phase bakes now if it has no probes yet (none prebaked), before the sun re-frames
     // its shadow box, which then holds the whole town for the bake.
     if (this.bake && this.bake.phase !== this.phase) { this.bake.cancel(); this.bake = null; }
@@ -858,7 +877,9 @@ class Game {
   private frame = (now: number): void => {
     this.frameId = requestAnimationFrame(this.frame);
     if (document.hidden) { this.lastTime = now; return; }
-    if (this.lowQuality && now - this.lastTime < 30) return;
+    // Only software rendering skips frames. Under a 30 fps cap the 28 fps rules (Balanced, Lightweight on a real GPU) never saw
+    // the headroom to raise their resolution again, so one slow second left a phone at its lowest scale for good.
+    if (this.graphics.software && now - this.lastTime < 30) return;
     // A queued animation frame can predate the startup or visibility timestamp.
     const rawDt = Math.max(0, (now - this.lastTime) / 1000); const dt = Math.min(rawDt, 0.1); this.lastTime = now; this.elapsed = this.capture ? 12 : this.elapsed + dt;
     if (this.mode === 'walking') this.updateWalking(dt);
@@ -884,6 +905,10 @@ class Game {
     if (this.fpsTime >= 1) { this.fps = Math.round(this.fpsFrames / this.fpsTime);
       // Adaptive resolution (render-scale.ts); ?capture=1 keeps the scale fixed so captures stay comparable.
       if (!this.capture) { const scale = this.scaler.sample(this.fps, this.fpsTime); if (scale !== this.renderScale) { this.renderScale = scale; this.renderer.setPixelRatio(this.pixelRatio()); } }
+      // Bakes and arriving parts cost frames that walking does not, so only plain walking seconds count toward an offer.
+      if (this.advisor && this.mode === 'walking' && !this.bake && !this.skyBaking && !this.town.waitingParts) {
+        const offer = this.advisor.sample(this.fps, this.fpsTime, this.scaler.scale, this.scaler.floor, this.scaler.ceiling); if (offer) this.ui.offerGraphics(offer, this.automaticTier);
+      }
       this.fpsFrames = 0; this.fpsTime = 0; }
   };
 }

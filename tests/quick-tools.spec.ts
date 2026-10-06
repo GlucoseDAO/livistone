@@ -9,6 +9,10 @@ test.beforeEach(({ page }) => {
 });
 test.afterEach(() => expect(errors).toEqual([]));
 
+/** Acts, waits for the reload it causes (else `ready` may read the page being left), then for the town. */
+const reloaded = async (page: import('@playwright/test').Page, act: () => Promise<unknown>): Promise<void> => {
+  await Promise.all([page.waitForEvent('load'), act()]); await ready(page);
+};
 const ready = async (page: import('@playwright/test').Page): Promise<void> => {
   await expect(page.locator('#hud-graphics')).toBeEnabled({ timeout: 90000 });
   expect(await page.evaluate(() => (window as unknown as { __livistone: { snapshot(): { backend: string } } }).__livistone.snapshot().backend)).toBe(EXPECTED_BACKEND);
@@ -60,11 +64,11 @@ for (const [tier, label] of [['gpu', 'Rich'], ['mobile', 'Balanced'], ['cpu', 'L
 test('quick graphics choice reloads, persists and matches the menu; seven tools fit narrow screens', async ({ page }) => {
   test.setTimeout(240000);
   await page.goto('/'); await ready(page);
-  await page.locator('#hud-graphics').click(); await page.locator('.graphics-option[data-action="performance:light"]').click(); await ready(page);
+  await page.locator('#hud-graphics').click(); await reloaded(page, () => page.locator('.graphics-option[data-action="performance:light"]').click());
   await expect(page.locator('#hud-graphics')).toHaveAttribute('title', 'Graphics: Lightweight');
   expect(await page.evaluate(() => localStorage.getItem('livistone-graphics-choice'))).toBe('light');
   await page.locator('[data-action="pause"]').click(); await expect(page.locator('#performance')).toHaveValue('light');
-  await page.locator('#performance').selectOption('auto'); await ready(page);
+  await reloaded(page, () => page.locator('#performance').selectOption('auto'));
   await expect(page.locator('#hud-graphics')).toHaveAttribute('title', /^Graphics: Auto \((Rich|Balanced|Lightweight)\)$/);
   for (const width of [360, 390, 440, 650, 651, 700, 740, 820, 1280]) {
     await page.setViewportSize({ width, height: 844 });

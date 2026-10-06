@@ -14,7 +14,8 @@ for (const mobile of [false, true]) test(`loading introduction and first-person 
     await page.goto('/', { waitUntil: 'commit' });
     await expect(page.locator('#loading-title')).toHaveText(TOWN_INTRO.title);
     await expect(page.locator('.loading-story')).toContainText(TOWN_INTRO.body);
-    await expect(page.locator('.loading-story')).toContainText(TOWN_INTRO.music);
+    // The credit; how to switch the music differs between the loading screen (its button) and the journal story.
+    await expect(page.locator('.loading-story')).toContainText(TOWN_INTRO.music.split('. ')[0]);
     await expect(page.getByRole('progressbar')).toBeVisible();
     await expect(page.locator('.loading-portrait img')).toBeVisible();
     // A real in-game view of the gate: the wide backdrop on desktop, the centred banner on phones.
@@ -33,7 +34,8 @@ for (const mobile of [false, true]) test(`loading introduction and first-person 
     expect(state.mode).toBe('walking'); expect(state.position.x).toBeCloseTo(SPAWN.x); expect(state.position.z).toBeCloseTo(SPAWN.z); expect(state.yaw).toBe(SPAWN.yaw);
     await expect(page.locator('#welcome')).toBeHidden();
     const sound = page.locator('#hud-sound');
-    await expect(sound).toBeVisible(); await expect(sound).toHaveAttribute('aria-label', 'Mute sound');
+    // The radio is on but the browser holds it until a gesture; any press outside a sound button starts it.
+    await expect(sound).toBeVisible(); await page.locator('.brand').click(); await expect(sound).toHaveAttribute('aria-label', 'Mute sound');
     const soundOnShape = await sound.locator('path').getAttribute('d');
     await sound.click(); await expect(sound).toHaveAttribute('aria-label', 'Enable sound');
     expect(await sound.locator('path').getAttribute('d')).not.toBe(soundOnShape);
