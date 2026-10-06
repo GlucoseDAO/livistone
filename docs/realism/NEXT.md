@@ -40,7 +40,7 @@ Built on branch `realism/summit-view` (pushed, not merged): on the gpu tier, hig
 What still holds the first view, measured on the production build (headless, one laptop; not device timings):
 
 - **Shader preparation, about 6–7 s.** Mostly three.js generating node shaders on the main thread for the arrival area's materials; deferring distant parts barely changes it. Fewer distinct materials (merge near-identical ones, share variants) is the lever.
-- **Texture uploads, about 1.5–2 s on the main thread.** `copyExternalImageToTexture` decodes images and reads painted canvases back synchronously; uploading `ImageBitmap`s (decoded off-thread) instead could move most of it off the main thread.
+- **Image uploads, about 0.2 s on the main thread.** Painted canvases now upload as plain copies (CPU-backed, `bootstrap.ts`); photographs and maps still decode synchronously in `copyExternalImageToTexture`. `ImageBitmap`s decoded off-thread would move that too; small.
 - **The ground (`mountains.ts`), about 1.5 s.** The whole ±520 m grid and its baked cover build before the first view; tiles beyond the arrival view could build later, as a progressive part per tile.
 - **The Embryo Station and train, about 1–2 s**, all in the arrival view: profile before changing.
 - **Walking straight ahead from the spawn stops after about 10 m** at the base of the station ring's silver shank (taller than the 0.32 m autostep), before progressive loading too. Decide whether the threshold should be walkable there.

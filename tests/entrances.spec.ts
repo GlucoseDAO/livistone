@@ -43,9 +43,12 @@ for (const mobile of [false, true]) test(`map labels arrive outside walkable ent
 });
 
 test('garden navigation uses the already loaded town even when later asset requests are blocked', async ({ page }) => {
+  test.setTimeout(180000);
   await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
   await page.route('**/models/trees/*.glb', route => route.abort());
   await page.locator('.landmark-item[data-action="landmark:living-waters"]').click();
-  const arrived = await snapshot(page); expect(arrived.mode).toBe('walking'); expect(arrived.zone).toBe('town');
+  // Right after the first view the garden may still be on its way (progressive loading): the stop waits for it, then arrives.
+  await expect.poll(async () => (await snapshot(page)).mode, { timeout: 90000 }).toBe('walking');
+  const arrived = await snapshot(page); expect(arrived.zone).toBe('town');
   expect(arrived.position.z).toBeCloseTo(LANDMARKS.find(l => l.id === 'living-waters')!.entrance.z);
 });

@@ -389,6 +389,10 @@ docs/jewelry-stl-inclusion-analysis.md Mesh health, decimation limits and a tier
 
 - **Keep loading work bounded by the arrival view.** Gallery models load only after play begins and within `ROOM_RANGE + 20` of their collection; captures and pinned models stay eager. Their placeholders prepare the same position/normal material shader and receive the collection's reflection probe before the GLB arrives. Saved reflection atlases are lossless half-float PMREMs, separately keyed by backend, quality and sky phase; `scripts/probe-signature.ts` hashes what a bake can see (see the reflection probes bullet) to reject stale files. Load only probes within 80 m of the walking eye, keep sky reflections until other files arrive, and retain runtime baking as a fallback. `?probes=bake` forces runtime bakes for regeneration/comparison. Regenerate both backends after changes that invalidate the digest. The welcome overlay stays up through the completed first walking frame; `snapshot().ready` and toolbar enablement follow its reveal. Do not expose a canvas cleared by resize or a partially prepared frame.
 
+- **Painted textures use CPU-backed canvases.** `bootstrap.ts` makes every 2D `getContext` default to `willReadFrequently: true`
+  (a caller's own options still win): a GPU-backed canvas uploads to WebGPU as a synchronous readback, over a second in all
+  during the shader warm-up on an integrated GPU, a CPU-backed one as a plain copy. Paint canvases as usual; do not opt out
+  without measuring the 92% stage.
 - **TypeScript is strict**, with `verbatimModuleSyntax` — import types with
   `import type { … }`. `bun run build` fails on any type error; treat it as the gate.
 - **The code style is deliberately dense.** Geometry-building code packs related statements

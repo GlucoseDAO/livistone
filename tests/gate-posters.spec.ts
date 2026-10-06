@@ -4,12 +4,15 @@ import { EYELENSE_POSTER } from '../src/world/eyelense-gate-layout';
 import { GPU_ERROR, EXPECTED_BACKEND } from './gpu-errors';
 
 test('source photographs at both eye gates open the full viewer and building captions', async ({ page }) => {
+  test.setTimeout(240000);
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error' && GPU_ERROR.test(m.text())) errors.push(m.text()); });
   await page.addInitScript(() => localStorage.setItem('livistone-time-of-day', 'day'));
   await page.goto('/?graphics=mobile&probes=off' + (process.env.LIVISTONE_BACKEND === 'webgl' ? '&backend=webgl' : ''));
   await expect(page.locator('#hud-teleport')).toBeEnabled({ timeout: 90000 });
+  // Both gates are distant parts built after the first view: their floors and boards must exist before standingHeight and clicks.
+  await expect.poll(() => page.evaluate(() => { const { parts } = (window as any).__livistone.snapshot(); return parts.waiting === 0 && parts.built === parts.shown; }), { timeout: 120000 }).toBe(true);
   for (const [p, piece, story] of [[WINTER_POSTER, 'eye-of-winter', 'Inside the Eye of Winter'], [EYELENSE_POSTER, 'eyelense', 'Through the broken lens']] as const) {
     const frames = await page.evaluate(() => (window as any).__livistone.snapshot().frames);
     await page.evaluate(p => {
