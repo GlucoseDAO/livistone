@@ -14,7 +14,7 @@ async function facePiece(page: Page, id: string): Promise<void> {
   await teleport(page, hall === 'station' ? -16 - x : x, hall === 'station' ? -z : z, site.yaw + (hall === 'station' ? Math.PI : 0)); await expect.poll(async () => (await snapshot(page)).interaction).toBe(id);
 }
 
-test('explore City Hall, preserve position through map mode, and retain discoveries', async ({ page }) => {
+test('explore City Hall, preserve position through map mode, and retain discoveries', { tag: '@smoke' }, async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click();
@@ -69,7 +69,7 @@ test('explore City Hall, preserve position through map mode, and retain discover
   expect(errors).toEqual([]);
 });
 
-test('mobile layout, simultaneous touch look/movement, cancellation, and aerial map', async ({ browser }) => {
+test('mobile layout, simultaneous touch look/movement, cancellation, and aerial map', { tag: '@smoke' }, async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
   const page = await context.newPage(); const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
@@ -102,7 +102,7 @@ test('mobile layout, simultaneous touch look/movement, cancellation, and aerial 
   await context.close();
 });
 
-test('movement keys preserve held-mouse rotation and never enable unpressed rotation', async ({ page }) => {
+test('movement keys preserve held-mouse rotation and never enable unpressed rotation', { tag: '@smoke' }, async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => {
     HTMLCanvasElement.prototype.requestPointerLock = () => { throw new Error('Livistone must never request pointer lock'); };

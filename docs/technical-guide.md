@@ -233,7 +233,8 @@ Livia's two original STL files are in `data/models/` and remain offline. The sma
 
 ```bash
 bun run test          # Vitest unit tests
-bun run test:browser  # Playwright browser tests in Google Chrome
+bun run test:smoke    # the @smoke browser specs, a few minutes
+bun run test:browser  # every Playwright browser spec in Google Chrome, about an hour
 ```
 
 Use `bun run test`, not `bun test` — these are Vitest tests. Unit tests cover saves, catalogue derivatives and attribution, molecular coordinates, and headless Rapier traversal through the town, train, pavilion and garden paths. Browser tests cover desktop/touch controls, navigation, collections and photo zoom, research links, discovery persistence, station boarding, direct garden access and map-position preservation.

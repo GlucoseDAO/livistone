@@ -8,7 +8,7 @@ interface Snapshot { ready: boolean; mode: string; position: { x: number; y: num
 const snapshot = (page: Page): Promise<Snapshot> => page.evaluate(() => (window as unknown as { __livistone: { snapshot(): Snapshot } }).__livistone.snapshot());
 const teleport = (page: Page, x: number, z: number): Promise<void> => page.evaluate(({ x, z }) => (window as unknown as { __livistone: { teleport(x: number, z: number, yaw: number): void } }).__livistone.teleport(-16 - x, -z, Math.PI), { x, z });
 
-test('enter the Embryo ring, explore the station, discover its story, and resume from its map card', async ({ page }) => {
+test('enter the Embryo ring, explore the station, discover its story, and resume from its map card', { tag: '@smoke' }, async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error' && GPU_ERROR.test(message.text())) errors.push(message.text()); });
   await page.goto('/'); await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 60000 }); await page.getByRole('button', { name: 'Map', exact: true }).click(); await page.click('#view-toggle');

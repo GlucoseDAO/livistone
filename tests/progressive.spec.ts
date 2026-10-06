@@ -5,7 +5,7 @@ const backend = process.env.LIVISTONE_BACKEND === 'webgl' ? '&backend=webgl' : '
 // Progressive loading (src/world/town-parts.ts): the distant parts build after the first view. A walk from the arrival and a
 // teleport into a distant place go on while they stream in; every part then arrives, none fails, and none was drawn nearer the
 // arrival point than its footprint allowed (the dev warning world.ts gives).
-test('distant parts stream in while a visitor walks from the arrival and teleports away', async ({ page }) => {
+test('distant parts stream in while a visitor walks from the arrival and teleports away', { tag: '@smoke' }, async ({ page }) => {
   test.setTimeout(300000);
   const problems: string[] = [];
   page.on('pageerror', error => problems.push(error.message));

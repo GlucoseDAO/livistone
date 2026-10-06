@@ -30,7 +30,8 @@ current build is generated in code at load time; binary assets are two tree GLBs
 | Type check + build | `bun run build` | `tsc --noEmit` then `vite build` into `dist/` |
 | Preview the build | `bun run preview` | Binds `0.0.0.0:4173`; open `http://localhost:4173` locally |
 | Unit tests | `bun run test` | Vitest, `tests/**/*.test.ts` — **not** `bun test` |
-| Browser tests | `bun run test:browser` | Playwright, `tests/**/*.spec.ts`, real Chrome. `LIVISTONE_BASE_URL=http://127.0.0.1:<port>` targets another worktree's dev server |
+| Smoke browser tests | `bun run test:smoke` | The `@smoke`-tagged specs (about six town loads, a few minutes): saved reflections, progressive loading, walking, map, mouse and touch input, the station arrival. Before every push that touches `src/` |
+| Browser tests | `bun run test:browser` | Every spec: about an hour on the dev laptop (each test loads the town; one worker shares the GPU). Before a release or deploy, and for the specs covering what changed. Playwright, `tests/**/*.spec.ts`, real Chrome. `LIVISTONE_BASE_URL=http://127.0.0.1:<port>` targets another worktree's dev server |
 | Sync agent docs | `bun run docs:sync` | What the pre-commit hook runs |
 | Install git hooks | `bun run hooks:install` | Sets `core.hooksPath` to `.githooks` |
 | Regenerate tree GLBs | `bun scripts/generate-trees.mjs` | Needs the dev server running |
@@ -483,8 +484,10 @@ Snow tracks cover an 8 × 16 m field with wandering hikers across its width. The
   capture harness add `--enable-unsafe-webgpu --enable-features=Vulkan --use-webgpu-power-preference=force-low-power` (only
   the integrated GPU presents headless). `LIVISTONE_BACKEND=webgl` runs the specs on the WebGL 2 fallback;
   `LIVISTONE_PARAMS=backend=webgl` captures it. Run both after changing materials or the render path.
-- After changing anything in `src/`, run `bun run build` and `bun run test`. Run
-  `bun run test:browser` for changes to input, modes, interaction, world layout, or the UI.
+- After changing anything in `src/`, run `bun run build` and `bun run test`. For changes to input, modes, interaction, world
+  layout, or the UI, run `bun run test:smoke` and the specs that cover the change (`npx playwright test tests/<area>.spec.ts`);
+  the full `bun run test:browser` (about an hour) runs before a release or deploy. Tag a new spec `{ tag: '@smoke' }` only if it
+  guards something every push must keep working, and keep the smoke set to a few town loads.
 - Realism work follows `docs/realism/README.md`: one sub-plan per `realism/NN-slug` branch, with before/after captures for desktop, touch and software. New scripts are TypeScript run with `bun scripts/<name>.ts`; `tsconfig.json` type-checks `scripts/**/*.ts`.
 - `node scripts/screenshot-landmarks.mjs` is the quickest visual check after touching
   `world.ts` or `jewelry.ts`; it renders on the GPU when one is available. Look at the images.

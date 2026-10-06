@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { GPU_ERROR } from './gpu-errors';
 const backend = process.env.LIVISTONE_BACKEND === 'webgl' ? '&backend=webgl' : '';
 
-test('saved reflections avoid startup baking and distant models wait for approach', async ({ page }) => {
+test('saved reflections avoid startup baking and distant models wait for approach', { tag: '@smoke' }, async ({ page }) => {
   test.setTimeout(120000);
   const errors: string[] = [], requests: string[] = [];
   page.on('pageerror', error => errors.push(error.message));

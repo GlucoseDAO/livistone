@@ -137,7 +137,8 @@ The build checks TypeScript, verifies the approved audio assets, and creates **`
 
 ```sh
 bun run test --maxWorkers=1 --testTimeout=20000
-bun run test:browser
+bun run test:smoke       # a few minutes: the critical browser checks
+bun run test:browser     # every browser spec, about an hour; before a release
 bun run check:hosts
 ```
 
