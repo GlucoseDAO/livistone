@@ -169,3 +169,9 @@ Livistone is a playable prototype. Performance varies by device, and physical-ph
 Click any concept-garden poster to open all 15 concepts in an enlarged slideshow. Use the on-screen arrows or Left/Right keys; Back to the garden closes it.
 
 In a building, clicking a piece panel opens its information. Previous/Next panel browses the content in that same building. Click an image to enlarge it and browse the building’s images; Back to panel content returns to the panel for the currently displayed image. Glucose chapters keep their own slide buttons, and their source images also open in the building album. Zoom, pan and Escape remain available.
+
+## Licence
+
+Copyright (C) 2026 Livia Zaharia and Anton Kulaga.
+
+The code is licensed under the [GNU Affero General Public License v3.0](LICENSE). If you run a modified version, including as a website, you must publish your changes under the same licence. For commercial use under other terms, get in touch with us through a GitHub issue. Third-party assets keep their own licences, listed in the [technical guide](docs/technical-guide.md#credits-and-licensing).
