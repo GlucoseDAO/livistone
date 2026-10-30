@@ -7,3 +7,5 @@ public/probes/**/*.bin.gz filter=lfs diff=lfs merge=lfs -text
 # Committed before the LFS rule; kept as plain git objects.
 data/enhancement/crystals/*.stl !filter !diff !merge
 concepts/15-moon-gates/models/*.glb filter=lfs diff=lfs merge=lfs -text
+# Keep the native scientific export byte-for-byte, including its CRLF line endings.
+data/stump-of-life/engraving-marks.csv -text whitespace=cr-at-eol

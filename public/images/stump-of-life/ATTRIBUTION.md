@@ -1,0 +1,5 @@
+# Stump of Life project diagrams
+
+Data-derived diagrams by Livia Zaharia and Anton Kulaga, copied unchanged from the Stump of Life project. Checksums and original paths are recorded in `sources.json`. The root map uses Natural Earth 1:50m public-domain coastlines and the project’s cited archaeological metadata; its paths indicate geographical provenance, not reconstructed migrations. The dated diagram documents an earlier perforated physical study. The in-town island is an enlarged digital interpretation.
+
+The current engraved-cap diagram and four-connection floor stencil are native, data-derived exports from the Canvas review-v03 proposal. They were copied without edits; neither contains AI-generated sequence marks. `floor-stencil.sources.json` preserves the shared control points and source hashes. The in-town cap and floor use the native proposal’s shared scale: a 500 mm plate, with 156 master units representing that diameter. The surrounding geographic islands retain their independent scale. The four kilometre values are rounded straight-line venue separations. The native 294-row mark table and checksum are retained under `data/stump-of-life/`.

@@ -1,10 +1,23 @@
 /** Shared channel boundaries for terrain, water, rocks and planting. `channelDistance` in shore-nodes.ts mirrors this field on the GPU; tests/shore.test.ts pins the two together. */
 export function riverCenter(x: number): number { return 26 + Math.sin(x * .036) * 4 + Math.sin(x * .075) * 3 * Math.min(1, Math.abs(x) / 35); }
 export function riverWidthVariation(x: number): number { return .38 * Math.sin(x * .19) + .18 * Math.sin(x * .53); }
+/** The Stronghold courtyard overlooks a bay downstream of the town and its Taiwan island. Only the north bank opens. */
+export const MATSU_BAY = { startX: 150, fullX: 225, northReach: 160 } as const;
+export function matsuBaySpread(x: number): number {
+  const t = Math.max(0, Math.min(1, (x - MATSU_BAY.startX) / (MATSU_BAY.fullX - MATSU_BAY.startX)));
+  return t * t * (3 - 2 * t) * MATSU_BAY.northReach;
+}
+export function riverBanks(x: number): { north: number; south: number } {
+  const centre = riverCenter(x), width = 7.3 + riverWidthVariation(x);
+  return { north: centre - width - matsuBaySpread(x), south: centre + width };
+}
 export function tributaryCenter(z: number, side: number): number { return side * (57 + 6 * Math.sin((z + 12) * .065)); }
 /** Signed bank distance to one channel: side 0 is the main river, -1/1 the west/east tributary. */
 export function channelDistance(x: number, z: number, side: number): number {
-  if (!side) return Math.abs(z - riverCenter(x)) - 7.3 - riverWidthVariation(x);
+  if (!side) {
+    if (x <= MATSU_BAY.startX) return Math.abs(z - riverCenter(x)) - 7.3 - riverWidthVariation(x);
+    const banks = riverBanks(x); return Math.max(z - banks.south, banks.north - z);
+  }
   // Tributaries rise below the railway and merge into the main river at its banks.
   if (z <= -58 || z >= 32) return Infinity;
   const cap = Math.min(1, (z + 58) / 8), width = (3.5 + .45 * Math.sin(z * .21)) * cap;
@@ -12,6 +25,10 @@ export function channelDistance(x: number, z: number, side: number): number {
 }
 export function waterDistance(x: number, z: number): number {
   return Math.min(channelDistance(x, z, 0), channelDistance(x, z, -1), channelDistance(x, z, 1));
+}
+/** Forest candidates keep the pre-bay field so a new coast cannot consume a different number of seeded random draws. */
+export function forestSeedWaterDistance(x: number, z: number): number {
+  return Math.min(Math.abs(z - riverCenter(x)) - 7.3 - riverWidthVariation(x), channelDistance(x, z, -1), channelDistance(x, z, 1));
 }
 export const GARDEN_BRIDGES = [{ x: -57, z: -12, yaw: Math.PI / 2, scale: .65 }, { x: 57, z: -12, yaw: Math.PI / 2, scale: .65 }];
 export const TIME_TOWER = { x: 17, z: -39, radius: 9.6 };

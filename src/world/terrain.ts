@@ -3,12 +3,13 @@ import { rotundaGrade } from './concept-rotunda-layout';
 import { meadowRelief } from './meadow-relief';
 import { enhancementClearing, ENHANCEMENT } from './enhancement-layout';
 import * as THREE from 'three';
-import { waterDistance } from './waterways';
+import { forestSeedWaterDistance, waterDistance } from './waterways';
 import { GARDENS, gardenHeight } from './living-waters-layout';
 import { RAILWAY, railwayCorridor } from './station-layout';
 import { futureClearing } from './elevated-layout';
 import { FAR_RANGES, farRangeHeight, ridgeErosion } from './far-ranges';
 import { mountainCalm, mountainShape } from './mountain-layout';
+import { courtyardTerrain } from './matsu-courtyard-layout';
 
 /** Dev-only `?ridges=classic`: the rounds 1–2 landscape, flat beyond about 400 m, with no distant ranges or far pass (sub-plan 26). */
 export type RidgesLook = 'ranges' | 'classic';
@@ -35,16 +36,16 @@ export function landscapeHeightOf(x: number, z: number, ranges: boolean): number
   // Sub-plan 27 shapes the north ridge (the trailhead's slope, the benched climb, the plateau, the peaks and their couloir) with the
   // eroded ridges only, so the forest's seeded draws, which read the classic heights, stay put.
   const height = ranges ? mountainShape(x, z, ridgeHeightOf(x, z, ranges)) : ridgeHeightOf(x, z, ranges);
-  return height * (1 - Math.max(eyelenseGrade(x, z), rotundaGrade(x, z)));
+  return courtyardTerrain(x, z, height * (1 - Math.max(eyelenseGrade(x, z), rotundaGrade(x, z))));
 }
 /** The eroded ridges before sub-plan 27 shapes them (mountain-layout.ts designs against it). */
 export function ridgeHeight(x: number, z: number): number { return ridgeHeightOf(x, z, RANGES); }
-function ridgeHeightOf(x: number, z: number, ranges: boolean): number {
+function ridgeHeightOf(x: number, z: number, ranges: boolean, channel = waterDistance): number {
   // Past the near box only the distant ranges stand; the river's carved channel ends there, inside the valley mist.
   if (ranges && Math.max(Math.abs(x), Math.abs(z + 20)) > FAR_RANGES.rise[0]) return farRangeHeight(x, z);
   if (Math.hypot(x - GARDENS.x, z - GARDENS.z) < 48) return gardenHeight(x - GARDENS.x, z - GARDENS.z);
   if (futureClearing(x, z, 5) || enhancementClearing(x, z, 2)) return 0;
-  const distance = waterDistance(x, z);
+  const distance = channel(x, z);
   if (distance < -2.6) return -2;
   if (distance < 0) return distance / 2.6 * 2;
   const clearing = Math.min(Math.hypot(x / 88, (z + 12) / 64), Math.hypot(x / 57, (z + 110) / 57), Math.hypot((x - 77) / 40, (z + 110) / 46), Math.hypot((x + 14) / 61, (z - 65) / 31), Math.hypot((x - 20) / 66, (z + 148) / 22));
@@ -76,6 +77,10 @@ export function terrainHeight(x: number, z: number): number { return terrainHeig
 export function terrainHeightOf(x: number, z: number, ranges: boolean): number {
   // The walkable floor follows the rail foundation under the visually open mountain bore.
   return railwayCorridor(x, z) ? 0 : landscapeHeightOf(x, z, ranges);
+}
+/** Seed rejection uses the original uneroded valley, before the new coast or courtyard grade; placement uses terrainHeight. */
+export function forestSeedHeight(x: number, z: number): number {
+  return railwayCorridor(x, z) ? 0 : ridgeHeightOf(x, z, false, forestSeedWaterDistance) * (1 - Math.max(eyelenseGrade(x, z), rotundaGrade(x, z)));
 }
 /**
  * Height of the triangulated two-metre town ground at (x, z): the collider below and the near grid of `mountainGeometry` share

@@ -1,0 +1,39 @@
+{
+  "images": [
+    {
+      "asset": "root-map.png",
+      "source": "/home/antonkulaga/sources/stump-of-life/docs/images/root-map.png",
+      "sha256": "ba141ff82a0915340fde973d1e85133fa153d95d47b96e9606d894c0e66bf4f5",
+      "kind": "Data-derived project diagram; copied without editing",
+      "attribution": "Livia Zaharia and Anton Kulaga / Stump of Life"
+    },
+    {
+      "asset": "dated-sample-plan.png",
+      "source": "/home/antonkulaga/sources/stump-of-life/docs/images/dated-sample-plan.png",
+      "sha256": "53e2a1d2b7948d0c01191b67e2dbc5df1096276e9efb61f5e0da21275de9ae01",
+      "kind": "Data-derived project diagram; copied without editing",
+      "attribution": "Livia Zaharia and Anton Kulaga / Stump of Life"
+    },
+    {
+      "asset": "dna-texture.png",
+      "source": "/home/antonkulaga/sources/stump-of-life/artifacts/stump-of-life-livistone-cap.png",
+      "sha256": "ef4467810610f441ac1963834b32e2540f6c7ee180f021688ccaeb3ab09323d2",
+      "kind": "Actual aligned DNA calls; copied unchanged",
+      "attribution": "Livia Zaharia and Anton Kulaga / Stump of Life"
+    },
+    {
+      "asset": "exact-cap-texture.png",
+      "source": "/home/antonkulaga/sources/stump-of-life/output/pdf/review-v03/assets/exact-cap-texture.png",
+      "sha256": "9b4dd9162b3dfb486753ed673934a57e1eb40d05507dc8620aa700fe4ab565f0",
+      "kind": "Native vector/data-derived proposal diagram, copied unchanged; no AI-generated marks",
+      "attribution": "Livia Zaharia and Anton Kulaga / Stump of Life"
+    },
+    {
+      "asset": "floor-stencil-master.png",
+      "source": "/home/antonkulaga/sources/stump-of-life/output/pdf/review-v03/assets/floor-stencil-master.png",
+      "sha256": "b85c2c422cccdbae7623c295c8a1389e31a8e318f7174f145a8cc37cdd9df38b",
+      "kind": "Native vector/data-derived proposal diagram, copied unchanged; no AI-generated marks",
+      "attribution": "Livia Zaharia and Anton Kulaga / Stump of Life"
+    }
+  ]
+}

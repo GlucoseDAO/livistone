@@ -12,6 +12,7 @@ import { TOWN_BOUNDS, FALL_FLOOR } from './world/town-layout';
 import { MOUNTAIN, mountainPlace, plateauInside, trailCorridor } from './world/mountain-layout';
 import { ridgesLook, terrainHeight } from './world/terrain';
 import { FAR_LAYER, FAR_VIEW, setDistantPhase } from './world/far-landscape';
+import { MatsuCoast } from './world/matsu-coast';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createSky, HORIZON_HAZE, HORIZON_RADIANCE, MOON_DIR, SKY_EXPOSURE, SUN_DIR, skyBake, skyLook } from './world/sky';
 import type { Sky, SkyPhase } from './world/sky';
@@ -26,6 +27,7 @@ import type { Mode } from './ui/ui';
 import { Input } from './game/input';
 import { ambience } from './game/audio';
 import { LANDMARKS, DISCOVERIES, SPAWN, readProgress, writeProgress } from './game/content';
+import { placeFromUrl, placeUrl } from './game/place-links';
 import { graphicsProfile } from './game/graphics';
 import { chosenTier, GRAPHICS_CHOICE_KEY, parseGraphicsChoice, readGraphicsChoice } from './game/graphics-choice';
 import type { AdapterInfo, GraphicsTier, PostMode } from './game/graphics';
@@ -48,6 +50,7 @@ import { aerialFogNode, aerialParams, setAerial } from './render/aerial';
 import { cubeTexture } from 'three/tsl';
 import { ProbeEnvironment, ReflectionProbes, litMaterials, probesEnabled, refreshEnvironment } from './world/probes';
 import type { TownPart } from './world/town-parts';
+import { PART_MARGIN } from './world/town-parts';
 import type { ProbeBake } from './world/probes';
 import { CPU_FOG_NEAR, LIGHT_COLOUR, LOADING_VIEW, MAP_FOG, MIST, SHADOW, SHADOW_TARGET, SUN_DISTANCE, phaseLight } from './render/scene-light';
 import type { Light } from './render/scene-light';
@@ -113,6 +116,7 @@ class Game {
   private readonly distantSky: ReturnType<typeof cubeTexture>;
   /** The distant pass's copies of the ranges, which interior probe faces leave out. */
   private readonly distantRanges: THREE.Mesh[] = [];
+  private coast: MatsuCoast | null = null;
   // The distant pass's own sun (or moon) and sky light, kept in step with the town's; the ranges cast and take no shadows.
   private readonly distantSun = new THREE.DirectionalLight();
   private readonly distantHemi = new THREE.HemisphereLight();
@@ -132,6 +136,7 @@ class Game {
   private readonly shadowLight = new THREE.Vector3();
   private shadowSize = 0;
   private readonly progress = readProgress();
+  private readonly initialPlace = placeFromUrl(location.href, LANDMARKS);
   private readonly raycaster = new THREE.Raycaster();
   private readonly direction = new THREE.Vector3();
   private readonly point = new THREE.Vector3();
@@ -300,13 +305,16 @@ class Game {
     // Leaf cards smooth their cut-out edges by alpha-to-coverage wherever the frame is multisampled (fine pointers).
     FOREST_DETAIL.coverage = this.renderer.samples > 1;
     this.mark('start', true);
-    this.town = await Town.create(this.reduced, loadingStage, this.graphics.tier, PROGRESSIVE && !this.capture); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
+    this.town = await Town.create(this.reduced, loadingStage, this.graphics.tier, PROGRESSIVE && !this.capture);
+    await this.prepareLinkedPlace(); this.scene.add(this.town.root); this.scene.updateMatrixWorld(true);
     this.mark('town');
     await loadingStage(70, 'Loading gallery images and woodland…');
     const assets = this.town.loadAssets();
     const { Physics } = await import('./game/physics');
     await loadingStage(78, 'Preparing walkable paths and interiors…');
     this.physics = await Physics.create(this.town.colliders);
+    const arrival = this.initialPlace?.entrance ?? SPAWN;
+    if (this.initialPlace) { this.physics.teleport(arrival); this.input.yaw = arrival.yaw; this.input.pitch = 0; this.selection = this.initialPlace.id; }
     await assets; this.mark('assets');
     if (this.graphics.tier === 'cpu') {
       await loadingStage(86, 'Preparing the CPU graphics profile…');
@@ -314,17 +322,18 @@ class Game {
     }
     // Probe surfaces take the environment node before the precompile, so their shaders build once, with every other one.
     if (this.environment && probesEnabled()) this.probes = new ReflectionProbes(this.town.probeScopes(), this.town.root, this.environment, this.graphics.tier === 'gpu' ? 256 : 128);
-    await this.probes?.load(this.renderer, this.phase, this.capture ? undefined : new THREE.Vector3(SPAWN.x, 0, SPAWN.z)); this.showProbes();
+    await this.probes?.load(this.renderer, this.phase, this.capture ? undefined : new THREE.Vector3(arrival.x, 0, arrival.z)); this.showProbes();
     this.scene.traverse(object => { if (object instanceof THREE.Mesh) for (const material of Array.isArray(object.material) ? object.material : [object.material]) setEyelenseNight(material, this.night); });
     this.pointReflections(this.skies.get(this.night)!); if (this.environment) this.litMaterials = litMaterials(this.scene, this.distant);
     this.nightLighting = new NightLighting(this.town.root, this.scene, this.reduced, this.graphics.tier, this.hardwareLight); this.nightLighting.setNight(this.night);
     // The distant pass draws its own copies of the ranges, which the map sees in the town (FAR_LAYER).
     if (this.ranges) for (const mesh of this.town.root.getObjectsByProperty('name', 'Distant ranges') as THREE.Mesh[]) { const copy = new THREE.Mesh(mesh.geometry, mesh.material); copy.name = mesh.name; this.distant.add(copy); this.distantRanges.push(copy); }
+    if (this.ranges) { this.coast = new MatsuCoast(); this.coast.setNight(this.night); this.distant.add(this.coast); }
     document.querySelector<HTMLElement>('#graphics-profile')!.textContent = ({ gpu: 'Rich scene with detailed reflections.', mobile: 'Balanced scene with reflections and fewer plants.', cpu: 'Lightweight scene for smoother walking; simpler materials and no cast shadows.' }[this.graphics.tier]);
     await loadingStage(92, 'Preparing materials for your first view…');
     this.bakeCamera.copy(this.mapCamera); this.startBake(); this.frameShadow(true);
     this.town.update(this.elapsed, this.mapCamera, MAP_FOG.far, true, this.sun.shadow);
-    this.walkCamera.position.set(SPAWN.x, this.eyeHeight(SPAWN), SPAWN.z); this.walkCamera.rotation.set(0, SPAWN.yaw, 0, 'YXZ');
+    this.walkCamera.position.set(arrival.x, this.eyeHeight(arrival), arrival.z); this.walkCamera.rotation.set(0, arrival.yaw, 0, 'YXZ');
     // Build every shader now, culled or not, and the shadow pass with one rendered frame: on WebGPU each shader costs a
     // synchronous node build, which would otherwise stall the first frames that show a new object.
     this.town.warmUp(true); this.mark('prepared', true);
@@ -332,7 +341,11 @@ class Game {
     await this.output.compile(this.walkCamera, [...this.town.root.children, ...this.scene.children.filter(child => child !== this.town.root && !(child as THREE.Light).isLight)], 6, this.scene, fraction => showLoadingStage(92 + Math.floor(fraction * 2), 'Preparing materials for your first view…'));
     performance.measure('startup · materials', { start: shaderStart }); this.mark('compiled', true);
     await loadingStage(95, 'Preparing the distant landscape…');
-    if (this.ranges) await this.output.compile(this.syncFar(), [...this.distant.children], 6, this.distant);
+    if (this.ranges) {
+      const far = this.syncFar(); if (this.coast) this.coast.visible = true; for (const range of this.distantRanges) range.visible = true;
+      try { await this.output.compile(far, [...this.distant.children], 6, this.distant); }
+      finally { this.coast?.updateView(this.walkCamera.position, this.distantRanges); }
+    }
     await loadingStage(97, 'Preparing building reflections…');
     // Saved reflections need no whole-town shadow render; the first walking frame builds only the nearby shadow box.
     if (this.graphics.shadows && !this.probes?.has(this.phase)) { this.sun.shadow.needsUpdate = true; this.render(this.walkCamera); this.sun.shadow.needsUpdate = false; }
@@ -346,6 +359,17 @@ class Game {
     await loadingStage(100, 'Welcome to Livistone');
     this.started = true; this.input.active = true; this.ui.ready(); if (graphicsTip({ ...this.graphics, tier: this.automaticTier }, this.view.backend, platform()) && firstTip()) this.ui.toast('Tip: the Graphics menu (top right) explains how to get a sharper town on this computer.', 9000); this.town.startStreaming(); this.lastTime = performance.now(); this.frameId = requestAnimationFrame(this.frame);
     this.mark('ready', true); void this.streamParts();
+  }
+  /** A linked arrival gets the same initial colliders, lighting and shader warm-up as the station before controls are enabled. */
+  private async prepareLinkedPlace(): Promise<void> {
+    if (!this.initialPlace) return;
+    const arrival = this.initialPlace.entrance;
+    await loadingStage(66, 'Preparing ' + this.initialPlace.name + '…');
+    while (this.town.pending(arrival.x, arrival.z, this.graphics.fog + PART_MARGIN)) {
+      const part = await this.town.buildNext(arrival); if (!part) break;
+      if (part.failed) throw part.failed;
+      await part.ready; this.town.show(part);
+    }
   }
   /**
    * After the first view, the distant parts one at a time, nearest the player (or a waiting teleport's destination) first. Each
@@ -398,6 +422,7 @@ class Game {
   /** The distant scene follows the phase: its sky, reflections and the town's sun or moon and sky light. */
   private syncDistant(): void {
     this.distantSky.value = this.skyBackground; if (!this.ranges) return;
+    this.coast?.setNight(this.night);
     this.distant.environmentIntensity = this.scene.environmentIntensity;
     this.distantSun.color.copy(this.sun.color); this.distantSun.intensity = this.sun.intensity; this.distantSun.position.copy(this.sunDirection).multiplyScalar(100);
     this.distantHemi.color.copy(this.hemi.color); this.distantHemi.groundColor.copy(this.hemi.groundColor); this.distantHemi.intensity = this.hemi.intensity;
@@ -405,6 +430,7 @@ class Game {
   /** The distant pass looks where the walking eye looks. */
   private syncFar(): THREE.PerspectiveCamera {
     const far = this.farCamera, walk = this.walkCamera;
+    this.coast?.updateView(walk.position, this.distantRanges);
     far.position.copy(walk.position); far.quaternion.copy(walk.quaternion);
     if (far.aspect !== walk.aspect || far.fov !== walk.fov) { far.aspect = walk.aspect; far.fov = walk.fov; far.updateProjectionMatrix(); }
     return far;
@@ -540,7 +566,7 @@ class Game {
     } else if (action === 'slide-prev' || action === 'slide-next') {
       if (this.mode === 'lore') this.ui.turnSlide(action === 'slide-next' ? 1 : -1);
     } else if (action === 'reset-position') {
-      this.physics?.teleport(); this.input.yaw = SPAWN.yaw; this.input.pitch = 0; this.returnMode = 'walking'; this.setMode('walking');  this.ui.toast('Back at the station exit, facing the city gate.');
+      this.physics?.teleport(); this.input.yaw = SPAWN.yaw; this.input.pitch = 0; this.returnMode = 'walking'; this.setMode('walking'); this.rememberPlace('station'); this.ui.toast('Back at the station exit, facing the city gate.');
     } else if (action === 'jump') {
       this.input.requestJump();
     } else if (action === 'sound') {
@@ -561,8 +587,13 @@ class Game {
     }
     this.physics!.teleport(landmark.entrance);
     this.input.yaw = landmark.entrance.yaw; this.input.pitch = 0; this.selection = landmark.id;
+    this.rememberPlace(landmark.id);
     this.returnMode = 'walking'; this.loreFromJournal = false; this.setMode('walking'); this.updateWalking(0); this.ambience.resume();
     this.ui.toast(landmark.name + ' · walk forward to explore.');
+  }
+  private rememberPlace(id: string): void {
+    const href = placeUrl(location.href, id, LANDMARKS);
+    if (href) history.replaceState(history.state, '', href);
   }
   private discover(id: string, fromJournal = false): void {
     const discovery = DISCOVERIES.find((d) => d.id === id); if (!discovery) return;
@@ -741,11 +772,12 @@ class Game {
     const budget = this.drawBudget?.(), kept = budget && structuredClone(budget);
     try {
       bake.step({ renderer: this.renderer, scene: this.scene, source: target ? { target, mrt: targets ?? null } : null, hidden: [this.town.details], distant: { scene: this.distant, far: FAR_VIEW, ranges: this.distantRanges },
-        visit: position => { this.probeEye.position.copy(position); this.nightLighting.update(this.probeEye); this.town.surround(position); } });
+        visit: position => { this.probeEye.position.copy(position); this.nightLighting.update(this.probeEye); this.town.surround(position); this.coast?.updateView(position, this.distantRanges); } });
     } finally {
       Object.assign(info, counts); if (budget && kept) { for (const group of Object.keys(budget)) if (!(group in kept)) delete budget[group]; Object.assign(budget, kept); }
       environment.view = view; shadowFade.value.copy(fade); this.setFog(); if (map) this.town.setMapMode(true);
       if (other) { this.sun.shadow.intensity = 1; this.night = !this.night; this.phaseState(); }
+      this.coast?.updateView(this.walkCamera.position, this.distantRanges);
     }
     if (!bake.done) { if (!other && bake.count !== count) this.showProbes(); return; }
     this.bake = null; this.showProbes(); if (!other) this.frameShadow(true);

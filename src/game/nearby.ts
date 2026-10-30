@@ -5,6 +5,7 @@ import { GATEWAY } from '../world/gateway-layout';
 
 export interface NearbyStory { id: string; title: string; sentence: string }
 const stories: Record<string, NearbyStory> = {
+  'stump-of-life-story': { id: 'stump-of-life-story', title: 'Stump of Life', sentence: 'A seat-sized silver DNA cap and four curved floor connections occupy a reconstruction of Matsu’s Stronghold 26 courtyard.' },
   'eyelense-gate-story': { id: 'eyelense-gate-story', title: 'Eyelense Gate', sentence: 'Livia’s broken sunglass lens becomes a black crescent pavilion with a passage through its red glass bead.' },
   'winter-gate-story': { id: 'winter-gate-story', title: 'Eye of Winter', sentence: 'Above the snow chimney, a clear eye encloses a smaller blue stone. Its iris opens into the Winter room; snow spreads across its plateau.' },
   'kings-chapel': { id: 'kings-chapel', title: 'King’s Chapel Double Ring', sentence: 'The entrance arch enlarges Livia’s two-finger silver ring, with its long green tourmaline held above the bridge.' },
@@ -20,7 +21,7 @@ const stories: Record<string, NearbyStory> = {
   'materialized-enhancements': { id: 'materialized-enhancements', title: 'Materialized Enhancements', sentence: 'This faceted hill grows out of Livia’s gene knowledgebase, character-building game and printable bioart project.' },
   'jepii-mici': { id: 'jepii-mici', title: 'Jepii Mici', sentence: 'The pointer names a real Bucegi trail marked with a blue cross and closed in winter; this trailhead is Livistone fiction.' },
 };
-const placeStories: Record<LandmarkId, string> = { 'eyelense-gate': 'eyelense-gate-story', 'winter-gate': 'winter-gate-story', station: 'embryo-station', energy: 'mitoring', science: 'nanot', 'city-hall': 'nut', timeface: 'timeface', glucose: 'glucose-livia', 'living-waters': 'living-vittoria', 'future-house': 'future-house-story', 'mycelium-garden': 'living-mycelium', enhancement: 'materialized-enhancements', 'jepii-mici': 'jepii-mici' };
+const placeStories: Record<LandmarkId, string> = { 'stump-of-life': 'stump-of-life-story', 'eyelense-gate': 'eyelense-gate-story', 'winter-gate': 'winter-gate-story', station: 'embryo-station', energy: 'mitoring', science: 'nanot', 'city-hall': 'nut', timeface: 'timeface', glucose: 'glucose-livia', 'living-waters': 'living-vittoria', 'future-house': 'future-house-story', 'mycelium-garden': 'living-mycelium', enhancement: 'materialized-enhancements', 'jepii-mici': 'jepii-mici' };
 export function storyFor(id: string): NearbyStory | null {
   if (stories[id]) return stories[id];
   const discovery = DISCOVERIES.find(d => d.id === id); if (!discovery) return null;
@@ -34,6 +35,7 @@ export function nearbyArchitecture(x: number, z: number): NearbyStory | null {
   if (!result) distance = 42;
   for (const landmark of LANDMARKS) {
     const d = Math.hypot(x - landmark.x, z - landmark.z);
+    if (landmark.id === 'stump-of-life' && d > 20) continue;
     if (d < distance) { distance = d; result = stories[placeStories[landmark.id]]; }
   }
   return result;

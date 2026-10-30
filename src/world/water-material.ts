@@ -3,6 +3,7 @@ import { Fn, abs, attribute, cameraPosition, cameraViewMatrix, clamp, color, cos
 import { PhysicalLightingModel } from 'three/webgpu';
 import type { Node, NodeBuilder } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
+import { MATSU_BAY, matsuBaySpread } from './waterways';
 
 /** Review variants (docs/realism/04-river-water.md): a = clear shallow stream, b = deeper green garden river. */
 export type WaterLook = 'a' | 'b';
@@ -54,13 +55,15 @@ const STREAM: Optics = {
 const luminance = ([r, g, b]: [number, number, number]): number => r * .2126 + g * .7152 + b * .0722;
 
 /** CPU tier: no transparency, so bake the same depth absorption into vertex colours, from wet bank to deep body. */
-export function cpuWaterColour(look: WaterLook = waterLook()): (depth: number, rock: number) => THREE.Color {
+export function cpuWaterColour(look: WaterLook = waterLook()): (depth: number, rock: number, x?: number, z?: number) => THREE.Color {
   const optics = LOOKS[look], bank = new THREE.Color('#5f6544'), shallow = new THREE.Color(optics.shallow), foam = new THREE.Color('#c9cdc4');
   // No environment reflection on this tier: lift the deep body a little toward the sky colour instead.
   const deep = new THREE.Color(optics.deep).lerp(new THREE.Color('#9dbcc6'), .22), extinction = luminance(optics.absorption);
-  return (depth, rock) => {
+  const bayShallow = new THREE.Color('#497f89'), bayDeep = new THREE.Color('#185777').lerp(new THREE.Color('#9dbcc6'), .22);
+  return (depth, rock, x = 0) => {
     const cover = 1 - Math.exp(-extinction * depth * 5);
-    return bank.clone().lerp(shallow, THREE.MathUtils.smoothstep(depth, 0, optics.shore) * .5).lerp(deep, cover).lerp(foam, rock * optics.foam * .35);
+    const river = bank.clone().lerp(shallow, THREE.MathUtils.smoothstep(depth, 0, optics.shore) * .5).lerp(deep, cover).lerp(foam, rock * optics.foam * .35), bay = matsuBaySpread(x) / MATSU_BAY.northReach;
+    return bay ? river.lerp(bayShallow.clone().lerp(bayDeep, cover).lerp(foam, rock * optics.foam * .35), bay) : river;
   };
 }
 
@@ -175,7 +178,9 @@ export function waterMaterial(tier: GraphicsTier, opts: { look?: WaterLook; stre
     WATER.foam.assign(foamCover(noise, depth, rock, optics.foam, channel.band));
     WATER.shore.assign(smoothstep(0, optics.shore, depth));
     if (opts.stream) WATER.wet.assign(attribute<'float'>('wet', 'float'));
-    return mix(mix(color(optics.shallow), color(optics.deep), smoothstep(0, .85, float(1).sub(seen))), vec3(.6, .63, .6), WATER.foam);
+    const bay = opts.stream ? float(0) : smoothstep(MATSU_BAY.startX, MATSU_BAY.fullX, world.x);
+    const shallow = mix(color(optics.shallow), color('#497f89'), bay), deep = mix(color(optics.deep), color('#185777'), bay);
+    return mix(mix(shallow, deep, smoothstep(0, .85, float(1).sub(seen))), vec3(.6, .63, .6), WATER.foam);
   })();
   material.normalNode = normalize(cameraViewMatrix.mul(vec4(WATER.normal, 0)).xyz);
   material.roughnessNode = mix(optics.roughness, .75, WATER.foam);

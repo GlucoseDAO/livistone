@@ -1,0 +1,20 @@
+{
+  "source_model_sha256": "54b068a34564670fafde06e5acbc5eede2b0a02a1666818b752b241f0083b06c",
+  "world_centre_xz": [
+    136.5,
+    20.302535024526335
+  ],
+  "rigid_yaw_radians": 0.1,
+  "uniform_scale": 1,
+  "coastline_boundary_samples": 256,
+  "minimum_river_bank_margin_m": 1.4821059928162539,
+  "water_handling": "Opaque closed native island land mesh rises above existing water sheet; matching triangle collision uses the same transform",
+  "physical_proposal_unmodified": true,
+  "runtime_support": "Flat lower floor of reconstructed Stronghold 26 courtyard; 500 mm cap at 45 cm seat height; geographic map placement unchanged",
+  "courtyard_world_origin_xz": [
+    177,
+    42
+  ],
+  "courtyard_yaw_radians": -1.2,
+  "courtyard_architecture_xz_scale": 0.7
+}

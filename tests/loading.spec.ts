@@ -9,10 +9,13 @@ test('saved reflections avoid startup baking and distant models wait for approac
   page.on('console', message => { if (message.type() === 'error' && GPU_ERROR.test(message.text())) errors.push(message.text()); });
   await page.addInitScript(() => { localStorage.setItem('livistone-time-of-day', 'day'); });
   let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
+  let releaseIsland!: () => void; const heldIsland = new Promise<void>(resolve => { releaseIsland = resolve; });
   await page.route('**/models/jewelry/*.glb', async route => {
     const name = route.request().url().split('/').at(-1)!;
     if (!['mycelium.glb', 'eye-of-winter-gate.glb', 'eyelense-gate.glb'].includes(name)) requests.push(name);
-    // Only City Hall's own models wait: the parts a teleport waits for may need others.
+    // The far island may begin streaming after the first view, but a held request must never block startup.
+    // City Hall's own models also wait until the test releases the requested approach.
+    if (name === 'stump-of-life-livistone.glb') await heldIsland;
     if (['nucalong.glb', 'nocciola.glb'].includes(name)) await held;
     await route.continue();
   });
@@ -22,8 +25,9 @@ test('saved reflections avoid startup baking and distant models wait for approac
     await expect(page.locator('#welcome')).toBeHidden();
     const initial = await page.evaluate(() => (window as any).__livistone.snapshot());
     expect(initial.probes.saved).toEqual(['day']); expect(initial.probes.day).toBeUndefined();
-    expect(requests.filter(name => !['inline.glb', 'la-navette.glb'].includes(name))).toEqual([]);
+    expect(requests.filter(name => !['inline.glb', 'la-navette.glb', 'stump-of-life-livistone.glb'].includes(name))).toEqual([]);
     // Started, not awaited: the teleport may wait for parts; City Hall's held models are asked for once the walker arrives.
+    releaseIsland();
     await page.evaluate(() => { (window as any).__arrival = (window as any).__livistone.teleport(0, -21, 0); });
     await expect.poll(() => requests.some(name => ['nucalong.glb', 'nocciola.glb'].includes(name)), { timeout: 60000 }).toBe(true);
     release(); await page.evaluate(() => (window as any).__arrival);
@@ -34,7 +38,7 @@ test('saved reflections avoid startup baking and distant models wait for approac
     await expect.poll(async () => page.evaluate(() => (window as any).__livistone.snapshot().probes.saved), { timeout: 30000 }).toEqual(['day', 'night']);
     expect((await page.evaluate(() => (window as any).__livistone.snapshot())).probes.night).toBeUndefined();
     expect(errors).toEqual([]);
-  } finally { release(); }
+  } finally { releaseIsland(); release(); }
 });
 
 test('missing saved reflections fall back to a playable town', async ({ page }) => {

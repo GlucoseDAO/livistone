@@ -1,4 +1,6 @@
+import { courtyardGround } from '../src/world/matsu-courtyard-layout';
 import { eyelenseGround } from '../src/world/eyelense-gate-layout';
+import { stumpBridgeEntrance, STUMP_BRIDGES } from '../src/world/stump-of-life-layout';
 import { WINTER } from '../src/world/winter-gate-layout';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
@@ -22,6 +24,7 @@ const roads = [
   ...GARDEN_PATHS.map(c => new THREE.CatmullRomCurve3(c.points.map(p => p.clone().add(point(GARDENS.x, GARDENS.z))))),
   line(point(0, 12), point(0, 40)),
   ...GARDEN_BRIDGES.map(b => line(point(b.x - 14 * b.scale, b.z), point(b.x + 14 * b.scale, b.z))),
+  ...STUMP_BRIDGES.map(bridge => line(point(bridge.from.x, bridge.from.z), point(bridge.to.x, bridge.to.z))),
   CAVE_APPROACH,
 ];
 const samples = roads.map(c => c.getSpacedPoints(Math.ceil(c.getLength() / .4)));
@@ -30,7 +33,7 @@ function touches(a: THREE.Vector3[], b: THREE.Vector3[], width: number): boolean
   return a.some(p => b.some(q => distance2(p, q) < width * width));
 }
 function pavedDestination(p: THREE.Vector3): boolean {
-  return eyelenseGround(p.x, p.z) || Math.hypot(p.x - WINTER.plazaX, p.z - WINTER.z) < WINTER.plazaRadius
+  return courtyardGround(p.x, p.z) || stumpBridgeEntrance(p.x, p.z) || eyelenseGround(p.x, p.z) || Math.hypot(p.x - WINTER.plazaX, p.z - WINTER.z) < WINTER.plazaRadius
     || CIVIC_LANDMARKS.some(l => Math.hypot((p.x - l.x) / (1 + (l.stretch.x - 1) * .85), (p.z - l.z) / (1 + (l.stretch.z - 1) * .85)) < 10.6)
     || Math.hypot(p.x - GLUCOSE_PAVILION.x, p.z - GLUCOSE_PAVILION.z) < GLUCOSE_PAVILION.radius
     || Math.hypot(p.x - TIME_TOWER.x, p.z - TIME_TOWER.z) < 9.4

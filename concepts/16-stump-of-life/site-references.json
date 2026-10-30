@@ -1,0 +1,47 @@
+{
+  "source": "Owner-provided exhibition-site photographs, supplied for reference on 30 October 2026",
+  "local_reference_directory": "/home/antonkulaga/Pictures/附件1：潛力展出地點／Attachment 1_ Potential exhibition sites/2027 地點影像 Site images/南竿26 據點 Nangan Stronghold 26",
+  "use": "Read-only architecture/material reference; no source photographs packaged as game textures",
+  "files": [
+    {
+      "name": "01.jpg",
+      "sha256": "4bc3ac0cceb29119e3e721cbc8416e7bbd1081ff077984247744c8c918df078c"
+    },
+    {
+      "name": "01.png",
+      "sha256": "effd187e67bb9c7bb28a0fde4a0707664d7cbf4a20e998c1a6f30134f9347171"
+    },
+    {
+      "name": "02.png",
+      "sha256": "3731a0ba4b12e88009ae285ea9248cdac894fac018bcc8eeaf2a375e62705a78"
+    },
+    {
+      "name": "03.png",
+      "sha256": "11c818e3ece3a0619efaa0692ab7876745fbfd837dbf2b7ec612e0e4954aad86"
+    },
+    {
+      "name": "04.png",
+      "sha256": "70380c88d5f458ab78ab7f381fc5bdb750d86c5d19852f4c42e1c6139e079e24"
+    },
+    {
+      "name": "05.png",
+      "sha256": "096fe71749ab969a431efd3a9b45ac39cd829790f55ab90c9556a21681341066"
+    },
+    {
+      "name": "06.png",
+      "sha256": "46d1204ed5df9291a9f984da39a3fc26637a75c4f28d03d3e7f857ed1b2cba03"
+    },
+    {
+      "name": "26據點_環境照.jpg",
+      "sha256": "bbf1577a9932a3626092ba7a72b684cc2feb92a15c055ad488040ead639d5fdd"
+    }
+  ],
+  "observations": [
+    "Rounded tan/grey fieldstone with thin joints",
+    "Two surviving chamber doorways, one green door, flaking white plaster on the central pier",
+    "Earth bank and small concrete landing with three metal treads",
+    "Board-formed concrete beams, open clerestory, pale roughcast walls",
+    "Light metal glazing frames and dark grilles",
+    "Courtyard proposal places the seat on lower concrete, sheltered from sun and clear of historic fabric"
+  ]
+}

@@ -20,11 +20,11 @@ export async function prepareCpuDetail(root: THREE.Object3D, reflection: THREE.C
     const convert = (source: THREE.Material): THREE.Material => {
       const cached = materials.get(source); if (cached) return cached;
       if (!standard(source)) return source;
-      const material = new THREE.MeshLambertMaterial({ color: source.color, map: source.map, emissive: source.emissive, emissiveIntensity: source.emissiveIntensity, emissiveMap: source.emissiveMap, vertexColors: source.vertexColors, transparent: source.transparent, opacity: source.opacity, alphaTest: source.alphaTest, side: source.side, depthWrite: source.depthWrite, flatShading: source.flatShading, fog: source.fog });
+      const material = new THREE.MeshLambertMaterial({ color: source.color, map: source.map, emissive: source.emissive, emissiveIntensity: source.emissiveIntensity, emissiveMap: source.emissiveMap, vertexColors: source.vertexColors, transparent: source.transparent, opacity: source.opacity, alphaTest: source.alphaTest, side: source.side, depthWrite: source.depthWrite, flatShading: source.flatShading, fog: source.fog, polygonOffset: source.polygonOffset, polygonOffsetFactor: source.polygonOffsetFactor, polygonOffsetUnits: source.polygonOffsetUnits });
       material.name = source.name; material.userData = { ...source.userData };
       // The Nut of Power crystal keeps its rim and distance solidity (city-hall.ts): at its bare opacity it vanished against the sky.
       // The station amber keeps its darker outline and its glow from inside (station-amber.ts), without which it is a flat orange.
-      if (source.userData.cityHallCrystal || source.userData.stationAmber) { const { colorNode, opacityNode, emissiveNode } = source as unknown as THREE.MeshStandardNodeMaterial; Object.assign(material, { colorNode, opacityNode, emissiveNode }); }
+      if (source.userData.cityHallCrystal || source.userData.stationAmber || source.userData.stumpMetal || source.userData.stumpWood) { const { colorNode, opacityNode, emissiveNode } = source as unknown as THREE.MeshStandardNodeMaterial; Object.assign(material, { colorNode, opacityNode, emissiveNode }); }
       if (source.metalness > .4 || source.userData.eyelenseGlass || source.userData.winterTopaz || source.userData.pavilionGem) { material.envMap = reflection; material.reflectivity = source.userData.winterTopaz || source.userData.pavilionGem ? .48 : .28; }
       materials.set(source, material); return material;
     };

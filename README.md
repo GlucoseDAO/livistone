@@ -1,6 +1,12 @@
 # Livistone
 
+**Stump of Life** now occupies a walkable reconstruction of the proposal’s Nangan Stronghold 26 courtyard: concrete shelter, gravel roof, framed glazing, exposed old stone, a fieldstone retaining wall and an upper terrace with descending stairs. The artwork keeps the proposal’s seat scale: a 500 mm polished silver cap, 45 cm above the floor, on weathered roots about 1.15 m across. Sixteen tracks retain 294 observed substitution marks and reserved ancient records. Four curved floor connections use the native proposal’s proportions and wording. Choose the work in Teleport or on the map; the enlarged Taiwan and Matsu map islands remain nearby, connected by visitor bridges and a shore path. Click the cap or poster to enlarge the detailed DNA study.
+
+The timber uses Rob Tuytel’s [Tree Stump 01 photogrammetry scan](https://polyhaven.com/a/tree_stump_01), released under [CC0](https://polyhaven.com/license), for the standing trunk and its photographed grain, with finer branching roots added in code to follow the proposal’s silhouette. It is not the actual Taiwanese timber specimen. The plate, seat height, native engraving and floor stencil follow the physical proposal’s dimensions; the geographical islands remain enlarged and walkable. This is a digital visualization of a proposal, not a claim that the seat has been built.
+
 The top navigation stays visible, with quick buttons for music, teleport and graphics. The desktop controls hints fold after six seconds; use their square button to reopen them. Map stops are compact glowing numbers with fixed connecting lines; hover or focus one to read its name.
+
+Link directly to any named stop with `?place=` and its landmark ID, for example `http://localhost:5173/?place=stump-of-life` or `?place=city-hall`. The destination is prepared before walking starts. Map and Teleport selections update the address without adding browser-history entries, so the current named destination can be bookmarked or shared. Other URL options are preserved; an unknown place starts safely at the station.
 
 Walk through Eyelense into the circular concept garden: fifteen posters hang inside climbing garden arches with dimensional ivory and blush flowers. All spaces have AI-generated architectural studies; the original five images are preserved and ten missing concepts have been added. Click a picture to view it. At night the floating Mycelium ring and soft flying lights along Jepii Mici glow. The lake pavilion has a polished Swiss blue topaz interpretation and coiled silver inspired by Livia’s supplied setting; the exact optimized silver model sits above the Dewdrop information stand.
 
@@ -18,7 +24,7 @@ Loading prepares the arrival view first: places beyond the view from the station
 
 **[▶ Visit Livistone](https://livistone.liviazaharia.com/)** (a recent browser is all you need) · [Run it locally](#run-it-locally) · [How it's made](#how-its-made) · [Technical guide](docs/technical-guide.md)
 
-## Thirteen stops, each from a real work or place
+## Fourteen stops, each from a real work or place
 
 ![The civic centre at street level: the amber Ministry of Energy on the left, the walnut City Hall in the middle and the silver-lattice Ministry of Science on the right, with the spiral gallery of Timeface Tower behind it, among paved paths, flowers and grass](docs/images/livistone-centre.jpg)
 
@@ -30,15 +36,16 @@ Every building and garden starts from something Livia actually made: a ring, a p
 | 2 | **Ministry of Energy** | The Mitoring: amber in silver folds that recall the cristae inside mitochondria | A long amber hall, entered through the ring itself |
 | 3 | **Ministry of Science** | The Nanot of Power pendant | A glass hall inside the pendant's silver lattice |
 | 4 | **Eyelense Gate** | Eyelense: a broken sunglass lens, black printed crescents, glass and brass | A rounded red bead with a real arched passage, a smoky overhead lens that clears at night, and a limestone meadow forecourt beyond Science |
-| 5 | **City Hall** | The Nut of Power: a walnut shell, amethyst and brass | The heart of the town, joined by brass clasps |
-| 6 | **Timeface Tower** | Timeface and older studio works | A spiral gallery round a silver hourglass, with a terrace above the town |
-| 7 | **Glucose Commons** | Livia's GlucoseDAO research | A walk beneath human insulin, traced from its atomic structure; six chapters of the research |
-| 8 | **Vittoria Lake** | The Vittoria Amazonica pendant and the Dewdrop ring | Silver walkways between water pools and a faceted blue pavilion |
-| 9 | **Future House** | Camel Dalí: copper, a 3D-printed part and leather | A copper camel drinking from the lake. Climb its neck into the exhibition cabin |
-| 10 | **Mycelium Rain Garden** | The Mycelium ring, whose silver folds let water drain off its opal | Tall silver mushrooms with opal hearts and a visible rain rill |
-| 11 | **Materialized Enhancements** | The [enhancement.bio](https://enhancement.bio/) bioart project | A violet Voronoi hill to climb, with gene-category crystals grown by the project itself |
-| 12 | **Jepii Mici** | A real, steep trail in Romania's Bucegi Mountains, marked with a blue cross and closed in winter | A mountain trail beyond the lake: from a forest trailhead and its warning board, through spruce and larch woods and up a rocky gorge with a stream running out of a snow cave, past a gully of old snow and a 17 m waterfall off the plateau's lip, to a rhododendron meadow among dwarf pines, its brook and the snowy Eye of Winter shelf. On desktop graphics the haze clears from the plateau to show the whole town below |
-| 13 | **Eye of Winter** | Eye of Winter ring and pendant: silver, quartz and topaz | An enclosed two-stone eye above the snow chimney, with the original silver ring, a hexagonal iris and a room. Snow spreads from it across the plateau and into the gully, suggesting its fictional winter power |
+| 5 | **Stump of Life** | Real geographical coastlines and aligned mitochondrial DNA | A reconstructed Matsu courtyard, a proposal-scale DNA seat, native floor connections, nearby Taiwan map islands and a full-size explanation poster |
+| 6 | **City Hall** | The Nut of Power: a walnut shell, amethyst and brass | The heart of the town, joined by brass clasps |
+| 7 | **Timeface Tower** | Timeface and older studio works | A spiral gallery round a silver hourglass, with a terrace above the town |
+| 8 | **Glucose Commons** | Livia's GlucoseDAO research | A walk beneath human insulin, traced from its atomic structure; six chapters of the research |
+| 9 | **Vittoria Lake** | The Vittoria Amazonica pendant and the Dewdrop ring | Silver walkways between water pools and a faceted blue pavilion |
+| 10 | **Future House** | Camel Dalí: copper, a 3D-printed part and leather | A copper camel drinking from the lake. Climb its neck into the exhibition cabin |
+| 11 | **Mycelium Rain Garden** | The Mycelium ring, whose silver folds let water drain off its opal | Tall silver mushrooms with opal hearts and a visible rain rill |
+| 12 | **Materialized Enhancements** | The [enhancement.bio](https://enhancement.bio/) bioart project | A violet Voronoi hill to climb, with gene-category crystals grown by the project itself |
+| 13 | **Jepii Mici** | A real, steep trail in Romania's Bucegi Mountains, marked with a blue cross and closed in winter | A mountain trail beyond the lake: from a forest trailhead and its warning board, through spruce and larch woods and up a rocky gorge with a stream running out of a snow cave, past a gully of old snow and a 17 m waterfall off the plateau's lip, to a rhododendron meadow among dwarf pines, its brook and the snowy Eye of Winter shelf. On desktop graphics the haze clears from the plateau to show the whole town below |
+| 14 | **Eye of Winter** | Eye of Winter ring and pendant: silver, quartz and topaz | An enclosed two-stone eye above the snow chimney, with the original silver ring, a hexagonal iris and a room. Snow spreads from it across the plateau and into the gully, suggesting its fictional winter power |
 
 The facts, photographs and research come from Livia's work and link to their sources; the Jepii Mici trail is a real place, and everything Livistone builds round it is fiction. The powers the town gives its artifacts (the "Livia Lore") are fiction, and the game labels them that way.
 
@@ -48,7 +55,7 @@ The facts, photographs and research come from Livia's work and link to their sou
 
 ## How it's made
 
-- **No 3D modelling program was involved.** Buildings, terrain, river, paths, bridges and planting are all generated in code each time the page loads. The binary assets are photographs, textures and two tree models.
+- **Geometry comes from code and source models.** Buildings, terrain, river, paths, bridges and planting are generated in code. Optimized GLB derivatives preserve jewellery models and the Stump of Life data geometry; photographs and local textures give the exhibits their source images.
 - **The silver comes from the jewellery itself.** The ministries' silver strands were traced from Livia's own 3D models of the rings (1–2 million triangles each) and rebuilt as cast-silver ribbons around the halls.
 - **The science is real data.** Glucose Commons lifts the backbone of human insulin from Protein Data Bank entry 1TRZ, and the crystals on the violet hill come out of the Materialized Enhancements pipeline.
 - **The sky is physically based.** On load, the game bakes a single-scattering atmosphere with ray-marched clouds, or a night sky with stars, the Milky Way and the moon. Distant mountain ranges fade into the valley haze.
@@ -62,7 +69,7 @@ Want the details? The [technical guide](docs/technical-guide.md) covers the arch
 You only need a recent browser with hardware acceleration. The town renders with WebGPU where the browser offers it and with WebGL 2 everywhere else. You don't need to install anything, create an account or log in.
 
 1. While the town loads, a screen introduces Livia with her homepage portrait. On short screens, scroll to see the whole portrait. The town opens in **first person at the station exit, facing the Livistone gate**.
-2. Walk towards the bridge and the city gate. Use the **Teleport** compass button beside sound to open the destination dropdown and arrive at any of the 13 stops. Press **Map** (M) to see the town from above; its named stops also take you to their entrances.
+2. Walk towards the bridge and the city gate. Use the **Teleport** compass button beside sound to open the destination dropdown and arrive at any of the 14 stops. Press **Map** (M) to see the town from above; its named stops also take you to their entrances.
 3. Approach a display and press **E**, or tap its prompt, to read the story. Click a photograph to enlarge it. The pointer turns into a hand over anything you can click. The posters at Materialized Enhancements open [enhancement.bio](https://enhancement.bio/) in a new tab. Large dark signs in gold lattice frames introduce a place; cream boards show individual pieces.
 4. Open **Journal** to read the stories and browse the jewellery catalogue at any time. **Meet Livia Zaharia** in Journal or Menu opens [her website](https://liviazaharia.com/) in a new tab; the creator story also links there.
 

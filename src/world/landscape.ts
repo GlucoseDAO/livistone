@@ -4,7 +4,7 @@ import { introductionClearing } from './introduction-layout';
 import { enhancementClearing, enhancementGround } from './enhancement-layout';
 import * as THREE from 'three';
 import { CIVIC_LANDMARKS } from '../game/content';
-import { GARDEN_BRIDGES, TIME_TOWER, waterDistance } from './waterways';
+import { GARDEN_BRIDGES, TIME_TOWER, forestSeedWaterDistance, waterDistance } from './waterways';
 import { stationClearing } from './station-layout';
 import { gatewayApproachWidth, gatewayClearing } from './gateway-layout';
 import { glucoseClearing } from './glucose-layout';
@@ -12,6 +12,8 @@ import { GARDEN_PATHS, GARDEN_PATH_CLEARANCE, GARDENS, gardenFootprint, gardenGr
 import { PathNetwork } from './path-network';
 import { futureClearing, futureGround } from './elevated-layout';
 import { winterClearing, winterGround } from './winter-gate-layout';
+import { STUMP_ISLAND, stumpClearing, stumpGround } from './stump-of-life-layout';
+import { COURTYARD_APPROACH } from './matsu-courtyard-layout';
 
 
 // Reserved for future authored homes; the white dome placeholders have been removed.
@@ -38,8 +40,9 @@ const routes = [
   [[38, -49], [38, -52]],
   [[-9, -27], [-22, -32], [-27, -43], [-23, -54]],
   [[29, 2], [41, -8], [45, -28], [28, -35], [26, -47], [38, -52]],
+  [[94, -36], [96, -20], [110, -7], [124, 6], [STUMP_ISLAND.bank.x, STUMP_ISLAND.bank.z]],
 ];
-export const PATH_CURVES = routes.map((path) => new THREE.CatmullRomCurve3(path.map(([x, z]) => new THREE.Vector3(x, .13, z))));
+export const PATH_CURVES = [...routes, COURTYARD_APPROACH.map(point => [point.x, point.z])].map((path) => new THREE.CatmullRomCurve3(path.map(([x, z]) => new THREE.Vector3(x, .13, z))));
 /** Paved width along a town route: the bridge apron's taper on the gateway approach, PATH_WIDTH elsewhere. */
 export function routeWidth(road: number, p: THREE.Vector3): number {
   return PATH_CURVES[road].points.every(point => point.x === 0 && point.z >= 40) ? gatewayApproachWidth(p.z) : PATH_WIDTH;
@@ -49,10 +52,10 @@ export const PATH_CLEARANCE = PATH_WIDTH / 2 + .3;
 /** Water keeps this much clear bank, plus the plant's own radius. */
 export const WATER_CLEARANCE = .35;
 /** Town routes (group 0) and the lake garden's paths (group 1) as one network: one merged paving and one clearance field. */
-export const WALKING_NETWORK = new PathNetwork([
-  ...PATH_CURVES.map((curve, road) => ({ curve, width: (p: THREE.Vector3) => routeWidth(road, p), margin: PATH_CLEARANCE - PATH_WIDTH / 2, group: 0 })),
-  ...GARDEN_PATHS.map(path => ({ curve: new THREE.CatmullRomCurve3(path.points.map(p => new THREE.Vector3(p.x + GARDENS.x, p.y, p.z + GARDENS.z))), width: PATH_WIDTH, margin: GARDEN_PATH_CLEARANCE - PATH_WIDTH / 2, group: 1 })),
-]);
+const townRoads = PATH_CURVES.map((curve, road) => ({ curve, width: (p: THREE.Vector3) => routeWidth(road, p), margin: PATH_CLEARANCE - PATH_WIDTH / 2, group: 0 }));
+const gardenRoads = GARDEN_PATHS.map(path => ({ curve: new THREE.CatmullRomCurve3(path.points.map(p => new THREE.Vector3(p.x + GARDENS.x, p.y, p.z + GARDENS.z))), width: PATH_WIDTH, margin: GARDEN_PATH_CLEARANCE - PATH_WIDTH / 2, group: 1 }));
+export const WALKING_NETWORK = new PathNetwork([...townRoads, ...gardenRoads]);
+const forestSeedNetwork = new PathNetwork([...townRoads.slice(0, routes.length), ...gardenRoads]);
 
 /** Reserve the whole plant footprint, not just its stem, along the rendered routes. */
 export function plantingAllowed(x: number, z: number, radius: number): boolean {
@@ -77,11 +80,19 @@ export function footprintReserved(x: number, z: number, radius: number): boolean
 }
 /** Clearings kept free of trees, shrubs and flowers but not of grass: the mycelium grove and lake margin, the meadow round the Enhancement hill and the ground under the Future House camel. */
 function canopyReserved(x: number, z: number, radius: number): boolean {
+  if (stumpClearing(x, z, radius)) return true;
+  return baseCanopyReserved(x, z, radius);
+}
+function baseCanopyReserved(x: number, z: number, radius: number): boolean {
   if (rotundaClearing(x, z, radius)) return true;
   return gardenFootprint(x, z, radius) || enhancementClearing(x, z, radius) || futureClearing(x, z, radius) || winterClearing(x, z, radius) || eyelenseClearing(x, z, radius);
 }
 /** Ground something stands on or covers, which neither plants nor grass may grow through (grass-field.ts bisects its radius). */
 export function groundReserved(x: number, z: number, radius: number): boolean {
+  if (stumpGround(x, z, radius)) return true;
+  return baseGroundReserved(x, z, radius);
+}
+function baseGroundReserved(x: number, z: number, radius: number): boolean {
   if (rotundaGround(x, z, radius)) return true;
   if (eyelenseGround(x, z, radius)) return true;
   if (introductionClearing(x, z, radius) || winterGround(x, z, radius)) return true;
@@ -96,4 +107,28 @@ export function groundReserved(x: number, z: number, radius: number): boolean {
     if (Math.abs(x - l.x) < 3.3 + radius && z > l.z && z < l.z + 20 + radius) return true;
   }
   return false;
+}
+
+// The original island, poster and two cap bridges remain seed clearances only. Removing one before the spacing pass would
+// move later trees; current coast, court and footbridge clearances instead filter the completed forest.
+const seedIsland = { x: 136.5, z: 20.302535024526335, yaw: .1, minX: -12.9, maxX: 12.9, minZ: -5.74, maxZ: 5.74 };
+const seedWorld = (x: number, z: number): { x: number; z: number } => ({ x: seedIsland.x + Math.cos(seedIsland.yaw) * x + Math.sin(seedIsland.yaw) * z, z: seedIsland.z - Math.sin(seedIsland.yaw) * x + Math.cos(seedIsland.yaw) * z });
+const seedMatsu = seedWorld(10.6439142571, -3.4787374527), seedTaiwan = seedWorld(3.7018695672, 1.5824432751), seedBank = { x: 140, z: 10 };
+function seedRim(point: { x: number; z: number }): { x: number; z: number } {
+  const d = Math.hypot(point.x - seedMatsu.x, point.z - seedMatsu.z);
+  return { x: seedMatsu.x + (point.x - seedMatsu.x) / d * 1.74, z: seedMatsu.z + (point.z - seedMatsu.z) / d * 1.74 };
+}
+const seedBridges = [[seedBank, seedRim(seedBank)], [seedRim(seedTaiwan), seedTaiwan]];
+function forestSeedIslandGround(x: number, z: number, radius: number): boolean {
+  const s = seedIsland, dx = x - s.x, dz = z - s.z, c = Math.cos(s.yaw), t = Math.sin(s.yaw), lx = c * dx - t * dz, lz = t * dx + c * dz;
+  return (lx > s.minX - radius && lx < s.maxX + radius && lz > s.minZ - radius && lz < s.maxZ + radius)
+    || Math.hypot(x - 136.7, z - 9.5) < 2.1 + radius || seedBridges.some(([a, b]) => {
+      const vx = b.x - a.x, vz = b.z - a.z, u = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz)));
+      return Math.hypot(x - a.x - vx * u, z - a.z - vz * u) < 1.3 + radius;
+    });
+}
+export function forestSeedPlantingAllowed(x: number, z: number, radius: number): boolean {
+  return forestSeedWaterDistance(x, z) >= radius + WATER_CLEARANCE && !forestSeedIslandGround(x, z, radius)
+    && !baseGroundReserved(x, z, radius) && forestSeedNetwork.clearance(x, z, Math.max(0, radius) + 1) >= radius
+    && !forestSeedIslandGround(x, z, radius + 1.5) && !baseCanopyReserved(x, z, radius);
 }

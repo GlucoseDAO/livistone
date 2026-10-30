@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { FAR_RANGES, farRangeHeight } from '../src/world/far-ranges';
 import { farLandscapeGeometry } from '../src/world/far-landscape';
 import { mountainGeometry, terrainEdge } from '../src/world/mountains';
 import { landscapeHeightOf, terrainHeight } from '../src/world/terrain';
-import { forestSites } from '../src/world/forest-layout';
+import { forestSites, treeSpecies } from '../src/world/forest-layout';
 import { PATH_CURVES } from '../src/world/landscape';
 import { LANDMARKS, SPAWN } from '../src/game/content';
 import { RAILWAY, STATION } from '../src/world/station-layout';
@@ -13,9 +14,9 @@ import { RAILWAY, STATION } from '../src/world/station-layout';
 // trail, its plateau, the peaks and the couloir out after the draws, so every other site is unchanged, and appended a few round
 // the trailhead (the last site is one of them). Winter moved from the meadow onto the already treeless mountain shelf; the meadow regains its 20 desktop / 14 mobile trees. Eyelense then clears 20 desktop / 12 mobile trees at its east-meadow site. Round 3 appends dwarf pines on the high ground round the gorge (51 desktop / 34 mobile; the last site is one).
 const FOREST: [boolean, number, [number, number], [number, number]][] = [
-  // The concept rotunda reserves the east meadow beyond Eyelense, including full tree crowns.
-  [false, 918, [-27.918645669706166, -199.93845618027262], [-78.6232712934725, -240.66769996890798]],
-  [true, 531, [-27.918645669706166, -199.93845618027262], [-108.59260804951191, -212.85239251912571]],
+  // Original island forest: 905 desktop / 522 mobile. The bay, courtyard and shore access filter 17 / 7 sites after all draws.
+  [false, 888, [-27.918645669706166, -199.93845618027262], [-78.6232712934725, -240.66769996890798]],
+  [true, 515, [-27.918645669706166, -199.93845618027262], [-108.59260804951191, -212.85239251912571]],
 ];
 
 describe('distant ranges (sub-plan 26)', () => {
@@ -62,6 +63,11 @@ describe('distant ranges (sub-plan 26)', () => {
       const sites = forestSites(mobile);
       expect(sites).toHaveLength(count);
       for (const [site, [x, z]] of [[sites[0], first], [sites[sites.length - 1], last]] as const) { expect(site.x).toBeCloseTo(x, 6); expect(site.z).toBeCloseTo(z, 6); expect(site.y).toBe(terrainHeight(site.x, site.z)); }
+      // Goldens from the original island checkout: every upstream trunk, height and species stays fixed, apart from the
+      // desktop tree at (148.052488, 35.687263) whose full canopy crossed the newly connected shore footbridge.
+      const upstream = sites.flatMap((p, index) => p.x <= 150 ? [[p.x.toFixed(6), p.y.toFixed(6), p.z.toFixed(6), treeSpecies(p, index)]] : []);
+      expect(upstream).toHaveLength(mobile ? 480 : 827);
+      expect(createHash('sha256').update(JSON.stringify(upstream)).digest('hex')).toBe(mobile ? '24a37d1e2b164e4d309ca9aebef5bad6f7f78a8e1c99b92a8efbe859c11f90e0' : '51818aa65bb5a3fe7aee0c49d602ad9301471a761218d021ee733e3e951db4b5');
     }
   });
 });

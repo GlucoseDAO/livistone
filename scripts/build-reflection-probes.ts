@@ -10,13 +10,24 @@ const backend = process.argv[2] ?? 'webgl';
 if (!['webgl', 'webgpu'].includes(backend)) throw new Error('Choose webgl or webgpu');
 const dir = 'public/probes', url = process.env.LIVISTONE_BASE_URL ?? 'http://127.0.0.1:5173';
 const flags = backend === 'webgl' ? ['--disable-features=WebGPU'] : process.platform === 'linux' ? ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-webgpu-power-preference=force-low-power'] : [];
-const browser = await chromium.launch({ channel: 'chrome', headless: !process.env.PW_HEADED, args: ['--disable-dev-shm-usage', ...(process.env.PW_HEADED && process.platform === 'linux' ? ['--ozone-platform=x11'] : []), '--use-gl=angle', process.platform === 'win32' ? '--use-angle=d3d11' : '--use-angle=gl', '--ignore-gpu-blocklist', ...flags] });
+const offscreen = process.env.LIVISTONE_OFFSCREEN ? ['--window-position=-3000,0', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] : [];
+const executablePath = process.env.LIVISTONE_CHROME_EXECUTABLE;
+const browser = await chromium.launch({ channel: executablePath ? undefined : 'chrome', executablePath, headless: !process.env.PW_HEADED, args: ['--disable-dev-shm-usage', ...(process.env.PW_HEADED && process.platform === 'linux' ? ['--ozone-platform=x11'] : []), ...offscreen, '--use-gl=angle', process.platform === 'win32' ? '--use-angle=d3d11' : '--use-angle=gl', '--ignore-gpu-blocklist', ...flags] });
 try {
   for (const tier of ['gpu', 'mobile']) for (const phase of ['day', 'night']) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } }), page = await context.newPage();
+    const errors: string[] = [];
+    page.on('pageerror', error => { errors.push(error.message); console.error(error.message); });
+    page.on('console', message => { if (message.type() === 'error') { errors.push(message.text()); console.error(message.text().slice(0, 1800)); } });
+    const progress = setInterval(() => {
+      void page.evaluate(() => {
+        const hook = (window as unknown as { __livistone?: { snapshot(): { ready: boolean; frames: number; probes: unknown } } }).__livistone;
+        const state = hook?.snapshot(); return state ? { ready: state.ready, frames: state.frames, probes: state.probes } : { loading: document.body.innerText.slice(-300) };
+      }).then(state => console.log(`${backend}/${tier}/${phase}: ${JSON.stringify(state)}`)).catch(() => {});
+    }, 30000);
     try {
       await page.addInitScript(phase => { localStorage.setItem('livistone-time-of-day', phase); }, phase);
-      await page.goto(`${url}/?graphics=${tier}&capture=1&probes=bake${backend === 'webgl' ? '&backend=webgl' : ''}`);
+      await page.goto(`${url}/?place=stump-of-life&graphics=${tier}&capture=1&probes=bake${backend === 'webgl' ? '&backend=webgl' : ''}`);
       await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('#tools button')?.disabled === false, null, { timeout: 240000 });
       const exported = await page.evaluate(async () => {
         type Atlas = { id: string; width: number; height: number; data: Uint16Array };
@@ -42,7 +53,13 @@ try {
       }
       manifest.sets[key] = entries; writeFileSync(`${dir}/manifest.json`, JSON.stringify(manifest, null, 2) + '\n');
       console.log(`${key}: ${entries.length} filtered HDR atlases, ${(bytes / 1048576).toFixed(2)} MiB`);
-    } finally { await context.close(); }
+    } catch (error) {
+      const folder = 'output/testing/reflection-probes'; mkdirSync(folder, { recursive: true });
+      const state = await page.evaluate(() => ({ loading: document.querySelector('#welcome')?.textContent, body: document.body.innerText.slice(-3000), state: (window as unknown as { __livistone?: { snapshot(): unknown } }).__livistone?.snapshot() })).catch(() => null);
+      writeFileSync(`${folder}/${backend}-${tier}-${phase}-failure.json`, JSON.stringify({ error: String(error), errors, state }, null, 2) + '\n');
+      await page.screenshot({ path: `${folder}/${backend}-${tier}-${phase}-failure.png` }).catch(() => {});
+      throw error;
+    } finally { clearInterval(progress); await context.close(); }
   }
   const manifest = JSON.parse(readFileSync(`${dir}/manifest.json`, 'utf8')) as ProbeManifest, used = new Set(Object.values(manifest.sets).flat().map(entry => entry.file));
   for (const folder of readdirSync(dir, { withFileTypes: true })) if (folder.isDirectory() && /^(webgl|webgpu)-(128|256)-(day|night)$/.test(folder.name)) {

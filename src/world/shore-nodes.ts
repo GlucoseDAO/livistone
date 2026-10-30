@@ -3,6 +3,7 @@ import { Fn, If, abs, attribute, dot, float, floor, fract, max, min, mix, normal
 import type { Node } from 'three/webgpu';
 import type { GraphicsTier } from '../game/graphics';
 import { WATER_LEVEL } from './water-surface';
+import { MATSU_BAY } from './waterways';
 
 type F = Node<'float'>; type V2 = Node<'vec2'>; type V3 = Node<'vec3'>;
 
@@ -17,7 +18,10 @@ export interface ShoreMaps { albedo: THREE.Texture; nrh: THREE.Texture }
 export const channelDistance = Fn(([xz]: [V2]) => {
   const x = xz.x, z = xz.y;
   const centre = float(26).add(sin(x.mul(.036)).mul(4)).add(sin(x.mul(.075)).mul(3).mul(min(abs(x).div(35), 1)));
-  const river = abs(z.sub(centre)).sub(7.3).sub(sin(x.mul(.19)).mul(.38)).sub(sin(x.mul(.53)).mul(.18));
+  const variation = sin(x.mul(.19)).mul(.38).add(sin(x.mul(.53)).mul(.18)), widthMain = float(7.3).add(variation);
+  const t = min(max(x.sub(MATSU_BAY.startX).div(MATSU_BAY.fullX - MATSU_BAY.startX), 0), 1), spread = t.mul(t).mul(float(3).sub(t.mul(2))).mul(MATSU_BAY.northReach);
+  const oldRiver = abs(z.sub(centre)).sub(7.3).sub(sin(x.mul(.19)).mul(.38)).sub(sin(x.mul(.53)).mul(.18));
+  const river = select(x.greaterThan(MATSU_BAY.startX), max(z.sub(centre.add(widthMain)), centre.sub(widthMain).sub(spread).sub(z)), oldRiver);
   // Both tributaries at once: the nearer one always lies on the same side as x.
   const offset = float(57).add(sin(z.add(12).mul(.065)).mul(6)), width = float(3.5).add(sin(z.mul(.21)).mul(.45)).mul(min(z.add(58).div(8), 1));
   return min(river, select(z.greaterThan(-58).and(z.lessThan(32)), abs(abs(x).sub(offset)).sub(width), float(1e4)));

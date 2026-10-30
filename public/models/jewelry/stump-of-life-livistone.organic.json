@@ -1,0 +1,122 @@
+{
+  "method": "CC0 photographed trunk adaptation with generated fine branching roots; no AI-generated wood",
+  "author": "Rob Tuytel",
+  "source": "https://polyhaven.com/a/tree_stump_01",
+  "license": "CC0 1.0",
+  "license_url": "https://polyhaven.com/license",
+  "original_source_sha256": "25fd9a6e633d2911a2eae58fabe252e32b58ccd157a4921eb60f558eca7d2af0",
+  "output_sha256": "54b068a34564670fafde06e5acbc5eede2b0a02a1666818b752b241f0083b06c",
+  "original_binary_byte_length": 1166492,
+  "original_binary_sha256": "21f0a4e90d282befa2be370a2638d00903771de58bd14475b756c904cbc211e4",
+  "protected_nonwood_mesh_definitions_sha256": "c5d87ff1e6fb43563b43babff884f5a4d8b1a7a049080a73c96b15b6388f07d8",
+  "original_nodes_sha256": "2cd0ccb3cb6bca4ba382e72760ea035e6271f7c0f8aae1565b2e35dc275abc36",
+  "protected_noncap_nodes_sha256": "7994d403d6633e45a80bfab96d8baa0bf26ec8a248eb66559f0d8e44189d7e95",
+  "permitted_cap_node_transforms": [
+    {
+      "node_index": 9,
+      "name": "Giant_Solid_Cap_Edge",
+      "original_translation": null,
+      "output_translation": [
+        0,
+        1.1,
+        0
+      ]
+    },
+    {
+      "node_index": 10,
+      "name": "Giant_Solid_DNA_Cap",
+      "original_translation": null,
+      "output_translation": [
+        0,
+        1.1,
+        0
+      ]
+    }
+  ],
+  "scan_geometry_sha256": "b4d9ca70b3c908c4a638fbd6a23ed96c84055bbbf14cf44b89e31ad59fa21e0a",
+  "scan_json_sha256": "fe5fa7ac8d6e68c2f5cb67bf6a3797040a00960fec4e6dd13a40610220851ed8",
+  "textures": [
+    {
+      "original": "/home/antonkulaga/sources/stump-of-life/output/references/tree_stump_01/4k/textures/tree_stump_01_nor_gl_4k.jpg",
+      "source_sha256": "52f739e50d3ee5ef63a708ee7ac11d8e4705cf9b549756748563b8681bc59847",
+      "resized_sha256": "d4d226ad5b304c334f7394bb31df22335e54cac57a6a8a712891416126ec83f8",
+      "pixels": 2048,
+      "jpeg_quality": 94,
+      "original_uvs_preserved": true
+    },
+    {
+      "original": "/home/antonkulaga/sources/stump-of-life/output/references/tree_stump_01/4k/textures/tree_stump_01_diff_4k.jpg",
+      "source_sha256": "761b5c87bbfdf08afaa25aafcf3db776c57712aec64be11b0469b91b322d6e21",
+      "resized_sha256": "2d952a054f307e10a8575868e0578e4d1c6cee6ac3a1120e94aba6632895bd01",
+      "pixels": 2048,
+      "jpeg_quality": 94,
+      "original_uvs_preserved": true
+    },
+    {
+      "original": "/home/antonkulaga/sources/stump-of-life/output/references/tree_stump_01/4k/textures/tree_stump_01_arm_4k.jpg",
+      "source_sha256": "62cc9cbff7dd588747c74b573b570a9e667e9692fef0beeab230f8d3ea146957",
+      "resized_sha256": "ef5368062517912933be7d3d32bc7874c9745ca19c127bb5978aa33390c4c2c6",
+      "pixels": 2048,
+      "jpeg_quality": 94,
+      "original_uvs_preserved": true
+    }
+  ],
+  "transformations": {
+    "source_centre_xz": [
+      -0.06,
+      0.04
+    ],
+    "radial_remap": "Height-dependent median-radius compensation; lower buttress transition and a soft crown limit below the unchanged cap",
+    "native_vertical_clip": [
+      0.025,
+      0.3
+    ],
+    "digital_vertical_range": [
+      0.25,
+      2.013
+    ],
+    "vertical_scale": 6.410909090909091,
+    "artistic_vertical_adaptation": true,
+    "root_clip_semiaxes_m": [
+      3.5,
+      3.5
+    ],
+    "base_radial_target_m": 2.02,
+    "crown_radial_target_m": 1.3,
+    "base_z_compression": 1,
+    "max_root_radius_m": 3.4848252217122346,
+    "root_clip": "Smooth radial profile with original photographed knots and grain; 64-plane outer guard; no repeated radial grooves or hard perimeter skirt",
+    "radial_boundary_edges_closed": 0,
+    "radial_closure": "Newly cut perimeter edges only are closed vertically to island y=.25 with planar cut-end panels; existing natural source cavities elsewhere remain. Generated closures use a separate untextured matte dark brown material, with no source grain or normal texture; preserved scan surfaces retain their original UVs/PBR.",
+    "digital_centre_xz": [
+      10.64391425710376,
+      -3.4787374527067465
+    ],
+    "cap_node_lift_m": 1.1,
+    "cap_top_y_m": 2.04
+  },
+  "output_vertices": 14508,
+  "output_triangles": 25037,
+  "original_binary_prefix_unchanged": true,
+  "nonwood_mesh_definitions_unchanged": true,
+  "scene_graph_changes": "Only the two cap nodes are translated rigidly upward by 1.10 m; all other nodes, scenes, cap/map geometry buffers, UVs and DNA image are unchanged",
+  "cap_before": {
+    "geometry": "9441f13f32847fe4021402d49077f11813eb1ec5dc232b74fa9f617aa524e580",
+    "texture": "a805d106d3d7b6a1770703e0168b87c3c17992434515f929d16b14070854e3f7"
+  },
+  "cap_after": {
+    "geometry": "9441f13f32847fe4021402d49077f11813eb1ec5dc232b74fa9f617aa524e580",
+    "texture": "a805d106d3d7b6a1770703e0168b87c3c17992434515f929d16b14070854e3f7"
+  },
+  "generated_fine_roots": {
+    "method": "Twenty unequal tapered branch tubes with asymmetric forks, gently flattened against the floor; digital additions inspired by the approved reference",
+    "photographed_scan_geometry": false,
+    "main_roots": 12,
+    "fork_roots": 8,
+    "vertices": 2080,
+    "triangles": 4080,
+    "material": "Untextured warm weathered wood; no claim of photographed bark on the generated twigs"
+  },
+  "physical_specimen_claim": false,
+  "note": "The raw asset retains its immutable 3.4 m DNA cap and all map/scientific resources. Runtime wrappers place the artwork at a 500 mm cap and 45 cm seat height. The CC0 scan supplies the reshaped trunk and photographed grain; fine branching roots are explicitly generated additions. This is not the actual Taiwanese material specimen. The separate physical proposal is unchanged."
+}

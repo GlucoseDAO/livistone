@@ -1,0 +1,13 @@
+{
+  "engraving-marks.csv": {
+    "source": "/home/antonkulaga/sources/stump-of-life/output/taiwan/engraved/marks.csv",
+    "sha256": "1c99c2015be902075d05b4460d101861cadd7a21c6fde4902e862a3038040974",
+    "kind": "294 native observed substitution marks; no ancient calls synthesized",
+    "reference_id": "KF540505.1",
+    "variable_alignment_columns": 175,
+    "tracks": 16,
+    "physical_cap_diameter_mm": 500,
+    "preserved_source_cap_diameter_m": 3.4,
+    "runtime_proposal_cap_diameter_m": 0.5
+  }
+}

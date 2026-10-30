@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { channelDistance, riverCenter, tributaryCenter, waterDistance } from './waterways';
+import { MATSU_BAY, channelDistance, riverCenter, tributaryCenter, waterDistance } from './waterways';
 import { terrainHeight } from './terrain';
 
 /** The river sheet height. The bank (`terrainHeight` = distance / 1.3 inside the channel) crosses it at WATER_EDGE. */
@@ -87,35 +87,46 @@ export function rockField(rocks: readonly RockSite[]): (x: number, z: number) =>
 }
 
 /**
- * One indexed sheet clipped to the shared bank outline on a 1 m grid (no overlapping sheets at junctions),
+ * One indexed sheet clipped to the shared bank outline on a 1 m town grid (no overlapping sheets at junctions),
  * with the per-vertex `flow`, `along`, `across`, `depth` and `rock` the water shader reads. `colour` optionally bakes
  * vertex colours (the CPU tier has no transparency, so depth tint stands in for it); CPU also uses 2 m cells,
- * whose straight edge segments stay within a centimetre of the curved bank.
+ * whose straight edge segments stay within a centimetre of the curved bank. The wider downstream bay uses 2/4 m cells,
+ * joining the original river at x = 150 without overlapping it or adding a second water draw.
  */
-export function waterSurfaceGeometry(rocks: readonly RockSite[], colour?: (depth: number, rock: number) => THREE.Color, cell = 1): THREE.BufferGeometry {
+export function waterSurfaceGeometry(rocks: readonly RockSite[], colour?: (depth: number, rock: number, x?: number, z?: number) => THREE.Color, cell = 1): THREE.BufferGeometry {
   const positions: number[] = [], flows: number[] = [], alongs: number[] = [], acrosses: number[] = [], depths: number[] = [], stirred: number[] = [], colours: number[] = [], indices: number[] = [];
   const known = new Map<string, number>(), rockNear = rockField(rocks);
   const vertex = (x: number, z: number): number => {
     const key = `${Math.round(x * 1e4)},${Math.round(z * 1e4)}`, found = known.get(key); if (found !== undefined) return found;
     const flow = waterFlow(x, z), depth = waterDepth(x, z), rock = rockNear(x, z), index = positions.length / 3;
     positions.push(x, WATER_LEVEL, z); flows.push(flow.x, flow.z); alongs.push(flow.along); acrosses.push(flow.across); depths.push(depth); stirred.push(rock);
-    if (colour) { const c = colour(depth, rock); colours.push(c.r, c.g, c.b); }
+    if (colour) { const c = colour(depth, rock, x, z); colours.push(c.r, c.g, c.b); }
     known.set(key, index); return index;
   };
   const inside = (x: number, z: number): number => waterDistance(x, z) - WATER_EDGE;
-  const emit = (corners: [number, number][]): void => {
+  const emit = (corners: [number, number][], refine = false): void => {
     const polygon: number[] = [];
     for (let i = 0; i < corners.length; i++) {
       const [ax, az] = corners[i], [bx, bz] = corners[(i + 1) % corners.length], da = inside(ax, az), db = inside(bx, bz);
       if (da <= 0) polygon.push(vertex(ax, az));
-      if ((da <= 0) !== (db <= 0)) { const t = da / (da - db); polygon.push(vertex(ax + (bx - ax) * t, az + (bz - az) * t)); }
+      if ((da <= 0) !== (db <= 0)) {
+        let t = da / (da - db);
+        // A coarse bay cell can span a curved headland; locate its actual waterline instead of extrapolating it.
+        if (refine) { let low = 0, high = 1; for (let step = 0; step < 15; step++) { const middle = (low + high) / 2, d = inside(ax + (bx - ax) * middle, az + (bz - az) * middle); if ((d <= 0) === (da <= 0)) low = middle; else high = middle; } t = (low + high) / 2; }
+        polygon.push(vertex(ax + (bx - ax) * t, az + (bz - az) * t));
+      }
     }
     for (let i = 1; i < polygon.length - 1; i++) indices.push(polygon[0], polygon[i], polygon[i + 1]);
   };
-  for (let x = -600; x < 600; x += cell) for (let z = -60; z < 45; z += cell) {
-    if (inside(x + cell / 2, z + cell / 2) > 1.5 * cell) continue;
-    emit([[x, z], [x, z + cell], [x + cell, z]]); emit([[x + cell, z], [x, z + cell], [x + cell, z + cell]]);
-  }
+  const grid = (minX: number, maxX: number, minZ: number, maxZ: number, step: number, refine: boolean): void => {
+    for (let x = minX; x < maxX; x += step) for (let z = minZ; z < maxZ; z += step) {
+      const right = Math.min(maxX, x + step), far = Math.min(maxZ, z + step);
+      if (inside((x + right) / 2, (z + far) / 2) > 1.5 * step) continue;
+      emit([[x, z], [x, far], [right, z]], refine); emit([[right, z], [x, far], [right, far]], refine);
+    }
+  };
+  grid(-600, MATSU_BAY.startX, -60, 45, cell, false);
+  grid(MATSU_BAY.startX, 600, -180, 45, cell * 2, true);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(positions.length).map((_, i) => i % 3 === 1 ? 1 : 0), 3));

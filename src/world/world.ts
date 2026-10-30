@@ -1,4 +1,7 @@
 import { createGatePoster } from './gate-posters';
+import { loadStumpOfLife } from './stump-of-life';
+import { STUMP_ISLAND } from './stump-of-life-layout';
+import { MATSU_COURTYARD } from './matsu-courtyard-layout';
 import { createConceptRotunda } from './concept-rotunda';
 import { TrailFireflies } from './trail-fireflies';
 import { gateFittingsEnabled } from './gate-lamps';
@@ -280,6 +283,11 @@ export class Town {
     label('Gateway poster');
     const introduction = createIntroduction(this.root, this.colliders); this.researchPanels.push(...introduction.panels); this.interactives.push({ id: 'about-livistone', object: introduction.panels[0], position: introduction.position });
     label('Introduction sign');
+    await this.place('Stump of Life', [...around(STUMP_ISLAND.x, STUMP_ISLAND.z, 20), ...around(MATSU_COURTYARD.x, MATSU_COURTYARD.z, 22)], async () => {
+      const stump = await loadStumpOfLife(this.wood, this.silver, mobile); this.root.add(stump.root); this.colliders.push(...stump.colliders);
+      this.researchPanels.push(...stump.panels); this.interactives.push({ id: 'stump-of-life-story', object: stump.panels[0], position: stump.position });
+      for (const side of [-1, 1]) this.contactSites.push({ x: STUMP_ISLAND.sign.x + side * 1.25, z: STUMP_ISLAND.sign.z, rx: .15, rz: .15, strength: .22 });
+    });
     await stage(28, 'Turning jewellery into civic buildings…');
     for (const landmark of CIVIC_LANDMARKS) landmark.id === 'energy' ? this.createEnergyHall(landmark.x, landmark.z) : this.createLandmark(landmark.id, landmark.x, landmark.z);
     label('Hall paving');
