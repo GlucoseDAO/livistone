@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { LANDMARKS, SPAWN } from '../src/game/content';
 import { STUMP_OF_LIFE } from '../src/world/stump-of-life-layout';
-import { COURTYARD_STAIRS, MATSU_COURTYARD as C, courtyardWorld } from '../src/world/matsu-courtyard-layout';
+import { COURTYARD_ARRIVAL, COURTYARD_STAIRS, MATSU_COURTYARD as C, courtyardWorld } from '../src/world/matsu-courtyard-layout';
 import { GPU_ERROR } from './gpu-errors';
 
 interface Snapshot {
@@ -11,6 +11,7 @@ interface Snapshot {
   position: { x: number; y: number; z: number };
   yaw: number;
   pitch: number;
+  interaction: string | null;
 }
 const snapshot = (page: Page): Promise<Snapshot> => page.evaluate(() => (window as unknown as { __livistone: { snapshot(): Snapshot } }).__livistone.snapshot());
 const backend = process.env.LIVISTONE_BACKEND === 'webgl' ? '&backend=webgl' : '';
@@ -53,6 +54,13 @@ test('a cold Stump of Life link waits for its courtyard and artwork, then named 
     await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeEnabled({ timeout: 90000 });
     await expectArrival(page, LANDMARKS.find(place => place.id === 'stump-of-life')!.entrance);
     await expect(page.locator('#welcome')).toBeHidden();
+    expect((await snapshot(page)).position.y).toBeLessThan(C.floorY + 1.1);
+    await expect.poll(async () => (await snapshot(page)).interaction).toBe('stump-of-life-story');
+    await page.keyboard.press('e');
+    await expect(page.locator('#lore-title')).toHaveText('Stump of Life');
+    await page.keyboard.press('Escape');
+    // Named arrival now reads the supported lower-court poster; explicitly start upstairs to retain cold-loaded stair coverage.
+    await page.evaluate(arrival => (window as any).__livistone.teleport(arrival.x, arrival.z, arrival.yaw, arrival.y), COURTYARD_ARRIVAL);
     const targets = [...[3, 4, 6, 7].map(index => COURTYARD_STAIRS[index]).map(point => ({ ...courtyardWorld(point), y: point.y })), { ...courtyardWorld({ x: 1, z: 2.4 }), y: C.floorY }];
     for (const target of targets) {
       const at = (await snapshot(page)).position, yaw = Math.atan2(at.x - target.x, at.z - target.z);

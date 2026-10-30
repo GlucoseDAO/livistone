@@ -14,8 +14,9 @@ import { RAILWAY, STATION } from '../src/world/station-layout';
 // trail, its plateau, the peaks and the couloir out after the draws, so every other site is unchanged, and appended a few round
 // the trailhead (the last site is one of them). Winter moved from the meadow onto the already treeless mountain shelf; the meadow regains its 20 desktop / 14 mobile trees. Eyelense then clears 20 desktop / 12 mobile trees at its east-meadow site. Round 3 appends dwarf pines on the high ground round the gorge (51 desktop / 34 mobile; the last site is one).
 const FOREST: [boolean, number, [number, number], [number, number]][] = [
-  // Original island forest: 905 desktop / 522 mobile. The bay, courtyard and shore access filter 17 / 7 sites after all draws.
-  [false, 888, [-27.918645669706166, -199.93845618027262], [-78.6232712934725, -240.66769996890798]],
+  // Original island forest: 905 desktop / 522 mobile. The bay, courtyard and shore access filter 16 / 7 sites after all draws.
+  // Moving the poster into the court restores one desktop ash at (150.008495, 47.176725), outside its former sign clearance.
+  [false, 889, [-27.918645669706166, -199.93845618027262], [-78.6232712934725, -240.66769996890798]],
   [true, 515, [-27.918645669706166, -199.93845618027262], [-108.59260804951191, -212.85239251912571]],
 ];
 

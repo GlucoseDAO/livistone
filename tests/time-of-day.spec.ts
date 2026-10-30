@@ -12,7 +12,7 @@ const promisesNight = (label: string): boolean => label.replace('Time of day: ',
 // player, the choice persists, and the menu's select and the button stay in step both ways.
 for (const touch of [false, true]) test(`the top-bar time button cycles your time, day and night (${touch ? 'touch' : 'desktop'})`, async ({ browser }) => {
   test.setTimeout(240000);
-  const context = await browser.newContext(touch ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1280, height: 800 } });
+  const context = await browser.newContext({ timezoneId: 'Europe/Bucharest', ...(touch ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1280, height: 800 } }) });
   const page = await context.newPage(), errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error' && GPU_ERROR.test(m.text())) errors.push(m.text()); });
   const button = page.locator('#hud-time'), select = page.locator('#time-of-day');
@@ -25,6 +25,8 @@ for (const touch of [false, true]) test(`the top-bar time button cycles your tim
     await expect(button).not.toHaveAttribute('aria-busy', 'true', { timeout: 60000 });
   };
   try {
+    // The reported Romanian morning must be daytime in Auto, even after a saved Night choice is reloaded below.
+    await page.clock.setFixedTime(new Date('2026-10-30T08:21:15Z'));
     await page.goto('/'); await ready();
     expect((await snapshot(page)).backend).toBe(EXPECTED_BACKEND);
     await expect(button).toBeVisible(); await expect(button).toBeEnabled(); await expect(button).toHaveAttribute('aria-keyshortcuts', 'T');
@@ -37,8 +39,10 @@ for (const touch of [false, true]) test(`the top-bar time button cycles your tim
 
     // A fresh visitor starts on your time, named with what the local clock gives now.
     const first = await snapshot(page), start = first.position, local = first.night ? 'night' : 'day';
-    expect(first.timeOfDay).toBe('auto');
-    await expect(button).toHaveAttribute('aria-label', `Time of day: your time (${local} now)`); await expect(button).toHaveAttribute('title', `Time of day: your time (${local} now)`);
+    expect(first.timeOfDay).toBe('auto'); expect(first.night).toBe(false);
+    await expect(button).toHaveAttribute('aria-label', `Time of day: your time (${local} now)`); await expect(button).toHaveAttribute('title', /Following your local clock.*Click for manual day/);
+    await expect(button.locator('strong')).toHaveText('Day'); await expect(button.locator('small')).toHaveText('Auto');
+    await expect(button.locator('.time-copy')).toBeVisible();
     await expect(select).toHaveValue('auto'); await expect(select.locator('option[value="auto"]')).toHaveText('Your time — local clock');
     const icons = new Set([await button.innerHTML()]);
     // Records each pending change of the button with the scene's phase at that moment.
@@ -63,8 +67,12 @@ for (const touch of [false, true]) test(`the top-bar time button cycles your tim
     await page.reload(); await ready();
     expect((await snapshot(page)).timeOfDay).toBe('night'); expect((await snapshot(page)).night).toBe(true);
     await expect(button).toHaveAttribute('aria-label', 'Time of day: night'); await expect(select).toHaveValue('night');
+    await expect(button.locator('strong')).toHaveText('Night'); await expect(button.locator('small')).toHaveText('Manual');
+    await expect(button).toHaveAttribute('title', /Manual night is saved.*Click for Your time \(local clock\)/);
+    await expect(page.locator('#time-of-day-help')).toContainText('Choose Your time');
     // Your time names what the local clock gives now; the scene follows the clock.
     await press(); await settled(/^Time of day: your time \((day|night) now\)$/); expect((await snapshot(page)).timeOfDay).toBe('auto'); await expect(select).toHaveValue('auto');
+    expect((await snapshot(page)).night).toBe(false); await expect(button.locator('small')).toHaveText('Auto');
 
     // The menu's select and the button follow each other, and the button still works over the open menu.
     if (touch) await page.getByRole('button', { name: 'Open menu' }).tap(); else await page.getByRole('button', { name: 'Open menu' }).click();
@@ -85,6 +93,13 @@ for (const touch of [false, true]) test(`the top-bar time button cycles your tim
       await page.emulateMedia({ reducedMotion: 'reduce' }); const still = await pending(); expect(still.animation).toBe('none'); expect(still.opacity).toBeLessThan(1);
       await page.emulateMedia({ reducedMotion: null });
     }
+    // A hidden tab can cross dusk. Returning checks Auto immediately instead of waiting another thirty active seconds.
+    await page.getByRole('button', { name: 'Open menu' }).click();
+    await select.selectOption('auto'); await settled('Time of day: your time (day now)');
+    await page.clock.setFixedTime(new Date('2026-10-30T18:00:00Z'));
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await settled('Time of day: your time (night now)');
+    expect(await page.evaluate(() => localStorage.getItem('livistone-time-of-day'))).toBe('auto');
     await page.screenshot({ path: `output/testing/time-of-day-${touch ? 'touch' : 'desktop'}.png` });
     expect(errors).toEqual([]);
   } finally { await context.close(); }

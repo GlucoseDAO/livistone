@@ -13,7 +13,7 @@ import { PathNetwork } from './path-network';
 import { futureClearing, futureGround } from './elevated-layout';
 import { winterClearing, winterGround } from './winter-gate-layout';
 import { STUMP_ISLAND, stumpClearing, stumpGround } from './stump-of-life-layout';
-import { COURTYARD_APPROACH } from './matsu-courtyard-layout';
+import { COURTYARD_APPROACH_CURVE } from './matsu-courtyard-layout';
 
 
 // Reserved for future authored homes; the white dome placeholders have been removed.
@@ -42,7 +42,7 @@ const routes = [
   [[29, 2], [41, -8], [45, -28], [28, -35], [26, -47], [38, -52]],
   [[94, -36], [96, -20], [110, -7], [124, 6], [STUMP_ISLAND.bank.x, STUMP_ISLAND.bank.z]],
 ];
-export const PATH_CURVES = [...routes, COURTYARD_APPROACH.map(point => [point.x, point.z])].map((path) => new THREE.CatmullRomCurve3(path.map(([x, z]) => new THREE.Vector3(x, .13, z))));
+export const PATH_CURVES = [...routes.map(path => new THREE.CatmullRomCurve3(path.map(([x, z]) => new THREE.Vector3(x, .13, z)))), COURTYARD_APPROACH_CURVE];
 /** Paved width along a town route: the bridge apron's taper on the gateway approach, PATH_WIDTH elsewhere. */
 export function routeWidth(road: number, p: THREE.Vector3): number {
   return PATH_CURVES[road].points.every(point => point.x === 0 && point.z >= 40) ? gatewayApproachWidth(p.z) : PATH_WIDTH;

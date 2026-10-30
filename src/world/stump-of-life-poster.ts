@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import type { ColliderSpec } from '../game/physics';
 import { STUMP_IMAGES, STUMP_POSTER_INTRO, STUMP_POSTER_READING } from '../game/stump-of-life';
-import { createPlaceSign } from './place-sign';
+import { createPlaceSign, PLACE_SIGN } from './place-sign';
 import type { PlaceSign } from './place-sign';
 import { paintPosterText } from './poster-text';
-import { terrainSurfaceHeight } from './terrain';
+import { COURTYARD_POSTER } from './matsu-courtyard-layout';
 import { transformColliders } from './town-layout';
 
 async function paintStumpPoster(sign: PlaceSign): Promise<void> {
@@ -28,11 +28,25 @@ async function paintStumpPoster(sign: PlaceSign): Promise<void> {
   const material = sign.faces[0].material as THREE.MeshBasicMaterial; material.color.set('#ffffff'); material.map = texture; material.needsUpdate = true;
 }
 
-/** Same two-sided, high-contrast place-sign component as the town's other stories, at full reading scale. */
-export function createStumpPoster(parent: THREE.Object3D, colliders: ColliderSpec[], site: { x: number; z: number; yaw: number }): { panels: THREE.Mesh[]; position: THREE.Vector3; ready: Promise<void> } {
+export interface StumpPosterSite { x: number; y: number; z: number; yaw: number; scale: number }
+/** World-space contact sites use the same post spacing, rotation and physical scale as the visible stand. */
+export function stumpPosterFeet(site: StumpPosterSite = COURTYARD_POSTER): { x: number; z: number; rx: number; rz: number; strength: number }[] {
+  return [-1, 1].map(side => ({ x: site.x + Math.cos(site.yaw) * side * PLACE_SIGN.postX * site.scale, z: site.z - Math.sin(site.yaw) * side * PLACE_SIGN.postX * site.scale, rx: .15 * site.scale, rz: .15 * site.scale, strength: .22 }));
+}
+
+/** DOM-independent: compact two-sided sign, visible floor-reaching posts and matching physical collision. */
+export function createStumpPosterStructure(site: StumpPosterSite = COURTYARD_POSTER): { root: THREE.Group; sign: PlaceSign; colliders: ColliderSpec[]; position: THREE.Vector3 } {
   const root = new THREE.Group(), local: ColliderSpec[] = [], sign = createPlaceSign(root, local, { x: 0, z: 0, yaw: 0 }, 'Stump of Life · project poster');
-  root.position.set(site.x, terrainSurfaceHeight(site.x, site.z), site.z); root.rotation.y = site.yaw; root.updateMatrix(); parent.add(root);
-  colliders.push(...transformColliders(local, root.matrix, site.yaw));
+  root.position.set(site.x, site.y, site.z); root.rotation.y = site.yaw; root.scale.setScalar(site.scale); root.updateMatrixWorld(true);
+  // transformColliders transforms box centres and yaw; explicit half-extents must share the sign's uniform scale too.
+  const scaled = local.map(spec => spec.type === 'box' ? { ...spec, size: spec.size.map(value => value * site.scale) as [number, number, number] } : spec);
+  const colliders = transformColliders(scaled, root.matrix, site.yaw);
   for (const face of sign.faces) { face.userData.discovery = 'stump-of-life-story'; face.userData.title = 'Stump of Life'; }
-  return { panels: sign.faces, position: sign.position.applyMatrix4(root.matrix), ready: paintStumpPoster(sign) };
+  return { root, sign, colliders, position: sign.position.clone().applyMatrix4(root.matrix) };
+}
+
+/** Paint the source story after its DOM-independent stand and supports have been placed on the courtyard floor. */
+export function createStumpPoster(parent: THREE.Object3D, colliders: ColliderSpec[], site: StumpPosterSite): { panels: THREE.Mesh[]; position: THREE.Vector3; ready: Promise<void> } {
+  const structure = createStumpPosterStructure(site); parent.add(structure.root); colliders.push(...structure.colliders);
+  return { panels: structure.sign.faces, position: structure.position, ready: paintStumpPoster(structure.sign) };
 }

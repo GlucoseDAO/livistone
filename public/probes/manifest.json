@@ -1,84 +1,84 @@
 {
-  "revision": "36950a99449d86b5",
+  "revision": "c4157e97e4496a67",
   "sets": {
     "webgpu-256-day": [
       {
         "id": "eyelense-gate",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-day/eyelense-gate-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-day/eyelense-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "winter-gate",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-day/winter-gate-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-day/winter-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-day/city-hall-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-day/city-hall-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-day/energy-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-day/energy-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-day/science-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-day/science-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-day/station-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-day/station-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "gateway",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-day/gateway-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-day/gateway-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "timeface",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-day/timeface-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-day/timeface-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "future-house",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-day/future-house-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-day/future-house-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall-inside",
         "width": 384,
         "height": 512,
-        "file": "webgpu-256-day/city-hall-inside-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-day/city-hall-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy-inside",
         "width": 384,
         "height": 512,
-        "file": "webgpu-256-day/energy-inside-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-day/energy-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science-inside",
         "width": 384,
         "height": 512,
-        "file": "webgpu-256-day/science-inside-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-day/science-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station-concourse",
         "width": 384,
         "height": 512,
-        "file": "webgpu-256-day/station-concourse-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-day/station-concourse-c4157e97e4496a67.bin.gz"
       }
     ],
     "webgpu-256-night": [
@@ -86,79 +86,79 @@
         "id": "eyelense-gate",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-night/eyelense-gate-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-night/eyelense-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "winter-gate",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-night/winter-gate-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-night/winter-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-night/city-hall-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-night/city-hall-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-night/energy-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-night/energy-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-night/science-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-night/science-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-night/station-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-night/station-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "gateway",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-night/gateway-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-night/gateway-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "timeface",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-night/timeface-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-night/timeface-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "future-house",
         "width": 768,
         "height": 1024,
-        "file": "webgpu-256-night/future-house-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-night/future-house-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall-inside",
         "width": 384,
         "height": 512,
-        "file": "webgpu-256-night/city-hall-inside-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-night/city-hall-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy-inside",
         "width": 384,
         "height": 512,
-        "file": "webgpu-256-night/energy-inside-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-night/energy-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science-inside",
         "width": 384,
         "height": 512,
-        "file": "webgpu-256-night/science-inside-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-night/science-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station-concourse",
         "width": 384,
         "height": 512,
-        "file": "webgpu-256-night/station-concourse-36950a99449d86b5.bin.gz"
+        "file": "webgpu-256-night/station-concourse-c4157e97e4496a67.bin.gz"
       }
     ],
     "webgpu-128-day": [
@@ -166,79 +166,79 @@
         "id": "eyelense-gate",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-day/eyelense-gate-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-day/eyelense-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "winter-gate",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-day/winter-gate-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-day/winter-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-day/city-hall-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-day/city-hall-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-day/energy-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-day/energy-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-day/science-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-day/science-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-day/station-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-day/station-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "gateway",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-day/gateway-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-day/gateway-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "timeface",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-day/timeface-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-day/timeface-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "future-house",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-day/future-house-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-day/future-house-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall-inside",
         "width": 336,
         "height": 256,
-        "file": "webgpu-128-day/city-hall-inside-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-day/city-hall-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy-inside",
         "width": 336,
         "height": 256,
-        "file": "webgpu-128-day/energy-inside-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-day/energy-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science-inside",
         "width": 336,
         "height": 256,
-        "file": "webgpu-128-day/science-inside-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-day/science-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station-concourse",
         "width": 336,
         "height": 256,
-        "file": "webgpu-128-day/station-concourse-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-day/station-concourse-c4157e97e4496a67.bin.gz"
       }
     ],
     "webgpu-128-night": [
@@ -246,79 +246,79 @@
         "id": "eyelense-gate",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-night/eyelense-gate-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-night/eyelense-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "winter-gate",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-night/winter-gate-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-night/winter-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-night/city-hall-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-night/city-hall-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-night/energy-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-night/energy-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-night/science-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-night/science-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-night/station-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-night/station-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "gateway",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-night/gateway-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-night/gateway-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "timeface",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-night/timeface-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-night/timeface-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "future-house",
         "width": 384,
         "height": 512,
-        "file": "webgpu-128-night/future-house-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-night/future-house-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall-inside",
         "width": 336,
         "height": 256,
-        "file": "webgpu-128-night/city-hall-inside-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-night/city-hall-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy-inside",
         "width": 336,
         "height": 256,
-        "file": "webgpu-128-night/energy-inside-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-night/energy-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science-inside",
         "width": 336,
         "height": 256,
-        "file": "webgpu-128-night/science-inside-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-night/science-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station-concourse",
         "width": 336,
         "height": 256,
-        "file": "webgpu-128-night/station-concourse-36950a99449d86b5.bin.gz"
+        "file": "webgpu-128-night/station-concourse-c4157e97e4496a67.bin.gz"
       }
     ],
     "webgl-256-day": [
@@ -326,79 +326,79 @@
         "id": "eyelense-gate",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-day/eyelense-gate-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-day/eyelense-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "winter-gate",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-day/winter-gate-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-day/winter-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-day/city-hall-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-day/city-hall-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-day/energy-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-day/energy-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-day/science-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-day/science-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-day/station-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-day/station-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "gateway",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-day/gateway-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-day/gateway-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "timeface",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-day/timeface-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-day/timeface-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "future-house",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-day/future-house-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-day/future-house-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall-inside",
         "width": 384,
         "height": 512,
-        "file": "webgl-256-day/city-hall-inside-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-day/city-hall-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy-inside",
         "width": 384,
         "height": 512,
-        "file": "webgl-256-day/energy-inside-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-day/energy-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science-inside",
         "width": 384,
         "height": 512,
-        "file": "webgl-256-day/science-inside-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-day/science-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station-concourse",
         "width": 384,
         "height": 512,
-        "file": "webgl-256-day/station-concourse-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-day/station-concourse-c4157e97e4496a67.bin.gz"
       }
     ],
     "webgl-256-night": [
@@ -406,79 +406,79 @@
         "id": "eyelense-gate",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-night/eyelense-gate-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-night/eyelense-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "winter-gate",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-night/winter-gate-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-night/winter-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-night/city-hall-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-night/city-hall-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-night/energy-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-night/energy-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-night/science-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-night/science-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-night/station-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-night/station-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "gateway",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-night/gateway-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-night/gateway-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "timeface",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-night/timeface-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-night/timeface-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "future-house",
         "width": 768,
         "height": 1024,
-        "file": "webgl-256-night/future-house-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-night/future-house-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall-inside",
         "width": 384,
         "height": 512,
-        "file": "webgl-256-night/city-hall-inside-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-night/city-hall-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy-inside",
         "width": 384,
         "height": 512,
-        "file": "webgl-256-night/energy-inside-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-night/energy-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science-inside",
         "width": 384,
         "height": 512,
-        "file": "webgl-256-night/science-inside-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-night/science-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station-concourse",
         "width": 384,
         "height": 512,
-        "file": "webgl-256-night/station-concourse-36950a99449d86b5.bin.gz"
+        "file": "webgl-256-night/station-concourse-c4157e97e4496a67.bin.gz"
       }
     ],
     "webgl-128-day": [
@@ -486,79 +486,79 @@
         "id": "eyelense-gate",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-day/eyelense-gate-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-day/eyelense-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "winter-gate",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-day/winter-gate-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-day/winter-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-day/city-hall-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-day/city-hall-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-day/energy-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-day/energy-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-day/science-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-day/science-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-day/station-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-day/station-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "gateway",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-day/gateway-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-day/gateway-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "timeface",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-day/timeface-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-day/timeface-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "future-house",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-day/future-house-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-day/future-house-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall-inside",
         "width": 336,
         "height": 256,
-        "file": "webgl-128-day/city-hall-inside-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-day/city-hall-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy-inside",
         "width": 336,
         "height": 256,
-        "file": "webgl-128-day/energy-inside-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-day/energy-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science-inside",
         "width": 336,
         "height": 256,
-        "file": "webgl-128-day/science-inside-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-day/science-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station-concourse",
         "width": 336,
         "height": 256,
-        "file": "webgl-128-day/station-concourse-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-day/station-concourse-c4157e97e4496a67.bin.gz"
       }
     ],
     "webgl-128-night": [
@@ -566,79 +566,79 @@
         "id": "eyelense-gate",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-night/eyelense-gate-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-night/eyelense-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "winter-gate",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-night/winter-gate-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-night/winter-gate-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-night/city-hall-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-night/city-hall-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-night/energy-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-night/energy-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-night/science-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-night/science-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-night/station-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-night/station-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "gateway",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-night/gateway-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-night/gateway-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "timeface",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-night/timeface-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-night/timeface-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "future-house",
         "width": 384,
         "height": 512,
-        "file": "webgl-128-night/future-house-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-night/future-house-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "city-hall-inside",
         "width": 336,
         "height": 256,
-        "file": "webgl-128-night/city-hall-inside-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-night/city-hall-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "energy-inside",
         "width": 336,
         "height": 256,
-        "file": "webgl-128-night/energy-inside-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-night/energy-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "science-inside",
         "width": 336,
         "height": 256,
-        "file": "webgl-128-night/science-inside-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-night/science-inside-c4157e97e4496a67.bin.gz"
       },
       {
         "id": "station-concourse",
         "width": 336,
         "height": 256,
-        "file": "webgl-128-night/station-concourse-36950a99449d86b5.bin.gz"
+        "file": "webgl-128-night/station-concourse-c4157e97e4496a67.bin.gz"
       }
     ]
   }

@@ -1,5 +1,6 @@
 import { createGatePoster } from './gate-posters';
 import { loadStumpOfLife } from './stump-of-life';
+import { stumpPosterFeet } from './stump-of-life-poster';
 import { STUMP_ISLAND } from './stump-of-life-layout';
 import { MATSU_COURTYARD } from './matsu-courtyard-layout';
 import { createConceptRotunda } from './concept-rotunda';
@@ -286,7 +287,7 @@ export class Town {
     await this.place('Stump of Life', [...around(STUMP_ISLAND.x, STUMP_ISLAND.z, 20), ...around(MATSU_COURTYARD.x, MATSU_COURTYARD.z, 22)], async () => {
       const stump = await loadStumpOfLife(this.wood, this.silver, mobile); this.root.add(stump.root); this.colliders.push(...stump.colliders);
       this.researchPanels.push(...stump.panels); this.interactives.push({ id: 'stump-of-life-story', object: stump.panels[0], position: stump.position });
-      for (const side of [-1, 1]) this.contactSites.push({ x: STUMP_ISLAND.sign.x + side * 1.25, z: STUMP_ISLAND.sign.z, rx: .15, rz: .15, strength: .22 });
+      this.contactSites.push(...stumpPosterFeet().map(site => ({ ...site, floor: MATSU_COURTYARD.floorY })));
     });
     await stage(28, 'Turning jewellery into civic buildings…');
     for (const landmark of CIVIC_LANDMARKS) landmark.id === 'energy' ? this.createEnergyHall(landmark.x, landmark.z) : this.createLandmark(landmark.id, landmark.x, landmark.z);

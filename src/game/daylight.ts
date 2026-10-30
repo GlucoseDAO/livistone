@@ -22,5 +22,9 @@ export function resolveNight(mode: TimeOfDay, date = new Date()): boolean { retu
 export function nextTimeOfDay(mode: TimeOfDay): TimeOfDay { return mode === 'auto' ? 'day' : mode === 'day' ? 'night' : 'auto'; }
 /** The button's name: the chosen mode and, for your time, what the clock gives now. */
 export function timeOfDayLabel(mode: TimeOfDay, night: boolean): string { return 'Time of day: ' + (mode === 'auto' ? `your time (${night ? 'night' : 'day'} now)` : mode); }
+/** Explain why a saved manual phase can differ from the visitor's clock, and how to follow that clock again. */
+export function timeOfDayHelp(mode: TimeOfDay): string {
+  return mode === 'auto' ? 'Following your local clock. Day and Night are saved manual choices.' : `Manual ${mode} is saved on this device. Choose Your time to follow your local clock again.`;
+}
 export function readTimeOfDay(): TimeOfDay { try { return parseTimeOfDay(localStorage.getItem('livistone-time-of-day')); } catch { return 'auto'; } }
 export function saveTimeOfDay(mode: TimeOfDay): void { try { localStorage.setItem('livistone-time-of-day', mode); } catch { /* Lighting still works when storage is blocked. */ } }

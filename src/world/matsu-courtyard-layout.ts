@@ -1,4 +1,5 @@
 import type { Footprint } from './town-parts';
+import * as THREE from 'three';
 
 export interface CourtyardPoint { x: number; z: number }
 export interface CourtyardRect { minX: number; maxX: number; minZ: number; maxZ: number }
@@ -24,8 +25,18 @@ const facing = (from: CourtyardPoint, to: CourtyardPoint): number => Math.atan2(
 const stump = courtyardWorld(MATSU_COURTYARD.stump);
 const arrival = courtyardWorld({ x: 8, z: 6.8 }), lowerEntry = courtyardWorld({ x: 3.8, z: 6.1 });
 export const COURTYARD_ARRIVAL = { ...arrival, y: MATSU_COURTYARD.upperFloorY + .85, yaw: facing(arrival, stump) };
+/** Compact story sign beside the lower court's glazing; its posts stand on the explicit concrete floor. */
+export const COURTYARD_POSTER = { ...courtyardWorld({ x: 4.2, z: 3.7 }), y: MATSU_COURTYARD.floorY, yaw: MATSU_COURTYARD.yaw - Math.PI / 2, scale: .55 };
+const reader = courtyardWorld({ x: 1.1, z: 3.7 });
+export const COURTYARD_POSTER_ARRIVAL = { ...reader, y: MATSU_COURTYARD.floorY + .85, yaw: facing(reader, COURTYARD_POSTER) };
 export const COURTYARD_LOWER_ENTRY = { ...lowerEntry, y: MATSU_COURTYARD.floorY + .85, yaw: facing(lowerEntry, stump) };
 export const COURTYARD_APPROACH: readonly CourtyardPoint[] = [{ x: 156, z: 35 }, { x: 163, z: 38 }, { x: 166, z: 43 }, lowerEntry];
+/** Paving, grading and ground-cover clearance follow this same curve rather than its straight control-point chords. */
+export const COURTYARD_APPROACH_CURVE = new THREE.CatmullRomCurve3(COURTYARD_APPROACH.map(point => new THREE.Vector3(point.x, .13, point.z)));
+// A road edge is 1.3 m from its centre; the far corner of its supporting 2 m terrain triangle can be another 2√2 m away.
+const APPROACH_FLAT = 4.4, APPROACH_BLEND = 8;
+const approachSamples = COURTYARD_APPROACH_CURVE.getSpacedPoints(Math.ceil(COURTYARD_APPROACH_CURVE.getLength() / .25));
+const approachBounds = new THREE.Box3().setFromPoints(approachSamples).expandByScalar(APPROACH_BLEND);
 /** Shared navigation guide; the architecture owns the actual treads, landings and their collision. */
 export const COURTYARD_STAIRS = [
   { x: 8, y: 3.6, z: 6.8 }, { x: 8, y: 3.6, z: 7.1 }, { x: 8, y: 1.925, z: 10.5 }, { x: 8, y: 1.925, z: 11 },
@@ -37,10 +48,11 @@ const smooth = (n: number, from: number, to: number): number => { const t = clam
 function rectDistance(point: CourtyardPoint, rect: CourtyardRect): number {
   return Math.hypot(Math.max(rect.minX - point.x, 0, point.x - rect.maxX), Math.max(rect.minZ - point.z, 0, point.z - rect.maxZ));
 }
-function approachDistance(x: number, z: number): number {
+export function courtyardApproachDistance(x: number, z: number): number {
+  if (x < approachBounds.min.x || x > approachBounds.max.x || z < approachBounds.min.z || z > approachBounds.max.z) return Infinity;
   let distance = Infinity;
-  for (let i = 1; i < COURTYARD_APPROACH.length; i++) {
-    const a = COURTYARD_APPROACH[i - 1], b = COURTYARD_APPROACH[i], dx = b.x - a.x, dz = b.z - a.z, t = clamp(((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz));
+  for (let i = 1; i < approachSamples.length; i++) {
+    const a = approachSamples[i - 1], b = approachSamples[i], dx = b.x - a.x, dz = b.z - a.z, t = clamp(((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz));
     distance = Math.min(distance, Math.hypot(x - a.x - dx * t, z - a.z - dz * t));
   }
   return distance;
@@ -52,9 +64,10 @@ function coreDistance(point: CourtyardPoint): number {
 
 /** Grade the walking shore route first, then the lower court and the upper terrace. Rendering and physics call the same field. */
 export function courtyardTerrain(x: number, z: number, current: number): number {
-  if (z < 35 || z >= 65 || x <= 155) return current;
-  const m = MATSU_COURTYARD, point = courtyardLocal({ x, z }), path = (1 - smooth(approachDistance(x, z), 1, 4)) * smooth(x, 155, 156);
+  const path = (1 - smooth(courtyardApproachDistance(x, z), APPROACH_FLAT, APPROACH_BLEND)) * smooth(x, 150, 152);
   let height = current * (1 - path);
+  if (z < 35 || z >= 65 || x <= 155) return height;
+  const m = MATSU_COURTYARD, point = courtyardLocal({ x, z });
   const lower = Math.min(rectDistance(point, m.lower), rectDistance(point, m.stairs), rectDistance(point, m.apron)), upper = rectDistance(point, m.upper), distance = Math.min(lower, upper);
   if (distance >= m.blend) return height;
   // The two-metre shared terrain grid needs a low shoulder beyond the court wall and below the whole stair footprint.
@@ -69,7 +82,7 @@ export function courtyardTerrain(x: number, z: number, current: number): number 
 
 /** The entire construction, its heightfield blend and the narrow shore approach reserve their full ground footprint. */
 export function courtyardGround(x: number, z: number, radius = 0): boolean {
-  return coreDistance(courtyardLocal({ x, z })) < MATSU_COURTYARD.blend + radius / MATSU_COURTYARD.planScale || approachDistance(x, z) < 4 + radius;
+  return coreDistance(courtyardLocal({ x, z })) < MATSU_COURTYARD.blend + radius / MATSU_COURTYARD.planScale || courtyardApproachDistance(x, z) < APPROACH_FLAT + radius;
 }
 export function courtyardClearing(x: number, z: number, radius = 0): boolean { return courtyardGround(x, z, radius + 2); }
 /** A conservative producer footprint, including the complete switchback stairs and the shore route's grading margin. */

@@ -1,8 +1,8 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { STUMP_ISLAND as ISLAND, STUMP_OF_LIFE as STUMP, STUMP_BRIDGES, stumpWorld } from '../src/world/stump-of-life-layout';
+import { STUMP_ISLAND as ISLAND, STUMP_OF_LIFE as STUMP, stumpWorld } from '../src/world/stump-of-life-layout';
 import { GPU_ERROR } from '../tests/gpu-errors';
-import { MATSU_COURTYARD as COURT, COURTYARD_CAMERAS, courtyardWorld } from '../src/world/matsu-courtyard-layout';
+import { MATSU_COURTYARD as COURT, COURTYARD_CAMERAS, COURTYARD_APPROACH, courtyardWorld } from '../src/world/matsu-courtyard-layout';
 
 interface Hook {
   snapshot(): { ready: boolean; mode: string; frames: number; [key: string]: unknown };
@@ -34,11 +34,14 @@ try {
   const near = courtyardWorld({ x: COURT.stump.x - .9, z: COURT.stump.z + .9 }), onCap = courtyardWorld(COURT.stump);
   const cover = COURTYARD_CAMERAS.find(view => view.name === 'courtyard-external-overlook')!;
   const floor = courtyardWorld({ x: COURT.stump.x - 1.2, z: COURT.stump.z }), wood = courtyardWorld({ x: COURT.stump.x + .75, z: COURT.stump.z + .65 });
+  const context = courtyardWorld({ x: -2.5, z: 4.8 }), shore = COURTYARD_APPROACH[1], next = COURTYARD_APPROACH[2];
   const views: CaptureView[] = [
+    { name: 'courtyard-poster-context', ...context, yaw: Math.atan2(context.x - ISLAND.sign.x, context.z - ISLAND.sign.z), pitch: -.13, height: COURT.floorY + .85 },
+    { name: 'courtyard-shore-approach', ...shore, yaw: Math.atan2(shore.x - next.x, shore.z - next.z), pitch: -.10 },
     { name: 'first-person-approach', x: STUMP.arrival.x, z: STUMP.arrival.z, yaw: STUMP.arrival.yaw, pitch: -.08 },
     { name: 'first-person-cap', ...near, yaw: Math.atan2(near.x - STUMP.x, near.z - STUMP.z), pitch: -.69, height: ISLAND.islandHeight + .85 },
     { name: 'first-person-dna-detail', ...onCap, yaw: COURT.yaw, pitch: -Math.PI / 2 + .001, height: ISLAND.capHeight + .15, hold: true },
-    { name: 'project-poster', x: ISLAND.sign.x + Math.sin(ISLAND.sign.yaw) * 3.1, z: ISLAND.sign.z + Math.cos(ISLAND.sign.yaw) * 3.1, yaw: ISLAND.sign.yaw, pitch: .11 },
+    { name: 'project-poster', x: ISLAND.sign.x + Math.sin(ISLAND.sign.yaw) * 2.17, z: ISLAND.sign.z + Math.cos(ISLAND.sign.yaw) * 2.17, yaw: ISLAND.sign.yaw, pitch: -.28 },
     { name: 'installation-oblique', x: ISLAND.x - 13, z: ISLAND.z - 15, yaw: -2.43, pitch: -.57, height: 13, hold: true },
     { ...cover, name: 'installation-cover' },
     { name: 'wood-low-oblique', ...wood, yaw: Math.atan2(wood.x - STUMP.x, wood.z - STUMP.z), pitch: -.19, height: ISLAND.islandHeight + .02, hold: true },

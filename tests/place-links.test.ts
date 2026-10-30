@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { LANDMARKS } from '../src/game/content';
 import { placeFromUrl, placeUrl } from '../src/game/place-links';
+import { MATSU_COURTYARD as C, COURTYARD_POSTER, COURTYARD_POSTER_ARRIVAL, courtyardLocal } from '../src/world/matsu-courtyard-layout';
 
 describe('named place links', () => {
+  it('places the Stump of Life reader beside the artwork on the lower floor, facing its courtyard poster', () => {
+    const entrance = placeFromUrl('https://example.com/?place=stump-of-life', LANDMARKS)!.entrance;
+    expect(entrance).toEqual(COURTYARD_POSTER_ARRIVAL);
+    expect(courtyardLocal(entrance).x).toBeCloseTo(1.1, 8); expect(courtyardLocal(entrance).z).toBeCloseTo(3.7, 8);
+    expect(entrance.y).toBeCloseTo(C.floorY + .85, 8);
+    expect(entrance.yaw).toBeCloseTo(Math.atan2(entrance.x - COURTYARD_POSTER.x, entrance.z - COURTYARD_POSTER.z), 8);
+  });
+
   it.each(LANDMARKS)('resolves the registered safe arrival for $id', landmark => {
     expect(placeFromUrl(`https://example.com/town/?place=${landmark.id}`, LANDMARKS)).toBe(landmark);
   });

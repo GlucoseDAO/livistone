@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MATSU_COURTYARD as C, COURTYARD_ARRIVAL, COURTYARD_LOWER_ENTRY, COURTYARD_APPROACH, COURTYARD_STAIRS, courtyardWorld, courtyardLocal, courtyardTerrain, courtyardGround, courtyardClearing, courtyardFootprint } from '../src/world/matsu-courtyard-layout';
+import { MATSU_COURTYARD as C, COURTYARD_ARRIVAL, COURTYARD_LOWER_ENTRY, COURTYARD_APPROACH, COURTYARD_STAIRS, courtyardWorld, courtyardLocal, courtyardTerrain, courtyardGround, courtyardClearing, courtyardFootprint, courtyardApproachDistance } from '../src/world/matsu-courtyard-layout';
 
 describe('Matsu proposal courtyard layout', () => {
   it('faces the open coastal vista with a compact footprint and safe upper and lower arrivals', () => {
@@ -19,9 +19,10 @@ describe('Matsu proposal courtyard layout', () => {
       const p = courtyardWorld(local); expect(courtyardTerrain(p.x, p.z, 12)).toBeCloseTo(0, 8);
     }
     const high = courtyardWorld({ x: 8.8, z: 0 }); expect(courtyardTerrain(high.x, high.z, 12)).toBeCloseTo(3.45, 8);
-    for (const z of [20, 34.99, 65, 80]) for (const x of [150, 170, 185, 200]) expect(courtyardTerrain(x, z, 7.25)).toBe(7.25);
-    expect(courtyardTerrain(155, 36, -2)).toBe(-2);
-    for (const p of COURTYARD_APPROACH) if (p.z > 35) expect(courtyardTerrain(p.x, p.z, 12)).toBeCloseTo(0, 8);
+    for (const z of [20, 34.99, 65, 80]) for (const x of [150, 170, 185, 200]) if (x <= 150 || courtyardApproachDistance(x, z) >= 8) expect(courtyardTerrain(x, z, 7.25)).toBe(7.25);
+    // The first road threshold straddles z=35: its complete supporting terrain cell must be graded too.
+    expect(courtyardTerrain(155, 36, -2)).toBeCloseTo(0, 8);
+    for (const p of COURTYARD_APPROACH) expect(courtyardTerrain(p.x, p.z, 12)).toBeCloseTo(0, 8);
   });
 
   it('reserves full construction, stair, approach and canopy footprints', () => {

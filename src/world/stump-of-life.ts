@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { ColliderSpec } from '../game/physics';
-import { STUMP_ISLAND as S, STUMP_OF_LIFE, STUMP_ARTWORK as A } from './stump-of-life-layout';
+import { STUMP_ISLAND as S, STUMP_ARTWORK as A } from './stump-of-life-layout';
 import { createStumpBridges } from './stump-of-life-bridges';
 import { createStumpPoster } from './stump-of-life-poster';
 import { stumpCapMaterial, stumpEngravingMaterial, stumpWoodMaterial } from './stump-of-life-materials';
@@ -49,7 +49,7 @@ export function placeStumpModel(model: THREE.Object3D, height: number, engraving
     object.castShadow = object.receiveShadow = true; object.userData.keepGeometry = true;
     if (object.name === 'Giant_Solid_DNA_Cap') {
       const texture = engravingMap ?? (object.material as THREE.MeshStandardMaterial).map!;
-      texture.center.set(.5, .5); texture.rotation = C.yaw - STUMP_OF_LIFE.arrival.yaw;
+      texture.center.set(.5, .5); texture.rotation = A.engravingRotation;
       object.material = stumpCapMaterial(texture); caps.push(object);
     }
     if (object.name.startsWith('Giant_Wood_Stump')) {

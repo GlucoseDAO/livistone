@@ -257,7 +257,8 @@ class Game {
     document.addEventListener('visibilitychange', () => {
       this.lastTime = performance.now(); this.accumulator = 0;
       if (document.hidden) { this.input.clear(); this.ambience.suspend(); }
-      else this.ambience.resume();
+      // A tab may have slept across dawn or dusk; check Auto on its first resumed frame, without changing manual choices.
+      else { this.ambience.resume(); this.clockCheck = 31; }
     });
     view.onLost(() => {
       this.input.active = false; this.input.clear(); cancelAnimationFrame(this.frameId);
@@ -589,7 +590,7 @@ class Game {
     this.input.yaw = landmark.entrance.yaw; this.input.pitch = 0; this.selection = landmark.id;
     this.rememberPlace(landmark.id);
     this.returnMode = 'walking'; this.loreFromJournal = false; this.setMode('walking'); this.updateWalking(0); this.ambience.resume();
-    this.ui.toast(landmark.name + ' · walk forward to explore.');
+    this.ui.toast(landmark.name + (landmark.id === 'stump-of-life' ? ' · read the poster, then turn left toward the seat.' : ' · walk forward to explore.'));
   }
   private rememberPlace(id: string): void {
     const href = placeUrl(location.href, id, LANDMARKS);
